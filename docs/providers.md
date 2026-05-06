@@ -39,6 +39,92 @@
 - geography live/report/export/group 仍受 `PAPER_FETCH_RUN_LIVE=1` 的 opt-in 边界保护；未启用 live 环境时，对应测试应稳定 skip。
 - golden criteria live review 产物写入 `live-downloads/golden-criteria-review/`，由 [`../scripts/run_golden_criteria_live_review.py`](../scripts/run_golden_criteria_live_review.py) 生成；每条结果保留兼容的 `elapsed_seconds`，并新增 `stage_timings.fetch_seconds` / `materialize_seconds` / `total_seconds` / `resolve_seconds` / `metadata_seconds` / `fulltext_seconds` / `asset_seconds` / `formula_seconds` / `render_seconds`，同时在 `http_cache_stats` 中记录该 sample 相对执行前的 cache delta。`10.1016/S1575-1813(18)30261-4` 这类预期 metadata-only 样本，以及当前不支持的 TandF / Sage 样本，应通过 manifest 的 expected outcome 标记为 `skipped`，不进入 provider bug 修复队列。
 
+### 待接入设计：Copernicus
+
+`copernicus` 还不是当前 runtime 已接入的 provider；本段记录预计技术栈。
+
+后续接入时，Copernicus 的默认语义应是 `fulltext_first`。Copernicus Publications 是开放获取出版社，正常情况下不需要登录态、机构授权或本地浏览器运行时。
+
+建议主路径：
+
+```text
+resolve DOI / landing URL
+-> direct landing HTML
+-> discover citation_xml_url / article XML link
+-> NLM/JATS XML -> Markdown
+-> direct full-text HTML fallback
+-> opportunistic PDF text-only fallback
+-> abstract-only / metadata-only fallback
+```
+
+实现细节：
+
+- 路由信号应来自 Copernicus 期刊域名、Crossref publisher alias `Copernicus Publications`，以及 DOI prefix `10.5194/`。
+- 优先从 landing HTML 的 `citation_xml_url` 或正文下载链接发现 XML，不应只靠 DOI 字符串拼 URL。
+- XML 通常是 NLM/JATS 风格 full-text XML，可复用或抽取共享 XML -> Markdown helper，重点覆盖章节、摘要、图表 caption、OASIS 表格、MathML、参考文献和 supplementary links。
+- Copernicus 同时提供 OAI-PMH；它适合批量或补充发现，不应成为单篇 DOI 的首个必需网络步骤。
+- PDF 当前只应作为 text-only fallback；如果 publisher 临时限制 PDF 下载，XML/HTML 成功路径不应受影响。
+- 不需要 FlareSolverr；如果 direct HTTP 失败，应优先判定为网络/限流/远端状态问题并降级。
+
+### 待接入设计：MDPI
+
+`mdpi` 还不是当前 runtime 已接入的 provider；本段记录预计技术栈。
+
+后续接入时，MDPI 的默认语义应是 `fulltext_first`。MDPI 文章通常公开提供 HTML、PDF 和 XML 版本，但实际请求可能受 CDN 策略影响，因此实现要区分“公开内容的传输失败”和“无全文权限”。
+
+建议主路径：
+
+```text
+resolve DOI / landing URL
+-> direct landing HTML
+-> discover article XML link or /xml route
+-> MDPI XML -> Markdown
+-> article HTML fallback
+-> direct Playwright HTML fallback when public page is CDN-blocked for plain HTTP
+-> PDF text-only fallback
+-> abstract-only / metadata-only fallback
+```
+
+实现细节：
+
+- 路由信号应来自 `mdpi.com` 域名、Crossref publisher alias `MDPI` / `MDPI AG`，以及 DOI prefix `10.3390/`。
+- 优先使用 landing page 或 article notes 暴露的 `/xml` 链接；不要只依赖固定 URL 拼接，固定拼接只能作为发现失败后的候选。
+- XML 成功时应走 provider-owned XML -> Markdown；HTML fallback 用 provider-specific cleanup 去掉页面导航、推荐文章、菜单、评论入口和引用弹层。
+- MDPI PDF fallback 当前只应承诺 text-only；资产下载应以 XML/HTML 中的正文图片、表格图片和 supplementary links 为准。
+- 如果 direct HTTP 返回 CDN 拦截或 `403`，可用 direct Playwright 读取公开页面作为 provider fallback；这不是 access-gate 绕过，也不应引入 FlareSolverr。
+- `asset_profile=body|all` 应支持正文 figure / table / formula 图片和 supplementary 文件，资产失败不应覆盖已成功的正文 Markdown。
+
+### 待接入设计：IEEE
+
+`ieee` 还不是当前 runtime 已接入的 provider；本段只记录后续实现应遵循的产品语义和技术路线，避免把设计判断散落在 issue 或对话中。
+
+后续接入时，IEEE 的默认语义应是 `fulltext_first`：
+
+- 默认尝试获取全文，而不是默认停在摘要或元数据。
+- 该默认行为假设操作者运行环境已经具备 IEEE Xplore 的合法访问权限，例如机构 IP、VPN、已登录浏览器态或个人订阅。
+- 默认尝试不等于保证全文；如果授权、网络、站点状态或返回内容不满足全文条件，必须自动降级到 provider-managed `abstract_only` 或通用 `metadata_only` fallback。
+- 不绕过 IEEE access gate，不处理验证码，不伪造授权状态；只能使用操作者已经具备的访问上下文。
+
+建议主路径：
+
+```text
+resolve DOI / landing URL
+-> extract IEEE article number
+-> GET https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true
+-> validate dynamic full-text HTML
+-> provider-owned IEEE HTML -> Markdown
+-> abstract-only / metadata-only fallback
+```
+
+实现细节：
+
+- 路由信号应来自 `ieeexplore.ieee.org` 域名、Crossref publisher alias `IEEE` / `Institute of Electrical and Electronics Engineers`，以及 DOI prefix `10.1109/`。
+- article number 可从 IEEE landing URL、DOI 落地页中的页面元数据或 Crossref landing URL 推导。
+- 动态全文端点返回的是 HTML fragment，常见 `content-type` 是 `text/html;charset=utf-8`，不能按 JSON API 处理。
+- 请求头至少应保留 publisher 页面上下文，例如 `Accept: application/json, text/plain, */*`、对应 document URL 的 `Referer`、`x-security-request: required` 和浏览器 UA。
+- 成功判定不能只看 HTTP `200`；需要校验返回体包含 `#article`、章节节点、足够正文段落或其他 IEEE full-text marker，并排除登录页、拦截页、摘要页、空壳和错误 HTML。
+- 动态 HTML 中的正文图片、表格图片和公式节点可按普通 `asset_profile=body|all` 语义接入，但资产下载失败不应把已成功的正文 Markdown 判为失败。
+
 ## 路由规则
 
 当前 provider 决策统一按更强信号优先：

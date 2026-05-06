@@ -73,6 +73,66 @@ This file is a human-maintained route reference for v1. Runtime behavior is auth
   - The runtime does not use publisher APIs for these providers.
   - These routes depend on repo-local FlareSolverr readiness and explicit local rate-limit settings.
 
+## Copernicus
+
+- Runtime status: planned design note only; not currently wired into the provider catalog, router, registry, CLI, MCP status surface, or tests.
+- Intended default behavior:
+  - Use `fulltext_first` when the route resolves to Copernicus.
+  - Treat Copernicus as an open-access direct HTTP provider.
+  - Fall back to provider-managed `abstract_only` or generic `metadata_only` when XML/HTML/PDF discovery or extraction fails.
+- Proposed implementation:
+  - Metadata starts from Crossref merge and landing-page signals.
+  - Route by Copernicus journal domains, publisher names such as `Copernicus Publications`, and DOI prefix `10.5194/`.
+  - Fetch the landing page first and discover `citation_xml_url` or article XML download links.
+  - Prefer article XML as the primary full-text source; Copernicus XML is typically NLM/JATS style and may include OASIS tables, MathML, references, figures, and supplementary links.
+  - Use direct full-text HTML as the first fallback when XML is absent or malformed.
+  - Use PDF only as an opportunistic text-only fallback; publisher-side PDF throttling must not fail an otherwise successful XML/HTML article.
+  - Consider OAI-PMH as a future bulk/discovery aid, not as the mandatory first step for a single DOI fetch.
+- Common constraints:
+  - This route should not depend on FlareSolverr or a seeded browser workflow by default.
+  - Validation should distinguish XML/HTML full text from publisher status pages, temporary PDF restriction pages, and metadata-only pages.
+
+## MDPI
+
+- Runtime status: planned design note only; not currently wired into the provider catalog, router, registry, CLI, MCP status surface, or tests.
+- Intended default behavior:
+  - Use `fulltext_first` when the route resolves to MDPI.
+  - Treat MDPI as an open-access provider whose article XML/HTML/PDF are public, while allowing CDN transport failures to degrade cleanly.
+  - Fall back to provider-managed `abstract_only` or generic `metadata_only` when public article retrieval, validation, or extraction fails.
+- Proposed implementation:
+  - Metadata starts from Crossref merge and landing-page signals.
+  - Route by `mdpi.com`, publisher names such as `MDPI` / `MDPI AG`, and DOI prefix `10.3390/`.
+  - Discover article XML from landing-page links or article notes; use fixed `/xml` route construction only as a secondary candidate.
+  - Prefer XML -> Markdown as the primary path, then provider-cleaned article HTML, then direct Playwright HTML if plain direct HTTP is blocked by CDN behavior.
+  - Use PDF only as a text-only fallback.
+  - Download body assets and supplementary files from XML/HTML-discovered links according to `asset_profile=body|all`.
+- Common constraints:
+  - Plain HTTP `403` or CDN denial on a public article should be treated as transport failure, not as publisher entitlement failure.
+  - Direct Playwright fallback is acceptable for public MDPI pages; FlareSolverr should not be introduced unless a concrete Cloudflare challenge exists.
+  - Validation should reject CDN error pages, bot-block pages, empty shells, menu-only pages, and abstract-only fragments before Markdown conversion.
+
+## IEEE
+
+- Runtime status: planned design note only; not currently wired into the provider catalog, router, registry, CLI, MCP status surface, or tests.
+- Intended default behavior:
+  - Use `fulltext_first` when the route resolves to IEEE.
+  - Assume the operator already has lawful IEEE Xplore access in the current environment, such as institution IP/VPN, authenticated browser cookies, or a personal subscription.
+  - Treat full-text retrieval as a best-effort default attempt, not as a guarantee.
+  - Fall back to provider-managed `abstract_only` or generic `metadata_only` when access, response shape, validation, extraction, or network checks fail.
+- Proposed implementation:
+  - Metadata still starts from Crossref merge and landing-page signals.
+  - Route by `ieeexplore.ieee.org`, Crossref publisher names such as `IEEE` / `Institute of Electrical and Electronics Engineers`, and DOI prefix `10.1109/`.
+  - Resolve the IEEE article number from the landing URL or page metadata.
+  - Fetch dynamic full-text HTML from `https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true`.
+  - Send page-context headers such as `Accept: application/json, text/plain, */*`, the document `Referer`, `x-security-request: required`, and a browser-like user agent.
+  - Parse the response as HTML, even when the endpoint looks like a REST path; observed successful responses use `text/html;charset=utf-8`.
+  - Validate full-text markers before extraction, for example `#article`, section containers, meaningful paragraph counts, and IEEE figure/table blocks.
+  - Reject login pages, access-gate pages, challenge pages, abstract-only pages, empty shells, and unrelated error HTML before Markdown conversion.
+- Common constraints:
+  - Do not bypass IEEE access controls, solve CAPTCHA flows, or fabricate entitlement state.
+  - The provider may use access context already present in the operator's environment, but must degrade cleanly when that context is missing.
+  - Dynamic HTML asset URLs can later be mapped into the normal `asset_profile=body|all` behavior; Markdown success should not depend on every asset being downloadable.
+
 ## Crossref
 
 - Official source: Crossref REST API documentation.

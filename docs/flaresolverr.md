@@ -36,6 +36,7 @@
 - 正文图片下载在单次 attempt 内会对 figure page 和图片候选 URL 做缓存，并按 `PAPER_FETCH_ASSET_DOWNLOAD_CONCURRENCY` 控制的 worker 上限拉取 payload，默认 `4`；文件写入仍按资产原顺序完成
 - 图片恢复、正文图片/附件下载、figure page HTML 发现路径不启用 `disableMedia=true`，避免阻断目标图片资源和 full-size URL 发现
 - 当图片 URL 在 Playwright `fetch()` 下返回 Cloudflare challenge HTML，但 FlareSolverr/Selenium 已能显示图片文档时，仓库本地 FlareSolverr patch 会返回 `solution.imagePayload`。下载器只接受可识别的图片 payload：位图走浏览器 canvas 导出的 PNG，顶层 SVG 文档保存原始 `image/svg+xml`；`imagePayload` 缺失、无效或实际是 challenge HTML 时会记录明确失败原因，不再退回截图裁剪
+- FlareSolverr 是 Cloudflare challenge 相关场景的本地浏览器运行时边界，不是新增 publisher 动态 HTML 路线时的默认依赖；新增 provider 只有在确实需要处理 Cloudflare 类阻断时才应接入这条链路。
 - 这条链路只保证在当前仓库 checkout 中运行
 - 站点 ToS、robots、授权与合规风险由操作者自行承担
 

@@ -26,6 +26,8 @@ Current runtime provider routing recognizes:
 
 If a journal belongs to another publisher, do not infer full-text support until that provider is explicitly added to both `api_notes.md` and the router logic.
 
+Copernicus, MDPI, and IEEE are documented in `api_notes.md` as planned provider routes, but the current runtime must still treat them as unsupported until each provider exists in the provider catalog, router, registry, status surface, and tests.
+
 ## Decision Order
 
 1. Resolve the query to a DOI / title / landing URL candidate.
@@ -53,3 +55,58 @@ Earlier signals win. DOI-prefix inference is intentionally a fallback, not an ov
 Current public traces represent this through `source_trail`, for example `route:signal_*`, `route:provider_selected_*`, `fulltext:*`, and `fallback:metadata_only`.
 
 If the router chooses `crossref` directly because there is no supported official path, Crossref remains a metadata-only source. If an official provider is selected and later cannot provide full text, the workflow returns provider-managed `abstract_only` when available, otherwise uses metadata fallback rather than trying a separate generic full-text route.
+
+## Planned Copernicus / MDPI / IEEE Semantics
+
+When Copernicus is implemented, route signals should follow the same precedence model:
+
+1. Copernicus journal landing-page / URL domain
+2. Crossref publisher-name alias `Copernicus Publications`
+3. DOI prefix fallback `10.5194/`
+
+If selected, Copernicus should default to a provider-owned `fulltext_first` waterfall:
+
+```text
+landing page discovery
+-> citation_xml_url / article XML
+-> NLM/JATS XML -> Markdown
+-> direct HTML fallback
+-> PDF text-only fallback
+-> abstract-only / metadata-only fallback
+```
+
+When MDPI is implemented, route signals should follow the same precedence model:
+
+1. `mdpi.com` landing-page / URL domain
+2. Crossref publisher-name aliases such as `MDPI` or `MDPI AG`
+3. DOI prefix fallback `10.3390/`
+
+If selected, MDPI should default to a provider-owned `fulltext_first` waterfall:
+
+```text
+landing page discovery
+-> article XML link or /xml candidate
+-> MDPI XML -> Markdown
+-> article HTML fallback
+-> direct Playwright HTML fallback for public CDN transport failure
+-> PDF text-only fallback
+-> abstract-only / metadata-only fallback
+```
+
+When IEEE is implemented, route signals should follow the same precedence model:
+
+1. `ieeexplore.ieee.org` landing-page / URL domain
+2. Crossref publisher-name aliases such as `IEEE` or `Institute of Electrical and Electronics Engineers`
+3. DOI prefix fallback such as `10.1109/`
+
+If selected, IEEE should default to a provider-owned `fulltext_first` waterfall:
+
+```text
+IEEE article number resolution
+-> dynamic full-text HTML endpoint
+-> full-text marker validation
+-> IEEE HTML -> Markdown
+-> abstract-only / metadata-only fallback
+```
+
+The dynamic HTML path assumes the operator already has lawful IEEE Xplore access in the current runtime environment. It must fail closed into abstract or metadata fallback when entitlement is absent, the response is not full text, or extraction validation fails.
