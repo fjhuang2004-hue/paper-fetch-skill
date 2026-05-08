@@ -605,7 +605,7 @@ def _references_match(left: set[str], right: set[str]) -> bool:
 
 def _asset_reference_candidates(asset: Any) -> set[str]:
     candidates: set[str] = set()
-    for field in (
+    for attribute_name in (
         "path",
         "url",
         "original_url",
@@ -615,7 +615,7 @@ def _asset_reference_candidates(asset: Any) -> set[str]:
         "full_size_url",
         "link",
     ):
-        candidates |= _reference_candidates(getattr(asset, field, None))
+        candidates |= _reference_candidates(getattr(asset, attribute_name, None))
     return candidates
 
 

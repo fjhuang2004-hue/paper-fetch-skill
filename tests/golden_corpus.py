@@ -241,10 +241,7 @@ def _ieee_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
         references_payload = json.loads(references_path.read_text(encoding="utf-8"))
         references = ieee_provider._references_from_ieee_reference_payload(references_payload)
         if references:
-            metadata["references"] = ieee_provider._merge_ieee_reference_lists(
-                references,
-                metadata.get("references"),
-            )
+            metadata["references"] = references
     if not metadata.get("doi"):
         metadata["doi"] = fixture.doi
     if article_number:
