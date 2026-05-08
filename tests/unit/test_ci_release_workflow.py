@@ -80,7 +80,7 @@ class CiReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("actions/download-artifact@v4", block)
         self.assertIn("pattern: paper-fetch-skill-*", block)
         self.assertIn("merge-multiple: true", block)
-        self.assertIn("softprops/action-gh-release@v2", block)
+        self.assertIn("softprops/action-gh-release@v3", block)
         self.assertIn("contents: write", block)
         self.assertIn("fail_on_unmatched_files: true", block)
 
