@@ -169,7 +169,7 @@ Date: 2026-04-28
 | `metadata` | `paper_fetch.extraction.html._metadata`、provider metadata adapters、`paper_fetch.metadata.crossref` | 标题、作者、摘要、provider-owned 信号和 redirect stub lookup metadata。 |
 | `provider-html-or-xml-extraction` | `paper_fetch.extraction.html.renderer`、`paper_fetch.providers._article_markdown_elsevier_document`、`paper_fetch.providers.springer_html`、`paper_fetch.providers.html_springer_nature`、`paper_fetch.providers.science_html`、`paper_fetch.providers.pnas_html`、`paper_fetch.providers.science_pnas`、`paper_fetch.providers.science_pnas_profiles`、`paper_fetch.providers.wiley_html`、`paper_fetch.providers.ieee` | publisher HTML/XML 到中间结构的提取；HTML provider 通过 renderer facade 复用 Markdown 渲染 / sidecar 编排，provider 层只保留 container/profile/postprocess 差异。 |
 | `html-cleanup` | `paper_fetch.extraction.html._runtime`、`paper_fetch.extraction.html.inline`、provider cleanup profiles | 站点 chrome、UI 噪声、caption fallback 和正文清洗。 |
-| `availability-quality` | `paper_fetch.quality.html_availability` | fulltext / abstract-only 判定和正文充分性度量。 |
+| `availability-quality` | `paper_fetch.quality.html_availability`、`paper_fetch.quality.html_signals` | fulltext / abstract-only 判定、正文充分性度量和 provider HTML availability signal。 |
 | `section-classification` | `paper_fetch.extraction.section_hints`、`paper_fetch.extraction.html.semantics` | section kind、frontmatter、back matter、availability 与 section hints。 |
 | `article-assembly` | `paper_fetch.models`、`paper_fetch.models.builders`、`paper_fetch.models.schema` | 中间结构合并成 `ArticleModel`。 |
 | `asset-discovery` | `paper_fetch.extraction.html.assets`、`paper_fetch.providers._html_asset_engine`、`paper_fetch.extraction.html.figure_links`、provider asset policies | figure、table、formula、supplementary 等资产候选识别。 |

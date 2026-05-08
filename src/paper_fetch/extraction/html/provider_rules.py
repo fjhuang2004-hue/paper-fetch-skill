@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
+
+from ...quality.html_signals import (
+    default_positive_signals,
+    ieee_blocking_fallback_signals,
+    ieee_positive_signals,
+    pnas_blocking_fallback_signals,
+    pnas_positive_signals,
+    science_blocking_fallback_signals,
+    science_positive_signals,
+    wiley_blocking_fallback_signals,
+    wiley_positive_signals,
+)
 
 
 DEFAULT_NOISE_PROFILE = "generic"
@@ -215,6 +227,8 @@ class ProviderHtmlRules:
     extraction_drop_keywords: tuple[str, ...] = ()
     availability_site_rule_overrides: Mapping[str, Any] = field(default_factory=dict)
     access_block_text_tokens: tuple[str, ...] = ()
+    positive_signals: Callable[[str], tuple[list[str], list[str], list[str]]] = default_positive_signals
+    blocking_fallback_signals: Callable[[str], list[str]] = lambda _html: []
 
 
 GENERIC_HTML_RULES = ProviderHtmlRules(name=DEFAULT_NOISE_PROFILE)
@@ -225,6 +239,8 @@ PROVIDER_HTML_RULES: Mapping[str, ProviderHtmlRules] = MappingProxyType(
             name="science",
             aliases=("aaas",),
             availability_site_rule_overrides=SCIENCE_SITE_RULE_OVERRIDES,
+            positive_signals=science_positive_signals,
+            blocking_fallback_signals=science_blocking_fallback_signals,
         ),
         "pnas": ProviderHtmlRules(
             name="pnas",
@@ -232,6 +248,8 @@ PROVIDER_HTML_RULES: Mapping[str, ProviderHtmlRules] = MappingProxyType(
             markdown_promo_tokens=PNAS_MARKDOWN_PROMO_TOKENS,
             extraction_drop_keywords=("signup-alert-ad", "tab-nav"),
             availability_site_rule_overrides=PNAS_SITE_RULE_OVERRIDES,
+            positive_signals=pnas_positive_signals,
+            blocking_fallback_signals=pnas_blocking_fallback_signals,
         ),
         "springer_nature": ProviderHtmlRules(
             name="springer_nature",
@@ -243,6 +261,8 @@ PROVIDER_HTML_RULES: Mapping[str, ProviderHtmlRules] = MappingProxyType(
             name="wiley",
             extraction_drop_keywords=("citation-tools", "publicationhistory"),
             availability_site_rule_overrides=WILEY_SITE_RULE_OVERRIDES,
+            positive_signals=wiley_positive_signals,
+            blocking_fallback_signals=wiley_blocking_fallback_signals,
         ),
         "ieee": ProviderHtmlRules(
             name="ieee",
@@ -252,6 +272,8 @@ PROVIDER_HTML_RULES: Mapping[str, ProviderHtmlRules] = MappingProxyType(
             extraction_drop_keywords=IEEE_AVAILABILITY_DROP_KEYWORDS,
             availability_site_rule_overrides=IEEE_SITE_RULE_OVERRIDES,
             access_block_text_tokens=IEEE_ACCESS_BLOCK_TEXT_TOKENS,
+            positive_signals=ieee_positive_signals,
+            blocking_fallback_signals=ieee_blocking_fallback_signals,
         ),
     }
 )

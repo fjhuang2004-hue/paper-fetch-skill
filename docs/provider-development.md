@@ -128,6 +128,7 @@ Provider-specific 代码只负责：
 - 找到 publisher 的 article container 或 XML root。
 - 把 publisher DOM/XML 映射成已有中间结构。
 - 在 `paper_fetch.extraction.html.provider_rules` 注册 publisher cleanup profile、Markdown promo tokens、availability site rule、access-block tokens 和必要 alias；不要在 `_runtime.py` 或 `quality/html_profiles.py` 新增 provider 字典分支。
+- Provider HTML availability signal 也通过 `paper_fetch.extraction.html.provider_rules` 注册，不再通过 `quality/html_profiles.py` 的 dict 分发。
 - 定义 asset scope 和 fallback 候选。
 - 把提取结果写入 `ProviderContent.diagnostics`，而不是塞进 legacy metadata。
 

@@ -744,3 +744,7 @@ bash / pwsh 各从 ~600 行缩减到 ~100 行。
   - 新增 `scripts/_skill_install_common.sh`，把 Claude/Codex skill installer 的参数解析、安装、复制和通用提示收敛到共享 lib；host 脚本只保留 MCP CLI 差异。
   - 新增 `installer/manifest.json`，集中维护 skill/MCP 名称、MCP env key 顺序、managed block marker 和 offline package 命名；Linux/Windows installer 与 build script 改为读取 manifest。
   - 更新 installer smoke/offline package tests，覆盖共享 installer lib、manifest 单一来源和动态 Codex MCP table 写入；`PYTHONPATH=src python3 -m pytest tests/unit -q` 通过。
+
+## Closeout note - 2026-05-08
+
+R1 尾巴已收口：provider HTML availability signal 已从 `quality/html_profiles.py` 的 `PROVIDER_SIGNAL_HANDLERS` dict 迁入 `extraction/html/provider_rules.py` 的 `ProviderHtmlRules` 注册项；signal 实现独立到 `quality/html_signals.py`，保留 `html_profiles.py` re-export 兼容入口。
