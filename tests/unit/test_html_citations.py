@@ -81,6 +81,34 @@ class HtmlCitationsTests(unittest.TestCase):
 
         self.assertEqual(normalized, "Losses reached (10<sup>15</sup> g).")
 
+    def test_normalize_inline_citation_markdown_preserves_isotope_superscript_spacing(self) -> None:
+        """rule: rule-markdown-inline-citation-normalization"""
+        self.assertEqual(
+            normalize_inline_citation_markdown("gas of <sup>6</sup>Li atoms"),
+            "gas of <sup>6</sup>Li atoms",
+        )
+        self.assertEqual(
+            normalize_inline_citation_markdown("states of <sup>6</sup>Li"),
+            "states of <sup>6</sup>Li",
+        )
+
+    def test_normalize_inline_citation_markdown_tightens_only_high_confidence_sup_sub_spacing(self) -> None:
+        """rule: rule-markdown-inline-citation-normalization"""
+        sentinel = make_numeric_citation_sentinel("17")
+
+        self.assertEqual(normalize_inline_citation_markdown(f"Example {sentinel}"), "Example<sup>17</sup>")
+        self.assertEqual(normalize_inline_citation_markdown("[ <sup>17</sup>]"), "[<sup>17</sup>]")
+        self.assertEqual(normalize_inline_citation_markdown("m <sup>-2</sup>"), "m<sup>-2</sup>")
+        self.assertEqual(normalize_inline_citation_markdown("km <sup>2</sup>"), "km<sup>2</sup>")
+        self.assertEqual(normalize_inline_citation_markdown("CO <sub>2</sub>"), "CO<sub>2</sub>")
+        self.assertEqual(normalize_inline_citation_markdown("H <sub>2</sub>O"), "H<sub>2</sub>O")
+        self.assertEqual(normalize_inline_citation_markdown("kg <sup>-1</sup>"), "kg<sup>-1</sup>")
+        self.assertEqual(normalize_inline_citation_markdown("AB <sub>3</sub>"), "AB<sub>3</sub>")
+        self.assertEqual(normalize_inline_citation_markdown("x <sup>2</sup>"), "x<sup>2</sup>")
+        self.assertEqual(normalize_inline_citation_markdown("*h* <sub>0</sub>"), "*h*<sub>0</sub>")
+        self.assertEqual(normalize_inline_citation_markdown("number of <sup>6</sup>Li"), "number of <sup>6</sup>Li")
+        self.assertEqual(normalize_inline_citation_markdown("state of <sub>2</sub>"), "state of <sub>2</sub>")
+
     def test_normalize_inline_citation_markdown_handles_legacy_science_italics(self) -> None:
         normalized = normalize_inline_citation_markdown("The event is documented (*46, 55*, *56*).")
 

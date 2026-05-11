@@ -18,7 +18,13 @@ from paper_fetch.extraction.html.formula_rules import (
     looks_like_formula_image,
 )
 from paper_fetch.extraction.html.inline import normalize_html_inline_text
+from paper_fetch.extraction.html.tables import render_table_markdown
 from paper_fetch.http import HttpTransport
+from paper_fetch.providers._html_section_markdown import (
+    render_clean_text_from_html,
+    render_container_markdown,
+    render_heading_text_from_html,
+)
 import paper_fetch.providers.springer_html as springer_html
 import paper_fetch.providers.wiley_html as wiley_html
 from paper_fetch.providers.science_pnas import asset_scopes as science_pnas_asset_scopes
@@ -148,6 +154,53 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertEqual(assets[0]["heading"], "Figure 1. Overview figure.")
         self.assertEqual(assets[0]["caption"], "Figure 1. Overview figure.")
         self.assertEqual(assets[0]["url"], "https://example.test/fig1.png")
+
+    def test_extract_figure_assets_reads_multi_image_multi_caption_figure_blocks(self) -> None:
+        html = """
+<html>
+  <body>
+    <figure id="F10">
+      <div><img src="/fig9.png" id="F10.g1" alt="Refer to caption" /></div>
+      <figcaption>Figure 9. First result.</figcaption>
+      <div><img src="/fig10.png" id="F10.g2" alt="Refer to caption" /></div>
+      <figcaption>Figure 10. Second result.</figcaption>
+    </figure>
+  </body>
+</html>
+"""
+
+        assets = html_assets.extract_figure_assets(html, "https://example.test/article")
+
+        self.assertEqual(len(assets), 2)
+        self.assertEqual(
+            [(asset["caption"], asset["url"], asset["dom_id"], asset["image_id"]) for asset in assets],
+            [
+                ("Figure 9. First result.", "https://example.test/fig9.png", "F10", "F10.g1"),
+                ("Figure 10. Second result.", "https://example.test/fig10.png", "F10", "F10.g2"),
+            ],
+        )
+
+    def test_section_renderer_outputs_multi_figcaption_blocks_separately(self) -> None:
+        soup = BeautifulSoup(
+            """
+<article>
+  <figure id="F10">
+    <img src="/fig9.png" />
+    <figcaption>Figure 9. First result.</figcaption>
+    <img src="/fig10.png" />
+    <figcaption>Figure 10. Second result.</figcaption>
+  </figure>
+</article>
+""",
+            "html.parser",
+        )
+        lines: list[str] = []
+        render_container_markdown(soup.article, lines, level=2, section_content_selectors=())
+        markdown = "\n".join(lines)
+
+        self.assertIn("**Figure 9.** First result.", markdown)
+        self.assertIn("**Figure 10.** Second result.", markdown)
+        self.assertNotIn("First result. Second result.", markdown)
 
     def test_extract_supplementary_assets_reads_supported_links(self) -> None:
         html = """
@@ -837,6 +890,172 @@ Important body text.
             "m<sup>-2</sup> )",
         )
         self.assertEqual(normalize_html_inline_text(raw_text, policy="heading"), "CO<sub>2</sub> emission</sup>+")
+
+    def test_inline_normalization_preserves_isotope_superscript_spacing(self) -> None:
+        """rule: rule-preserve-inline-semantics-in-body-and-tables"""
+        self.assertEqual(
+            normalize_html_inline_text("gas of <sup>6</sup>Li atoms"),
+            "gas of <sup>6</sup>Li atoms",
+        )
+        self.assertEqual(
+            normalize_html_inline_text("states of <sup>6</sup>Li"),
+            "states of <sup>6</sup>Li",
+        )
+
+    def test_inline_normalization_tightens_high_confidence_sup_sub_spacing(self) -> None:
+        """rule: rule-preserve-inline-semantics-in-body-and-tables"""
+        self.assertEqual(normalize_html_inline_text("[ <sup>17</sup>]"), "[<sup>17</sup>]")
+        self.assertEqual(normalize_html_inline_text("m <sup> -2 </sup>"), "m<sup>-2</sup>")
+        self.assertEqual(normalize_html_inline_text("km <sup>2</sup>"), "km<sup>2</sup>")
+        self.assertEqual(normalize_html_inline_text("CO <sub>2</sub>"), "CO<sub>2</sub>")
+        self.assertEqual(normalize_html_inline_text("H <sub>2</sub>O"), "H<sub>2</sub>O")
+        self.assertEqual(normalize_html_inline_text("kg <sup>-1</sup>"), "kg<sup>-1</sup>")
+        self.assertEqual(normalize_html_inline_text("AB <sub>3</sub>"), "AB<sub>3</sub>")
+        self.assertEqual(normalize_html_inline_text("x <sup>2</sup>"), "x<sup>2</sup>")
+        self.assertEqual(normalize_html_inline_text("*h* <sub>0</sub>"), "*h*<sub>0</sub>")
+        self.assertEqual(normalize_html_inline_text("number of <sup>6</sup>Li"), "number of <sup>6</sup>Li")
+        self.assertEqual(normalize_html_inline_text("state of <sub>2</sub>"), "state of <sub>2</sub>")
+
+    def test_inline_token_joiner_is_shared_by_body_heading_and_table_cells(self) -> None:
+        """rule: rule-preserve-inline-semantics-in-body-and-tables"""
+        soup = BeautifulSoup(
+            """
+<article>
+  <h2>CO <sub>2</sub> and x <sup>2</sup></h2>
+  <p>kg <sup>-1</sup> flux and number of <sup>6</sup>Li atoms.</p>
+  <table><tr><th>Compound</th></tr><tr><td>AB <sub>3</sub></td></tr></table>
+</article>
+""",
+            "html.parser",
+        )
+
+        body_text = render_clean_text_from_html(soup.p)
+        heading_text = render_heading_text_from_html(soup.h2)
+        table_markdown = render_table_markdown(soup.table, label="", caption="")
+
+        self.assertEqual(heading_text, "CO<sub>2</sub> and x<sup>2</sup>")
+        self.assertEqual(body_text, "kg<sup>-1</sup> flux and number of <sup>6</sup>Li atoms.")
+        self.assertIn("AB<sub>3</sub>", table_markdown)
+
+    def test_table_header_flattening_removes_redundant_global_spanner(self) -> None:
+        soup = BeautifulSoup(
+            """
+<table>
+  <thead>
+    <tr><th colspan="2">Production MoE models</th></tr>
+    <tr><th>Model</th><th>Parameters</th></tr>
+  </thead>
+  <tbody><tr><td>A</td><td>1B</td></tr></tbody>
+</table>
+""",
+            "html.parser",
+        )
+
+        markdown = render_table_markdown(soup.table, label="", caption="")
+
+        self.assertTrue(markdown.startswith("Production MoE models\n\n| Model"))
+        self.assertIn("| Model | Parameters |", markdown)
+        self.assertNotIn("Production MoE models / Model", markdown)
+
+    def test_table_header_flattening_lifts_full_width_title_and_keeps_pipe_rows_valid(self) -> None:
+        soup = BeautifulSoup(
+            r"""
+<table>
+  <tr><th colspan="5">Probability of quota violations
+  with $(1,x,y)$ uniform on $\{1&lt;x&lt;y\}$</th></tr>
+  <tr><th>Method</th><td>M</td><td>Theoretical Probability</td><td>Sample Probability</td><td>95% Confidence Interval</td></tr>
+  <tr><th>Huntington-Hill</th><td>10</td><td>0.257</td><td>0.257</td><td>(0.254, 0.260)</td></tr>
+</table>
+""",
+            "html.parser",
+        )
+
+        markdown = render_table_markdown(soup.table, label="", caption="")
+        pipe_lines = [line for line in markdown.splitlines() if line.startswith("|")]
+
+        self.assertIn("Probability of quota violations with $(1,x,y)$ uniform", markdown)
+        self.assertIn("| Method", markdown)
+        self.assertFalse(markdown.splitlines()[0].startswith("|"))
+        self.assertTrue(pipe_lines)
+        self.assertEqual({line.count("|") for line in pipe_lines}, {6})
+
+    def test_table_header_flattening_preserves_distinguishing_group_spanners(self) -> None:
+        soup = BeautifulSoup(
+            """
+<table>
+  <thead>
+    <tr><th colspan="2">Configuration</th><th colspan="2">Inference</th></tr>
+    <tr><th>n_r</th><th>k</th><th>MMLU</th><th>GPQA</th></tr>
+  </thead>
+  <tbody><tr><td>2</td><td>4</td><td>80</td><td>50</td></tr></tbody>
+</table>
+""",
+            "html.parser",
+        )
+
+        markdown = render_table_markdown(soup.table, label="", caption="")
+
+        self.assertIn("Configuration / n_r", markdown)
+        self.assertIn("Inference / MMLU", markdown)
+
+    def test_section_renderer_collapses_prose_hard_linebreaks_without_touching_blocks(self) -> None:
+        soup = BeautifulSoup(
+            """
+<article>
+  <p>Drosophila melanogaster
+  embryos possess
+  coordinated cell cycles with <math><mi>x</mi></math>
+  checkpoints.</p>
+  <math display="block"><mi>E</mi><mo>=</mo><mi>m</mi></math>
+  <ul>
+    <li>First item
+    wraps across source lines.</li>
+    <li>Second item.</li>
+  </ul>
+</article>
+""",
+            "html.parser",
+        )
+        lines: list[str] = []
+        render_container_markdown(soup.article, lines, level=2, section_content_selectors=())
+        markdown = "\n".join(lines)
+
+        self.assertIn("Drosophila melanogaster embryos possess coordinated cell cycles", markdown)
+        self.assertNotIn("melanogaster\nembryos", markdown)
+        self.assertIn("$$\nE = m\n$$", markdown)
+        self.assertIn("- First item wraps across source lines.", markdown)
+        self.assertIn("- Second item.", markdown)
+
+    def test_inline_math_operators_are_preserved_in_body_and_table_cells(self) -> None:
+        soup = BeautifulSoup(
+            """
+<article>
+  <p>Spin <math><mi>s</mi><mo>(</mo><mi>s</mi><mo>+</mo><mn>1</mn><mo>)</mo></math>
+  and <math><mo>(</mo><mi>D</mi><mo>+</mo><mn>1</mn><mo>)</mo></math>-dimensional terms.</p>
+</article>
+""",
+            "html.parser",
+        )
+        lines: list[str] = []
+        render_container_markdown(soup.article, lines, level=2, section_content_selectors=())
+        markdown = "\n".join(lines)
+
+        self.assertIn("$s(s + 1)$", markdown)
+        self.assertIn("$(D + 1)$-dimensional", markdown)
+        self.assertNotIn("s(s 1)", markdown)
+        self.assertNotIn("(D 1)-dimensional", markdown)
+
+        table = BeautifulSoup(
+            """
+<table>
+  <tr><th>Expression</th></tr>
+  <tr><td><math><mi>s</mi><mo>+</mo><mn>1</mn></math></td></tr>
+</table>
+""",
+            "html.parser",
+        )
+        table_markdown = render_table_markdown(table.table, label="", caption="", render_inline_text=render_clean_text_from_html)
+        self.assertIn("s + 1", table_markdown)
 
     def test_formula_rules_detect_real_formula_image_urls(self) -> None:
         """rule: rule-preserve-formula-image-fallbacks"""

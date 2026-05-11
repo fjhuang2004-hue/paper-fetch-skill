@@ -100,6 +100,13 @@ class FormulaConversionTests(unittest.TestCase):
 
         self.assertEqual(normalized, r"\mkern6mu x + \mkern-1.5mu y + \mspace{2pt}z")
 
+    def test_normalize_latex_removes_only_zero_width_spacing(self) -> None:
+        normalized = formula_conversion.normalize_latex(
+            "S\u200bO + " + r"a\hspace{0pt}b + c\hspace*{ 0.0 em }d + e\hspace{1pt}f"
+        )
+
+        self.assertEqual(normalized, r"SO + ab + cd + e\hspace{1pt}f")
+
     def test_backend_registry_preserves_public_backend_groups(self) -> None:
         self.assertEqual(
             formula_conversion.SUPPORTED_BACKENDS,

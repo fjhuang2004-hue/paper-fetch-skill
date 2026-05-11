@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from .extraction.html.assets.dom import preview_dimensions_are_acceptable
 from .models import AssetProfile
 from .tracing import download_marker
 from .utils import (
@@ -18,10 +19,6 @@ from .utils import (
     safe_text,
     sanitize_filename,
 )
-
-ACCEPTABLE_PREVIEW_MIN_WIDTH = 300
-ACCEPTABLE_PREVIEW_MIN_HEIGHT = 200
-
 
 @dataclass(frozen=True)
 class DownloadPolicy:
@@ -121,7 +118,7 @@ class ArtifactStore:
     ) -> Path | None:
         if content is None or self.download_dir is None:
             return None
-        if normalize_text(provider_name).lower() != "springer":
+        if normalize_text(provider_name).lower() not in {"springer", "arxiv"}:
             return None
         if normalize_text(content.route_kind).lower() != "html":
             return None
@@ -182,15 +179,6 @@ class ArtifactStore:
             preview_accepted_count = sum(1 for asset in preview_assets if _preview_asset_accepted(asset))
             preview_fallback_count = len(preview_assets) - preview_accepted_count
             if preview_accepted_count:
-                extend_unique(
-                    warnings,
-                    [
-                        (
-                            f"{provider_display_name(provider_name)} figure downloads used preview images for "
-                            f"{preview_accepted_count} asset(s), but their saved dimensions met the acceptance threshold."
-                        )
-                    ],
-                )
                 extend_unique(source_trail, [download_marker(f"{provider_name}_assets_preview", "accepted")])
             if preview_fallback_count:
                 extend_unique(
@@ -224,4 +212,4 @@ def _preview_asset_accepted(asset: Mapping[str, Any]) -> bool:
         height = int(asset.get("height") or 0)
     except (TypeError, ValueError):
         return False
-    return width >= ACCEPTABLE_PREVIEW_MIN_WIDTH and height >= ACCEPTABLE_PREVIEW_MIN_HEIGHT
+    return preview_dimensions_are_acceptable(width, height)

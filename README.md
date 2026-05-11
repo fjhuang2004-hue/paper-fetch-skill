@@ -32,7 +32,7 @@
 
 - 支持 DOI、URL 和标题查询。
 - 输出结构化论文元数据、正文 Markdown、引用信息和本地缓存资源。
-- 支持常见 provider 路由，包括 Crossref、Elsevier、Springer、Wiley、Science、PNAS 和 IEEE。
+- 支持常见 provider 路由，包括 Crossref、arXiv、Elsevier、Springer、Wiley、Science、PNAS、IEEE 和 Copernicus。
 - 在无法取得全文时返回带 warning 的 abstract-only 或 metadata-only 结果。
 
 项目边界：
@@ -220,6 +220,8 @@ Linux 在原离线包解压目录运行：
 ```bash
 ./install.sh --lite
 ```
+
+arXiv official HTML 是全文主路径；只要能从 DOI、URL 或裸 ID 解析出 arXiv ID，就会先请求 `https://arxiv.org/html/{id}`，再把可用的 arXiv API metadata 与 HTML front matter 合并。API 429/临时失败不会阻塞 HTML fulltext，也不会导致 HTML 成功结果退化成 `Untitled Article`。HTML 不可用、返回非 HTML、正文不足或质量检测失败时，直接进入 text-only PDF fallback。HTML 正文图片通过 direct `HttpTransport` 使用图片 `Accept` 下载，不通过 HTML seed 构造 cookie opener；单张图片的网络类失败会顺序重试并保留 per-asset 诊断。PDF fallback 只提供正文文本，不下载 figure 或 supplementary 资产。
 
 如果只想装进当前 Python 环境：
 

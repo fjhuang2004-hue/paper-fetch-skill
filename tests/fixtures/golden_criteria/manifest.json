@@ -1,5 +1,165 @@
 {
   "samples": {
+    "10.48550_arxiv.1406.2661v1": {
+      "doi": "10.48550/arxiv.1406.2661v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/pdf/1406.2661v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.1406.2661v1/api.json",
+        "original.pdf": "tests/fixtures/golden_criteria/10.48550_arxiv.1406.2661v1/original.pdf"
+      },
+      "fixture_family": "golden",
+      "title": "Generative Adversarial Networks",
+      "landing_url": "https://arxiv.org/abs/1406.2661v1",
+      "route_kind": "pdf_fallback",
+      "content_type": "application/pdf"
+    },
+    "10.48550_arxiv.2006.11239v2": {
+      "doi": "10.48550/arxiv.2006.11239v2",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/pdf/2006.11239v2",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2006.11239v2/api.json",
+        "original.pdf": "tests/fixtures/golden_criteria/10.48550_arxiv.2006.11239v2/original.pdf"
+      },
+      "fixture_family": "golden",
+      "title": "Denoising Diffusion Probabilistic Models",
+      "landing_url": "https://arxiv.org/abs/2006.11239v2",
+      "route_kind": "pdf_fallback",
+      "content_type": "application/pdf"
+    },
+    "10.48550_arxiv.2605.06556v1": {
+      "doi": "10.48550/arxiv.2605.06556v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06556v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06556v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06556v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Probability of Quota Violations in Divisor Apportionment Methods with Nonzero Allocations",
+      "landing_url": "https://arxiv.org/abs/2605.06556v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06598v1": {
+      "doi": "10.48550/arxiv.2605.06598v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06598v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06598v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06598v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Mathematical Modeling of Early Embryonic Cell Cycles of Drosophila melanogaster",
+      "landing_url": "https://arxiv.org/abs/2605.06598v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06653v1": {
+      "doi": "10.48550/arxiv.2605.06653v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06653v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06653v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06653v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "From Baby Universes to Narain Moduli: Topological Boundary Averaging in SymTFTs",
+      "landing_url": "https://arxiv.org/abs/2605.06653v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06659v1": {
+      "doi": "10.48550/arxiv.2605.06659v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06659v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06659v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06659v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "The Pulsar Radial Acceleration Relation",
+      "landing_url": "https://arxiv.org/abs/2605.06659v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06663v1": {
+      "doi": "10.48550/arxiv.2605.06663v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06663v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06663v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06663v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "EMO: Pretraining Mixture of Experts for Emergent Modularity",
+      "landing_url": "https://arxiv.org/abs/2605.06663v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06665v1": {
+      "doi": "10.48550/arxiv.2605.06665v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06665v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06665v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06665v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "UniPool: A Globally Shared Expert Pool for Mixture-of-Experts",
+      "landing_url": "https://arxiv.org/abs/2605.06665v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06666v1": {
+      "doi": "10.48550/arxiv.2605.06666v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06666v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06666v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06666v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "The Kubo-Thermalization Correspondence",
+      "landing_url": "https://arxiv.org/abs/2605.06666v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
+    "10.48550_arxiv.2605.06667v1": {
+      "doi": "10.48550/arxiv.2605.06667v1",
+      "publisher": "arxiv",
+      "source_url": "https://arxiv.org/html/2605.06667v1",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "api.json": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06667v1/api.json",
+        "original.html": "tests/fixtures/golden_criteria/10.48550_arxiv.2605.06667v1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "ActCam: Zero-Shot Joint Camera and 3D Motion Control for Video Generation",
+      "landing_url": "https://arxiv.org/abs/2605.06667v1",
+      "route_kind": "html",
+      "content_type": "text/html; charset=utf-8"
+    },
     "10.1007_s10584-011-0143-4": {
       "doi": "10.1007/s10584-011-0143-4",
       "publisher": "springer",

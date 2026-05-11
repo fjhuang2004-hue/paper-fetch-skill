@@ -6,17 +6,18 @@ import math
 import re
 import urllib.parse
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import Any, Mapping
 
 from ..utils import normalize_text, safe_text
 from .markdown import (
-    MARKDOWN_IMAGE_LINK_PATTERN,
-    MARKDOWN_IMAGE_URL_PATTERN,
     NUMBERED_REFERENCE_PATTERN,
     SLASH_RUN_PATTERN,
     TABLE_LIKE_FIGURE_ASSET_PATTERN,
+    iter_markdown_images,
     normalize_inline_html_text,
     normalize_markdown_text,
+    replace_markdown_images,
     strip_markdown_images,
 )
 from .schema import (
@@ -40,6 +41,13 @@ from .sections import (
     split_leading_abstract_context_sections,
 )
 from .tokens import estimate_normalized_tokens, estimate_tokens, normalize_token_budget, truncate_text_to_tokens
+
+MARKDOWN_DECORATION_PATTERN = re.compile(r"[*_`$]+")
+FIGURE_CAPTION_LABEL_PREFIX_PATTERN = re.compile(
+    r"^\s*(?:figure|fig\.?|extended data fig\.?)\s+\d+[A-Za-z]?\s*[:.]?\s*",
+    flags=re.IGNORECASE,
+)
+
 
 def asset_link(asset: "Asset") -> str:
     return normalize_text(asset.path or asset.url)
@@ -141,7 +149,14 @@ def _build_markdown_render_plan(
         if strip_markdown_images(section.text) and normalize_text(section.kind).lower() in RETAINED_NON_BODY_SECTION_KINDS
     )
     figure_assets = selected_figure_assets(article.assets, asset_profile=asset_profile)
-    figure_assets = filter_inline_body_figure_assets(figure_assets, sections=body_sections)
+    figure_assets = filter_inline_body_figure_assets(
+        figure_assets,
+        sections=(*lead_sections, *rendered_abstract_sections, *remaining_body_sections, *retained_sections),
+    )
+    figure_assets = suppress_repeated_body_figure_captions(
+        figure_assets,
+        sections=(*rendered_abstract_sections, *body_sections, *retained_sections),
+    )
     return _MarkdownRenderPlan(
         token_budget=token_budget,
         abstract_text=first_abstract_text(abstract_text=article.metadata.abstract, sections=article.sections),
@@ -262,8 +277,8 @@ def selected_figure_assets(assets: list[Asset], *, asset_profile: AssetProfile) 
 def _inline_markdown_image_urls(sections: Sequence["Section"]) -> set[str]:
     urls: set[str] = set()
     for section in sections:
-        for match in MARKDOWN_IMAGE_URL_PATTERN.finditer(section.text or ""):
-            candidate = normalize_text(match.group(1)).strip("<>")
+        for image in iter_markdown_images(section.text or ""):
+            candidate = normalize_text(image.url).strip("<>")
             if candidate:
                 urls.add(candidate)
     return urls
@@ -318,6 +333,8 @@ def _asset_markdown_reference_candidates(asset: Asset | Mapping[str, Any]) -> se
         "original_url",
         "download_url",
         "source_url",
+        "source_path",
+        "source_href",
         "preview_url",
         "full_size_url",
         "link",
@@ -342,17 +359,17 @@ def rewrite_markdown_asset_links(markdown_text: str, assets: Sequence[Asset | Ma
     if not indexed_assets:
         return markdown_text
 
-    def replace(match: re.Match[str]) -> str:
-        inline_url = normalize_text(match.group(2)).strip("<>")
+    def replace_image(image) -> str:
+        inline_url = normalize_text(image.url).strip("<>")
         inline_candidates = _image_reference_candidates(inline_url)
         if not inline_candidates:
-            return match.group(0)
+            return image.text
         for replacement_path, asset_candidates in indexed_assets:
             if _image_references_match(asset_candidates, inline_candidates):
-                return f"![{match.group(1)}]({replacement_path})"
-        return match.group(0)
+                return f"![{image.alt}]({replacement_path})"
+        return image.text
 
-    return MARKDOWN_IMAGE_LINK_PATTERN.sub(replace, markdown_text)
+    return replace_markdown_images(markdown_text, replace_image)
 
 
 def filter_inline_body_figure_assets(
@@ -370,7 +387,7 @@ def filter_inline_body_figure_assets(
         if not asset_in_body(asset):
             remaining.append(asset)
             continue
-        asset_candidates = _image_reference_candidates(asset.path) | _image_reference_candidates(asset.url)
+        asset_candidates = _asset_markdown_reference_candidates(asset)
         if asset_candidates and any(
             _image_references_match(asset_candidates, inline_candidate)
             for inline_candidate in inline_candidates
@@ -379,6 +396,53 @@ def filter_inline_body_figure_assets(
             continue
         remaining.append(asset)
     return remaining
+
+
+def _caption_match_text(value: str | None) -> str:
+    text = strip_markdown_images(normalize_markdown_text(value or ""))
+    text = re.sub(r"</?(?:sub|sup)>", "", text, flags=re.IGNORECASE)
+    text = MARKDOWN_DECORATION_PATTERN.sub("", text)
+    return re.sub(r"[\W_]+", "", normalize_text(text).lower(), flags=re.UNICODE)
+
+
+def _caption_has_meaningful_body(value: str | None) -> bool:
+    text = FIGURE_CAPTION_LABEL_PREFIX_PATTERN.sub("", normalize_text(value or ""))
+    return len(_caption_match_text(text)) >= 8
+
+
+def _figure_caption_candidates(asset: Asset) -> list[str]:
+    caption = normalize_text(asset.caption)
+    heading = normalize_text(asset.heading)
+    candidates: list[str] = []
+    if caption:
+        candidates.append(caption)
+    if heading and caption and not normalize_text(caption).lower().startswith(heading.lower()):
+        candidates.append(f"{heading}. {caption}")
+    return candidates
+
+
+def suppress_repeated_body_figure_captions(
+    assets: Sequence[Asset],
+    *,
+    sections: Sequence["Section"],
+) -> list[Asset]:
+    if not assets or not sections:
+        return list(assets)
+    body_match_text = _caption_match_text("\n\n".join(section.text for section in sections))
+    if not body_match_text:
+        return list(assets)
+
+    suppressed: list[Asset] = []
+    for asset in assets:
+        if not asset_in_body(asset) or not normalize_text(asset.caption):
+            suppressed.append(asset)
+            continue
+        repeated = any(
+            _caption_has_meaningful_body(candidate) and _caption_match_text(candidate) in body_match_text
+            for candidate in _figure_caption_candidates(asset)
+        )
+        suppressed.append(replace(asset, caption=None) if repeated else asset)
+    return suppressed
 
 
 def selected_table_assets(assets: list[Asset], *, asset_profile: AssetProfile) -> list[Asset]:
@@ -656,6 +720,7 @@ __all__ = [
     "selected_figure_assets",
     "rewrite_markdown_asset_links",
     "filter_inline_body_figure_assets",
+    "suppress_repeated_body_figure_captions",
     "selected_table_assets",
     "selected_supplementary_assets",
     "build_rendered_block",

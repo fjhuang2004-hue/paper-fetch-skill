@@ -251,7 +251,7 @@ class ServiceProbeAndAssetTests(unittest.TestCase):
 
         self.assertIn("download:science_assets_preview_accepted", envelope.source_trail)
         self.assertNotIn("download:science_assets_preview_fallback", envelope.source_trail)
-        self.assertTrue(any("used preview images" in warning for warning in envelope.warnings))
+        self.assertFalse(any("used preview images" in warning for warning in envelope.warnings))
     def test_probe_has_fulltext_uses_crossref_license_signal(self) -> None:
         resolved = paper_fetch.ResolvedQuery(
             query="10.1000/license",

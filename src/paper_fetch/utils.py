@@ -148,6 +148,7 @@ def sanitize_filename(value: str) -> str:
 def provider_display_name(value: str) -> str:
     normalized = normalize_text(value).lower().replace("-", "_")
     special_names = {
+        "arxiv": "arXiv",
         "ieee": "IEEE",
         "pnas": "PNAS",
     }

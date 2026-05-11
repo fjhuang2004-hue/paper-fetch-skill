@@ -7,7 +7,7 @@ from typing import Any, Callable, Mapping
 
 from ...models import normalize_markdown_text
 from ...utils import normalize_text
-from .inline import normalize_html_inline_text, wrap_html_inline_text_fragment
+from .inline import normalize_html_inline_text, render_html_inline_node, wrap_html_inline_text_fragment
 
 try:
     from bs4 import NavigableString, Tag
@@ -16,6 +16,7 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     Tag = None
 
 TABLE_PLACEHOLDER_PREFIX = "PAPER_FETCH_TABLE_PLACEHOLDER_"
+TABLE_CELL_LINE_BREAK_PATTERN = re.compile(r"\s*\n+\s*")
 
 RenderInlineTextFn = Callable[[Any], str]
 CleanMarkdownFn = Callable[[str], str]
@@ -30,40 +31,7 @@ def wrap_table_text_fragment(text: str, marker: str | None) -> str:
 
 
 def render_table_inline_node(node: Any, *, text_style: str | None = None) -> str:
-    if node is None:
-        return ""
-    if NavigableString is not None and isinstance(node, NavigableString):
-        return wrap_table_text_fragment(str(node), text_style)
-    if not isinstance(node, Tag):
-        return ""
-
-    parts: list[str] = []
-    for child in node.children:
-        if NavigableString is not None and isinstance(child, NavigableString):
-            parts.append(wrap_table_text_fragment(str(child), text_style))
-            continue
-        if not isinstance(child, Tag):
-            continue
-
-        name = normalize_text(child.name or "").lower()
-        if name in {"i", "em"}:
-            parts.append(render_table_inline_node(child, text_style="*"))
-        elif name in {"b", "strong"}:
-            parts.append(render_table_inline_node(child, text_style="**"))
-        elif name == "sub":
-            text = render_table_inline_node(child)
-            if text:
-                parts.append(f"<sub>{text}</sub>")
-        elif name == "sup":
-            text = render_table_inline_node(child)
-            if text:
-                parts.append(f"<sup>{text}</sup>")
-        elif name == "br":
-            parts.append("<br>")
-        else:
-            parts.append(render_table_inline_node(child, text_style=text_style))
-
-    return normalize_table_inline_text("".join(parts))
+    return render_html_inline_node(node, policy="table_cell", text_style=text_style)
 
 
 def render_table_inline_text(node: Any) -> str:
@@ -81,9 +49,23 @@ def table_cell_data(cell: Tag, *, render_inline_text: RenderInlineTextFn = rende
         colspan = max(1, int(colspan_text))
     except ValueError:
         colspan = 1
+    class_values = cell.get("class") or []
+    if isinstance(class_values, str):
+        classes = {normalize_text(item).lower() for item in class_values.split() if normalize_text(item)}
+    else:
+        classes = {normalize_text(str(item)).lower() for item in class_values if normalize_text(str(item))}
+    is_header = normalize_text(cell.name or "").lower() == "th"
+    has_bold_text = cell.find(["b", "strong"]) is not None or bool(cell.select(".ltx_font_bold"))
+    is_header_candidate = (
+        is_header
+        or normalize_text(str(cell.get("scope") or ""))
+        or bool(classes & {"ltx_th", "ltx_th_column", "ltx_th_row"})
+        or (has_bold_text and "ltx_border_tt" in classes)
+    )
     return {
         "text": render_inline_text(cell),
-        "is_header": normalize_text(cell.name or "").lower() == "th",
+        "is_header": is_header,
+        "is_header_candidate": bool(is_header_candidate),
         "rowspan": rowspan,
         "colspan": colspan,
     }
@@ -117,7 +99,48 @@ def table_header_row_count(table: Tag, rows: list[list[dict[str, Any]]]) -> int:
         return leading_all_header_rows
     if rows and rows[0] and any(cell.get("is_header") for cell in rows[0]):
         return 1
+    if (
+        rows
+        and rows[0]
+        and len(rows) > 1
+        and all(normalize_text(str(cell.get("text") or "")) for cell in rows[0])
+        and all(cell.get("is_header_candidate") for cell in rows[0])
+    ):
+        return 1
     return 0
+
+
+def table_row_declared_width(row: list[dict[str, Any]]) -> int:
+    return sum(max(1, int(cell.get("colspan") or 1)) for cell in row)
+
+
+def row_looks_like_column_header(row: list[dict[str, Any]]) -> bool:
+    if not row or not all(normalize_text(str(cell.get("text") or "")) for cell in row):
+        return False
+    return any(cell.get("is_header") or cell.get("is_header_candidate") for cell in row)
+
+
+def leading_full_width_spanner_rows(
+    rows: list[list[dict[str, Any]]],
+) -> tuple[list[str], list[list[dict[str, Any]]]]:
+    lifted: list[str] = []
+    index = 0
+    while index + 1 < len(rows):
+        row = rows[index]
+        next_row = rows[index + 1]
+        if len(row) != 1:
+            break
+        cell = row[0]
+        text = normalize_table_block_text(str(cell.get("text") or ""))
+        colspan = max(1, int(cell.get("colspan") or 1))
+        next_width = table_row_declared_width(next_row)
+        if not text or colspan <= 1 or next_width <= 1 or colspan < next_width:
+            break
+        if not row_looks_like_column_header(next_row):
+            break
+        lifted.append(text)
+        index += 1
+    return lifted, rows[index:]
 
 
 def expanded_table_matrix(rows: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]] | None:
@@ -162,6 +185,7 @@ def expanded_table_matrix(rows: list[list[dict[str, Any]]]) -> list[list[dict[st
 def flatten_table_header_rows(rows: list[list[dict[str, Any]]]) -> list[str]:
     if not rows:
         return []
+    rows = normalize_table_header_rows(rows)
     width = len(rows[0])
     headers: list[str] = []
     for col_index in range(width):
@@ -174,8 +198,23 @@ def flatten_table_header_rows(rows: list[list[dict[str, Any]]]) -> list[str]:
                 continue
             if not parts or text != parts[-1]:
                 parts.append(text)
-        headers.append(" / ".join(parts) or f"Column {col_index + 1}")
+        headers.append(" / ".join(parts))
     return headers
+
+
+def normalize_table_header_rows(rows: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]]:
+    if len(rows) <= 1:
+        return rows
+    first_row = rows[0]
+    first_texts = [normalize_text(str(cell.get("text") or "")) for cell in first_row]
+    if not first_texts or any(not text for text in first_texts):
+        return rows
+    if len(set(first_texts)) != 1:
+        return rows
+    next_row_texts = [normalize_text(str(cell.get("text") or "")) for cell in rows[1]]
+    if not any(next_row_texts):
+        return rows
+    return rows[1:]
 
 
 def table_headers_and_data(
@@ -184,9 +223,23 @@ def table_headers_and_data(
     render_inline_text: RenderInlineTextFn = render_table_inline_text,
 ) -> tuple[list[str], list[list[dict[str, Any]]], bool]:
     rows = table_rows(table, render_inline_text=render_inline_text)
+    lifted_spanners, rows = leading_full_width_spanner_rows(rows)
+    return table_headers_and_data_from_rows(table, rows, use_thead=not lifted_spanners)
+
+
+def table_headers_and_data_from_rows(
+    table: Tag,
+    rows: list[list[dict[str, Any]]],
+    *,
+    use_thead: bool,
+) -> tuple[list[str], list[list[dict[str, Any]]], bool]:
     if not rows:
         return [], [], False
-    header_row_count = table_header_row_count(table, rows)
+    header_row_count = (
+        table_header_row_count(table, rows)
+        if use_thead
+        else table_header_row_count_without_thead(rows)
+    )
     matrix = expanded_table_matrix(rows)
     if matrix is not None:
         if header_row_count:
@@ -194,22 +247,52 @@ def table_headers_and_data(
             headers = flatten_table_header_rows(header_rows)
             data_rows = matrix[header_row_count:]
         else:
-            headers = [f"Column {index + 1}" for index in range(len(matrix[0]))]
+            headers = ["" for _index in range(len(matrix[0]))]
             data_rows = matrix
         return headers, data_rows, True
 
     if header_row_count:
-        headers = [normalize_text(str(cell["text"])) or f"Column {index + 1}" for index, cell in enumerate(rows[0])]
+        headers = [normalize_text(str(cell["text"])) for cell in rows[0]]
         data_rows = rows[header_row_count:]
     else:
         width = max(len(row) for row in rows)
-        headers = [f"Column {index + 1}" for index in range(width)]
+        headers = ["" for _index in range(width)]
         data_rows = rows
     return headers, data_rows, False
 
 
+def table_header_row_count_without_thead(rows: list[list[dict[str, Any]]]) -> int:
+    leading_all_header_rows = 0
+    for row in rows:
+        if row and all(cell.get("is_header") for cell in row):
+            leading_all_header_rows += 1
+            continue
+        break
+    if leading_all_header_rows:
+        return leading_all_header_rows
+    if rows and rows[0] and any(cell.get("is_header") for cell in rows[0]):
+        return 1
+    if (
+        rows
+        and rows[0]
+        and len(rows) > 1
+        and all(normalize_text(str(cell.get("text") or "")) for cell in rows[0])
+        and all(cell.get("is_header_candidate") for cell in rows[0])
+    ):
+        return 1
+    return 0
+
+
+def normalize_table_block_text(text: str) -> str:
+    return normalize_text(TABLE_CELL_LINE_BREAK_PATTERN.sub(" ", text))
+
+
+def normalize_table_cell_markdown_text(text: str) -> str:
+    return TABLE_CELL_LINE_BREAK_PATTERN.sub("<br>", normalize_text(text))
+
+
 def escape_markdown_table_cell(text: str) -> str:
-    return normalize_text(text).replace("|", r"\|")
+    return normalize_table_cell_markdown_text(text).replace("|", r"\|")
 
 
 def render_aligned_markdown_table(matrix: list[list[str]]) -> list[str]:
@@ -245,17 +328,38 @@ def render_table_markdown(
     if not isinstance(table, Tag):
         return ""
 
-    heading_line = f"**{label}** {caption}".strip()
-    headers, data_rows, is_simple = table_headers_and_data(table, render_inline_text=render_inline_text)
-    if not headers:
-        return heading_line
+    heading_parts: list[str] = []
+    normalized_label = normalize_text(label)
+    normalized_caption = normalize_text(caption)
+    if normalized_label:
+        heading_parts.append(f"**{normalized_label}**")
+    if normalized_caption:
+        heading_parts.append(normalized_caption)
+    heading_line = " ".join(heading_parts).strip()
+    lines = [heading_line, ""] if heading_line else []
+    rows = table_rows(table, render_inline_text=render_inline_text)
+    lifted_spanners, rows = leading_full_width_spanner_rows(rows)
+    for spanner in lifted_spanners:
+        if heading_line and normalize_text(spanner) == normalize_text(heading_line):
+            continue
+        lines.extend([spanner, ""])
 
-    lines = [heading_line, ""]
+    headers, data_rows, is_simple = table_headers_and_data_from_rows(
+        table,
+        rows,
+        use_thead=not lifted_spanners,
+    )
+    if not headers:
+        return "\n".join(lines).rstrip()
+
     if is_simple:
-        header_row = [header or f"Column {index + 1}" for index, header in enumerate(headers)]
+        header_row = [header for header in headers]
         body_rows: list[list[str]] = []
         for row in data_rows:
             cells = [normalize_text(str(cell.get("text") or "")) for cell in row]
+            nonempty_cells = [cell for cell in cells if cell]
+            if len(nonempty_cells) > 1 and len(set(nonempty_cells)) == 1:
+                cells = [nonempty_cells[0], *[""] * (len(cells) - 1)]
             body_rows.append(cells + [""] * max(0, len(header_row) - len(cells)))
         lines.extend(render_aligned_markdown_table([header_row, *body_rows]))
         return "\n".join(lines)
@@ -263,15 +367,17 @@ def render_table_markdown(
     for row in data_rows:
         parts: list[str] = []
         for index, cell in enumerate(row):
-            value = normalize_text(str(cell.get("text") or ""))
+            value = normalize_table_cell_markdown_text(str(cell.get("text") or ""))
             if not value:
                 continue
-            header = headers[index] if index < len(headers) else f"Column {index + 1}"
-            parts.append(f"{header}: {value}")
+            header = headers[index] if index < len(headers) else ""
+            parts.append(f"{header}: {value}" if header else value)
         if parts:
             lines.append(f"- {'; '.join(parts)}")
-    if len(lines) == 2:
-        lines.append("- " + "; ".join(headers))
+    if not any(line.startswith("- ") for line in lines):
+        fallback_headers = [header for header in headers if normalize_text(header)]
+        if fallback_headers:
+            lines.append("- " + "; ".join(fallback_headers))
     return "\n".join(lines)
 
 

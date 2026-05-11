@@ -13,16 +13,17 @@ from ..extraction.html.formula_rules import (
     mathml_element_from_html_node,
 )
 from ..extraction.html.inline import (
-    join_inline_fragments,
+    InlineToken,
+    html_inline_tokens,
     needs_space_between_inline_text,
-    normalize_html_inline_text,
-    wrap_html_inline_text_fragment,
+    render_html_inline_node,
+    render_inline_tokens,
 )
 from ..extraction.html.semantics import normalize_section_title
 from ..formula.convert import normalize_latex_macros
 from ..models import normalize_text
 from ._article_markdown_math import render_external_mathml_expression, render_mathml_expression
-from ..markdown.citations import is_citation_link, make_numeric_citation_sentinel, numeric_citation_payload
+from ..markdown.citations import is_citation_link, numeric_citation_payload
 from .html_noise import HTML_BLOCK_TAGS, HTML_DROP_TAGS, should_drop_html_element
 
 try:
@@ -37,7 +38,9 @@ INLINE_IMAGE_SPACING_PATTERN = re.compile(r"(?<=[^\s])(!\[)")
 INLINE_WHITESPACE_PATTERN = re.compile(r"[ \t\r\f\v]+")
 LINE_EDGE_WHITESPACE_PATTERN = re.compile(r" *\n *")
 MARKDOWN_BLANK_RUN_PATTERN = re.compile(r"\n{3,}")
-HTML_TIGHT_INLINE_TAGS = {"sub", "sup"}
+ORDERED_LIST_PREFIX_PATTERN = re.compile(r"^\s*(?:\(?\d+[A-Za-z]?\)?|[ivxlcdm]+)[.)]\s+", flags=re.IGNORECASE)
+UNORDERED_LIST_PREFIX_PATTERN = re.compile(r"^\s*[•◦▪▫‣⁃∙●○◾◽◼□■]\s*")
+MARKDOWN_LIST_ITEM_PATTERN = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 FIGURE_LABEL_PATTERN = re.compile(r"^\s*(?:fig(?:ure)?\.?)\s*(\d+[A-Za-z]?)\s*[:.]?\s*(.*)$", flags=re.IGNORECASE)
 FIGURE_ID_PATTERN = re.compile(r"(?:^|[-_ ])figure[-_ ]?(\d+[A-Za-z]?)$", flags=re.IGNORECASE)
 FIGURE_TRAILING_LINK_PATTERN = re.compile(r"\b(?:PowerPoint slide|Full size image)\b.*$", flags=re.IGNORECASE)
@@ -46,51 +49,11 @@ FIGURE_DESCRIPTION_SELECTORS = (
     ".c-article-section__figure-description",
     ".figure__caption-text",
 )
-
-def _normalize_inline_text(text: str) -> str:
-    return normalize_html_inline_text(text, policy="heading")
-
-
-def _wrap_inline_text_fragment(text: str, marker: str | None = None) -> str:
-    return wrap_html_inline_text_fragment(text, marker)
-
-
-def _render_heading_inline_fragment(node: Any, *, text_style: str | None = None) -> str:
-    if NavigableString is not None and isinstance(node, NavigableString):
-        return _wrap_inline_text_fragment(str(node), text_style)
-    if not isinstance(node, Tag):
-        return ""
-
-    name = normalize_text(node.name or "").lower()
-    if name in {"i", "em"}:
-        return _render_heading_inline_node(node, text_style="*")
-    if name in {"b", "strong"}:
-        return _render_heading_inline_node(node, text_style="**")
-    if name == "sub":
-        text = _render_heading_inline_node(node)
-        return f"<sub>{text}</sub>" if text else ""
-    if name == "sup":
-        text = _render_heading_inline_node(node)
-        return f"<sup>{text}</sup>" if text else ""
-    if name == "br":
-        return "<br>"
-    return _render_heading_inline_node(node, text_style=text_style)
-
+INLINE_FIGURE_SRC_ATTR = "data-paper-fetch-inline-src"
+INLINE_FIGURE_ALT_ATTR = "data-paper-fetch-inline-alt"
 
 def _render_heading_inline_node(node: Any, *, text_style: str | None = None) -> str:
-    if node is None:
-        return ""
-    if NavigableString is not None and isinstance(node, NavigableString):
-        return _wrap_inline_text_fragment(str(node), text_style)
-    if not isinstance(node, Tag):
-        return ""
-
-    parts: list[str] = []
-    for child in node.children:
-        rendered = _render_heading_inline_fragment(child, text_style=text_style)
-        if rendered:
-            parts.append(rendered)
-    return _normalize_inline_text(join_inline_fragments(parts))
+    return render_html_inline_node(node, policy="heading", text_style=text_style)
 
 
 def render_heading_text_from_html(node: Any) -> str:
@@ -183,7 +146,7 @@ def render_container_markdown(
 
     for child in node.children:
         if isinstance(child, NavigableString):
-            text = normalize_text(str(child))
+            text = normalize_prose_markdown_line_breaks(str(child))
             if text:
                 lines.extend([text, ""])
             continue
@@ -219,16 +182,32 @@ def render_container_markdown(
             if heading_text:
                 lines.extend([f"{'#' * max(2, min(level, 6))} {heading_text}", ""])
             continue
-        if child.name in {"p", "blockquote", "pre"}:
+        if child.name in {"p", "blockquote"}:
+            text = render_clean_text_from_html(child, collapse_prose_line_breaks=True)
+            if text:
+                lines.extend([text, ""])
+            continue
+        if child.name == "pre":
             text = render_clean_text_from_html(child)
             if text:
                 lines.extend([text, ""])
             continue
         if child.name in {"ul", "ol"}:
-            for item in child.find_all("li", recursive=False):
-                text = render_clean_text_from_html(item)
+            start = 1
+            if child.name == "ol":
+                try:
+                    start = int(normalize_text(str(child.get("start") or "1")) or "1")
+                except ValueError:
+                    start = 1
+            for index, item in enumerate(child.find_all("li", recursive=False)):
+                text = render_clean_text_from_html(item, collapse_prose_line_breaks=True)
                 if text:
-                    lines.append(f"- {text}")
+                    if child.name == "ol":
+                        text = ORDERED_LIST_PREFIX_PATTERN.sub("", text)
+                        lines.append(f"{start + index}. {text}")
+                    else:
+                        text = UNORDERED_LIST_PREFIX_PATTERN.sub("", text)
+                        lines.append(f"- {text}")
             if lines and lines[-1]:
                 lines.append("")
             continue
@@ -408,36 +387,85 @@ def _iter_figure_text_candidates(node: Any) -> list[str]:
     return candidates
 
 
+def _iter_inline_figure_images(node: Any) -> list[tuple[str, str]]:
+    if not isinstance(node, Tag):
+        return []
+
+    images: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add_image(candidate: Any) -> None:
+        if not isinstance(candidate, Tag):
+            return
+        src = normalize_text(str(candidate.get(INLINE_FIGURE_SRC_ATTR) or ""))
+        if not src:
+            return
+        alt = normalize_text(str(candidate.get(INLINE_FIGURE_ALT_ATTR) or "Figure")) or "Figure"
+        item = (src, alt)
+        if item in seen:
+            return
+        seen.add(item)
+        images.append(item)
+
+    add_image(node)
+    for image in node.find_all("img"):
+        add_image(image)
+    return images
+
+
+def _append_inline_figure_image(lines: list[str], src: str, alt: str) -> None:
+    lines.extend([f"![{alt or 'Figure'}]({src})", ""])
+
+
 def render_figure_markdown(node: Any, lines: list[str]) -> None:
     if not isinstance(node, Tag):
         return
 
-    inline_url = normalize_text(str(node.get("data-paper-fetch-inline-src") or ""))
-    inline_alt = normalize_text(str(node.get("data-paper-fetch-inline-alt") or "Figure"))
-    figure_label = ""
-    figure_parts: list[str] = []
+    inline_images = _iter_inline_figure_images(node)
+    figure_items: list[tuple[str, str]] = []
     for text in _iter_figure_text_candidates(node):
         label, remainder = _figure_label_from_text(text)
-        if label and not figure_label:
-            figure_label = label
         candidate = _clean_figure_text_candidate(remainder if label else text)
-        if candidate and candidate not in figure_parts:
-            figure_parts.append(candidate)
-    if not figure_label:
-        figure_label = _figure_label_from_node(node)
-    if not figure_label and not figure_parts:
+        item = (label, candidate)
+        if (label or candidate) and item not in figure_items:
+            figure_items.append(item)
+
+    fallback_label = _figure_label_from_node(node)
+    if not figure_items and fallback_label:
+        figure_items.append((fallback_label, ""))
+    if not figure_items:
+        for src, alt in inline_images:
+            _append_inline_figure_image(lines, src, alt)
         return
 
-    if inline_url:
-        lines.extend([f"![{inline_alt or figure_label or 'Figure'}]({inline_url})", ""])
+    if inline_images and len(inline_images) == len(figure_items) and len(inline_images) > 1:
+        for index, (label, caption) in enumerate(figure_items):
+            src, alt = inline_images[index]
+            _append_inline_figure_image(lines, src, alt)
+            active_label = label or (fallback_label if index == 0 else "")
+            if active_label:
+                line = f"**{active_label}**"
+                if caption:
+                    line = f"{line} {caption}"
+            else:
+                line = caption
+            if line:
+                lines.extend([line, ""])
+        return
 
-    if figure_label:
-        line = f"**{figure_label}**"
-        if figure_parts:
-            line = f"{line} {' '.join(figure_parts)}"
-    else:
-        line = " ".join(figure_parts)
-    lines.extend([line, ""])
+    for src, alt in inline_images:
+        _append_inline_figure_image(lines, src, alt)
+
+    for index, (label, caption) in enumerate(figure_items):
+        active_label = label or (fallback_label if index == 0 else "")
+        if active_label:
+            line = f"**{active_label}**"
+            if caption:
+                line = f"{line} {caption}"
+        else:
+            line = caption
+        if line:
+            lines.extend([line, ""])
 
 
 def _has_explicit_citation_marker(node: Any) -> bool:
@@ -478,12 +506,44 @@ def _numeric_citation_payload_from_html(node: Any) -> str | None:
     return None
 
 
-def render_clean_text_from_html(node: Any) -> str:
+def _is_linebreak_sensitive_markdown_block(block: str) -> bool:
+    lines = [line.strip() for line in block.splitlines() if normalize_text(line)]
+    if len(lines) <= 1:
+        return False
+    if any(
+        line.startswith(("$$", "|", "```", "~~~", "![", "#"))
+        or MARKDOWN_LIST_ITEM_PATTERN.match(line)
+        for line in lines
+    ):
+        return True
+    return "$$\n" in block or "\n$$" in block
+
+
+def normalize_prose_markdown_line_breaks(text: str) -> str:
+    normalized = MARKDOWN_BLANK_RUN_PATTERN.sub("\n\n", text.replace("\r\n", "\n").replace("\r", "\n"))
+    parts = re.split(r"(\n\s*\n)", normalized)
+    collapsed: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        if re.fullmatch(r"\n\s*\n", part):
+            collapsed.append("\n\n")
+            continue
+        if _is_linebreak_sensitive_markdown_block(part):
+            collapsed.append(normalize_text(part))
+            continue
+        collapsed.append(normalize_text(re.sub(r"\s*\n\s*", " ", part)))
+    return normalize_text("".join(collapsed))
+
+
+def render_clean_text_from_html(node: Any, *, collapse_prose_line_breaks: bool = False) -> str:
     rendered = render_clean_html_node(node)
     rendered = INLINE_IMAGE_SPACING_PATTERN.sub(r" \1", rendered)
     rendered = INLINE_WHITESPACE_PATTERN.sub(" ", rendered)
     rendered = LINE_EDGE_WHITESPACE_PATTERN.sub("\n", rendered)
     rendered = MARKDOWN_BLANK_RUN_PATTERN.sub("\n\n", rendered)
+    if collapse_prose_line_breaks:
+        rendered = normalize_prose_markdown_line_breaks(rendered)
     return normalize_text(rendered)
 
 
@@ -508,24 +568,11 @@ def render_clean_html_node(node: Any) -> str:
             return rendered_formula
     if node.name == "br":
         return "\n"
-    if node.name == "a":
-        payload = _numeric_citation_payload_from_html(node)
-        if payload is not None:
-            return make_numeric_citation_sentinel(payload) or ""
-        text = render_clean_children(node)
-        return text
-    if node.name == "sup":
-        payload = _numeric_citation_payload_from_html(node)
-        if payload is not None:
-            return make_numeric_citation_sentinel(payload) or ""
-        text = render_clean_children(node)
-        return f"<sup>{text}</sup>" if text else ""
-    if node.name == "sub":
-        text = render_clean_children(node)
-        return f"<sub>{text}</sub>" if text else ""
     if node.name == "figure":
         caption = node.find("figcaption")
         return render_clean_html_node(caption)
+    if _is_inline_html_node(node):
+        return _render_clean_inline_node(node)
 
     rendered = render_clean_children(node)
     if not rendered.strip():
@@ -537,17 +584,95 @@ def render_clean_html_node(node: Any) -> str:
     return rendered
 
 
+def _is_inline_html_node(node: Any) -> bool:
+    if not isinstance(node, Tag):
+        return False
+    name = normalize_text(node.name or "").lower()
+    return bool(name) and name not in HTML_BLOCK_TAGS and name not in {"figure", "table"}
+
+
+def _raw_inline_markdown_from_node(node: Any) -> str | None:
+    if not isinstance(node, Tag):
+        return None
+    if _is_mathjax_tex_node(node):
+        return normalize_latex_macros(node.get_text("", strip=False).strip()) or None
+    if normalize_text(node.name or "").lower() == "math":
+        return _render_mathml_node(node) or None
+    if _is_formula_image_node(node):
+        return _render_formula_image_node(node) or None
+    if _is_formula_container(node):
+        return _render_formula_container(node) or None
+    return None
+
+
+def _drop_inline_node(node: Any) -> bool:
+    return isinstance(node, Tag) and node.name in HTML_DROP_TAGS
+
+
+def _render_clean_inline_node(node: Any) -> str:
+    return render_html_inline_node(
+        node,
+        policy="body",
+        citation_payload_from_node=_numeric_citation_payload_from_html,
+        raw_markdown_from_node=_raw_inline_markdown_from_node,
+        drop_node=_drop_inline_node,
+        render_text_styles=False,
+        break_render="\n",
+    )
+
+
+def _render_clean_inline_tokens(tokens: list[InlineToken]) -> str:
+    return render_inline_tokens(tokens, policy="body", break_render="\n")
+
+
 def render_clean_children(node: Any) -> str:
     text = ""
-    previous_child: Any = None
+    inline_tokens: list[InlineToken] = []
+
+    def flush_inline_tokens() -> None:
+        nonlocal text, inline_tokens
+        if not inline_tokens:
+            return
+        rendered_inline = _render_clean_inline_tokens(inline_tokens)
+        if rendered_inline:
+            if needs_space_between_inline_text(
+                text,
+                rendered_inline,
+                right_is_markdown_image=rendered_inline.startswith("!["),
+            ):
+                text += " "
+            text += rendered_inline
+        inline_tokens = []
+
     for child in node.children:
+        if isinstance(child, NavigableString):
+            inline_tokens.extend(html_inline_tokens(child))
+            continue
+        if not isinstance(child, Tag):
+            continue
+        if _is_inline_html_node(child):
+            inline_tokens.extend(
+                html_inline_tokens(
+                    child,
+                    citation_payload_from_node=_numeric_citation_payload_from_html,
+                    raw_markdown_from_node=_raw_inline_markdown_from_node,
+                    drop_node=_drop_inline_node,
+                    render_text_styles=False,
+                )
+            )
+            continue
+        flush_inline_tokens()
         rendered = render_clean_html_node(child)
         if not rendered:
             continue
-        if needs_space_between(text, rendered, previous_child, child):
+        if needs_space_between_inline_text(
+            text,
+            rendered,
+            right_is_markdown_image=rendered.startswith("!["),
+        ):
             text += " "
         text += rendered
-        previous_child = child
+    flush_inline_tokens()
     return text
 
 
@@ -590,14 +715,5 @@ def _formula_latex_from_node(node: Any) -> str:
 
 
 def needs_space_between(left: str, right: str, previous_child: Any, child: Any) -> bool:
-    return needs_space_between_inline_text(
-        left,
-        right,
-        previous_is_tight=is_tight_inline_node(previous_child),
-        current_is_tight=is_tight_inline_node(child),
-        right_is_markdown_image=right.startswith("!["),
-    )
-
-
-def is_tight_inline_node(node: Any) -> bool:
-    return isinstance(node, Tag) and node.name in HTML_TIGHT_INLINE_TAGS
+    del previous_child, child
+    return needs_space_between_inline_text(left, right, right_is_markdown_image=right.startswith("!["))

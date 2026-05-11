@@ -313,6 +313,42 @@ class CliTests(unittest.TestCase):
             self.assertIn(str(figure_path), rewritten)
             self.assertEqual(rewritten.count(str(figure_path)), 1)
 
+    def test_rewrite_markdown_asset_links_handles_image_alt_with_brackets(self) -> None:
+        article = sample_article()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "downloads"
+            output_dir.mkdir(parents=True)
+            asset_dir = output_dir / "body_assets"
+            asset_dir.mkdir()
+            figure_path = asset_dir / "figure-1.png"
+            figure_path.write_bytes(b"figure")
+            article.sections[0].text = (
+                f"![Functional relation $\\mathcal{{F}}[R(\\Delta)]$]({figure_path})"
+            )
+            article.assets = [
+                Asset(kind="figure", heading="Figure 1", caption="Functional relation.", path=str(figure_path), section="body")
+            ]
+            envelope = paper_fetch.build_fetch_envelope(
+                article,
+                modes={"article", "markdown"},
+                render=RenderOptions(asset_profile="body"),
+            )
+            envelope.markdown = f"![Functional relation $\\mathcal{{F}}[R(\\Delta)]$]({figure_path})"
+
+            rewritten = paper_fetch_cli.rewrite_markdown_asset_links(
+                envelope.markdown or "",
+                envelope,
+                target_path=output_dir / "article.md",
+                render=RenderOptions(asset_profile="body"),
+            )
+
+            self.assertIn(
+                "![Functional relation $\\mathcal{F}[R(\\Delta)]$](body_assets/figure-1.png)",
+                rewritten,
+            )
+            self.assertNotIn(str(figure_path), rewritten)
+
     def test_rewrite_markdown_asset_links_maps_remote_figure_urls_to_downloaded_local_assets(self) -> None:
         article = sample_article()
 

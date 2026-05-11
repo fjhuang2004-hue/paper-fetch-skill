@@ -88,6 +88,9 @@ def _asset_from_entry(
         ),
         "",
     )
+    source_url = safe_text(entry.get("source_url")) or None
+    source_path = safe_text(entry.get("source_path")) or None
+    source_href = safe_text(entry.get("source_href")) or None
     return Asset(
         kind=kind,
         heading=safe_text(entry.get("heading") or heading_fallback) or heading_fallback,
@@ -99,7 +102,10 @@ def _asset_from_entry(
         anchor_key=safe_text(entry.get("anchor_key") or entry.get("key")) or None,
         download_tier=safe_text(entry.get("download_tier")) or None,
         download_url=safe_text(entry.get("download_url")) or None,
-        original_url=original_url or None,
+        original_url=safe_text(entry.get("original_url")) or original_url or None,
+        source_url=source_url,
+        source_path=source_path,
+        source_href=source_href,
         content_type=safe_text(entry.get("content_type")) or None,
         downloaded_bytes=_optional_int(entry.get("downloaded_bytes")),
         width=_optional_int(entry.get("width")),

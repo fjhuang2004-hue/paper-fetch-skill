@@ -18,6 +18,8 @@ SourceKind = Literal[
     "pnas",
     "ieee_html",
     "ieee_pdf",
+    "arxiv_html",
+    "arxiv_pdf",
     "copernicus_xml",
     "copernicus_pdf",
     "crossref_meta",
@@ -103,6 +105,9 @@ class Asset:
     download_tier: str | None = None
     download_url: str | None = None
     original_url: str | None = None
+    source_url: str | None = None
+    source_path: str | None = None
+    source_href: str | None = None
     content_type: str | None = None
     downloaded_bytes: int | None = None
     width: int | None = None

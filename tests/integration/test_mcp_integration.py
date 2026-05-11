@@ -241,6 +241,31 @@ SERVER_SCRIPT = textwrap.dedent(
                     ],
                 )
             ),
+            "arxiv": FakeProviderClient(
+                ProviderStatusResult(
+                    provider="arxiv",
+                    status="ready",
+                    available=True,
+                    official_provider=True,
+                    checks=[
+                        build_provider_status_check(
+                            "metadata_api",
+                            "ok",
+                            "arXiv API metadata route is optional enrichment.",
+                        ),
+                        build_provider_status_check(
+                            "html_route",
+                            "ok",
+                            "arXiv official HTML fallback is available.",
+                        ),
+                        build_provider_status_check(
+                            "pdf_fallback",
+                            "ok",
+                            "arXiv PDF fallback is available.",
+                        ),
+                    ],
+                )
+            ),
             "copernicus": FakeProviderClient(
                 ProviderStatusResult(
                     provider="copernicus",
@@ -364,7 +389,7 @@ class McpStdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         self.assertFalse(provider_status.isError)
                         self.assertEqual(
                             [item["provider"] for item in provider_status.structuredContent["providers"]],
-                            ["crossref", "elsevier", "springer", "wiley", "science", "pnas", "ieee", "copernicus"],
+                            ["crossref", "elsevier", "springer", "wiley", "science", "pnas", "ieee", "arxiv", "copernicus"],
                         )
                         self.assertEqual(provider_status.structuredContent["providers"][0]["status"], "ready")
                         self.assertEqual(provider_status.structuredContent["providers"][1]["missing_env"], ["ELSEVIER_API_KEY"])

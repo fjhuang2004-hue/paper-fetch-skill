@@ -80,6 +80,9 @@ class AssetOutput(TypedDict, total=False):
     download_tier: str | None
     download_url: str | None
     original_url: str | None
+    source_url: str | None
+    source_path: str | None
+    source_href: str | None
     content_type: str | None
     downloaded_bytes: int | None
     width: int | None

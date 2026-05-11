@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import re
 import xml.etree.ElementTree as ET
 
-from ..formula.convert import convert_mathml_element_to_latex
+from ..formula.convert import convert_mathml_element_to_latex, normalize_latex_macros
 from ._article_markdown_xml import (
     child_text,
     first_descendant,
@@ -159,7 +159,7 @@ def render_mathml_expression(element: ET.Element | None) -> str:
             return expression
         return f"{{{expression}}}"
 
-    expression = render_node(element)
+    expression = normalize_latex_macros(render_node(element))
     expression = re.sub(r"\s+", " ", expression).strip()
     expression = re.sub(r"\(\s+", "(", expression)
     expression = re.sub(r"\s+\)", ")", expression)

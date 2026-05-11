@@ -111,6 +111,10 @@ UPGREEK_LATEX_ALIAS_PATTERN = re.compile(r"\\(" + UPGREEK_LATEX_ALIAS_NAMES + r"
 LATEX_MSPACE_MU_PATTERN = re.compile(
     r"\\mspace\s*\{\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*mu\s*\}"
 )
+LATEX_ZERO_HSPACE_PATTERN = re.compile(
+    r"\\hspace\*?\s*\{\s*[+-]?(?:0+(?:\.0*)?|\.0+)\s*(?:pt|em|ex|mu|mm|cm|in|pc)?\s*\}"
+)
+ZERO_WIDTH_SPACE_PATTERN = re.compile(r"[\u200b\u200c\u200d\u2060\ufeff]")
 
 
 @dataclass(slots=True)
@@ -425,6 +429,8 @@ def normalize_latex_macros(value: str | None) -> str:
         suffix = " " if following and following.isalnum() else ""
         return rf"\mkern{match.group(1)}mu{suffix}"
 
+    text = ZERO_WIDTH_SPACE_PATTERN.sub("", text)
+    text = LATEX_ZERO_HSPACE_PATTERN.sub("", text)
     text = UPGREEK_LATEX_ALIAS_PATTERN.sub(replace_alias, text)
     return LATEX_MSPACE_MU_PATTERN.sub(replace_mspace, text)
 

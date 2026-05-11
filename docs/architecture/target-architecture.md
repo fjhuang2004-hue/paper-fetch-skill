@@ -352,6 +352,12 @@ workflow 会尽可能拿到两类元数据：
 - `ieee`
   - 走 provider 自管 `landing metadata / article number -> dynamic HTML endpoint -> direct HTTP PDF fallback -> seeded-browser PDF fallback`
   - dynamic HTML 成功公开为 `ieee_html`；无可用 HTML 但 PDF payload 成功时公开为 `ieee_pdf`
+- `arxiv`
+  - 走 provider 自管 `arXiv ID 解析 -> arXiv official HTML -> optional arXiv API / HTML metadata merge -> direct HTTP PDF fallback`
+  - official HTML 成功公开为 `arxiv_html`；HTML 不可用、返回非 HTML、正文不足或质量检测失败时直接进入 text-only PDF fallback 并公开为 `arxiv_pdf`
+- `copernicus`
+  - 走 provider 自管 `landing HTML / DOI-derived URL -> NLM/JATS XML -> direct HTTP PDF fallback`
+  - XML 成功公开为 `copernicus_xml`；PDF fallback 成功公开为 `copernicus_pdf`
 
 `paper_fetch.providers.browser_workflow` 是 Wiley / Science / PNAS 的 canonical browser workflow facade：它保留 `ProviderBrowserProfile`、`BrowserWorkflowClient`、bootstrap、seeded-browser PDF fallback、article conversion 和 related asset download orchestration 的稳定入口。底层职责已拆到独立包：`paper_fetch.providers.browser_workflow.profile/bootstrap/pdf_fallback/article/assets/client/shared/html_extraction/fetchers` 分别承载 profile、HTML bootstrap、PDF/ePDF fallback、article assembly、asset retry helper、client 基类、URL/signal helper、HTML payload/cache helper 和 Playwright fetcher helper。旧 `paper_fetch.providers.browser_workflow_fetchers.*`、`_browser_workflow_html_extraction.py`、`_browser_workflow_shared.py` 和 `_browser_workflow_fetchers.py` 兼容入口已删除；新代码只能从 `paper_fetch.providers.browser_workflow.*` 引入。`paper_fetch.providers.science_html`、`paper_fetch.providers.pnas_html` 与 `paper_fetch.providers.wiley_html` 暴露 provider-owned HTML 作者提取和 blocking fallback 信号；`paper_fetch.providers.science_pnas_profiles` 暴露 Science/PNAS/Wiley candidate routing helper。`paper_fetch.providers.science_pnas` 承载 Science/PNAS/Wiley browser HTML markdown、asset scopes、normalization 和 postprocess entrypoint。facade 继续 re-export 测试和 provider 已依赖的 patch 点（例如 `load_runtime_config`、`fetch_html_with_flaresolverr`、`fetch_html_with_direct_playwright`、`fetch_pdf_with_playwright`、`extract_science_pnas_markdown` 与 shared Playwright fetcher 构造器）。
 

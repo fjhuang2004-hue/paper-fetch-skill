@@ -6,9 +6,15 @@ import re
 import urllib.parse
 
 from ..utils import normalize_text
+from .inline_spacing import normalize_inline_sup_sub_tag_bodies
 
 NUMERIC_CITATION_SENTINEL_PREFIX = "@@PF_CITE:"
 NUMERIC_CITATION_SENTINEL_PATTERN = re.compile(r"@@PF_CITE:(?P<payload>[^@\n]+)@@")
+INLINE_TOKEN_MARKER_PATTERN = re.compile(
+    rf"{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}|</?(?:sub|sup)\b|<br\s*/?>",
+    flags=re.IGNORECASE,
+)
+FENCED_CODE_BLOCK_PATTERN = re.compile(r"(?ms)(^```.*?^```|^~~~.*?^~~~)")
 NUMERIC_CITATION_ITEM_PATTERN = re.compile(r"(?P<start>\d{1,3})(?:\s*[–-]\s*(?P<end>\d{1,3}))?")
 REFERENCE_PREFIX_SENTINEL_PATTERN = re.compile(
     rf"(?i)\brefs?\.\s*(?P<sentinel>{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@)"
@@ -17,7 +23,6 @@ PARENTHETICAL_CITATION_PATTERN = re.compile(r"\((?P<inner>[^()\n]{1,160})\)")
 ADJACENT_SENTINEL_RUN_PATTERN = re.compile(
     rf"{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@(?:\s*[,–-]\s*{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@)+"
 )
-INLINE_SUP_SUB_TEXT_PATTERN = re.compile(r"<(?P<tag>sub|sup)>(?P<body>[^<>]*)</(?P=tag)>")
 INLINE_ARTICLE_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\((?:/(?:article|articles)/[^)]+|#[^)]+)\)")
 LABEL_PATTERN = re.compile(r"\b((?:Extended Data|Fig|Figs|Tab|Tabs|Eq|Eqs|Ref|Refs))\s+(\d+[A-Za-z]?)\b")
 FIGURE_LINE_PATTERN = re.compile(r"(?im)^(?:extended data\s+)?fig\.\s*[a-z0-9.-]+:.*$")
@@ -69,17 +74,44 @@ def _coalesce_sentinel_run(text: str) -> str:
     return sentinel or text
 
 
-def _normalize_inline_sup_sub_spacing(text: str) -> str:
-    def normalize_match(match: re.Match[str]) -> str:
-        tag = match.group("tag")
-        body = match.group("body")
-        stripped = body.strip()
-        if not stripped:
-            return ""
-        trailing_space = " " if body and body[-1].isspace() else ""
-        return f"<{tag}>{stripped}</{tag}>{trailing_space}"
+def _normalize_inline_token_lines(text: str) -> str:
+    from ..extraction.html.inline import inline_markdown_tokens, render_inline_tokens
 
-    return INLINE_SUP_SUB_TEXT_PATTERN.sub(normalize_match, text)
+    def normalize_part(part: str) -> str:
+        lines = part.splitlines(keepends=True)
+        rendered_lines: list[str] = []
+        for line in lines:
+            newline = ""
+            body = line
+            if line.endswith("\r\n"):
+                body = line[:-2]
+                newline = "\r\n"
+            elif line.endswith("\n"):
+                body = line[:-1]
+                newline = "\n"
+            if INLINE_TOKEN_MARKER_PATTERN.search(body):
+                body = render_inline_tokens(
+                    inline_markdown_tokens(body, parse_citations=True),
+                    policy="body",
+                    collapse_newlines=False,
+                    break_render="<br>",
+                    strip=False,
+                )
+            rendered_lines.append(f"{body}{newline}")
+        return "".join(rendered_lines)
+
+    parts = FENCED_CODE_BLOCK_PATTERN.split(text)
+    if len(parts) == 1:
+        return normalize_part(text)
+    normalized_parts: list[str] = []
+    for part in parts:
+        if not part:
+            continue
+        if FENCED_CODE_BLOCK_PATTERN.fullmatch(part):
+            normalized_parts.append(part)
+        else:
+            normalized_parts.append(normalize_part(part))
+    return "".join(normalized_parts)
 
 
 def normalize_inline_citation_markdown(text: str) -> str:
@@ -107,9 +139,9 @@ def normalize_inline_citation_markdown(text: str) -> str:
             return match.group(0)
         return f"<sup>{payload}</sup>"
 
+    normalized = _normalize_inline_token_lines(normalized)
     normalized = NUMERIC_CITATION_SENTINEL_PATTERN.sub(render_sentinel, normalized)
-    normalized = _normalize_inline_sup_sub_spacing(normalized)
-    normalized = re.sub(r"\s+(<(?:(?:sub|sup)\b[^>]*)>)", r"\1", normalized)
+    normalized = normalize_inline_sup_sub_tag_bodies(normalized)
     normalized = re.sub(r"(</(?:sub|sup)>)\s+([,.;:?]|!(?!\[))", r"\1\2", normalized)
     normalized = re.sub(r"\s+([,.;:?]|!(?!\[))", r"\1", normalized)
     normalized = re.sub(r"([(\[])\s+", r"\1", normalized)

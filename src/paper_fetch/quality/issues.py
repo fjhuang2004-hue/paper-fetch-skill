@@ -21,6 +21,7 @@ EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER = {
     "science": frozenset({"science"}),
     "pnas": frozenset({"pnas"}),
     "ieee": frozenset({"ieee_html", "ieee_pdf"}),
+    "arxiv": frozenset({"arxiv_html", "arxiv_pdf"}),
     "copernicus": frozenset({"copernicus_xml", "copernicus_pdf"}),
 }
 ASCII_DOI_PATTERN = re.compile(r"^10\.\d{4,9}/[!-~]+$")

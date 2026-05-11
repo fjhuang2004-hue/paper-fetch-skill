@@ -59,6 +59,15 @@ ACCEPTABLE_PREVIEW_MIN_WIDTH = 300
 ACCEPTABLE_PREVIEW_MIN_HEIGHT = 200
 
 
+ACCEPTABLE_PREVIEW_MIN_AREA = ACCEPTABLE_PREVIEW_MIN_WIDTH * ACCEPTABLE_PREVIEW_MIN_HEIGHT
+
+
+ACCEPTABLE_WIDE_PREVIEW_MIN_WIDTH = 600
+
+
+ACCEPTABLE_WIDE_PREVIEW_MIN_HEIGHT = 120
+
+
 FIGURE_PAGE_HINTS = (
     "full size image",
     "view figure",
@@ -145,7 +154,15 @@ def supplementary_response_block_reason(content_type: str | None, body: bytes | 
 
 
 def preview_dimensions_are_acceptable(width: int | None, height: int | None) -> bool:
-    return int(width or 0) >= ACCEPTABLE_PREVIEW_MIN_WIDTH and int(height or 0) >= ACCEPTABLE_PREVIEW_MIN_HEIGHT
+    normalized_width = int(width or 0)
+    normalized_height = int(height or 0)
+    if normalized_width >= ACCEPTABLE_PREVIEW_MIN_WIDTH and normalized_height >= ACCEPTABLE_PREVIEW_MIN_HEIGHT:
+        return True
+    return (
+        normalized_width >= ACCEPTABLE_WIDE_PREVIEW_MIN_WIDTH
+        and normalized_height >= ACCEPTABLE_WIDE_PREVIEW_MIN_HEIGHT
+        and normalized_width * normalized_height >= ACCEPTABLE_PREVIEW_MIN_AREA
+    )
 
 
 def _first_url_from_srcset(value: str | None) -> str:
@@ -222,6 +239,9 @@ __all__ = [
     "PREVIEW_URL_TOKENS",
     "ACCEPTABLE_PREVIEW_MIN_WIDTH",
     "ACCEPTABLE_PREVIEW_MIN_HEIGHT",
+    "ACCEPTABLE_PREVIEW_MIN_AREA",
+    "ACCEPTABLE_WIDE_PREVIEW_MIN_WIDTH",
+    "ACCEPTABLE_WIDE_PREVIEW_MIN_HEIGHT",
     "FIGURE_PAGE_HINTS",
     "_response_header",
     "_image_dimensions",

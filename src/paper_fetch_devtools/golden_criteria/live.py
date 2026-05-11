@@ -27,7 +27,7 @@ from paper_fetch.workflow.rendering import rewrite_markdown_asset_links
 
 logger = logging.getLogger("paper_fetch_devtools.golden_criteria.live")
 
-SUPPORTED_PROVIDERS = ("elsevier", "springer", "wiley", "science", "pnas", "ieee")
+SUPPORTED_PROVIDERS = ("elsevier", "springer", "wiley", "science", "pnas", "ieee", "arxiv")
 UNSUPPORTED_PROVIDER_STATUS = "skipped_unsupported_provider"
 DEFAULT_REVIEW_ROOT_NAME = "golden-criteria-review"
 RUN_LIVE_ENV_VAR = "PAPER_FETCH_RUN_LIVE"
@@ -515,9 +515,15 @@ def issue_categories_for_result(
             normalize_text(getattr(asset, "kind", None)).lower() != "formula"
             for asset in preview_fallback_assets
         )
+        article_asset_failures = list(
+            getattr(envelope.article.quality, "asset_failures", []) if envelope.article is not None else []
+        )
         if (
             "asset_failures" in trail_blob
+            or "related assets could not be downloaded" in warning_blob
             or "partially downloaded" in warning_blob
+            or "assets were only partially downloaded" in warning_blob
+            or bool(article_asset_failures)
             or ("assets_preview_fallback" in trail_blob and (not preview_fallback_assets or preview_fallback_has_non_formula_asset))
             or _markdown_has_unlocalized_downloaded_ieee_mediastore_asset(envelope)
         ):
@@ -676,8 +682,6 @@ def normalize_body_assets(article: Any, sample_dir: Path) -> int:
         return 0
     assets = list(getattr(article, "assets", []) or [])
     body_asset_dir = sample_dir / "body_assets"
-    if body_asset_dir.exists():
-        shutil.rmtree(body_asset_dir)
     body_asset_dir.mkdir(parents=True, exist_ok=True)
 
     used_names: set[str] = set()
@@ -686,9 +690,14 @@ def normalize_body_assets(article: Any, sample_dir: Path) -> int:
         source_path = local_existing_asset_path(asset)
         if source_path is None:
             continue
-        filename = unique_asset_filename(source_path, used_names)
-        destination = body_asset_dir / filename
-        if source_path.resolve() != destination.resolve():
+        source_resolved = source_path.resolve()
+        body_asset_resolved = body_asset_dir.resolve()
+        if source_resolved.parent == body_asset_resolved:
+            destination = source_path
+            used_names.add(source_path.name)
+        else:
+            filename = unique_asset_filename(source_path, used_names)
+            destination = body_asset_dir / filename
             shutil.copy2(source_path, destination)
         if isinstance(asset, Asset):
             asset.path = str(destination)
@@ -834,6 +843,18 @@ def _emit_sample_result_log(result: GoldenCriteriaLiveResult) -> None:
         elapsed_seconds=result.elapsed_seconds,
         stage_timings=dict(result.stage_timings),
         http_cache_stats=dict(result.http_cache_stats),
+    )
+
+
+def _emit_sample_start_log(sample: GoldenCriteriaLiveSample) -> None:
+    emit_structured_log(
+        logger,
+        logging.DEBUG,
+        "golden_criteria_live_sample_start",
+        sample_id=sample.sample_id,
+        provider=sample.provider,
+        doi=sample.doi,
+        title=sample.title,
     )
 
 
@@ -1074,6 +1095,7 @@ def fetch_sample_result(
     transport: HttpTransport,
     clients: Mapping[str, Any],
 ) -> GoldenCriteriaLiveResult:
+    _emit_sample_start_log(sample)
     started_at = time.monotonic()
     cache_stats_before = _transport_cache_stats(transport)
     fetch_seconds = 0.0
@@ -1335,16 +1357,20 @@ def run_golden_criteria_live_review(
         sample_dir = sample_output_dir(output_root, sample)
         sample_dir.mkdir(parents=True, exist_ok=True)
         if not sample.supported:
+            _emit_sample_start_log(sample)
             result = skipped_result(sample, sample_dir)
             result = apply_expected_outcome(sample, result)
             review = ensure_review_file(result, sample_dir)
-            results_by_sample_id[sample.sample_id] = result_with_review_summary(result, review)
+            reviewed_result = result_with_review_summary(result, review)
+            _emit_sample_result_log(reviewed_result)
+            results_by_sample_id[sample.sample_id] = reviewed_result
 
     for sample in schedule_supported_samples(selected_samples):
         sample_dir = sample_output_dir(output_root, sample)
         sample_dir.mkdir(parents=True, exist_ok=True)
         provider_status_entry = provider_status_by_provider.get(sample.provider, {})
         if provider_status_entry and not bool(provider_status_entry.get("available")):
+            _emit_sample_start_log(sample)
             result = precheck_blocked_result(
                 sample,
                 sample_dir,
@@ -1352,7 +1378,9 @@ def run_golden_criteria_live_review(
             )
             result = apply_expected_outcome(sample, result)
             review = ensure_review_file(result, sample_dir)
-            results_by_sample_id[sample.sample_id] = result_with_review_summary(result, review)
+            reviewed_result = result_with_review_summary(result, review)
+            _emit_sample_result_log(reviewed_result)
+            results_by_sample_id[sample.sample_id] = reviewed_result
             continue
         result = fetch_sample_result(
             sample,

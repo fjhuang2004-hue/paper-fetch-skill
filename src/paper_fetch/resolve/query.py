@@ -12,6 +12,13 @@ from typing import Any, Mapping
 
 from rapidfuzz import fuzz
 
+from ..arxiv_id import (
+    arxiv_id_from_doi,
+    arxiv_id_from_query,
+    arxiv_id_from_url,
+    canonical_arxiv_abs_url,
+    canonical_arxiv_doi,
+)
 from ..config import build_runtime_env, build_user_agent
 from ..errors import ProviderFailure
 from ..extraction.html.landing import fetch_landing_html
@@ -108,6 +115,27 @@ def resolve_query(
     normalized_query = query.strip()
     if not normalized_query:
         raise ProviderFailure("not_supported", "Query must not be empty.")
+
+    direct_arxiv_id = arxiv_id_from_query(normalized_query)
+    if direct_arxiv_id and (arxiv_id_from_url(normalized_query) or normalized_query.lower().startswith("arxiv:")):
+        return ResolvedQuery(
+            query=normalized_query,
+            query_kind="url" if is_url(normalized_query) else "arxiv_id",
+            doi=canonical_arxiv_doi(direct_arxiv_id),
+            landing_url=canonical_arxiv_abs_url(direct_arxiv_id),
+            provider_hint="arxiv",
+            confidence=1.0,
+        )
+    if direct_arxiv_id and not is_url(normalized_query):
+        direct_arxiv_doi = canonical_arxiv_doi(direct_arxiv_id)
+        return ResolvedQuery(
+            query=normalized_query,
+            query_kind="doi" if arxiv_id_from_doi(normalized_query) else "arxiv_id",
+            doi=direct_arxiv_doi,
+            landing_url=canonical_arxiv_abs_url(direct_arxiv_id),
+            provider_hint="arxiv",
+            confidence=1.0,
+        )
 
     active_transport = transport or HttpTransport()
     active_env = env or build_runtime_env()

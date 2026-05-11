@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from ..artifacts import ArtifactStore
 from ..models import ArticleModel, FetchEnvelope, OutputMode, RenderOptions
+from ..models.markdown import replace_markdown_images
 from ..provider_catalog import known_article_source_names
 from ..tracing import download_marker, fallback_marker, merge_trace, source_trail_from_trace, trace_from_markers
 from ..utils import extend_unique, normalize_text, sanitize_filename
@@ -133,6 +134,8 @@ def _local_asset_lookups(
             "original_url",
             "download_url",
             "source_url",
+            "source_path",
+            "source_href",
             "preview_url",
             "full_size_url",
             "link",
@@ -205,8 +208,30 @@ def rewrite_markdown_asset_links(
             return match.group(0)
         return f"{prefix}{relative_path}{match.group(3)}"
 
+    def rewrite_image(image: Any) -> str:
+        destination = normalize_text(image.url).strip("<>")
+        relative_path = relative_asset_link(destination, target_path=target_path)
+        if relative_path is None:
+            destination_candidates = _image_reference_candidates(destination)
+            for candidate in destination_candidates:
+                relative_path = local_assets_by_reference.get(candidate)
+                if relative_path is not None:
+                    break
+            if relative_path is None:
+                for candidate in destination_candidates:
+                    relative_path = local_assets_by_candidate_basename.get(_reference_basename(candidate))
+                    if relative_path is not None:
+                        break
+            if relative_path is None:
+                relative_path = local_assets_by_basename.get(_remote_asset_basename(destination) or "")
+        if relative_path is None:
+            return image.text
+        title = f' "{image.title}"' if image.title else ""
+        return f"![{image.alt}]({relative_path}{title})"
+
+    markdown = replace_markdown_images(markdown, rewrite_image)
     return re.sub(
-        r"(!?\[[^\]]*\]\()([^)]+)(\))",
+        r"((?<!!)\[[^\]]*\]\()([^)]+)(\))",
         rewrite_inline_match,
         markdown,
     )

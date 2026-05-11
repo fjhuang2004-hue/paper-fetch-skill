@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from paper_fetch.providers import _flaresolverr
+from paper_fetch.providers.arxiv import ArxivClient
 from paper_fetch.providers.base import ProviderFailure
 from paper_fetch.providers.crossref import CrossrefClient
 from paper_fetch.providers.elsevier import ElsevierClient
@@ -105,6 +106,20 @@ class ProviderStatusTests(unittest.TestCase):
         checks = {check.name: check for check in result.checks}
         self.assertEqual(checks["html_route"].status, "ok")
         self.assertEqual(checks["pdf_fallback"].status, "ok")
+
+    def test_arxiv_api_html_and_pdf_routes_are_ready_without_env(self) -> None:
+        result = ArxivClient(DummyTransport(), {}).probe_status()
+
+        self.assertEqual(result.status, "ready")
+        self.assertTrue(result.available)
+        self.assertEqual(result.missing_env, [])
+        checks = {check.name: check for check in result.checks}
+        self.assertEqual(checks["metadata_api"].status, "ok")
+        self.assertEqual(checks["html_route"].status, "ok")
+        self.assertEqual(checks["html_route"].details["mode"], "direct_http_html")
+        self.assertEqual(checks["pdf_fallback"].status, "ok")
+        self.assertEqual(checks["pdf_fallback"].details["mode"], "direct_http_pdf")
+        self.assertEqual(set(checks), {"metadata_api", "html_route", "pdf_fallback"})
 
     def test_wiley_missing_runtime_and_token_is_not_configured(self) -> None:
         result = WileyClient(DummyTransport(), {}).probe_status()

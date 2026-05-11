@@ -88,7 +88,7 @@
 ### `source`
 
 - 公开给调用方的粗粒度结果来源。
-- 例如 `elsevier_xml`、`elsevier_pdf`、`springer_html`、`wiley_browser`、`science`、`pnas`、`ieee_html`、`ieee_pdf`、`crossref_meta`、`metadata_only`。
+- 例如 `elsevier_xml`、`elsevier_pdf`、`springer_html`、`wiley_browser`、`science`、`pnas`、`ieee_html`、`ieee_pdf`、`arxiv_html`、`arxiv_pdf`、`copernicus_xml`、`copernicus_pdf`、`crossref_meta`、`metadata_only`。
 
 ### `source_trail`
 
@@ -129,7 +129,7 @@
 - `preview` 不是天然错误；当宽高满足阈值且 `source_trail` 有 preview accepted 轨迹时，是可接受降级。
 - preview 降级仍必须导出自包含 Markdown；如果正文图片链接能映射到已下载本地资产，最终 `.md` 不应残留远端图片 URL。
 - `wiley` / `science` / `pnas` 的 challenge 恢复链路只接受能识别为图片的 FlareSolverr `solution.imagePayload`，包括浏览器导出的 PNG 和原始 SVG；不会再把图片文档 screenshot 裁剪成正文图片资产，也不会把 challenge HTML 保存成图片。
-- live review 中，只有公式图片发生 preview fallback 时不自动归为 `asset_download_failure`；figure/table preview fallback 仍需要 accepted 轨迹或其它证据才能降噪。
+- live review 中，只有公式图片发生 preview fallback 时不自动归为 `asset_download_failure`；figure/table preview fallback 仍需要 accepted 轨迹或其它证据才能降噪。资产下载 warning、`asset_failures` 轨迹或 `quality.asset_failures` 会归为 `asset_download_failure`。
 
 ### `semantic_losses`
 
@@ -169,6 +169,7 @@
 
 - golden criteria live review 的 `stage_timings` 包含 `fetch_seconds`、`materialize_seconds`、`total_seconds`、`resolve_seconds`、`metadata_seconds`、`fulltext_seconds`、`asset_seconds`、`formula_seconds`、`render_seconds`。
 - 每个 sample 的 `http_cache_stats` 表示该 sample 执行前后差值；最终汇总日志仍可查看 `HttpTransport.cache_stats_snapshot()` 的累计快照。
+- live runner supported provider 包含 `arxiv`；只要能从 DOI/URL 推导 arXiv ID，会先走 official HTML，再合并可用的 arXiv API metadata 与 HTML front matter。arXiv API 429/临时失败只保留 metadata degraded 诊断，不阻塞 HTML fulltext，也不应造成 `Untitled Article` / `metadata_loss`。arXiv official HTML 的正文图片下载走 direct `HttpTransport` 图片请求，不通过 HTML seed 构造 cookie opener；网络类单图失败会顺序重试并保留 per-asset 诊断。HTML 不可用、返回非 HTML、正文不足或质量检测失败时直接进入 PDF fallback；PDF fallback 只产出正文文本，不下载正文 figure 或 supplementary 资产。
 
 ## 一句话阅读建议
 

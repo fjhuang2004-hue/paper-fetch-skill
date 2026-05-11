@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, cast
 import urllib.parse
 
+from ..arxiv_id import arxiv_id_from_doi
 from ..config import build_user_agent
 from ..extraction.html.landing import fetch_landing_html
 from ..http import HttpTransport, RequestFailure
@@ -263,7 +264,18 @@ def probe_official_provider(
     clients: Mapping[str, object],
     context: RuntimeContext | None = None,
 ) -> RouteProbeResult:
-    if provider_name != "elsevier":
+    if provider_name == "arxiv":
+        arxiv_id = arxiv_id_from_doi(doi)
+        if not arxiv_id:
+            return RouteProbeResult(provider=provider_name, state="negative")
+        from ..providers.arxiv import minimal_arxiv_metadata
+
+        return RouteProbeResult(
+            provider=provider_name,
+            state="positive",
+            metadata=minimal_arxiv_metadata(arxiv_id, doi=doi, metadata={}),
+        )
+    if provider_name not in {"elsevier", "arxiv"}:
         return RouteProbeResult(provider=provider_name, state="unknown")
     if not isinstance(clients.get(provider_name), MetadataProvider):
         return RouteProbeResult(provider=provider_name, state="unknown")

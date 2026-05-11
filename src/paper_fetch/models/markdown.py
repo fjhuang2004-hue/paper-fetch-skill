@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 import html
 import re
 from typing import Any
@@ -36,6 +38,24 @@ MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\([^)]+\)")
 
 
 MARKDOWN_IMAGE_LINK_PATTERN = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+
+@dataclass(frozen=True)
+class MarkdownImageMatch:
+    start: int
+    end: int
+    alt: str
+    url: str
+    title: str
+    attrs: str
+    attrs_start: int | None
+    text: str
+
+    @property
+    def text_without_attrs(self) -> str:
+        if self.attrs_start is None:
+            return self.text
+        return self.text[: self.attrs_start - self.start].rstrip()
 
 
 MARKDOWN_BLOCK_IMAGE_ALT_PATTERN = re.compile(
@@ -92,6 +112,122 @@ INLINE_HTML_AFTER_SUBSUP_WORD_PATTERN = re.compile(r"(</(?:sub|sup)>)(?=[A-Za-z0
 INLINE_HTML_AFTER_SUBSUP_PUNCT_PATTERN = re.compile(r"(</(?:sub|sup)>)\s+([,.;:%\]\}\+\)])", flags=re.IGNORECASE)
 
 
+def _find_balanced_markdown_delimiter(text: str, start: int, opener: str, closer: str) -> int:
+    depth = 1
+    index = start + 1
+    while index < len(text):
+        char = text[index]
+        if char == "\\":
+            index += 2
+            continue
+        if char == opener:
+            depth += 1
+        elif char == closer:
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return -1
+
+
+def _split_markdown_image_destination(raw_destination: str) -> tuple[str, str]:
+    destination = raw_destination.strip()
+    if not destination:
+        return "", ""
+    if destination.startswith("<"):
+        close_index = destination.find(">")
+        if close_index > 0:
+            url = destination[1:close_index]
+            title = destination[close_index + 1 :].strip()
+            return url, title
+    match = re.match(r"(?P<url>\S+)(?:\s+(?P<title>.*))?\s*$", destination, flags=re.DOTALL)
+    if match is None:
+        return destination, ""
+    return match.group("url") or "", (match.group("title") or "").strip()
+
+
+def _parse_markdown_image_at(text: str, start: int) -> MarkdownImageMatch | None:
+    if not text.startswith("![", start):
+        return None
+
+    alt_open = start + 1
+    alt_close = _find_balanced_markdown_delimiter(text, alt_open, "[", "]")
+    if alt_close < 0:
+        return None
+    if alt_close + 1 >= len(text) or text[alt_close + 1] != "(":
+        return None
+
+    destination_open = alt_close + 1
+    destination_close = _find_balanced_markdown_delimiter(text, destination_open, "(", ")")
+    if destination_close < 0:
+        return None
+
+    attrs = ""
+    attrs_start: int | None = None
+    end = destination_close + 1
+    attr_probe = end
+    while attr_probe < len(text) and text[attr_probe] in " \t":
+        attr_probe += 1
+    if attr_probe < len(text) and text[attr_probe] == "{":
+        attr_close = text.find("}", attr_probe + 1)
+        if attr_close >= 0 and "\n" not in text[attr_probe : attr_close + 1]:
+            attrs_start = attr_probe
+            attrs = text[attr_probe : attr_close + 1]
+            end = attr_close + 1
+
+    url, title = _split_markdown_image_destination(text[destination_open + 1 : destination_close])
+    return MarkdownImageMatch(
+        start=start,
+        end=end,
+        alt=text[alt_open + 1 : alt_close],
+        url=url,
+        title=title,
+        attrs=attrs,
+        attrs_start=attrs_start,
+        text=text[start:end],
+    )
+
+
+def iter_markdown_images(markdown_text: str) -> Iterator[MarkdownImageMatch]:
+    text = str(markdown_text or "")
+    index = 0
+    while index < len(text):
+        start = text.find("![", index)
+        if start < 0:
+            return
+        match = _parse_markdown_image_at(text, start)
+        if match is None:
+            index = start + 2
+            continue
+        yield match
+        index = match.end
+
+
+def replace_markdown_images(
+    markdown_text: str,
+    replace: Callable[[MarkdownImageMatch], str],
+) -> str:
+    text = str(markdown_text or "")
+    pieces: list[str] = []
+    cursor = 0
+    for image in iter_markdown_images(text):
+        pieces.append(text[cursor : image.start])
+        pieces.append(replace(image))
+        cursor = image.end
+    if cursor == 0:
+        return text
+    pieces.append(text[cursor:])
+    return "".join(pieces)
+
+
+def markdown_image_fullmatch(markdown_text: str) -> MarkdownImageMatch | None:
+    text = str(markdown_text or "")
+    image = _parse_markdown_image_at(text, 0)
+    if image is not None and image.end == len(text):
+        return image
+    return None
+
+
 def normalize_markdown_text(value: str | None) -> str:
     text = (value or "").replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
     normalized_lines: list[str] = []
@@ -133,28 +269,28 @@ def _is_standalone_markdown_image_alt(alt_text: str) -> bool:
 
 
 def _is_standalone_markdown_image_line(line: str) -> bool:
-    match = MARKDOWN_IMAGE_LINK_PATTERN.fullmatch(line.strip())
-    return bool(match and _is_standalone_markdown_image_alt(match.group(1)))
+    match = markdown_image_fullmatch(line.strip())
+    return bool(match and _is_standalone_markdown_image_alt(match.alt))
 
 
 def _split_markdown_image_adjacency_line(line: str) -> list[str]:
-    matches = list(MARKDOWN_IMAGE_LINK_PATTERN.finditer(line))
+    matches = list(iter_markdown_images(line))
     if not matches:
         return [line]
 
     stripped = line.strip()
-    if MARKDOWN_IMAGE_LINK_PATTERN.fullmatch(stripped):
+    if markdown_image_fullmatch(stripped):
         return [line]
 
     split_required = False
     for match in matches:
-        prefix = line[: match.start()]
-        suffix = line[match.end() :]
-        if _is_block_markdown_image_alt(match.group(1)):
+        prefix = line[: match.start]
+        suffix = line[match.end :]
+        if _is_block_markdown_image_alt(match.alt):
             split_required = True
             break
         if (
-            _is_standalone_markdown_image_alt(match.group(1))
+            _is_standalone_markdown_image_alt(match.alt)
             and re.search(r"\b(?:equation|formula)\b", normalize_text(prefix), flags=re.IGNORECASE)
             and not normalize_text(suffix)
         ):
@@ -169,11 +305,11 @@ def _split_markdown_image_adjacency_line(line: str) -> list[str]:
     pieces: list[str] = []
     cursor = 0
     for match in matches:
-        prefix = line[cursor : match.start()]
+        prefix = line[cursor : match.start]
         if normalize_text(prefix):
             pieces.append(prefix.rstrip())
-        pieces.append(match.group(0))
-        cursor = match.end()
+        pieces.append(match.text)
+        cursor = match.end
     suffix = line[cursor:]
     if normalize_text(suffix):
         pieces.append(suffix.strip())
@@ -286,7 +422,7 @@ def normalize_markdown_prose_line(line: str) -> str:
 
 
 def strip_markdown_images(text: str) -> str:
-    stripped = MARKDOWN_IMAGE_PATTERN.sub("", text)
+    stripped = replace_markdown_images(text, lambda _image: "")
     return normalize_markdown_text(stripped)
 
 
@@ -365,6 +501,7 @@ __all__ = [
     "MARKDOWN_IMAGE_URL_PATTERN",
     "MARKDOWN_IMAGE_PATTERN",
     "MARKDOWN_IMAGE_LINK_PATTERN",
+    "MarkdownImageMatch",
     "MARKDOWN_BLOCK_IMAGE_ALT_PATTERN",
     "MARKDOWN_STANDALONE_IMAGE_ALT_PATTERN",
     "TABLE_LIKE_FIGURE_ASSET_PATTERN",
@@ -381,6 +518,9 @@ __all__ = [
     "INLINE_HTML_AFTER_SUBSUP_WORD_PATTERN",
     "INLINE_HTML_AFTER_SUBSUP_PUNCT_PATTERN",
     "normalize_markdown_text",
+    "iter_markdown_images",
+    "replace_markdown_images",
+    "markdown_image_fullmatch",
     "should_preserve_markdown_line",
     "normalize_markdown_prose_line",
     "strip_markdown_images",

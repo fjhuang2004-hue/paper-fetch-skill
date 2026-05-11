@@ -13,7 +13,7 @@ from ...extraction.html.formula_rules import (
     looks_like_formula_image,
     mathml_element_from_html_node,
 )
-from ...extraction.html.inline import normalize_html_inline_text
+from ...extraction.html.inline import normalize_html_inline_text, render_html_inline_node
 from ...extraction.html.semantics import (
     ABSTRACT_ATTR_TOKENS as ABSTRACT_TOKENS,
     ANCILLARY_TOKENS,
@@ -43,7 +43,7 @@ from ...extraction.html.tables import (
     table_rows,
     wrap_table_text_fragment,
 )
-from ...markdown.citations import is_citation_link, make_numeric_citation_sentinel, numeric_citation_payload
+from ...markdown.citations import is_citation_link, numeric_citation_payload
 from ...utils import normalize_text
 from .._article_markdown_math import render_external_mathml_expression
 from .._science_pnas_profiles import publisher_profile as _publisher_profile
@@ -124,49 +124,23 @@ def _normalize_non_table_inline_text(value: str) -> str:
 
 
 def _render_non_table_inline_fragment(node: Any, *, text_style: str | None = None) -> str:
-    if NavigableString is not None and isinstance(node, NavigableString):
-        return _wrap_table_text_fragment(str(node), text_style)
-    if not isinstance(node, Tag):
-        return ""
-
-    name = normalize_text(node.name or "").lower()
-    payload = _numeric_citation_payload_from_inline_node(node)
-    if payload is not None:
-        return make_numeric_citation_sentinel(payload) or ""
-    if name == "img" and _looks_like_formula_image_node(node):
-        return _formula_image_markdown(node)
-    if name == "a":
-        return _render_non_table_inline_node(node, text_style=text_style)
-    if name in {"i", "em"}:
-        return _render_non_table_inline_node(node, text_style="*")
-    if name in {"b", "strong"}:
-        return _render_non_table_inline_node(node, text_style="**")
-    if name == "sub":
-        text = _render_non_table_inline_node(node)
-        return f"<sub>{text}</sub>" if text else ""
-    if name == "sup":
-        text = _render_non_table_inline_node(node)
-        return f"<sup>{text}</sup>" if text else ""
-    if name == "br":
-        return "<br>"
     return _render_non_table_inline_node(node, text_style=text_style)
 
 
 def _render_non_table_inline_node(node: Any, *, text_style: str | None = None) -> str:
-    if node is None:
-        return ""
-    if NavigableString is not None and isinstance(node, NavigableString):
-        return _wrap_table_text_fragment(str(node), text_style)
-    if not isinstance(node, Tag):
-        return ""
+    return render_html_inline_node(
+        node,
+        policy="body",
+        text_style=text_style,
+        citation_payload_from_node=_numeric_citation_payload_from_inline_node,
+        raw_markdown_from_node=_non_table_raw_markdown_from_node,
+    )
 
-    parts: list[str] = []
-    for child in node.children:
-        rendered_child = _render_non_table_inline_fragment(child, text_style=text_style)
-        if rendered_child:
-            parts.append(rendered_child)
 
-    return _normalize_non_table_inline_text("".join(parts))
+def _non_table_raw_markdown_from_node(node: Any) -> str | None:
+    if isinstance(node, Tag) and normalize_text(node.name or "").lower() == "img" and _looks_like_formula_image_node(node):
+        return _formula_image_markdown(node)
+    return None
 
 
 def _render_non_table_inline_text(node: Any) -> str:

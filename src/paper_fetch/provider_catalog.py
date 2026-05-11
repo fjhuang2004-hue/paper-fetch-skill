@@ -125,6 +125,19 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         client_factory_path="paper_fetch.providers.ieee:IeeeClient",
         status_order=6,
     ),
+    "arxiv": ProviderSpec(
+        name="arxiv",
+        display_name="arXiv",
+        official=True,
+        domains=("arxiv.org",),
+        doi_prefixes=("10.48550/",),
+        publisher_aliases=("arxiv",),
+        asset_default="body",
+        probe_capability="metadata_api",
+        abstract_only_policy="metadata_fallback",
+        client_factory_path="paper_fetch.providers.arxiv:ArxivClient",
+        status_order=7,
+    ),
     "copernicus": ProviderSpec(
         name="copernicus",
         display_name="Copernicus",
@@ -167,7 +180,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         probe_capability="routing_signal",
         abstract_only_policy="metadata_fallback",
         client_factory_path="paper_fetch.providers.copernicus:CopernicusClient",
-        status_order=7,
+        status_order=8,
     ),
 }
 
@@ -181,6 +194,8 @@ SOURCE_PROVIDER_MAP: dict[str, str] = {
     "pnas": "pnas",
     "ieee_html": "ieee",
     "ieee_pdf": "ieee",
+    "arxiv_html": "arxiv",
+    "arxiv_pdf": "arxiv",
     "copernicus_xml": "copernicus",
     "copernicus_pdf": "copernicus",
 }

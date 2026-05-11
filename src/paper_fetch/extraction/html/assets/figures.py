@@ -35,7 +35,9 @@ class _FigureParser(HTMLParser):
         self.assets: list[dict[str, str]] = []
         self._in_figure = False
         self._in_figcaption = False
-        self._current_src = ""
+        self._current_images: list[dict[str, str]] = []
+        self._current_id = ""
+        self._current_caption_parts: list[str] = []
         self._caption_parts: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -43,36 +45,68 @@ class _FigureParser(HTMLParser):
         lowered_tag = tag.lower()
         if lowered_tag == "figure":
             self._in_figure = True
-            self._current_src = ""
+            self._current_images = []
+            self._current_id = attributes.get("id", "").strip()
+            self._current_caption_parts = []
             self._caption_parts = []
-        elif self._in_figure and lowered_tag == "img" and not self._current_src:
-            self._current_src = attributes.get("src", "").strip()
+        elif self._in_figure and lowered_tag == "img":
+            self._current_images.append(
+                {
+                    "src": attributes.get("src", "").strip(),
+                    "image_id": attributes.get("id", "").strip(),
+                    "alt": attributes.get("alt", "").strip(),
+                }
+            )
         elif self._in_figure and lowered_tag == "figcaption":
             self._in_figcaption = True
+            self._current_caption_parts = []
 
     def handle_endtag(self, tag: str) -> None:
         lowered_tag = tag.lower()
         if lowered_tag == "figcaption":
+            caption = normalize_text(" ".join(self._current_caption_parts))
+            if caption:
+                self._caption_parts.append(caption)
             self._in_figcaption = False
         elif lowered_tag == "figure":
-            caption = normalize_text(" ".join(self._caption_parts))
-            if self._current_src or caption:
+            captions = [normalize_text(caption) for caption in self._caption_parts if normalize_text(caption)]
+            images = list(self._current_images)
+            if not images and captions:
+                images = [{"src": "", "image_id": "", "alt": ""}]
+            for index, image in enumerate(images):
+                caption = _caption_for_image_index(captions, index)
+                alt_text = normalize_text(image.get("alt", ""))
                 self.assets.append(
                     {
                         "kind": "figure",
-                        "heading": caption[:80] or "Figure",
+                        "heading": caption[:80] or alt_text or "Figure",
                         "caption": caption,
-                        "url": self._current_src,
+                        "url": image.get("src", ""),
+                        "dom_id": self._current_id,
+                        "image_id": image.get("image_id", ""),
+                        "asset_order": str(index),
                     }
                 )
             self._in_figure = False
             self._in_figcaption = False
-            self._current_src = ""
+            self._current_images = []
+            self._current_id = ""
+            self._current_caption_parts = []
             self._caption_parts = []
 
     def handle_data(self, data: str) -> None:
         if self._in_figcaption and data.strip():
-            self._caption_parts.append(data)
+            self._current_caption_parts.append(data)
+
+
+def _caption_for_image_index(captions: list[str], image_index: int) -> str:
+    if not captions:
+        return ""
+    if len(captions) == 1:
+        return captions[0]
+    if image_index < len(captions):
+        return captions[image_index]
+    return captions[-1]
 
 
 def _figure_caption_from_soup(node: Any, soup: Any) -> str:
@@ -153,56 +187,149 @@ def _figure_full_size_url_from_soup(node: Any, source_url: str) -> str:
     return ""
 
 
-def _figure_asset_from_soup_node(node: Any, soup: Any, source_url: str) -> dict[str, str] | None:
-    if Tag is None or not isinstance(node, Tag):
+def _image_source_candidate(image: Any) -> Any:
+    if Tag is None or not isinstance(image, Tag):
         return None
+    picture = image.find_parent("picture")
+    if isinstance(picture, Tag):
+        source = picture.find("source")
+        if isinstance(source, Tag):
+            return source
+    return None
 
-    image = node.find("img")
-    source = node.find("source")
-    preview_url = _soup_attr_url(image, *PREVIEW_IMAGE_ATTRS) if image else ""
-    if not preview_url:
-        preview_url = _soup_attr_url(source, "srcset", "data-srcset") if source else ""
-    full_size_url = _figure_full_size_url_from_soup(node, source_url)
-    if not full_size_url and image is not None:
-        full_size_url = _soup_attr_url(image, *FULL_SIZE_IMAGE_ATTRS)
-    if not full_size_url and source is not None:
+
+def _image_anchor_url(image: Any, node: Any, source_url: str) -> str:
+    if Tag is None or not isinstance(image, Tag):
+        return ""
+    anchor = image.find_parent("a", href=True)
+    if not isinstance(anchor, Tag):
+        return ""
+    current: Any = anchor
+    while isinstance(current, Tag):
+        if current is node:
+            href = normalize_text(str(anchor.get("href") or ""))
+            if href and not href.startswith("#"):
+                return urllib.parse.urljoin(source_url, href)
+            return ""
+        current = getattr(current, "parent", None)
+    return ""
+
+
+def _image_full_size_url_from_soup(image: Any, node: Any, source_url: str, *, single_image: bool) -> str:
+    if Tag is None or not isinstance(image, Tag):
+        return ""
+    full_size_url = _soup_attr_url(image, *FULL_SIZE_IMAGE_ATTRS)
+    source = _image_source_candidate(image)
+    if not full_size_url and isinstance(source, Tag):
         full_size_url = _soup_attr_url(source, *FULL_SIZE_IMAGE_ATTRS)
-    if not full_size_url and looks_like_full_size_asset_url(preview_url):
-        full_size_url = preview_url
-    absolute_preview_url = urllib.parse.urljoin(source_url, preview_url) if preview_url else ""
-    absolute_full_size_url = urllib.parse.urljoin(source_url, full_size_url) if full_size_url else ""
+    if full_size_url:
+        return urllib.parse.urljoin(source_url, full_size_url)
+
+    anchor_url = _image_anchor_url(image, node, source_url)
+    if anchor_url and looks_like_full_size_asset_url(anchor_url):
+        return anchor_url
+
+    if single_image:
+        return _figure_full_size_url_from_soup(node, source_url)
+    return ""
+
+
+def _image_preview_url_from_soup(image: Any, source_url: str) -> str:
+    if Tag is None or not isinstance(image, Tag):
+        return ""
+    source = _image_source_candidate(image)
+    preview_url = _soup_attr_url(image, *PREVIEW_IMAGE_ATTRS)
+    if not preview_url and isinstance(source, Tag):
+        preview_url = _soup_attr_url(source, "srcset", "data-srcset")
+    return urllib.parse.urljoin(source_url, preview_url) if preview_url else ""
+
+
+def _figure_caption_texts_from_soup(node: Any) -> list[str]:
+    if Tag is None or not isinstance(node, Tag):
+        return []
+    captions: list[str] = []
+    for figcaption in node.find_all("figcaption"):
+        if not isinstance(figcaption, Tag):
+            continue
+        caption = normalize_text(figcaption.get_text(" ", strip=True))
+        if caption:
+            captions.append(caption)
+    return captions
+
+
+def _figure_assets_from_soup_node(node: Any, soup: Any, source_url: str) -> list[dict[str, str]]:
+    if Tag is None or not isinstance(node, Tag):
+        return []
+
     figure_page_url = _figure_page_url_from_soup(node, source_url)
-    if (
-        absolute_full_size_url
-        and figure_page_url
-        and absolute_full_size_url == figure_page_url
-        and not looks_like_full_size_asset_url(absolute_full_size_url)
-    ):
-        absolute_full_size_url = ""
+    dom_id = normalize_text(str(node.get("id") or ""))
+    captions = _figure_caption_texts_from_soup(node)
+    images = [image for image in node.find_all("img") if isinstance(image, Tag)]
+    if not images:
+        caption = _figure_caption_from_soup(node, soup)
+        if not caption:
+            return []
+        return [
+            {
+                "kind": "figure",
+                "heading": caption[:80] or "Figure",
+                "caption": caption,
+                "url": "",
+                "section": "body",
+                **({"dom_id": dom_id} if dom_id else {}),
+            }
+        ]
 
-    caption = _figure_caption_from_soup(node, soup)
-    alt_text = normalize_text(str(image.get("alt") or "")) if isinstance(image, Tag) else ""
-    heading = caption[:80] or alt_text or "Figure"
-    if not caption and alt_text:
-        caption = alt_text
+    single_image = len(images) == 1
+    assets: list[dict[str, str]] = []
+    for index, image in enumerate(images):
+        absolute_preview_url = _image_preview_url_from_soup(image, source_url)
+        absolute_full_size_url = _image_full_size_url_from_soup(
+            image,
+            node,
+            source_url,
+            single_image=single_image,
+        )
+        if (
+            absolute_full_size_url
+            and figure_page_url
+            and absolute_full_size_url == figure_page_url
+            and not looks_like_full_size_asset_url(absolute_full_size_url)
+        ):
+            absolute_full_size_url = ""
+        if not absolute_full_size_url and looks_like_full_size_asset_url(absolute_preview_url):
+            absolute_full_size_url = absolute_preview_url
 
-    if not preview_url and not full_size_url and not caption:
-        return None
+        caption = _caption_for_image_index(captions, index)
+        alt_text = normalize_text(str(image.get("alt") or ""))
+        heading = caption[:80] or alt_text or "Figure"
+        if not caption and alt_text:
+            caption = alt_text
 
-    asset: dict[str, str] = {
-        "kind": "figure",
-        "heading": heading,
-        "caption": caption,
-        "url": absolute_full_size_url or absolute_preview_url,
-        "section": "body",
-    }
-    if absolute_preview_url:
-        asset["preview_url"] = absolute_preview_url
-    if absolute_full_size_url:
-        asset["full_size_url"] = absolute_full_size_url
-    if figure_page_url:
-        asset["figure_page_url"] = figure_page_url
-    return asset
+        if not absolute_preview_url and not absolute_full_size_url and not caption:
+            continue
+
+        asset: dict[str, str] = {
+            "kind": "figure",
+            "heading": heading,
+            "caption": caption,
+            "url": absolute_full_size_url or absolute_preview_url,
+            "section": "body",
+            "asset_order": str(index),
+        }
+        image_id = normalize_text(str(image.get("id") or ""))
+        if dom_id:
+            asset["dom_id"] = dom_id
+        if image_id:
+            asset["image_id"] = image_id
+        if absolute_preview_url:
+            asset["preview_url"] = absolute_preview_url
+        if absolute_full_size_url:
+            asset["full_size_url"] = absolute_full_size_url
+        if figure_page_url:
+            asset["figure_page_url"] = figure_page_url
+        assets.append(asset)
+    return assets
 
 
 def _extract_figure_assets_with_soup(html_text: str, source_url: str) -> list[dict[str, str]]:
@@ -214,6 +341,8 @@ def _extract_figure_assets_with_soup(html_text: str, source_url: str) -> list[di
     seen_nodes: set[int] = set()
 
     for node in soup.find_all("figure"):
+        if node.find("figure") is not None:
+            continue
         node_id = id(node)
         if node_id not in seen_nodes:
             seen_nodes.add(node_id)
@@ -221,29 +350,27 @@ def _extract_figure_assets_with_soup(html_text: str, source_url: str) -> list[di
 
     assets_by_key: dict[tuple[str, str, str], dict[str, str]] = {}
     for node in candidates:
-        asset = _figure_asset_from_soup_node(node, soup, source_url)
-        if asset is None:
-            continue
-        figure_page_url = normalize_text(asset.get("figure_page_url") or "")
-        preview_url = normalize_text(asset.get("url") or "")
-        caption = normalize_text(asset.get("caption") or "")
-        heading = normalize_text(asset.get("heading") or "")
-        key = (figure_page_url or preview_url, preview_url, "figure")
-        existing = assets_by_key.get(key)
-        if existing is None:
-            assets_by_key[key] = asset
-            continue
+        for asset in _figure_assets_from_soup_node(node, soup, source_url):
+            figure_page_url = normalize_text(asset.get("figure_page_url") or "")
+            preview_url = normalize_text(asset.get("url") or "")
+            caption = normalize_text(asset.get("caption") or "")
+            heading = normalize_text(asset.get("heading") or "")
+            key = (preview_url or figure_page_url, preview_url, "figure")
+            existing = assets_by_key.get(key)
+            if existing is None:
+                assets_by_key[key] = asset
+                continue
 
-        existing_caption = normalize_text(existing.get("caption") or "")
-        existing_heading = normalize_text(existing.get("heading") or "")
-        if len(caption) > len(existing_caption):
-            existing["caption"] = caption
-        if len(heading) > len(existing_heading):
-            existing["heading"] = heading
-        if figure_page_url and not normalize_text(existing.get("figure_page_url") or ""):
-            existing["figure_page_url"] = figure_page_url
-        if preview_url and not normalize_text(existing.get("url") or ""):
-            existing["url"] = preview_url
+            existing_caption = normalize_text(existing.get("caption") or "")
+            existing_heading = normalize_text(existing.get("heading") or "")
+            if len(caption) > len(existing_caption):
+                existing["caption"] = caption
+            if len(heading) > len(existing_heading):
+                existing["heading"] = heading
+            if figure_page_url and not normalize_text(existing.get("figure_page_url") or ""):
+                existing["figure_page_url"] = figure_page_url
+            if preview_url and not normalize_text(existing.get("url") or ""):
+                existing["url"] = preview_url
 
     return list(assets_by_key.values())
 
@@ -267,6 +394,9 @@ def extract_figure_assets(html_text: str, source_url: str) -> list[dict[str, str
                 "caption": item.get("caption", ""),
                 "url": urllib.parse.urljoin(source_url, url) if url else "",
                 "section": "body",
+                "dom_id": item.get("dom_id", ""),
+                "image_id": item.get("image_id", ""),
+                "asset_order": item.get("asset_order", ""),
             }
         )
     return assets

@@ -36,6 +36,7 @@ provider 与环境变量说明见 [`providers.md`](providers.md)，Wiley / Scien
 - 这是在线一键安装入口：用户不需要手动下载浏览器和 FlareSolverr 依赖，但脚本仍会从官方来源拉取这些大型组件
 - 如果只想安装 Python 包和配置骨架，不准备浏览器链路，使用 `./install.sh --lite`
 - 如果要装进当前 `python3` 环境而不是 `.venv`，使用 `./install.sh --system`
+- arXiv 不需要本地转换器；official HTML 不可用或质量检测失败时直接进入 text-only PDF fallback
 - 如果只想跳过某个重型部分，可使用 `--skip-playwright-install` 或 `--skip-flaresolverr-setup`
 
 ### 离线包
@@ -257,6 +258,7 @@ scripts/clean-local-artifacts.sh --days 7
 - `wiley` / `science` / `pnas` 还需要 Playwright Chromium，因为 PNAS direct HTML preflight、HTML 正文图片资产下载和 seeded-browser PDF/ePDF fallback 都会使用 browser context
 - `elsevier` 只需要 `ELSEVIER_API_KEY`
 - `ieee` 不需要额外 env；普通 fetch 在无授权或 REST/browser/PDF route 返回非全文时会降级到 provider abstract-only / metadata-only；golden criteria live review 面向具备合法 IEEE Xplore 授权上下文的机器，IEEE 样本预期为 fulltext，降级会作为 blocked live fetch 暴露；配置了 `download_dir` 时 PDF fallback 的最后一个非 PDF HTML 会保存在 `ieee_pdf_fallback/pdf.failure.html`
+- `arxiv` 不需要额外 env；golden criteria live review 已纳入 arXiv 样本。只要 DOI/URL 可推导 arXiv ID，会优先走 official HTML，再合并可用的 arXiv API metadata 与 HTML front matter；API 429/临时失败不会阻塞 HTML fulltext，也不应造成 `Untitled Article` / `metadata_loss`。HTML 成功时正文 figure 资产从 official HTML 下载；PDF fallback 保持 text-only。
 - 如果只想启用 `wiley` 的官方 TDM API PDF lane，可以只配置 `WILEY_TDM_CLIENT_TOKEN`；这不会启用 HTML 资产下载或 seeded-browser PDF/ePDF fallback
 - `wiley` 现在走 `FlareSolverr HTML -> seeded-browser publisher PDF/ePDF -> Wiley TDM API PDF -> abstract-only / metadata-only`
 - 本地 FlareSolverr 限速变量与账本已移除；browser workflow 不再读取 `FLARESOLVERR_MIN_INTERVAL_SECONDS`、`FLARESOLVERR_MAX_REQUESTS_PER_HOUR` 或 `FLARESOLVERR_MAX_REQUESTS_PER_DAY`

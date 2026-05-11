@@ -92,6 +92,15 @@ def _provider_status_payload(**kwargs):
                 "notes": [],
                 "checks": [],
             },
+            {
+                "provider": "arxiv",
+                "status": "ready",
+                "available": True,
+                "official_provider": True,
+                "missing_env": [],
+                "notes": [],
+                "checks": [],
+            },
         ]
     }
 
@@ -185,6 +194,9 @@ def _metadata_only_envelope(doi: str) -> FetchEnvelope:
 
 
 class GoldenCriteriaLiveTests(unittest.TestCase):
+    def test_supported_providers_include_arxiv(self) -> None:
+        self.assertIn("arxiv", SUPPORTED_PROVIDERS)
+
     def test_manifest_loader_selects_golden_samples_and_classifies_provider_support(self) -> None:
         manifest = load_manifest()
         samples = iter_golden_criteria_samples(manifest)
@@ -344,6 +356,33 @@ class GoldenCriteriaLiveTests(unittest.TestCase):
             rendered = (sample_dir / "extracted.md").read_text(encoding="utf-8")
             self.assertIn("](body_assets/figure_one.png)", rendered)
 
+    def test_materialize_fetch_artifacts_keeps_assets_already_in_body_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            sample_dir = root / "sample"
+            body_asset_dir = sample_dir / "body_assets"
+            body_asset_dir.mkdir(parents=True)
+            source_asset = body_asset_dir / "figure-source.png"
+            source_asset.write_bytes(b"figure")
+
+            article = sample_article()
+            article.assets = [
+                Asset(kind="figure", heading="Figure 1", caption="A figure.", path=str(source_asset), section="body")
+            ]
+            envelope = build_envelope(article)
+
+            count = materialize_fetch_artifacts(
+                envelope=envelope,
+                sample_dir=sample_dir,
+                render=RenderOptions(include_refs="all", asset_profile="body", max_tokens="full_text"),
+            )
+
+            self.assertEqual(count, 1)
+            self.assertTrue(source_asset.exists())
+            rendered = (sample_dir / "extracted.md").read_text(encoding="utf-8")
+            self.assertIn("](body_assets/figure-source.png)", rendered)
+            self.assertNotIn(str(source_asset), rendered)
+
     def test_materialize_fetch_artifacts_rewrites_ieee_large_link_to_preview_asset(self) -> None:
         large_url = "https://ieeexplore.ieee.org/mediastore/IEEE/content/media/10932570/garg7-0932570-large.gif"
         preview_url = "https://ieeexplore.ieee.org/mediastore/IEEE/content/media/10932570/garg7-0932570-small.gif"
@@ -405,9 +444,7 @@ class GoldenCriteriaLiveTests(unittest.TestCase):
             "download:science_assets_saved_profile_body",
             "download:science_assets_preview_accepted",
         ]
-        envelope.warnings = [
-            "Science figure downloads used preview images for 4 asset(s), but their saved dimensions met the acceptance threshold."
-        ]
+        envelope.warnings = []
 
         categories = issue_categories_for_result(status="fulltext", envelope=envelope)
 
@@ -487,6 +524,31 @@ class GoldenCriteriaLiveTests(unittest.TestCase):
 
         self.assertIn("asset_download_failure", categories)
 
+    def test_related_assets_could_not_be_downloaded_warning_is_asset_issue(self) -> None:
+        article = sample_article()
+        envelope = build_envelope(article)
+        envelope.warnings = ["arXiv related assets could not be downloaded: Network error for image: timed out."]
+
+        categories = issue_categories_for_result(status="fulltext", envelope=envelope)
+
+        self.assertIn("asset_download_failure", categories)
+
+    def test_quality_asset_failures_are_asset_issue(self) -> None:
+        article = sample_article()
+        article.quality.asset_failures = [
+            {
+                "kind": "figure",
+                "heading": "Figure 1",
+                "source_url": "https://arxiv.org/html/2605.06663v1/x1.png",
+                "reason": "Network error for image: timed out.",
+            }
+        ]
+        envelope = build_envelope(article)
+
+        categories = issue_categories_for_result(status="fulltext", envelope=envelope)
+
+        self.assertIn("asset_download_failure", categories)
+
     def test_references_block_mixed_numbered_and_bullet_items_is_reference_loss(self) -> None:
         """rule: rule-fulltext-reference-priority"""
         article = sample_article()
@@ -546,9 +608,7 @@ class GoldenCriteriaLiveTests(unittest.TestCase):
             content_kind="fulltext",
             source="science",
             has_fulltext=True,
-            warnings=[
-                "Science figure downloads used preview images for 4 asset(s), but their saved dimensions met the acceptance threshold."
-            ],
+            warnings=[],
             source_trail=[
                 "download:science_assets_saved_profile_body",
                 "download:science_assets_preview_accepted",
