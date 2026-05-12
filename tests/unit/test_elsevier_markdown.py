@@ -7,6 +7,7 @@ from pathlib import Path
 
 from paper_fetch.providers._article_markdown_common import render_inline_text
 from paper_fetch.providers import _article_markdown_elsevier_document as elsevier_document
+from paper_fetch.providers import _elsevier_xml_rules as elsevier_rules
 from paper_fetch.providers import _article_markdown_math as article_markdown_math
 from paper_fetch.models import article_from_markdown, article_from_structure
 from tests.golden_criteria import golden_criteria_asset, golden_criteria_scenario_asset
@@ -105,6 +106,31 @@ class ElsevierMarkdownTests(unittest.TestCase):
         self.assertIsNotNone(structure)
         assert structure is not None
         self.assertEqual(structure.authors, ["Jane Doe", "Smith, J.", "Open Climate Consortium"])
+
+    def test_elsevier_structure_builder_dispatch_rejects_unknown_provider(self) -> None:
+        structure = elsevier_document.build_article_structure(
+            provider="not_elsevier",
+            metadata={"doi": "10.1016/test", "title": "Unsupported"},
+            xml_body=b"<article/>",
+            xml_path=Path("unsupported.xml"),
+            assets=[],
+        )
+
+        self.assertIsNone(structure)
+        self.assertIsNone(
+            elsevier_document.build_markdown_document(
+                provider="not_elsevier",
+                metadata={"doi": "10.1016/test", "title": "Unsupported"},
+                xml_body=b"<article/>",
+                xml_path=Path("unsupported.xml"),
+                assets=[],
+            )
+        )
+
+    def test_elsevier_asset_group_requires_numbered_author_manuscript_key(self) -> None:
+        self.assertEqual(elsevier_rules.infer_elsevier_asset_group_key("am1.docx"), "am1")
+        self.assertEqual(elsevier_rules.infer_elsevier_asset_group_key("frame123.pdf"), "frame123.pdf")
+        self.assertTrue(elsevier_rules.should_ignore_elsevier_section_title("Graphical Abstract"))
 
     def test_build_article_structure_extracts_numbered_xml_references(self) -> None:
         """rule: rule-elsevier-xml-references"""

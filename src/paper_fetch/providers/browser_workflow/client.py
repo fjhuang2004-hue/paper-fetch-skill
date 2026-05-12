@@ -13,13 +13,13 @@ from ...extraction.html.assets import (
     download_supplementary_assets as _download_supplementary_assets,
     split_body_and_supplementary_assets,
 )
-from ...extraction.html.signals import SciencePnasHtmlFailure
+from ...extraction.html.signals import HtmlExtractionFailure
 from ...metadata.types import ProviderMetadata
 from ...models import AssetProfile
 from ...publisher_identity import normalize_doi
 from ...runtime import RuntimeContext
 from ...tracing import download_marker, fulltext_marker, trace_from_markers
-from ...utils import empty_asset_results, normalize_text
+from ...utils import empty_asset_results, normalize_text, provider_display_name
 from .shared import (
     build_browser_workflow_html_candidates,
     build_browser_workflow_pdf_candidates,
@@ -55,8 +55,8 @@ from .fetchers import (
     _flaresolverr_image_document_payload,
     _flaresolverr_image_payload_failure_reason,
 )
-from ..science_pnas import (
-    extract_science_pnas_markdown as _extract_science_pnas_markdown,
+from ..atypon_browser_workflow import (
+    extract_atypon_browser_workflow_markdown as _extract_atypon_browser_workflow_markdown,
 )
 from .article import (
     _finalize_abstract_only_provider_article,
@@ -121,11 +121,9 @@ class BrowserWorkflowClient(ProviderClient):
 
     def provider_label(self) -> str:
         profile = self.profile
-        return (
-            profile.label
-            if profile is not None
-            else ("PNAS" if self.name == "pnas" else self.name.title())
-        )
+        if profile is not None and profile.label:
+            return profile.label
+        return provider_display_name(self.name)
 
     def allow_pdf_fallback_after_html_failure(
         self,
@@ -224,7 +222,7 @@ class BrowserWorkflowClient(ProviderClient):
         profile = self.require_profile()
         publisher = normalize_text(profile.markdown_publisher) or profile.name
         return _facade_attr(
-            "extract_science_pnas_markdown", _extract_science_pnas_markdown
+            "extract_atypon_browser_workflow_markdown", _extract_atypon_browser_workflow_markdown
         )(
             html_text,
             final_url,
@@ -309,7 +307,9 @@ class BrowserWorkflowClient(ProviderClient):
                 ProviderWaterfallStep(
                     label="pdf",
                     run=run_pdf_fallback,
-                    success_markers=(fulltext_marker(self.name, "ok", route="pdf_fallback"),),
+                    success_markers=(
+                        fulltext_marker(self.name, "ok", route="pdf_fallback"),
+                    ),
                 )
             ],
             initial_warnings=[*bootstrap.warnings, initial_warning],
@@ -439,7 +439,7 @@ class BrowserWorkflowClient(ProviderClient):
                 asset_profile=asset_profile,
                 context=context,
             )
-        except SciencePnasHtmlFailure:
+        except HtmlExtractionFailure:
             return empty_asset_results()
         if not article_assets:
             return empty_asset_results()

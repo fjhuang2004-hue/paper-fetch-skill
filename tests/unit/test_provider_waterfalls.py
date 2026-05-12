@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from paper_fetch.http import RequestFailure
-import paper_fetch.providers.springer_html as springer_html
+from paper_fetch.providers import _springer_html as springer_html
 from paper_fetch.providers import _flaresolverr, browser_workflow, elsevier as elsevier_provider, springer as springer_provider, wiley as wiley_provider
 from paper_fetch.providers.base import ProviderContent, ProviderFailure, RawFulltextPayload
 from paper_fetch.runtime import RuntimeContext
@@ -682,7 +682,7 @@ class PublisherWaterfallTests(unittest.TestCase):
         self.assertEqual(mocked_pdf.call_args.kwargs["seed_urls"], [landing_url])
         self.assertEqual(_payload_route(raw_payload), "pdf_fallback")
         self.assertTrue(raw_payload.needs_local_copy)
-        self.assertEqual(article.source, "springer_html")
+        self.assertEqual(article.source, "springer_pdf")
         self.assertIn("fulltext:springer_html_fail", article.quality.source_trail)
         self.assertIn("fulltext:springer_pdf_fallback_ok", article.quality.source_trail)
         self.assertTrue(
@@ -834,7 +834,7 @@ class PublisherWaterfallTests(unittest.TestCase):
         ):
             result = client.fetch_result(doi, metadata, None)
 
-        self.assertEqual(result.article.source, "springer_html")
+        self.assertEqual(result.article.source, "springer_pdf")
         self.assertEqual(result.article.quality.content_kind, "fulltext")
         self.assertIn("fulltext:springer_html_fail", result.article.quality.source_trail)
         self.assertIn("fulltext:springer_pdf_fallback_ok", result.article.quality.source_trail)
@@ -871,7 +871,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                 ),
                 mock.patch.object(
                     browser_workflow,
-                    "extract_science_pnas_markdown",
+                    "extract_atypon_browser_workflow_markdown",
                     return_value=(f"# {WILEY_SAMPLE.title}\n\n## Results\n\n" + ("Body text " * 120), {"title": WILEY_SAMPLE.title}),
                 ),
                 mock.patch.object(wiley_provider, "_fetch_wiley_tdm_pdf_result") as mocked_api,
@@ -907,7 +907,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                 mock.patch.object(
                     browser_workflow,
                     "fetch_html_with_flaresolverr",
-                    side_effect=browser_workflow.SciencePnasHtmlFailure(
+                    side_effect=browser_workflow.HtmlExtractionFailure(
                         "insufficient_fulltext",
                         "HTML content does not look like a complete full-text article.",
                     ),
@@ -1103,7 +1103,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                 mock.patch.object(
                     browser_workflow,
                     "fetch_html_with_flaresolverr",
-                    side_effect=browser_workflow.SciencePnasHtmlFailure(
+                    side_effect=browser_workflow.HtmlExtractionFailure(
                         "insufficient_fulltext",
                         "HTML content does not look like a complete full-text article.",
                     ),

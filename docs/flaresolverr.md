@@ -171,8 +171,10 @@ PAPER_FETCH_RUN_LIVE=1 \
 FLARESOLVERR_ENV_FILE="$PWD/vendor/flaresolverr/.env.flaresolverr-source-headless" \
 PYTHONPATH=src pytest -n 0 \
   tests/live/test_live_publishers.py::LivePublisherTests::test_wiley_doi_live_fulltext \
-  tests/live/test_live_science_pnas.py
+  tests/live/test_live_atypon_browser_workflow.py
 ```
+
+这里使用 `-n 0` 是因为 live browser/provider 测试共享本地 FlareSolverr 服务、真实站点状态和外部限流；普通 unit / integration 验证仍复用 `pyproject.toml` 的并行配置。
 
 ## 常见失败与排障
 

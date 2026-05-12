@@ -12,27 +12,12 @@ from ..models import (
     filtered_body_sections,
     strip_markdown_images,
 )
+from ..provider_catalog import provider_for_source, sources_by_provider
 from ..utils import normalize_text
+from .html_signals import authorless_heading_signatures_for_provider
 
-EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER = {
-    "elsevier": frozenset({"elsevier_xml", "elsevier_pdf"}),
-    "springer": frozenset({"springer_html"}),
-    "wiley": frozenset({"wiley_browser"}),
-    "science": frozenset({"science"}),
-    "pnas": frozenset({"pnas"}),
-    "ieee": frozenset({"ieee_html", "ieee_pdf"}),
-    "arxiv": frozenset({"arxiv_html", "arxiv_pdf"}),
-    "copernicus": frozenset({"copernicus_xml", "copernicus_pdf"}),
-}
+EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER = sources_by_provider()
 ASCII_DOI_PATTERN = re.compile(r"^10\.\d{4,9}/[!-~]+$")
-RESEARCH_BRIEFING_HEADING_SIGNATURE = (
-    "the question",
-    "the discovery",
-    "the implications",
-    "expert opinion",
-    "behind the paper",
-    "from the editor",
-)
 ABSTRACT_INFLATED_TOKEN_THRESHOLD = 900
 ABSTRACT_INFLATED_CHAR_THRESHOLD = 3500
 ABSTRACT_INFLATED_WITH_OVERLAP_TOKEN_THRESHOLD = 600
@@ -123,7 +108,10 @@ def collect_issue_flags(provider: str, envelope: FetchEnvelope, *, status: str) 
         issue_flags.append("refs_doi_not_normalized")
     if status == "fulltext" and envelope.source not in EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER.get(provider, frozenset()):
         issue_flags.append("unexpected_source_path")
-    if article is not None and not getattr(metadata, "authors", []) and not is_authorless_briefing_like(article):
+    if article is not None and not getattr(metadata, "authors", []) and not is_authorless_briefing_like(
+        article,
+        provider=provider,
+    ):
         issue_flags.append("empty_authors")
     if len(envelope.warnings) >= 3:
         issue_flags.append("high_warning_count")
@@ -164,7 +152,7 @@ def has_inflated_abstract(
     return False
 
 
-def is_authorless_briefing_like(article: Any) -> bool:
+def is_authorless_briefing_like(article: Any, *, provider: str | None = None) -> bool:
     headings = [
         normalize_text(getattr(section, "heading", "")).lower()
         for section in filtered_body_sections(getattr(article, "sections", []) or [])
@@ -172,8 +160,12 @@ def is_authorless_briefing_like(article: Any) -> bool:
     ]
     if not headings:
         return False
+    provider_name = provider or provider_for_source(getattr(article, "source", "")) or getattr(article, "source", "")
+    signatures = authorless_heading_signatures_for_provider(provider_name)
+    if not signatures:
+        return False
     heading_set = set(headings)
-    return all(item in heading_set for item in RESEARCH_BRIEFING_HEADING_SIGNATURE)
+    return any(all(item in heading_set for item in signature) for signature in signatures)
 
 
 def overlap_chunks(text: str) -> list[str]:

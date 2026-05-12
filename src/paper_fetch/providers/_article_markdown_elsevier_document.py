@@ -248,9 +248,8 @@ def extract_elsevier_references(root: ET.Element) -> list[Reference]:
     return references
 
 
-def build_article_structure(
+def _build_elsevier_article_structure(
     *,
-    provider: str,
     metadata: Mapping[str, Any],
     xml_body: bytes,
     xml_path: Path,
@@ -276,25 +275,39 @@ def build_article_structure(
     used_figure_keys: set[str] = set()
     used_table_keys: set[str] = set()
     formula_renders = []
-    if provider == "elsevier":
-        abstract_node = first_descendant(root, "abstract")
-        body_node = first_descendant(root, "body")
-        abstract_lines = render_elsevier_blocks(
-            abstract_node,
-            heading_level=3,
-            formula_renders=formula_renders,
+    abstract_node = first_descendant(root, "abstract")
+    body_node = first_descendant(root, "body")
+    abstract_lines = render_elsevier_blocks(
+        abstract_node,
+        heading_level=3,
+        formula_renders=formula_renders,
+    )
+    if not abstract_lines:
+        fallback_abstract = normalize_text(
+            str(metadata.get("abstract") or child_text(first_descendant(root, "coredata"), "description"))
         )
-        if not abstract_lines:
-            fallback_abstract = normalize_text(
-                str(metadata.get("abstract") or child_text(first_descendant(root, "coredata"), "description"))
-            )
-            if fallback_abstract:
-                abstract_lines = [fallback_abstract, ""]
-        table_lookup, table_entries = elsevier_table_registry(root, assets, xml_path.with_suffix(".md"))
-        figure_lookup, figure_entries = elsevier_figure_registry(root, assets, xml_path.with_suffix(".md"))
-        body_lines = render_elsevier_blocks(
-            body_node,
-            heading_level=3,
+        if fallback_abstract:
+            abstract_lines = [fallback_abstract, ""]
+    table_lookup, table_entries = elsevier_table_registry(root, assets, xml_path.with_suffix(".md"))
+    figure_lookup, figure_entries = elsevier_figure_registry(root, assets, xml_path.with_suffix(".md"))
+    body_lines = render_elsevier_blocks(
+        body_node,
+        heading_level=3,
+        figure_lookup=figure_lookup,
+        figure_entries=figure_entries,
+        used_figure_keys=used_figure_keys,
+        table_lookup=table_lookup,
+        used_table_keys=used_table_keys,
+        formula_renders=formula_renders,
+    )
+    head_availability_lines: list[str] = []
+    for availability_node in _iter_elements_by_local_name(root, "data-availability"):
+        if _contains_element(body_node, availability_node):
+            continue
+        availability_title = child_text(availability_node, "section-title") or child_text(availability_node, "title")
+        availability_body_lines = render_elsevier_blocks(
+            availability_node,
+            heading_level=4,
             figure_lookup=figure_lookup,
             figure_entries=figure_entries,
             used_figure_keys=used_figure_keys,
@@ -302,30 +315,13 @@ def build_article_structure(
             used_table_keys=used_table_keys,
             formula_renders=formula_renders,
         )
-        head_availability_lines: list[str] = []
-        for availability_node in _iter_elements_by_local_name(root, "data-availability"):
-            if _contains_element(body_node, availability_node):
-                continue
-            availability_title = child_text(availability_node, "section-title") or child_text(availability_node, "title")
-            availability_body_lines = render_elsevier_blocks(
-                availability_node,
-                heading_level=4,
-                figure_lookup=figure_lookup,
-                figure_entries=figure_entries,
-                used_figure_keys=used_figure_keys,
-                table_lookup=table_lookup,
-                used_table_keys=used_table_keys,
-                formula_renders=formula_renders,
-            )
-            normalized_availability_title = normalize_text(availability_title)
-            if normalized_availability_title and availability_body_lines:
-                head_availability_lines.extend([f"### {normalized_availability_title}", ""])
-            head_availability_lines.extend(availability_body_lines)
-        body_lines.extend(head_availability_lines)
-        supplement_entries = elsevier_supplement_entries(root, assets, xml_path.with_suffix(".md"))
-        references = extract_elsevier_references(root)
-    else:
-        return None
+        normalized_availability_title = normalize_text(availability_title)
+        if normalized_availability_title and availability_body_lines:
+            head_availability_lines.extend([f"### {normalized_availability_title}", ""])
+        head_availability_lines.extend(availability_body_lines)
+    body_lines.extend(head_availability_lines)
+    supplement_entries = elsevier_supplement_entries(root, assets, xml_path.with_suffix(".md"))
+    references = extract_elsevier_references(root)
 
     semantic_losses = SemanticLosses(
         table_fallback_count=sum(1 for entry in table_entries if normalize_text(str(entry.get("kind") or "")) == "fallback"),
@@ -358,6 +354,32 @@ def build_article_structure(
     )
 
 
+_ARTICLE_STRUCTURE_BUILDERS = {
+    "elsevier": _build_elsevier_article_structure,
+}
+
+
+def build_article_structure(
+    *,
+    provider: str,
+    metadata: Mapping[str, Any],
+    xml_body: bytes,
+    xml_path: Path,
+    assets: list[dict[str, Any]],
+    xml_root: ET.Element | None = None,
+) -> ArticleStructure | None:
+    builder = _ARTICLE_STRUCTURE_BUILDERS.get(provider)
+    if builder is None:
+        return None
+    return builder(
+        metadata=metadata,
+        xml_body=xml_body,
+        xml_path=xml_path,
+        assets=assets,
+        xml_root=xml_root,
+    )
+
+
 def build_markdown_document(
     *,
     provider: str,
@@ -367,9 +389,6 @@ def build_markdown_document(
     assets: list[dict[str, Any]],
     xml_root: ET.Element | None = None,
 ) -> str | None:
-    if provider != "elsevier":
-        return None
-
     structure = build_article_structure(
         provider=provider,
         metadata=metadata,

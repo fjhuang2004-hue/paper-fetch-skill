@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from ...config import build_user_agent
 from ...extraction.html.assets import extract_scoped_html_assets
-from ...extraction.html.signals import SciencePnasHtmlFailure, detect_html_block, summarize_html
+from ...extraction.html.signals import HtmlExtractionFailure, detect_html_block, summarize_html
 from ...metadata.types import ProviderMetadata
 from ...models import AssetProfile
 from ...runtime import RuntimeContext
@@ -21,9 +21,9 @@ from .._flaresolverr import (
     FlareSolverrFailure,
     fetch_html_with_flaresolverr,
 )
-from ..science_pnas import (
+from ..atypon_browser_workflow import (
     extract_browser_workflow_asset_html_scopes,
-    extract_science_pnas_markdown,
+    extract_atypon_browser_workflow_markdown,
     rewrite_inline_figure_links,
 )
 from ..base import ProviderContent, RawFulltextPayload
@@ -58,7 +58,7 @@ __all__ = [
     "_fetch_flaresolverr_html_payload",
     "_fetch_flaresolverr_html_payload_with_fast_path",
     "extract_browser_workflow_asset_html_scopes",
-    "extract_science_pnas_markdown",
+    "extract_atypon_browser_workflow_markdown",
     "fetch_html_with_direct_playwright",
     "rewrite_inline_figure_links",
 ]
@@ -169,16 +169,16 @@ def fetch_html_with_direct_playwright(
     context: RuntimeContext | None = None,
 ) -> FetchedPublisherHtml:
     if not candidate_urls:
-        raise SciencePnasHtmlFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
+        raise HtmlExtractionFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
     try:
         from playwright.sync_api import sync_playwright
     except Exception as exc:
-        raise SciencePnasHtmlFailure(
+        raise HtmlExtractionFailure(
             "playwright_unavailable",
             f"Playwright is not available for direct {publisher} HTML preflight: {exc}",
         ) from exc
 
-    last_failure: SciencePnasHtmlFailure | None = None
+    last_failure: HtmlExtractionFailure | None = None
     manager = None
     browser = None
     browser_context = None
@@ -225,7 +225,7 @@ def fetch_html_with_direct_playwright(
                 html_text = page.content()
                 title = normalize_text(str(page.title() or "")) or None
             except Exception as exc:
-                last_failure = SciencePnasHtmlFailure(
+                last_failure = HtmlExtractionFailure(
                     "playwright_direct_failed",
                     normalize_text(str(exc)) or f"Direct {publisher} Playwright HTML preflight failed.",
                 )
@@ -239,7 +239,7 @@ def fetch_html_with_direct_playwright(
                 last_failure = detected
                 continue
             if not normalize_text(html_text):
-                last_failure = SciencePnasHtmlFailure(
+                last_failure = HtmlExtractionFailure(
                     "empty_html_response",
                     f"Direct {publisher} Playwright HTML preflight returned empty HTML.",
                 )
@@ -274,7 +274,7 @@ def fetch_html_with_direct_playwright(
 
     if last_failure is not None:
         raise last_failure
-    raise SciencePnasHtmlFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
+    raise HtmlExtractionFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
 
 
 def _browser_workflow_html_payload(
@@ -353,7 +353,7 @@ def _fetch_flaresolverr_html_payload(
 def _should_retry_fast_flaresolverr_failure(exc: Exception) -> bool:
     if isinstance(exc, FlareSolverrFailure):
         return exc.kind in _FAST_FLARESOLVERR_RETRY_KINDS
-    if isinstance(exc, SciencePnasHtmlFailure):
+    if isinstance(exc, HtmlExtractionFailure):
         return True
     return False
 
@@ -381,7 +381,7 @@ def _fetch_flaresolverr_html_payload_with_fast_path(
             wait_seconds=_FAST_FLARESOLVERR_HTML_WAIT_SECONDS,
             warm_wait_seconds=_FAST_FLARESOLVERR_HTML_WARM_WAIT_SECONDS,
         )
-    except (FlareSolverrFailure, SciencePnasHtmlFailure) as exc:
+    except (FlareSolverrFailure, HtmlExtractionFailure) as exc:
         if not _should_retry_fast_flaresolverr_failure(exc):
             raise
         logger.debug(

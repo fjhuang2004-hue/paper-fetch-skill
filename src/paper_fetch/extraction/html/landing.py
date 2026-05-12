@@ -81,17 +81,11 @@ def fetch_landing_html(
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     retry_on_transient: bool = True,
     max_redirects: int = 0,
-    redirect_base: str = "response_url",
     raise_on_redirect_limit: bool = False,
     decoder: HtmlDecoder = decode_html,
     metadata_parser: HtmlMetadataParser = parse_html_metadata,
 ) -> LandingHtmlFetchResult:
-    """Fetch a landing HTML page and parse provider-neutral metadata.
-
-    ``redirect_base`` preserves legacy caller behavior for relative redirect
-    resolution: ``response_url`` uses the response URL as the base, while
-    ``current_url`` uses the URL that was requested for that hop.
-    """
+    """Fetch a landing HTML page and parse provider-neutral metadata."""
 
     current_url = landing_url
     request_headers = dict(headers or {})
@@ -113,9 +107,7 @@ def fetch_landing_html(
                 decoder=decoder,
                 metadata_parser=metadata_parser,
             )
-        final_url = _response_url(response, current_url)
-        base_url = current_url if redirect_base == "current_url" else final_url
-        current_url = urllib.parse.urljoin(base_url, redirect_location)
+        current_url = urllib.parse.urljoin(current_url, redirect_location)
         response = transport.request(
             "GET",
             current_url,

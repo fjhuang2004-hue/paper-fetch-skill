@@ -1,15 +1,56 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
 
-from paper_fetch.providers import _pdf_candidates, _pdf_common, _pdf_fallback
+from paper_fetch.providers import (
+    _flaresolverr,
+    _pdf_candidates,
+    _pdf_common,
+    _pdf_fallback,
+)
 from tests.unit._paper_fetch_support import RecordingTransport
 
 
 class PdfFallbackHelperTests(unittest.TestCase):
+    def test_sanitize_storage_state_uses_shared_cloudflare_cookie_tokens(self) -> None:
+        self.assertIs(
+            _pdf_common.CLOUDFLARE_COOKIE_NAMES,
+            _flaresolverr.CLOUDFLARE_COOKIE_NAMES,
+        )
+        self.assertIs(
+            _pdf_common._CLOUDFLARE_COOKIE_PREFIXES,
+            _flaresolverr._CLOUDFLARE_COOKIE_PREFIXES,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_path = Path(tmpdir) / "state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "cookies": [
+                            {"name": "_cfuvid", "value": "1"},
+                            {"name": "__cf_bm", "value": "2"},
+                            {"name": "cf_clearance", "value": "3"},
+                            {"name": "cf_chl_rc_ni", "value": "4"},
+                            {"name": "session", "value": "kept"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            sanitized_path = _pdf_common.sanitize_storage_state(state_path)
+            try:
+                sanitized = json.loads(sanitized_path.read_text(encoding="utf-8"))
+            finally:
+                sanitized_path.unlink(missing_ok=True)
+
+        self.assertEqual(sanitized["cookies"], [{"name": "session", "value": "kept"}])
+
     def test_pdf_fallback_strategy_delegates_http_fetch_options(self) -> None:
         calls: list[dict[str, object]] = []
 
@@ -86,6 +127,15 @@ class PdfFallbackHelperTests(unittest.TestCase):
 
         self.assertIn("https://example.org/viewer.html?file=/doi/pdfdirect/10.1111/test", candidates)
         self.assertIn("https://example.org/doi/pdfdirect/10.1111/test", candidates)
+
+    def test_pdf_url_token_groups_document_shared_and_route_specific_semantics(self) -> None:
+        for token in _pdf_candidates.PDF_URL_COMMON_TOKENS:
+            self.assertIn(token, _pdf_candidates.PDF_HREF_TOKENS)
+            self.assertIn(token, _pdf_candidates.BROWSER_WORKFLOW_PDF_URL_TOKENS)
+
+        self.assertIn("/pdfft", _pdf_candidates.PDF_HREF_TOKENS)
+        self.assertNotIn("/pdfft", _pdf_candidates.BROWSER_WORKFLOW_PDF_URL_TOKENS)
+        self.assertIn("/fullpdf", _pdf_candidates.BROWSER_WORKFLOW_PDF_URL_TOKENS)
 
     def test_rule_based_pdf_candidates_cover_springer(self) -> None:
         springer_candidates = _pdf_candidates.build_springer_pdf_candidates(

@@ -1,10 +1,10 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
-from ._science_pnas_provider_support import *
+from ._atypon_browser_workflow_provider_support import *
 
 
-class SciencePnasProviderAssetDownloadTests(SciencePnasProviderTestCase):
+class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProviderTestCase):
     def test_science_provider_download_related_assets_body_profile_ignores_supplementary(self) -> None:
         html = """
 <article>
@@ -472,7 +472,7 @@ class SciencePnasProviderAssetDownloadTests(SciencePnasProviderTestCase):
                 mock.patch.object(browser_workflow, "ensure_runtime_ready"),
                 mock.patch.object(browser_workflow, "fetch_html_with_flaresolverr") as mocked_fetch,
                 mock.patch.object(
-                    science_pnas_asset_scopes,
+                    atypon_browser_workflow_asset_scopes,
                     "extract_scoped_html_assets",
                     return_value=[
                         {

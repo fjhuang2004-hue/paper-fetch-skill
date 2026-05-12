@@ -15,7 +15,30 @@ class IeeeProviderRouteTests(unittest.TestCase):
 
         self.assertEqual(metadata["articleNumber"], "10388355")
         self.assertEqual(ieee_provider._article_number_from_url("https://ieeexplore.ieee.org/document/10388355/"), "10388355")
+        self.assertEqual(ieee_provider._article_number_from_url("https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10388355"), "")
+        self.assertEqual(ieee_provider._article_number_from_url("https://ieeexplore.ieee.org/rest/document/10388355/references"), "")
         self.assertTrue(metadata["isDynamicHtml"])
+
+    def test_ieee_block_page_detection_is_cached_in_runtime_context(self) -> None:
+        context = RuntimeContext(env={})
+        html = "<html><body>Your request has been blocked. Verify you are human.</body></html>"
+        try:
+            with mock.patch.object(
+                ieee_provider,
+                "_scan_ieee_block_page_tokens",
+                wraps=ieee_provider._scan_ieee_block_page_tokens,
+            ) as scanner:
+                for _ in range(2):
+                    with self.assertRaises(ieee_provider.ProviderFailure):
+                        ieee_provider._extract_ieee_html(
+                            html,
+                            "https://ieeexplore.ieee.org/rest/document/10388355/?logAccess=true",
+                            metadata={"title": "Blocked"},
+                            context=context,
+                        )
+                self.assertEqual(scanner.call_count, 1)
+        finally:
+            context.close()
     def test_landing_attempt_merges_ieee_keywords_and_reference_text(self) -> None:
         """rule: rule-ieee-landing-metadata-references
         rule: rule-fulltext-reference-priority"""

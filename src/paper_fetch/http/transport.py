@@ -36,6 +36,7 @@ from .errors import (
     RequestCancelledError,
     RequestFailure,
     build_network_error_detail,
+    classify_network_error,
     is_timeout_network_error,
 )
 from .retry import (
@@ -392,6 +393,7 @@ class HttpTransport(CacheMixin, RetryMixin, BodyMixin):
                         None,
                         f"Network error for {redact_url_for_cache(url)}: {build_network_error_detail(exc)}",
                         url=redact_url_for_cache(url),
+                        error_category=classify_network_error(exc),
                     ) from exc
                 except (socket.timeout, TimeoutError) as exc:
                     if self._retry_remaining(transient_policy) > 0:
@@ -426,6 +428,7 @@ class HttpTransport(CacheMixin, RetryMixin, BodyMixin):
                         None,
                         f"Network error for {redact_url_for_cache(url)}: {exc}",
                         url=redact_url_for_cache(url),
+                        error_category=classify_network_error(exc),
                     ) from exc
                 finally:
                     if response is not None:

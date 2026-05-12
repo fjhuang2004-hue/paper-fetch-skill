@@ -1,4 +1,4 @@
-"""Internal compatibility aggregator for split Science/PNAS helpers."""
+"""Internal compatibility aggregator for split Atypon browser-workflow helpers."""
 
 from __future__ import annotations
 

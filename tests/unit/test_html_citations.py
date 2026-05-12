@@ -9,6 +9,11 @@ from paper_fetch.markdown.citations import (
     make_numeric_citation_sentinel,
     normalize_inline_citation_markdown,
 )
+from paper_fetch.providers.html_springer_nature import (
+    SPRINGER_NATURE_CITATION_LABEL_PATTERNS,
+    SPRINGER_NATURE_FIGURE_LINE_PATTERNS,
+    SPRINGER_NATURE_INLINE_LINK_UNWRAP_PATTERNS,
+)
 
 
 class HtmlCitationsTests(unittest.TestCase):
@@ -25,6 +30,7 @@ class HtmlCitationsTests(unittest.TestCase):
         self.assertTrue(is_citation_link("#core-collateral-r5", "5"))
         self.assertFalse(is_citation_link("/articles/example", "1"))
         self.assertFalse(is_citation_link("#Fig1", "1"))
+        self.assertFalse(is_citation_link("#references", "1"))
         self.assertFalse(is_citation_link("#gcb16414-bib-0007", "2019"))
 
     def test_clean_citation_markers_preserves_year_ranges(self) -> None:
@@ -36,15 +42,34 @@ class HtmlCitationsTests(unittest.TestCase):
         cleaned = clean_citation_markers(
             "See [details](/articles/example#ref-CR1) and Fig 1 for context.",
             unwrap_inline_links=True,
+            inline_link_patterns=SPRINGER_NATURE_INLINE_LINK_UNWRAP_PATTERNS,
             normalize_labels=True,
         )
 
         self.assertEqual(cleaned, "See details and Fig1 for context.")
 
+    def test_clean_citation_markers_keeps_provider_specific_labels_out_of_generic_defaults(self) -> None:
+        generic = clean_citation_markers(
+            "Extended Data Fig 2 and Fig 1 are cited.",
+            unwrap_inline_links=True,
+            normalize_labels=True,
+        )
+        springer_nature = clean_citation_markers(
+            "See [details](/articles/example#ref-CR1), Extended Data Fig 2 and Fig 1.",
+            unwrap_inline_links=True,
+            inline_link_patterns=SPRINGER_NATURE_INLINE_LINK_UNWRAP_PATTERNS,
+            normalize_labels=True,
+            label_patterns=SPRINGER_NATURE_CITATION_LABEL_PATTERNS,
+        )
+
+        self.assertEqual(generic, "Extended Data Fig 2 and Fig1 are cited.")
+        self.assertEqual(springer_nature, "See details, Extended Data Fig2 and Fig1.")
+
     def test_clean_citation_markers_drops_springer_figure_lines_when_requested(self) -> None:
         cleaned = clean_citation_markers(
             "Fig. 1: Caption that should be removed.\n\nSource data\n\n## Results",
             drop_figure_lines=True,
+            figure_line_patterns=SPRINGER_NATURE_FIGURE_LINE_PATTERNS,
         )
 
         self.assertEqual(cleaned, "## Results")

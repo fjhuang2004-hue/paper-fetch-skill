@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..utils import normalize_text
+from ._flaresolverr import CLOUDFLARE_COOKIE_NAMES, _CLOUDFLARE_COOKIE_PREFIXES
 
 
 @dataclass(frozen=True)
@@ -70,8 +71,8 @@ def sanitize_storage_state(path: Path) -> Path:
     filtered_cookies = [
         cookie
         for cookie in cookies
-        if cookie.get("name") not in {"_cfuvid", "__cf_bm", "cf_clearance"}
-        and not str(cookie.get("name", "")).startswith("cf_chl_")
+        if cookie.get("name") not in CLOUDFLARE_COOKIE_NAMES
+        and not str(cookie.get("name", "")).startswith(_CLOUDFLARE_COOKIE_PREFIXES)
     ]
     payload["cookies"] = filtered_cookies
 

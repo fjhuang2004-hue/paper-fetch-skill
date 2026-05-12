@@ -1,21 +1,45 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from typing import get_args
 import unittest
 
 from paper_fetch import publisher_identity
 from paper_fetch.provider_catalog import (
+    DEFAULT_BODY_TEXT_THRESHOLDS,
     PROVIDER_CATALOG,
     SOURCE_PROVIDER_MAP,
+    api_like_hosts,
     default_asset_profile_for_provider,
     default_asset_profile_for_source,
     is_official_provider,
     known_article_source_names,
+    matching_provider_domain,
     official_provider_names,
+    provider_api_url_template,
+    provider_base_domains,
+    provider_body_text_thresholds,
+    provider_crossref_pdf_position,
+    provider_domain_matches,
+    provider_emits_html_managed_marker,
     provider_for_source,
+    provider_for_xml_source,
+    provider_html_path_templates,
     provider_managed_abstract_only_names,
+    provider_metadata_probe_short_circuit,
     provider_names,
+    provider_pdf_source_path_templates,
+    provider_pdf_path_templates,
+    provider_persists_provider_html,
+    provider_display_names,
+    provider_supports_metadata_api_probe,
     provider_status_order,
+    sources_by_provider,
 )
+from paper_fetch.quality.issues import EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER
+from paper_fetch.models.schema import SourceKind
+from paper_fetch.providers import _pdf_candidates, html_springer_nature
+from paper_fetch import utils
 from paper_fetch.mcp import tools as mcp_tools
 from paper_fetch.providers.registry import build_clients
 from paper_fetch.workflow import fulltext, routing
@@ -41,12 +65,23 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(len(status_order), len(set(status_order)))
         self.assertEqual(
             list(status_order),
-            [spec.name for spec in sorted(PROVIDER_CATALOG.values(), key=lambda item: item.status_order)],
+            [
+                spec.name
+                for spec in sorted(
+                    PROVIDER_CATALOG.values(), key=lambda item: item.status_order
+                )
+            ],
         )
         for spec in PROVIDER_CATALOG.values():
             self.assertIn(spec.asset_default, valid_asset_profiles)
-            self.assertEqual(default_asset_profile_for_provider(spec.name), spec.asset_default)
+            self.assertEqual(
+                default_asset_profile_for_provider(spec.name), spec.asset_default
+            )
             self.assertTrue(spec.client_factory_path)
+            self.assertEqual(
+                provider_supports_metadata_api_probe(spec.name),
+                spec.probe_capability == "metadata_api",
+            )
 
     def test_official_and_provider_managed_sets_are_catalog_derived(self) -> None:
         self.assertEqual(
@@ -58,7 +93,7 @@ class ProviderCatalogTests(unittest.TestCase):
             {
                 name
                 for name, spec in PROVIDER_CATALOG.items()
-                if spec.abstract_only_policy == "provider_managed"
+                if spec.provider_managed_abstract_only
             },
         )
 
@@ -70,6 +105,16 @@ class ProviderCatalogTests(unittest.TestCase):
         )
         self.assertEqual(mcp_tools._PROVIDER_STATUS_ORDER, provider_names())
         self.assertEqual(mcp_tools._PROVIDER_STATUS_ORDER, provider_status_order())
+
+    def test_provider_display_name_helper_wraps_catalog(self) -> None:
+        for name, display_name in provider_display_names().items():
+            self.assertEqual(utils.provider_display_name(name), display_name)
+
+        self.assertEqual(utils.provider_display_name("pnas"), "PNAS")
+        self.assertEqual(
+            utils.provider_display_name("unknown-provider"), "Unknown Provider"
+        )
+        self.assertEqual(utils.provider_display_name(""), "Provider")
 
     def test_is_official_provider_follows_catalog(self) -> None:
         for name, spec in PROVIDER_CATALOG.items():
@@ -99,42 +144,305 @@ class ProviderCatalogTests(unittest.TestCase):
     def test_known_article_source_names_include_all_source_keys(self) -> None:
         self.assertEqual(known_article_source_names(), frozenset(SOURCE_PROVIDER_MAP))
 
-    def test_catalog_preserves_publisher_doi_domain_inference(self) -> None:
-        self.assertEqual(publisher_identity.infer_provider_from_doi("10.1038/nphys1170"), "springer")
-        self.assertEqual(publisher_identity.infer_provider_from_doi("10.1016/j.solener.2024.01.001"), "elsevier")
-        self.assertEqual(publisher_identity.infer_provider_from_doi("10.1109/ACCESS.2024.3352924"), "ieee")
-        self.assertEqual(publisher_identity.infer_provider_from_doi("10.5194/acp-24-1-2024"), "copernicus")
-        self.assertEqual(publisher_identity.infer_provider_from_doi("10.48550/arXiv.2605.06663"), "arxiv")
-        self.assertEqual(publisher_identity.infer_provider_from_publisher("John Wiley & Sons"), "wiley")
-        self.assertEqual(publisher_identity.infer_provider_from_publisher("Copernicus Publications"), "copernicus")
-        self.assertEqual(publisher_identity.infer_provider_from_publisher("arXiv"), "arxiv")
+    def test_source_kind_literal_matches_known_article_sources(self) -> None:
+        self.assertEqual(frozenset(get_args(SourceKind)), known_article_source_names())
+
+    def test_sources_by_provider_are_derived_from_source_provider_map(self) -> None:
+        expected = {}
+        for source, provider in SOURCE_PROVIDER_MAP.items():
+            expected.setdefault(provider, set()).add(source)
+
         self.assertEqual(
-            publisher_identity.infer_provider_from_publisher("Institute of Electrical and Electronics Engineers"),
-            "ieee",
+            sources_by_provider(),
+            {provider: frozenset(sources) for provider, sources in expected.items()},
+        )
+        self.assertEqual(EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER, sources_by_provider())
+
+    def test_every_declared_source_maps_to_catalog_provider(self) -> None:
+        for source, provider in SOURCE_PROVIDER_MAP.items():
+            with self.subTest(source=source):
+                self.assertIn(provider, PROVIDER_CATALOG)
+                self.assertEqual(provider_for_source(source), provider)
+
+        self.assertEqual(provider_for_source("springer_pdf"), "springer")
+
+    def test_api_like_hosts_are_catalog_derived(self) -> None:
+        self.assertIn("scopus.com", api_like_hosts())
+        self.assertIn("www.scopus.com", api_like_hosts())
+        self.assertTrue(
+            utils.is_api_like_url("https://www.scopus.com/inward/record.uri?scp=123")
+        )
+        self.assertTrue(utils.is_api_like_url("https://api.example.org/v1/articles"))
+        self.assertFalse(
+            utils.is_api_like_url("https://www.scopus.com.evil.test/landing")
+        )
+
+    def test_springer_nature_host_helpers_read_catalog_domains(self) -> None:
+        self.assertTrue(provider_domain_matches("springer", "www.nature.com"))
+        self.assertEqual(
+            matching_provider_domain("springer", "www.nature.com"), "nature.com"
+        )
+        self.assertTrue(
+            html_springer_nature.is_springer_nature_url(
+                "https://www.nature.com/articles/example"
+            )
+        )
+        self.assertTrue(
+            html_springer_nature.is_nature_url(
+                "https://www.nature.com/articles/example"
+            )
+        )
+        self.assertFalse(
+            html_springer_nature.is_nature_url(
+                "https://link.springer.com/article/example"
+            )
+        )
+        self.assertFalse(provider_domain_matches("springer", "springer.com.evil.test"))
+
+        candidates = _pdf_candidates.build_springer_pdf_candidates(
+            "10.1038/example",
+            {},
+            source_url="https://www.nature.com/articles/example",
+        )
+        self.assertIn("https://www.nature.com/articles/example.pdf", candidates)
+
+    def test_provider_api_templates_are_catalog_derived(self) -> None:
+        self.assertEqual(
+            provider_api_url_template("wiley", "tdm_pdf"),
+            "https://api.wiley.com/onlinelibrary/tdm/v1/articles/{doi}",
+        )
+        self.assertIsNone(provider_api_url_template("springer", "tdm_pdf"))
+
+    def test_atypon_browser_route_templates_are_catalog_derived(self) -> None:
+        self.assertEqual(
+            provider_base_domains("science"), ("www.science.org", "science.org")
         )
         self.assertEqual(
-            publisher_identity.infer_provider_from_url("https://linkinghub.elsevier.com/retrieve/pii/S0021863496900852"),
+            provider_html_path_templates("science"), ("/doi/full/{doi}", "/doi/{doi}")
+        )
+        self.assertEqual(
+            provider_pdf_path_templates("pnas"),
+            ("/doi/epdf/{doi}", "/doi/pdf/{doi}?download=true", "/doi/pdf/{doi}"),
+        )
+        self.assertEqual(provider_crossref_pdf_position("wiley"), 1)
+
+    def test_springer_pdf_templates_are_catalog_derived(self) -> None:
+        self.assertEqual(provider_base_domains("springer"), ("link.springer.com",))
+        self.assertEqual(
+            provider_pdf_path_templates("springer"),
+            ("/content/pdf/{doi_quoted}.pdf",),
+        )
+        source_templates = provider_pdf_source_path_templates("springer")
+        self.assertEqual(len(source_templates), 1)
+        self.assertEqual(source_templates[0].domain, "nature.com")
+        self.assertEqual(source_templates[0].path_prefix, "/articles/")
+        self.assertEqual(source_templates[0].path_template, "{source_path}.pdf")
+
+        candidates = _pdf_candidates.build_springer_pdf_candidates(
+            "10.1038/example",
+            {},
+            source_url="https://www.nature.com/articles/example",
+        )
+        self.assertEqual(
+            candidates,
+            [
+                "https://www.nature.com/articles/example.pdf",
+                "https://link.springer.com/content/pdf/10.1038%2Fexample.pdf",
+            ],
+        )
+
+    def test_arxiv_metadata_probe_special_case_is_catalog_gated(self) -> None:
+        original = PROVIDER_CATALOG["arxiv"]
+        try:
+            PROVIDER_CATALOG["arxiv"] = replace(
+                original, probe_capability="routing_signal"
+            )
+
+            result = routing.probe_official_provider(
+                "arxiv",
+                doi="10.48550/arxiv.2605.06663",
+                clients={},
+            )
+        finally:
+            PROVIDER_CATALOG["arxiv"] = original
+
+        self.assertEqual(result.state, "unknown")
+        self.assertIsNone(result.metadata)
+
+    def test_arxiv_metadata_probe_short_circuit_is_catalog_derived(self) -> None:
+        callback = provider_metadata_probe_short_circuit("arxiv")
+
+        self.assertIsNotNone(callback)
+        result = routing.probe_official_provider(
+            "arxiv",
+            doi="10.48550/arxiv.2605.06663",
+            clients={},
+        )
+
+        self.assertEqual(result.state, "positive")
+        self.assertEqual(result.metadata["provider"], "arxiv")
+        self.assertEqual(result.metadata["arxiv_id"], "2605.06663")
+        self.assertEqual(
+            result.metadata["pdf_url"], "https://arxiv.org/pdf/2605.06663"
+        )
+        self.assertIsNone(provider_metadata_probe_short_circuit("elsevier"))
+
+    def test_provider_html_persistence_is_catalog_derived(self) -> None:
+        self.assertTrue(provider_persists_provider_html("springer"))
+        self.assertTrue(provider_persists_provider_html("arxiv"))
+        self.assertFalse(provider_persists_provider_html("wiley"))
+        self.assertFalse(provider_persists_provider_html(None))
+
+    def test_xml_source_provider_inference_is_catalog_derived(self) -> None:
+        self.assertEqual(
+            provider_for_xml_source(
+                "full-text-retrieval-response",
+                "/tmp/10.1016_example/original.xml",
+            ),
             "elsevier",
         )
         self.assertEqual(
-            publisher_identity.infer_provider_from_url("https://ieeexplore.ieee.org/document/10388355/"),
+            provider_for_xml_source(
+                "article",
+                "/tmp/10.5194_acp-24-1-2024/original.xml",
+            ),
+            "copernicus",
+        )
+        self.assertEqual(
+            provider_for_xml_source("article", "/tmp/10.1038_example/original.xml"),
+            "springer",
+        )
+        self.assertEqual(
+            provider_for_xml_source("unknown-root", "/tmp/payload.xml"),
+            "unknown",
+        )
+
+    def test_provider_fallback_and_body_thresholds_are_catalog_derived(self) -> None:
+        self.assertFalse(provider_emits_html_managed_marker("crossref"))
+        self.assertFalse(provider_emits_html_managed_marker("copernicus"))
+        self.assertTrue(provider_emits_html_managed_marker("springer"))
+        self.assertEqual(provider_body_text_thresholds("copernicus").min_chars, 500)
+        self.assertEqual(
+            provider_body_text_thresholds("springer"), DEFAULT_BODY_TEXT_THRESHOLDS
+        )
+
+    def test_fulltext_provider_attempt_skips_non_official_catalog_provider(
+        self,
+    ) -> None:
+        class ExplodingProvider:
+            def fetch_result(self, *args, **kwargs):
+                raise AssertionError(
+                    "non-official providers should not enter fulltext provider attempts"
+                )
+
+        warnings: list[str] = []
+        source_trail: list[str] = []
+
+        article = fulltext._try_official_provider(
+            doi="10.5555/example",
+            metadata={},
+            provider_name="crossref",
+            strategy=fulltext.FetchStrategy(),
+            artifact_store=object(),
+            context=object(),
+            clients={"crossref": ExplodingProvider()},
+            warnings=warnings,
+            source_trail=source_trail,
+        )
+
+        self.assertIsNone(article)
+        self.assertEqual(warnings, [])
+        self.assertEqual(source_trail, [])
+
+    def test_catalog_preserves_publisher_doi_domain_inference(self) -> None:
+        self.assertEqual(
+            publisher_identity.infer_provider_from_doi("10.1038/nphys1170"), "springer"
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_doi("10.1016/j.solener.2024.01.001"),
+            "elsevier",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_doi("10.1109/ACCESS.2024.3352924"),
             "ieee",
         )
         self.assertEqual(
-            publisher_identity.infer_provider_from_url("https://acp.copernicus.org/articles/24/1/2024/"),
+            publisher_identity.infer_provider_from_doi("10.5194/acp-24-1-2024"),
             "copernicus",
         )
         self.assertEqual(
-            publisher_identity.infer_provider_from_url("https://cp.copernicus.org/articles/19/1/2023/"),
+            publisher_identity.infer_provider_from_doi("10.48550/arXiv.2605.06663"),
+            "arxiv",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_publisher("John Wiley & Sons"),
+            "wiley",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_publisher("Copernicus Publications"),
             "copernicus",
         )
         self.assertEqual(
-            publisher_identity.infer_provider_from_url("https://arxiv.org/abs/2605.06663v1"),
+            publisher_identity.infer_provider_from_publisher("arXiv"), "arxiv"
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_publisher(
+                "Institute of Electrical and Electronics Engineers"
+            ),
+            "ieee",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://linkinghub.elsevier.com/retrieve/pii/S0021863496900852"
+            ),
+            "elsevier",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://ieeexplore.ieee.org/document/10388355/"
+            ),
+            "ieee",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://acp.copernicus.org/articles/24/1/2024/"
+            ),
+            "copernicus",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://cp.copernicus.org/articles/19/1/2023/"
+            ),
+            "copernicus",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://egusphere.copernicus.org/preprints/2026/example/"
+            ),
+            "copernicus",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://brand-new-journal.copernicus.org/articles/1/1/2026/"
+            ),
+            "copernicus",
+        )
+        self.assertIsNone(
+            publisher_identity.infer_provider_from_url(
+                "https://copernicus.org.example.test/articles/1"
+            )
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://arxiv.org/abs/2605.06663v1"
+            ),
             "arxiv",
         )
         self.assertEqual(
             publisher_identity.ordered_provider_candidates(
-                landing_urls=["https://linkinghub.elsevier.com/retrieve/pii/S0021863496900852"],
+                landing_urls=[
+                    "https://linkinghub.elsevier.com/retrieve/pii/S0021863496900852"
+                ],
                 publishers=["Springer Nature"],
                 doi="10.1111/example",
             ),

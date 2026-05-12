@@ -14,7 +14,14 @@ from ...extraction.html.semantics import (
     heading_category,
     parse_markdown_heading,
 )
-from ...extraction.html.signals import PAYWALL_PATTERNS
+from ...extraction.html.provider_rules import (
+    front_matter_contains_tokens_for_profile,
+    front_matter_exact_texts_for_profile,
+    front_matter_publication_keywords_for_profile,
+    markdown_promo_tokens_for_profile,
+)
+from ...extraction.html._runtime import FRONT_MATTER_PUBLICATION_KEYWORDS
+from ...extraction.html.signals import contains_access_gate_text
 from ...extraction.html.shared import (
     class_tokens as _class_tokens,
     direct_child_tags as _direct_child_tags,
@@ -27,7 +34,7 @@ from ...quality.html_availability import (
     HtmlContainerSelectionPolicy,
 )
 from ...utils import normalize_text
-from .._science_pnas_profiles import (
+from .._atypon_browser_workflow_profiles import (
     noise_profile_for_publisher as _profile_noise_profile_for_publisher,
     publisher_profile as _publisher_profile,
 )
@@ -69,18 +76,6 @@ FRONT_MATTER_LINE_PATTERNS = (
 )
 
 
-FRONT_MATTER_EXACT_TEXTS = {
-    "full access",
-    "open access",
-    "free access",
-    "research article",
-    "perspective",
-    "review",
-    "editorial",
-    "commentary",
-}
-
-
 POST_CONTENT_BREAK_PREFIXES = (
     "copyright",
     "license information",
@@ -95,19 +90,9 @@ POST_CONTENT_BREAK_TEXTS = {
 
 POST_CONTENT_BREAK_TOKENS = (
     "view all articles by this author",
-    "purchase digital access to this article",
-    "purchase access to other journals in the science family",
     "select the format you want to export the citation of this publication",
     "loading institution options",
-    "become a aaas member",
-    "activate your aaas id",
     "account help",
-)
-
-
-PROMO_BLOCK_TOKENS = (
-    "sign up for pnas alerts",
-    "get alerts for new articles, or get an alert when an article is cited",
 )
 
 
@@ -158,6 +143,40 @@ def _noise_profile_for_publisher(publisher: str | None) -> str:
     return _profile_noise_profile_for_publisher(publisher)
 
 
+def _promo_block_tokens(publisher: str | None) -> tuple[str, ...]:
+    return markdown_promo_tokens_for_profile(
+        publisher or _noise_profile_for_publisher(publisher)
+    )
+
+
+def _front_matter_exact_texts(publisher: str | None) -> tuple[str, ...]:
+    return front_matter_exact_texts_for_profile(
+        publisher or _noise_profile_for_publisher(publisher)
+    )
+
+
+def _front_matter_contains_tokens(publisher: str | None) -> tuple[str, ...]:
+    return front_matter_contains_tokens_for_profile(
+        publisher or _noise_profile_for_publisher(publisher)
+    )
+
+
+def _front_matter_publication_keywords(publisher: str | None) -> set[str]:
+    return {
+        *FRONT_MATTER_PUBLICATION_KEYWORDS,
+        *front_matter_publication_keywords_for_profile(
+            publisher or _noise_profile_for_publisher(publisher)
+        ),
+    }
+
+
+def _post_content_break_tokens(publisher: str | None) -> tuple[str, ...]:
+    return (
+        *POST_CONTENT_BREAK_TOKENS,
+        *_publisher_profile(publisher).post_content_break_tokens,
+    )
+
+
 def _container_selection_policy(publisher: str) -> HtmlContainerSelectionPolicy:
     profile = _publisher_profile(publisher)
     return HtmlContainerSelectionPolicy(
@@ -184,29 +203,33 @@ def _sentence_count(text: str) -> int:
 
 def _is_substantial_prose(text: str) -> bool:
     normalized = normalize_text(text)
-    return len(normalized) >= BODY_PARAGRAPH_MIN_CHARS or _sentence_count(normalized) >= 2
+    return (
+        len(normalized) >= BODY_PARAGRAPH_MIN_CHARS or _sentence_count(normalized) >= 2
+    )
 
 
 def _heading_category(node_name: str, text: str, *, title: str | None = None) -> str:
     return heading_category(node_name, text, title=title)
 
 
-def _promotional_parent(node: Tag) -> Tag:
+def _promotional_parent(node: Tag, *, promo_block_tokens: tuple[str, ...] = ()) -> Tag:
     current = node
     while isinstance(current.parent, Tag):
         parent = current.parent
         parent_text = _short_text(parent).lower()
         if not parent_text or len(parent_text) > 320:
             break
-        if any(token in parent_text for token in PROMO_BLOCK_TOKENS) or parent_text == "learn more":
+        if any(token in parent_text for token in promo_block_tokens):
             current = parent
             continue
         break
     return current
 
 
-def _drop_promotional_blocks(container: Tag, publisher: str) -> None:
-    if publisher != "pnas":
+def _drop_promotional_blocks(
+    container: Tag, *, promo_block_tokens: tuple[str, ...]
+) -> None:
+    if not promo_block_tokens:
         return
     for node in list(container.find_all(True)):
         if not isinstance(node, Tag) or node.parent is None:
@@ -214,23 +237,34 @@ def _drop_promotional_blocks(container: Tag, publisher: str) -> None:
         text = _short_text(node).lower()
         if not text or len(text) > 220:
             continue
-        if any(token in text for token in PROMO_BLOCK_TOKENS) or text == "learn more":
-            _promotional_parent(node).decompose()
+        if any(token in text for token in promo_block_tokens):
+            _promotional_parent(node, promo_block_tokens=promo_block_tokens).decompose()
 
 
 def _structural_abstract_nodes(container: Tag) -> list[Tag]:
     abstract_roots: list[Tag] = []
-    if normalize_text(((getattr(container, "attrs", None) or {}).get("id") or "")).lower() == "abstracts":
+    if (
+        normalize_text(
+            ((getattr(container, "attrs", None) or {}).get("id") or "")
+        ).lower()
+        == "abstracts"
+    ):
         abstract_roots.append(container)
     try:
-        abstract_roots.extend([node for node in container.select("#abstracts") if isinstance(node, Tag)])
+        abstract_roots.extend(
+            [node for node in container.select("#abstracts") if isinstance(node, Tag)]
+        )
     except Exception:
         pass
 
     sections: list[Tag] = []
     seen: set[int] = set()
     for root in abstract_roots:
-        search_parents = [child for child in _direct_child_tags(root) if "core-container" in _class_tokens(child)] or [root]
+        search_parents = [
+            child
+            for child in _direct_child_tags(root)
+            if "core-container" in _class_tokens(child)
+        ] or [root]
         for parent in search_parents:
             for child in _direct_child_tags(parent):
                 if normalize_text(child.name or "").lower() != "section":
@@ -264,9 +298,7 @@ def _node_language_hint(node: Tag) -> str | None:
     return html_node_language_hint(node, allow_soft_hints=True)
 
 
-def _drop_abstract_sections_from_body_container(container: Tag, publisher: str) -> None:
-    if publisher != "wiley":
-        return
+def _drop_abstract_sections_from_body_container(container: Tag) -> None:
     for node in _abstract_nodes(container):
         node.decompose()
 
@@ -279,7 +311,9 @@ def extract_page_title(soup: BeautifulSoup) -> str | None:
         if node is None:
             continue
         if node.name == "meta":
-            title = normalize_text((getattr(node, "attrs", None) or {}).get("content", ""))
+            title = normalize_text(
+                (getattr(node, "attrs", None) or {}).get("content", "")
+            )
         elif node.name == "h1":
             title = _render_non_table_inline_text(node)
         else:
@@ -293,60 +327,83 @@ def _ancestor_identity_text(node: Tag | None) -> str:
     return ancestor_identity_text(node)
 
 
-def _looks_like_front_matter_paragraph(text: str, *, title: str | None = None) -> bool:
+def _looks_like_front_matter_paragraph(
+    text: str,
+    *,
+    title: str | None = None,
+    publisher: str | None = None,
+) -> bool:
     normalized = normalize_text(text)
     lowered = normalized.lower()
     if not normalized:
         return True
     if title and lowered == normalize_text(title).lower():
         return True
-    if lowered in FRONT_MATTER_EXACT_TEXTS:
+    if lowered in _front_matter_exact_texts(publisher):
         return True
-    if "authors info" in lowered or "affiliations" in lowered:
+    if any(token in lowered for token in _front_matter_contains_tokens(publisher)):
         return True
-    if len(normalized) <= 80 and normalized.upper() == normalized and len(normalized.split()) <= 5:
+    if (
+        len(normalized) <= 80
+        and normalized.upper() == normalized
+        and len(normalized.split()) <= 5
+    ):
         return True
     if lowered.startswith("by ") and _sentence_count(normalized) <= 1:
         return True
     if any(pattern.match(normalized) for pattern in FRONT_MATTER_LINE_PATTERNS):
         return True
-    return lowered in {"science", "pnas", "wiley interdisciplinary reviews"}
+    return _looks_like_publication_watermark(normalized, publisher=publisher)
+
+
+def _looks_like_publication_watermark(
+    text: str,
+    *,
+    publisher: str | None = None,
+) -> bool:
+    normalized = normalize_text(text)
+    lowered = normalized.lower()
+    if not normalized or len(normalized) > 64:
+        return False
+    if any(character in normalized for character in ".:;!?。！？"):
+        return False
+    tokens = lowered.split()
+    if not tokens or len(tokens) > 5:
+        return False
+    if normalized.upper() == normalized and len(normalized) <= 8:
+        return True
+    publication_keywords = _front_matter_publication_keywords(publisher)
+    if not any(
+        token.strip("&") in publication_keywords for token in tokens
+    ):
+        return False
+    return all(
+        token[:1].isupper() or token.lower() in {"and", "of", "the", "&"}
+        for token in normalized.split()
+    )
 
 
 def _looks_like_access_gate_text(text: str) -> bool:
-    lowered = normalize_text(text).lower()
-    if not lowered:
-        return False
-    if any(pattern in lowered for pattern in PAYWALL_PATTERNS):
-        return True
-    return any(
-        pattern in lowered
-        for pattern in (
-            "get access",
-            "sign in to access",
-            "view access options",
-            "access provided by",
-            "institutional login",
-            "purchase article",
-        )
-    )
+    return contains_access_gate_text(text)
 
 
 def _markdown_heading_info(block: str) -> tuple[int, str] | None:
     return parse_markdown_heading(block)
 
 
-def _looks_like_post_content_noise_block(text: str) -> bool:
+def _looks_like_post_content_noise_block(
+    text: str, *, publisher: str | None = None
+) -> bool:
     lowered = normalize_text(text).lower()
     if not lowered:
         return False
-    if any(token in lowered for token in PROMO_BLOCK_TOKENS) or lowered == "learn more":
+    if any(token in lowered for token in _promo_block_tokens(publisher)):
         return True
     if lowered in POST_CONTENT_BREAK_TEXTS:
         return True
     if any(lowered.startswith(prefix) for prefix in POST_CONTENT_BREAK_PREFIXES):
         return True
-    return any(token in lowered for token in POST_CONTENT_BREAK_TOKENS)
+    return any(token in lowered for token in _post_content_break_tokens(publisher))
 
 
 def _looks_like_markdown_auxiliary_block(text: str) -> bool:
@@ -355,7 +412,11 @@ def _looks_like_markdown_auxiliary_block(text: str) -> bool:
         return False
     if lowered == "$$":
         return True
-    return lowered.startswith("**equation") or lowered.startswith("**figure") or lowered.startswith("**table")
+    return (
+        lowered.startswith("**equation")
+        or lowered.startswith("**figure")
+        or lowered.startswith("**table")
+    )
 
 
 def _is_descendant(node: Tag, candidate_ancestor: Tag) -> bool:
@@ -376,7 +437,9 @@ def _dedupe_top_level_nodes(nodes: list[Tag]) -> list[Tag]:
             continue
         if any(_is_descendant(node, existing) for existing in deduped):
             continue
-        deduped = [existing for existing in deduped if not _is_descendant(existing, node)]
+        deduped = [
+            existing for existing in deduped if not _is_descendant(existing, node)
+        ]
         deduped.append(node)
         seen.add(id(node))
     return deduped
@@ -398,30 +461,50 @@ def _nodes_from_selectors(container: Tag, selectors: tuple[str, ...]) -> list[Ta
 def _availability_node_score(node: Tag) -> int:
     score = 0
     identity = _ancestor_identity_text(node)
-    node_id = normalize_text(str((getattr(node, "attrs", None) or {}).get("id") or "")).lower()
+    node_id = normalize_text(
+        str((getattr(node, "attrs", None) or {}).get("id") or "")
+    ).lower()
     if node_id in {"data-availability", "code-availability", "software-availability"}:
         score += 120
     if normalize_text(node.name or "").lower() == "section":
         score += 10
     if any(token in identity for token in BODY_CONTAINER_TOKENS):
         score += 40
-    if any(token in identity for token in DATA_AVAILABILITY_TOKENS + CODE_AVAILABILITY_TOKENS):
+    if any(
+        token in identity
+        for token in DATA_AVAILABILITY_TOKENS + CODE_AVAILABILITY_TOKENS
+    ):
         score += 20
     heading = node.find(HEADING_TAG_PATTERN)
     if isinstance(heading, Tag):
-        heading_kind = _heading_category(normalize_text(heading.name or "").lower(), heading.get_text(" ", strip=True))
+        heading_kind = _heading_category(
+            normalize_text(heading.name or "").lower(),
+            heading.get_text(" ", strip=True),
+        )
         if heading_kind in {"data_availability", "code_availability"}:
             score += 40
     if any(token in identity for token in ANCILLARY_TOKENS):
         score -= 60
-    if any(token in identity for token in ("collateral", "tabpanel", "tab-panel", "tab_panel", "info-panel", "info_panel")):
+    if any(
+        token in identity
+        for token in (
+            "collateral",
+            "tabpanel",
+            "tab-panel",
+            "tab_panel",
+            "info-panel",
+            "info_panel",
+        )
+    ):
         score -= 120
     return score
 
 
 def _select_availability_nodes(container: Tag, body_nodes: list[Tag]) -> list[Tag]:
     chosen_by_text: dict[str, tuple[int, int, Tag]] = {}
-    for index, node in enumerate(_nodes_from_selectors(container, CONTENT_AVAILABILITY_SELECTORS)):
+    for index, node in enumerate(
+        _nodes_from_selectors(container, CONTENT_AVAILABILITY_SELECTORS)
+    ):
         if any(_is_descendant(node, body_node) for body_node in body_nodes):
             continue
         text_key = normalize_text(node.get_text(" ", strip=True)).lower()
@@ -432,7 +515,10 @@ def _select_availability_nodes(container: Tag, body_nodes: list[Tag]) -> list[Ta
         if current is None or candidate[0] > current[0]:
             chosen_by_text[text_key] = candidate
     return _dedupe_top_level_nodes(
-        [entry[2] for entry in sorted(chosen_by_text.values(), key=lambda entry: entry[1])]
+        [
+            entry[2]
+            for entry in sorted(chosen_by_text.values(), key=lambda entry: entry[1])
+        ]
     )
 
 
@@ -486,11 +572,10 @@ __all__ = [
     "HEADING_TAG_PATTERN",
     "SENTENCE_PATTERN",
     "FRONT_MATTER_LINE_PATTERNS",
-    "FRONT_MATTER_EXACT_TEXTS",
+    "FRONT_MATTER_PUBLICATION_KEYWORDS",
     "POST_CONTENT_BREAK_PREFIXES",
     "POST_CONTENT_BREAK_TEXTS",
     "POST_CONTENT_BREAK_TOKENS",
-    "PROMO_BLOCK_TOKENS",
     "CONTENT_ABSTRACT_SELECTORS",
     "CONTENT_BODY_SELECTORS",
     "CONTENT_AVAILABILITY_SELECTORS",
@@ -508,6 +593,7 @@ __all__ = [
     "extract_page_title",
     "_ancestor_identity_text",
     "_looks_like_front_matter_paragraph",
+    "_looks_like_publication_watermark",
     "_looks_like_access_gate_text",
     "_markdown_heading_info",
     "_looks_like_post_content_noise_block",

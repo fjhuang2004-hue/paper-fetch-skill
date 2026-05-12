@@ -13,6 +13,7 @@ SourceKind = Literal[
     "elsevier_xml",
     "elsevier_pdf",
     "springer_html",
+    "springer_pdf",
     "wiley_browser",
     "science",
     "pnas",

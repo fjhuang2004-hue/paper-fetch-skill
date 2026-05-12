@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import unittest
 
-from paper_fetch.providers import _science_pnas_postprocess
-from paper_fetch.providers.science_pnas import extract_science_pnas_markdown, rewrite_inline_figure_links
+from paper_fetch.extraction.html.figure_links import inject_inline_figure_links
+from paper_fetch.providers.atypon_browser_workflow import (
+    extract_atypon_browser_workflow_markdown,
+    rewrite_inline_figure_links,
+)
 from tests.golden_criteria import golden_criteria_asset, golden_criteria_scenario_asset
 
 
@@ -20,7 +23,7 @@ SCIADV_ABG9690_FIXTURE = golden_criteria_asset("10.1126/sciadv.abg9690", "origin
 SCIADV_ADM9732_FIXTURE = golden_criteria_asset("10.1126/sciadv.adm9732", "original.html")
 
 
-class SciencePnasPostprocessTests(unittest.TestCase):
+class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
     def _assert_equation_blocks_are_normalized(self, markdown: str) -> None:
         self.assertRegex(markdown, r"\*\*Equation \d+[A-Za-z]?\.\*\*\n\n\$\$\n")
         self.assertNotRegex(markdown, r"\*\*Equation \d+[A-Za-z]?\.\*\*\$\$")
@@ -61,7 +64,7 @@ class SciencePnasPostprocessTests(unittest.TestCase):
         if title:
             metadata["title"] = title
         html = fixture_path.read_text(encoding="utf-8")
-        return extract_science_pnas_markdown(
+        return extract_atypon_browser_workflow_markdown(
             html,
             source_url,
             publisher,
@@ -346,7 +349,7 @@ class SciencePnasPostprocessTests(unittest.TestCase):
         ]
 
         rewritten = rewrite_inline_figure_links(markdown, figure_assets=figure_assets, publisher="science")
-        injected = _science_pnas_postprocess.inject_inline_figure_links(
+        injected = inject_inline_figure_links(
             markdown,
             figure_assets=figure_assets,
             clean_markdown_fn=lambda value: value,

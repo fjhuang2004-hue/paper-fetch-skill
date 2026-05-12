@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 from .extraction.html.assets.dom import preview_dimensions_are_acceptable
 from .models import AssetProfile
+from .provider_catalog import provider_persists_provider_html
 from .tracing import download_marker
 from .utils import (
     build_output_path,
@@ -118,7 +119,7 @@ class ArtifactStore:
     ) -> Path | None:
         if content is None or self.download_dir is None:
             return None
-        if normalize_text(provider_name).lower() not in {"springer", "arxiv"}:
+        if not provider_persists_provider_html(provider_name):
             return None
         if normalize_text(content.route_kind).lower() != "html":
             return None

@@ -272,6 +272,52 @@ class ArxivProviderTests(unittest.TestCase):
                 self.assertEqual(sample["route_kind"], "pdf_fallback")
                 self.assertEqual(set(sample["assets"]), {"api.json", "original.pdf"})
 
+    def test_author_boundary_splits_affiliations_without_rejecting_country_name_authors(self) -> None:
+        soup = arxiv_provider.BeautifulSoup(
+            """
+            <article>
+              <span class="ltx_personname">Anatole France</span>
+              <span class="ltx_personname">Ada Lovelace<br><span>Department of Computing, Example University, Russia</span></span>
+            </article>
+            """,
+            "html.parser",
+        )
+        names = soup.select(".ltx_personname")
+
+        self.assertTrue(arxiv_provider._looks_like_arxiv_author_name("Anatole France"))
+        candidate = arxiv_provider._candidate_arxiv_author_text_from_person_node(names[1])
+        self.assertNotIn("Department", candidate)
+        self.assertEqual(arxiv_provider._split_arxiv_author_text(candidate), ["Ada Lovelace"])
+
+    def test_generic_html_frontmatter_and_references_fallback_without_ltx_selectors(self) -> None:
+        soup = arxiv_provider.BeautifulSoup(
+            """
+            <html><body><article>
+              <h1>Generic HTML arXiv Article</h1>
+              <section id="abstract"><h2>Abstract</h2><p>Fallback abstract text.</p></section>
+              <section><h2>Introduction</h2><p>Body text.</p></section>
+              <section><h2>References</h2>
+                <ol><li>Example Author. Generic reference title. 2024. 10.1000/example.</li></ol>
+              </section>
+            </article></body></html>
+            """,
+            "html.parser",
+        )
+        article = soup.find("article")
+
+        frontmatter = arxiv_provider._extract_arxiv_html_frontmatter(
+            soup,
+            article,
+            "https://arxiv.org/html/2605.00001v1",
+            metadata={"doi": "10.48550/arxiv.2605.00001v1"},
+        )
+        references = arxiv_provider._extract_arxiv_html_references(article)
+
+        self.assertEqual(frontmatter["title"], "Generic HTML arXiv Article")
+        self.assertEqual(frontmatter["abstract"], "Fallback abstract text.")
+        self.assertEqual(references[0]["year"], "2024")
+        self.assertEqual(references[0]["doi"], "10.1000/example")
+
     def test_html_success_only_requests_official_html(self) -> None:
         arxiv_id = "2605.06663v1"
         metadata = _metadata(arxiv_id)
@@ -1022,7 +1068,8 @@ class ArxivProviderTests(unittest.TestCase):
             "heading": retried_asset.get("heading", "Figure"),
             "caption": retried_asset.get("caption", ""),
             "source_url": retried_asset.get("url", ""),
-            "reason": "Network error for arXiv image: SSL EOF occurred in violation of protocol",
+            "reason": "transport failed before a response",
+            "error_category": arxiv_provider.RequestErrorCategory.TLS_ERROR.value,
             "section": "body",
         }
         non_retryable_failure = {

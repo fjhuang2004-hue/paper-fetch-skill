@@ -12,18 +12,18 @@ from paper_fetch.extraction.html._metadata import merge_html_metadata, parse_htm
 from paper_fetch.http import HttpTransport
 from paper_fetch.publisher_identity import normalize_doi
 from paper_fetch.providers import (
+    _pnas_html,
+    _science_html,
+    _atypon_browser_workflow_profiles as atypon_browser_workflow_profiles,
+    _wiley_html,
     copernicus as copernicus_provider,
     elsevier as elsevier_provider,
     ieee as ieee_provider,
     pnas as pnas_provider,
-    pnas_html,
     science as science_provider,
-    science_html,
-    science_pnas_profiles,
     springer as springer_provider,
-    springer_html,
+    _springer_html as springer_html,
     wiley as wiley_provider,
-    wiley_html,
 )
 from paper_fetch.quality.html_availability import assess_html_fulltext_availability
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
@@ -464,20 +464,20 @@ def lightweight_positive_summary_from_fixture(fixture: GoldenCorpusFixture) -> d
         metadata = parse_html_metadata(html_text, fixture.source_url)
         browser_helpers = {
             "science": (
-                science_html.extract_authors,
-                science_html.blocking_fallback_signals,
+                _science_html.extract_authors,
+                _science_html.blocking_fallback_signals,
             ),
             "pnas": (
-                pnas_html.extract_authors,
-                pnas_html.blocking_fallback_signals,
+                _pnas_html.extract_authors,
+                _pnas_html.blocking_fallback_signals,
             ),
             "wiley": (
-                wiley_html.extract_authors,
-                wiley_html.blocking_fallback_signals,
+                _wiley_html.extract_authors,
+                _wiley_html.blocking_fallback_signals,
             ),
         }
         extract_authors, blocking_fallback_signals = browser_helpers[fixture.provider]
-        candidate_urls = science_pnas_profiles.build_html_candidates(
+        candidate_urls = atypon_browser_workflow_profiles.build_html_candidates(
             fixture.provider,
             fixture.doi,
             fixture.landing_url,

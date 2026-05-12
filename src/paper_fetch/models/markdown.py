@@ -71,7 +71,13 @@ MARKDOWN_STANDALONE_IMAGE_ALT_PATTERN = re.compile(
 
 
 TABLE_LIKE_FIGURE_ASSET_PATTERN = re.compile(
-    r"^(?:(?:extended data|supplementary)\s+)?table\s+\d+[A-Za-z]?\b",
+    r"^(?:supplementary\s+)?table\s+\d+[A-Za-z]?\b",
+    flags=re.IGNORECASE,
+)
+
+
+NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN = re.compile(
+    r"^extended data\s+table\s+\d+[A-Za-z]?\b",
     flags=re.IGNORECASE,
 )
 
@@ -505,6 +511,7 @@ __all__ = [
     "MARKDOWN_BLOCK_IMAGE_ALT_PATTERN",
     "MARKDOWN_STANDALONE_IMAGE_ALT_PATTERN",
     "TABLE_LIKE_FIGURE_ASSET_PATTERN",
+    "NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN",
     "NUMBERED_REFERENCE_PATTERN",
     "INLINE_WHITESPACE_PATTERN",
     "SLASH_RUN_PATTERN",

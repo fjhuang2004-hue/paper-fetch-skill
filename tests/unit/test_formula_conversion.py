@@ -49,6 +49,40 @@ class FormulaConversionTests(unittest.TestCase):
         self.assertEqual(len(samples), 1)
         self.assertEqual(samples[0].raw_mathml, '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>')
 
+    def test_infer_source_provider_uses_provider_catalog(self) -> None:
+        elsevier_root = ET.fromstring("<full-text-retrieval-response />")
+        jats_root = ET.fromstring("<article />")
+        unknown_root = ET.fromstring("<payload />")
+
+        self.assertEqual(
+            formula_conversion.infer_source_provider(
+                elsevier_root,
+                Path("/tmp/10.1016_example/original.xml"),
+            ),
+            "elsevier",
+        )
+        self.assertEqual(
+            formula_conversion.infer_source_provider(
+                jats_root,
+                Path("/tmp/10.5194_acp-24-1-2024/original.xml"),
+            ),
+            "copernicus",
+        )
+        self.assertEqual(
+            formula_conversion.infer_source_provider(
+                jats_root,
+                Path("/tmp/10.1038_example/original.xml"),
+            ),
+            "springer",
+        )
+        self.assertEqual(
+            formula_conversion.infer_source_provider(
+                unknown_root,
+                Path("/tmp/payload.xml"),
+            ),
+            "unknown",
+        )
+
     def test_normalize_latex_repairs_identifier_escaped_underscores(self) -> None:
         """rule: rule-formula-latex-normalization"""
         samples = json.loads(

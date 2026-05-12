@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Mapping
 
 from ..extraction.html._runtime import body_metrics, has_sufficient_article_body
+from ..extraction.html.provider_rules import front_matter_footer_prefixes
 from ..extraction.html.signals import (
     CHALLENGE_PATTERNS,
     contains_access_gate_text,
@@ -35,6 +36,7 @@ from ..models import classify_article_content, filtered_body_sections
 from ..utils import normalize_text
 from .html_profiles import (
     looks_like_abstract_redirect,
+    provider_availability_overrides,
     provider_blocking_fallback_signals,
     provider_positive_signals,
     site_rule_for_publisher,
@@ -112,6 +114,9 @@ class StructuredBodyAnalysis:
     page_has_paywall_text: bool = False
     container_has_paywall_text: bool = False
     access_gate_markers: list[str] = field(default_factory=list)
+    provider_hard_negative_signals: list[str] = field(default_factory=list)
+    provider_abstract_only_hints: list[str] = field(default_factory=list)
+    provider_blocking_fallback_signals: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -173,6 +178,7 @@ def _extract_article_type(
     provider: str | None = None,
     html_text: str | None = None,
 ) -> str | None:
+    del provider
     metadata_map = dict(metadata or {})
     for key in ("article_type", "type", "subtype"):
         value = normalize_text(metadata_map.get(key))
@@ -196,8 +202,6 @@ def _extract_article_type(
             value = normalize_text(str(attrs.get("data-article-type") or node.get_text(" ", strip=True)))
         if value:
             return value
-    if provider == "science" and soup.select_one(".perspective, .article-type-perspective"):
-        return "Perspective"
     return None
 
 
@@ -399,7 +403,7 @@ def _refine_selected_container(node: Tag, policy: HtmlContainerSelectionPolicy) 
 
 def select_best_container(
     soup: BeautifulSoup,
-    publisher: str,
+    publisher: str | None,
     *,
     policy: HtmlContainerSelectionPolicy | None = None,
 ):
@@ -456,7 +460,7 @@ def select_best_container(
     )
 
 
-def _should_drop_browser_workflow_node(node: Tag, publisher: str) -> bool:
+def _should_drop_browser_workflow_node(node: Tag, publisher: str | None) -> bool:
     if node.name in {"script", "style", "noscript", "svg", "iframe", "button", "input", "form"}:
         return True
 
@@ -477,7 +481,7 @@ def _should_drop_browser_workflow_node(node: Tag, publisher: str) -> bool:
 
 def should_drop_node(
     node: Tag,
-    publisher: str,
+    publisher: str | None,
     *,
     drop_profile: str = HTML_CONTAINER_DROP_AVAILABILITY,
 ) -> bool:
@@ -500,7 +504,7 @@ def should_drop_node(
 
 def clean_container(
     container: Tag,
-    publisher: str,
+    publisher: str | None,
     *,
     drop_profile: str = HTML_CONTAINER_DROP_AVAILABILITY,
 ) -> Tag:
@@ -531,7 +535,7 @@ def _looks_like_front_matter_paragraph(text: str, *, title: str | None = None) -
             for prefix in ARTICLE_TYPE_FRONT_MATTER_PREFIXES:
                 if compact_text.startswith(re.sub(r"\s+", "", prefix)):
                     return True
-    if lowered.startswith("all content on this site") or lowered.startswith("copyright"):
+    if any(lowered.startswith(prefix) for prefix in front_matter_footer_prefixes()):
         return True
     return any(
         token in lowered
@@ -573,6 +577,26 @@ def _category_for_section_hint_kind(kind: str) -> str:
     return "body_heading"
 
 
+def _apply_provider_availability_overrides(
+    *,
+    provider: str | None,
+    soup: BeautifulSoup,
+    analysis: StructuredBodyAnalysis,
+    final_url: str | None,
+    metadata: Mapping[str, Any] | None,
+) -> None:
+    override_hard, override_abstract, override_blocking = provider_availability_overrides(
+        provider,
+        soup,
+        analysis,
+        final_url=final_url,
+        metadata=metadata,
+    )
+    analysis.provider_hard_negative_signals = _dedupe_signals(list(override_hard))
+    analysis.provider_abstract_only_hints = _dedupe_signals(list(override_abstract))
+    analysis.provider_blocking_fallback_signals = _dedupe_signals(list(override_blocking))
+
+
 def _analyze_html_structure(
     html_text: str,
     *,
@@ -588,11 +612,18 @@ def _analyze_html_structure(
         return analysis, None, None
 
     soup = BeautifulSoup(html_text, choose_parser())
-    container = select_best_container(soup, provider or "wiley")
+    container = select_best_container(soup, provider)
     if container is None:
+        _apply_provider_availability_overrides(
+            provider=provider,
+            soup=soup,
+            analysis=analysis,
+            final_url=final_url,
+            metadata=metadata,
+        )
         return analysis, None, None
 
-    clean_container(container, provider or "wiley")
+    clean_container(container, provider)
     analysis.explicit_body_container = container_has_explicit_body_container(container)
     container_text = normalize_text(container.get_text(" ", strip=True))
     page_text = _normalized_page_text(html_text)
@@ -730,6 +761,13 @@ def _analyze_html_structure(
         and (analysis.container_has_paywall_text or _final_url_looks_like_access_page(final_url))
     )
     analysis.access_gate_markers = _dedupe_signals(analysis.access_gate_markers)
+    _apply_provider_availability_overrides(
+        provider=provider,
+        soup=soup,
+        analysis=analysis,
+        final_url=final_url,
+        metadata=metadata,
+    )
     return analysis, container.name, len(" ".join(container.stripped_strings))
 
 
@@ -967,15 +1005,6 @@ def _dom_access_hints(
     if citation_fulltext_url and normalized_final_url and normalized_final_url == citation_fulltext_url:
         hard_negative_signals = [signal for signal in hard_negative_signals if signal != "publisher_paywall"]
         blocking_fallback_signals = [signal for signal in blocking_fallback_signals if signal != "publisher_paywall"]
-    if provider == "elsevier":
-        canonical_node = soup.select_one("link[rel='canonical']")
-        canonical_url = normalize_text(str((getattr(canonical_node, "attrs", None) or {}).get("href") or ""))
-        if "/science/article/abs/" in canonical_url:
-            abstract_only_hints.append("canonical_abstract_url")
-            blocking_fallback_signals.append("canonical_abstract_url")
-    if provider == "springer" and not structure.post_abstract_body_run:
-        if soup.select_one(".app-article-access__heading, .c-preview-message__link, [data-test='access-via-institution']"):
-            blocking_fallback_signals.append("springer_access_preview_wall")
     return (
         _dedupe_signals(hard_negative_signals),
         _dedupe_signals(abstract_only_hints),
@@ -1036,7 +1065,12 @@ def assess_html_fulltext_availability(
         if not resolved_container_text_length:
             resolved_container_text_length = inferred_container_text_length
     structure_ok = _structure_accepts_fulltext(structure)
-    body_ok_fallback = has_sufficient_article_body(markdown_text, metadata_map, section_hints=section_hints)
+    body_ok_fallback = has_sufficient_article_body(
+        markdown_text,
+        metadata_map,
+        section_hints=section_hints,
+        provider=provider,
+    )
     body_ok = structure_ok or body_ok_fallback
     metrics = body_metrics(markdown_text, metadata_map, section_hints=section_hints)
     metrics["body_run_paragraph_count"] = structure.body_run_paragraph_count
@@ -1082,9 +1116,12 @@ def assess_html_fulltext_availability(
             metadata=metadata_map,
         )
         hard_negative_signals.extend(dom_hard_negative_signals)
+        hard_negative_signals.extend(structure.provider_hard_negative_signals)
         abstract_only_hints.extend(dom_abstract_only_hints)
         abstract_only_hints.extend(provider_abstract)
+        abstract_only_hints.extend(structure.provider_abstract_only_hints)
         blocking_fallback_signals.extend(dom_blocking_fallback_signals)
+        blocking_fallback_signals.extend(structure.provider_blocking_fallback_signals)
     blocking_fallback_signals.extend(structure.access_gate_markers)
     if not blocking_fallback_signals and not body_ok and structure.paywall_gate_detected:
         hard_negative_signals.append("publisher_paywall")

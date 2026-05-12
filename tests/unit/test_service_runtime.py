@@ -458,6 +458,12 @@ class ServiceRuntimeTests(unittest.TestCase):
                 doi="10.1007/example",
                 metadata={"title": "Springer Example"},
             )
+            wiley_html_warnings, wiley_html_trail = store.save_provider_html_payload(
+                "wiley",
+                content=html_content,
+                doi="10.1111/example",
+                metadata={"title": "Wiley Example"},
+            )
 
             saved_paths = list(Path(tmpdir).glob("*"))
 
@@ -465,5 +471,7 @@ class ServiceRuntimeTests(unittest.TestCase):
         self.assertTrue(any("Wiley official full text was downloaded as PDF/binary to" in item for item in saved_warnings))
         self.assertEqual(html_warnings, [])
         self.assertEqual(html_trail, ["download:springer_html_saved"])
+        self.assertEqual(wiley_html_warnings, [])
+        self.assertEqual(wiley_html_trail, [])
         self.assertTrue(any(path.name.endswith(".pdf") for path in saved_paths))
         self.assertTrue(any(path.name.endswith("_original.html") for path in saved_paths))

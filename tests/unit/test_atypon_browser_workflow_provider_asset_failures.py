@@ -1,10 +1,10 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
-from ._science_pnas_provider_support import *
+from ._atypon_browser_workflow_provider_support import *
 
 
-class SciencePnasProviderAssetFailureTests(SciencePnasProviderTestCase):
+class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProviderTestCase):
     def test_science_provider_replay_for_adz3492_saves_svg_body_asset(self) -> None:
         """rule: rule-image-download-validates-real-images"""
         svg_url = (

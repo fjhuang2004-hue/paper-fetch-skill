@@ -6,9 +6,9 @@ from bs4 import BeautifulSoup
 
 from paper_fetch.extraction.html._runtime import body_metrics
 from paper_fetch.providers._html_references import extract_numbered_references_from_html
-from paper_fetch.extraction.html.signals import SciencePnasHtmlFailure
-from paper_fetch.providers.science_pnas import extract_science_pnas_markdown
-from paper_fetch.providers.science_pnas import normalization as science_pnas_normalization
+from paper_fetch.extraction.html.signals import HtmlExtractionFailure
+from paper_fetch.providers.atypon_browser_workflow import extract_atypon_browser_workflow_markdown
+from paper_fetch.providers.atypon_browser_workflow import normalization as atypon_browser_workflow_normalization
 from tests.golden_criteria import golden_criteria_asset
 from tests.provider_benchmark_samples import provider_benchmark_sample
 from tests.paths import FIXTURE_DIR
@@ -22,7 +22,7 @@ SCIENCE_PERSPECTIVE_FIXTURE = golden_criteria_asset("10.1126/science.aeg3511", "
 SCIENCE_ADP0212_FIXTURE = golden_criteria_asset("10.1126/science.adp0212", "original.html")
 
 
-class SciencePnasMarkdownTests(unittest.TestCase):
+class AtyponBrowserWorkflowMarkdownTests(unittest.TestCase):
     def test_extract_numbered_references_from_bibliography_labels(self) -> None:
         html = """
         <section id="bibliography" role="doc-bibliography">
@@ -66,7 +66,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         if title:
             metadata["title"] = title
         html = fixture_path.read_text(encoding="utf-8")
-        return extract_science_pnas_markdown(
+        return extract_atypon_browser_workflow_markdown(
             html,
             source_url,
             publisher,
@@ -117,8 +117,8 @@ class SciencePnasMarkdownTests(unittest.TestCase):
     def test_pnas_abstract_fixture_is_rejected(self) -> None:
         html = golden_criteria_asset("10.1073/pnas.2406303121", "abstract.html").read_text(encoding="utf-8")
 
-        with self.assertRaises(SciencePnasHtmlFailure) as ctx:
-            extract_science_pnas_markdown(
+        with self.assertRaises(HtmlExtractionFailure) as ctx:
+            extract_atypon_browser_workflow_markdown(
                 html,
                 PNAS_SAMPLE.landing_url,
                 "pnas",
@@ -310,9 +310,9 @@ class SciencePnasMarkdownTests(unittest.TestCase):
 
         container = soup.select_one(".article-section__content")
         self.assertIsNotNone(container)
-        science_pnas_normalization._normalize_display_formula_blocks(container)
-        science_pnas_normalization._normalize_inline_math_nodes(container)
-        science_pnas_normalization._normalize_non_table_inline_blocks(container)
+        atypon_browser_workflow_normalization._normalize_display_formula_blocks(container)
+        atypon_browser_workflow_normalization._normalize_inline_math_nodes(container)
+        atypon_browser_workflow_normalization._normalize_non_table_inline_blocks(container)
 
         rendered = str(container)
         self.assertNotIn("[Formula unavailable]", rendered)
@@ -338,7 +338,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
 
         container = soup.select_one(".article-section__content")
         self.assertIsNotNone(container)
-        science_pnas_normalization._normalize_display_formula_blocks(container)
+        atypon_browser_workflow_normalization._normalize_display_formula_blocks(container)
 
         rendered = str(container)
         self.assertNotIn("[Formula unavailable]", rendered)
@@ -424,7 +424,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://onlinelibrary.wiley.com/doi/full/10.1111/test-bilingual",
             "wiley",
@@ -475,7 +475,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, info = extract_science_pnas_markdown(
+        markdown, info = extract_atypon_browser_workflow_markdown(
             html,
             "https://onlinelibrary.wiley.com/doi/full/10.1111/test-nested",
             "wiley",
@@ -534,7 +534,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, info = extract_science_pnas_markdown(
+        markdown, info = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/science.abp8622",
             "science",
@@ -591,7 +591,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, info = extract_science_pnas_markdown(
+        markdown, info = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/test-browser-language-filter",
             "science",
@@ -630,7 +630,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        _, info = extract_science_pnas_markdown(
+        _, info = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/test-browser-section-hints",
             "science",
@@ -665,7 +665,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, info = extract_science_pnas_markdown(
+        markdown, info = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/test-browser-code-section-hints",
             "science",
@@ -698,7 +698,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/test-browser-portuguese-only",
             "science",
@@ -751,7 +751,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/test-citation-regression",
             "science",
@@ -785,7 +785,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.pnas.org/doi/full/10.1073/pnas.test-citation-regression",
             "pnas",
@@ -820,7 +820,7 @@ class SciencePnasMarkdownTests(unittest.TestCase):
         </html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://onlinelibrary.wiley.com/doi/full/10.1111/test-author-year-regression",
             "wiley",

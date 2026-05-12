@@ -2,6 +2,25 @@
 
 All notable public changes to `paper-fetch-skill` are documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Reworked Phase 1 routing/extraction internals: Copernicus URL identity now uses catalog `domain_suffixes`, early metadata probes are driven by `ProviderSpec.probe_capability`, reference-anchor detection is centralized in HTML semantics, Wiley supplementary data attributes are handled by the Wiley extractor, and Science/PNAS figure teaser filtering now receives the actual publisher.
+- Centralized provider source ownership, including Springer HTML/PDF source ownership, API-like hosts, Wiley TDM URL template, Springer/Nature domain matching, workflow HTML-managed fallback markers, and body-text thresholds in `ProviderSpec` / `SOURCE_PROVIDER_MAP`.
+- Tightened Phase 4 generic extraction boundaries: Springer/Nature citation cleanup patterns now live in the provider layer, provider formula tokens require explicit `ProviderHtmlRules` profile injection, and Research Briefing authorless signatures live with quality signals.
+- Completed Phase 4 duplicate-source cleanup: `FRONT_MATTER_PUBLICATION_KEYWORDS` now has one generic source with Science/PNAS publication tokens scoped to provider rules, `SourceKind` is checked against catalog sources at import time, Cloudflare cookie filters share the FlareSolverr constants, and Science reuses the shared AAAS datalayer pattern.
+- Centralized Phase 3 HTML availability overrides and access-gate signals through provider rules and shared signal patterns, including Science perspective, Elsevier canonical abstract, and Springer preview-wall body-run handling.
+- Hardened Phase 6 provider-specific contracts: IEEE article-number URL parsing now only accepts `/document/{article_number}/` landing paths, Springer/Nature Creative Commons cleanup no longer removes article roots, and HTML asset helpers avoid importing the public models package during package initialization.
+- Completed Phase 7 cleanup: generic browser HTML failures are now `HtmlExtractionFailure`, FlareSolverr status probes use a non-DOI sentinel, landing-page redirect resolution has one request-URL-based semantic, and old FlareSolverr rate-limit env cleanup code was removed.
+- Moved Atypon browser HTML/PDF candidate templates into `ProviderSpec` and removed the `paper_fetch.providers.science_html`, `paper_fetch.providers.pnas_html`, and `paper_fetch.providers.wiley_html` compatibility facades.
+- Completed Phase 5 Atypon/Wiley cleanup: Wiley owns abbreviations and supplementary filename contracts, datalayer signal parsing uses schema field maps, and Atypon browser workflow scope is documented as Science/PNAS/Wiley catalog entries only.
+- Documented Phase 8 CI/test policy updates: regular unit/integration jobs and full golden regression continue to use pytest-xdist defaults, while live FlareSolverr/MCP paths document their required serial execution.
+- Completed Phase 2 callback cleanup: Atypon DOM postprocess and scoped asset extraction are now provider-registered callbacks, and provider display names resolve through the catalog-backed `provider_display_name()` helper.
+- Completed Phase 3 catalog field cleanup: Springer/Nature PDF candidates, arXiv metadata probe short-circuiting, provider HTML artifact persistence, XML source inference, provider-managed abstract-only handling, and PDF URL token semantics are now catalog/callback driven instead of provider-name hardcoded.
+- Completed Phase 5 Atypon browser workflow rename: the old Science/PNAS package/profile/postprocess names were moved to `atypon_browser_workflow`, the legacy profiles facade was removed, Atypon profile dispatch now dynamically imports provider HTML modules from `ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES`, shared figure-link and abstract-redirect helpers live in neutral modules, and Science citation-italic repair now belongs to `_science_html.py`.
+- Elsevier XML body asset downloads now retry only failed transient network items once sequentially and remove the original asset failure when the retry succeeds.
+
 ## 1.3 - 2026-05-09
 
 ### Added
@@ -33,6 +52,7 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 - 为 Wiley / Science / PNAS 正文抓取增加 FlareSolverr HTML 快速首轮：主 HTML 请求使用 `waitInSeconds=0` 和 `disableMedia=true`，遇到 challenge、访问拦截、摘要重定向或正文抽取不足时自动回退到原保守等待策略。
 - 图片恢复、正文/附件资产下载、figure-page HTML 发现继续走允许媒体资源的路径，避免 `disableMedia` 阻断 full-size 图片发现与下载。
 - 收敛 HTML availability/container、section hint、browser-workflow Markdown profile、作者 fallback、Crossref resolve 转发和 HTML heading/table helper 的重复实现；canonical owner 分别为 `quality.html_availability`、`extraction.section_hints` / `extraction.html.semantics`、`ProviderBrowserProfile` / `_html_authors.py`、`metadata.crossref`。
+- 明确 Science / PNAS / Wiley 共享浏览器抽取为 Atypon-only profile，并把 asset scope、Wiley abbreviations、Wiley author noise、supplementary URL/filename 和 AAAS/PNAS/Wiley datalayer 判定收敛到 provider-owned callback/schema。
 - 将 HTML asset canonical owner 移到 `paper_fetch.extraction.html.assets` 包，删除 `paper_fetch.extraction.html._assets` 与 `paper_fetch.providers.html_assets` 兼容门面；下载 hook 现在从 extraction asset 包或 `paper_fetch.extraction.html.assets.download` patch。
 - 将 `paper_fetch.models` 物化为包，并按 schema、markdown、tokens、quality、render、sections、builders 拆分实现；`from paper_fetch.models import ...` 继续兼容。
 - 将 Science/PNAS browser-workflow HTML 实现物化为 `paper_fetch.providers.science_pnas` 包，删除 `paper_fetch.providers._science_pnas_html` 兼容门面，并抽出 provider HTML asset policy engine 与 Playwright document fetcher 基类。
@@ -53,8 +73,8 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 ### Validation
 
-- `PYTHONPATH=src python3 -m pytest -n 0 tests/unit/test_provider_request_options.py`
-- `PYTHONPATH=src python3 -m pytest -n 0 tests/unit/test_science_pnas_provider.py -k 'download_related_assets or image'`
+- `PYTHONPATH=src python3 -m pytest tests/unit/test_provider_request_options.py`
+- `PYTHONPATH=src python3 -m pytest tests/unit/test_science_pnas_provider.py -k 'download_related_assets or image'`
 - Live smoke: Wiley `10.1111/gcb.16414`, Science `10.1126/science.ady3136`, and PNAS `10.1073/pnas.2406303121` produced full-text Markdown with full-size body images using the WSLg FlareSolverr preset.
 
 ## 2026-04-25
@@ -228,8 +248,8 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 ### Validation
 
 - `ruff check .`
-- `python -m pytest tests/unit tests/integration -q`
-- `python -m pytest tests/live/test_live_mcp.py -q` skips cleanly when live env is not enabled
+- `PYTHONPATH=src python3 -m pytest tests/unit tests/integration -q`
+- `PYTHONPATH=src python3 -m pytest -n 0 tests/live/test_live_mcp.py -q` skips cleanly when live env is not enabled; `-n 0` is required because live MCP shares external publisher/API state and secrets.
 
 ### Follow-up
 

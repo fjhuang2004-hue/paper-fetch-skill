@@ -19,7 +19,7 @@ from paper_fetch.providers import (
     science as science_provider,
     wiley as wiley_provider,
 )
-from paper_fetch.providers.science_pnas import asset_scopes as science_pnas_asset_scopes
+from paper_fetch.providers.atypon_browser_workflow import asset_scopes as atypon_browser_workflow_asset_scopes
 from paper_fetch.quality.html_availability import assess_html_fulltext_availability
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
 from paper_fetch.tracing import trace_from_markers
@@ -144,7 +144,7 @@ class AssetTransport:
             raise response
         return response
 
-class SciencePnasProviderTestCase(unittest.TestCase):
+class AtyponBrowserWorkflowProviderTestCase(unittest.TestCase):
     def _metadata_from_golden_criteria(self, article_path: Path, doi: str) -> dict[str, object]:
         article_payload = json.loads(article_path.read_text(encoding="utf-8"))
         metadata = dict(article_payload.get("metadata") or {})

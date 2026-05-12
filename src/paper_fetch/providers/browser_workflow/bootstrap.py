@@ -6,7 +6,7 @@ import logging
 import sys
 from typing import TYPE_CHECKING
 
-from ...extraction.html.signals import SciencePnasHtmlFailure
+from ...extraction.html.signals import HtmlExtractionFailure
 from ...metadata.types import ProviderMetadata
 from ...publisher_identity import normalize_doi
 from ...runtime import RuntimeContext
@@ -130,7 +130,7 @@ def bootstrap_browser_workflow(
                 warnings=result.warnings,
             )
             return result
-        except SciencePnasHtmlFailure as exc:
+        except HtmlExtractionFailure as exc:
             logger.debug(
                 "browser_workflow_direct_html_preflight provider=%s doi=%s action=fallback reason=%s message=%s",
                 client.name,
@@ -179,7 +179,7 @@ def bootstrap_browser_workflow(
         )
         result.html_failure_reason = exc.kind
         result.html_failure_message = exc.message
-    except SciencePnasHtmlFailure as exc:
+    except HtmlExtractionFailure as exc:
         result.html_failure_reason = exc.reason
         result.html_failure_message = exc.message
 

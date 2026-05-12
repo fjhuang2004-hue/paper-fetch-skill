@@ -88,7 +88,7 @@
 ### `source`
 
 - 公开给调用方的粗粒度结果来源。
-- 例如 `elsevier_xml`、`elsevier_pdf`、`springer_html`、`wiley_browser`、`science`、`pnas`、`ieee_html`、`ieee_pdf`、`arxiv_html`、`arxiv_pdf`、`copernicus_xml`、`copernicus_pdf`、`crossref_meta`、`metadata_only`。
+- 例如 `elsevier_xml`、`elsevier_pdf`、`springer_html`、`springer_pdf`、`wiley_browser`、`science`、`pnas`、`ieee_html`、`ieee_pdf`、`arxiv_html`、`arxiv_pdf`、`copernicus_xml`、`copernicus_pdf`、`crossref_meta`、`metadata_only`。
 
 ### `source_trail`
 

@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from ..utils import normalize_text, safe_text
 from .markdown import (
+    NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN,
     NUMBERED_REFERENCE_PATTERN,
     SLASH_RUN_PATTERN,
     TABLE_LIKE_FIGURE_ASSET_PATTERN,
@@ -55,7 +56,10 @@ def asset_link(asset: "Asset") -> str:
 
 def is_table_like_figure_asset(asset: "Asset") -> bool:
     for candidate in (asset.heading, asset.caption):
-        if TABLE_LIKE_FIGURE_ASSET_PATTERN.match(normalize_text(candidate)):
+        normalized = normalize_text(candidate)
+        if TABLE_LIKE_FIGURE_ASSET_PATTERN.match(normalized) or NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN.match(
+            normalized
+        ):
             return True
     return False
 

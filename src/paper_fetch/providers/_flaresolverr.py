@@ -27,6 +27,7 @@ from ..config import (
 )
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..quality.html_availability import choose_parser, extract_page_title
+from ..quality.html_signals import looks_like_abstract_redirect
 from ..utils import normalize_text, sanitize_filename
 from .base import (
     ProviderFailure,
@@ -34,21 +35,26 @@ from .base import (
     build_provider_status_check,
     provider_status_check_from_failure,
 )
-from ._science_pnas_profiles import looks_like_abstract_redirect
 
 try:
     from bs4 import BeautifulSoup
 except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
 
-CLOUDFLARE_COOKIE_NAMES = {
-    "_cfuvid",
-    "__cf_bm",
-    "cf_clearance",
-}
+CLOUDFLARE_COOKIE_NAMES = frozenset(
+    {
+        "_cfuvid",
+        "__cf_bm",
+        "cf_clearance",
+    }
+)
+_CLOUDFLARE_COOKIE_PREFIXES = (
+    "cf_chl_",
+)
 DEFAULT_FLARESOLVERR_WAIT_SECONDS = 8
 DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS = 1
 DEFAULT_FLARESOLVERR_MAX_TIMEOUT_MS = 120000
+FLARESOLVERR_STATUS_PROBE_ID = "probe://flaresolverr/status"
 
 logger = logging.getLogger("paper_fetch.providers.flaresolverr")
 
@@ -251,7 +257,7 @@ def probe_runtime_status(
     env: Mapping[str, str],
     *,
     provider: str,
-    doi: str = "10.0000/provider-status",
+    doi: str = FLARESOLVERR_STATUS_PROBE_ID,
 ) -> ProviderStatusResult:
     runtime_details = _runtime_probe_details(env)
     checks = []

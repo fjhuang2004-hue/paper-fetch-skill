@@ -18,7 +18,7 @@ from paper_fetch.providers import pnas as pnas_provider
 from paper_fetch.providers import science as science_provider
 from paper_fetch.providers import springer as springer_provider
 from paper_fetch.providers import wiley as wiley_provider
-from paper_fetch.providers.science_pnas import extract_science_pnas_markdown
+from paper_fetch.providers.atypon_browser_workflow import extract_atypon_browser_workflow_markdown
 from paper_fetch.providers.base import ProviderContent, ProviderFailure, RawFulltextPayload
 from paper_fetch.tracing import trace_from_markers
 from tests.provider_benchmark_samples import (
@@ -264,7 +264,7 @@ class RegressionSampleTests(unittest.TestCase):
             "landing_page_url": landing_url,
         }
         html = read_fixture_text(fixture_name)
-        markdown, info = extract_science_pnas_markdown(
+        markdown, info = extract_atypon_browser_workflow_markdown(
             html,
             landing_url,
             "wiley",
@@ -516,7 +516,7 @@ class RegressionSampleTests(unittest.TestCase):
 
     def test_paper_fetch_uses_science_replay_fixture_for_positive_sample(self) -> None:
         science_html = read_fixture_text(SCIENCE_SAMPLE.fixture_name)
-        markdown_text, _ = extract_science_pnas_markdown(
+        markdown_text, _ = extract_atypon_browser_workflow_markdown(
             science_html,
             SCIENCE_SAMPLE.landing_url,
             "science",
@@ -579,7 +579,7 @@ class RegressionSampleTests(unittest.TestCase):
             "fulltext_links": [],
             "references": [],
         }
-        markdown_text, extraction_info = extract_science_pnas_markdown(
+        markdown_text, extraction_info = extract_atypon_browser_workflow_markdown(
             wiley_html,
             WILEY_SAMPLE.landing_url,
             "wiley",
@@ -691,7 +691,7 @@ class RegressionSampleTests(unittest.TestCase):
             "fulltext_links": [],
             "references": [],
         }
-        markdown_text, extraction_info = extract_science_pnas_markdown(
+        markdown_text, extraction_info = extract_atypon_browser_workflow_markdown(
             pnas_html,
             PNAS_SAMPLE.landing_url,
             "pnas",

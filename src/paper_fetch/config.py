@@ -40,11 +40,6 @@ FLARESOLVERR_URL_ENV_VAR = "FLARESOLVERR_URL"
 FLARESOLVERR_ENV_FILE_ENV_VAR = "FLARESOLVERR_ENV_FILE"
 FLARESOLVERR_SOURCE_DIR_ENV_VAR = "FLARESOLVERR_SOURCE_DIR"
 FLARESOLVERR_KEEP_SESSION_ENV_VAR = "PAPER_FETCH_FLARESOLVERR_KEEP_SESSION"
-LEGACY_FLARESOLVERR_RATE_LIMIT_ENV_VARS = (
-    "FLARESOLVERR_MIN_INTERVAL_SECONDS",
-    "FLARESOLVERR_MAX_REQUESTS_PER_HOUR",
-    "FLARESOLVERR_MAX_REQUESTS_PER_DAY",
-)
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -94,8 +89,6 @@ def build_runtime_env(
     for candidate in candidates:
         merged.update(load_env_file(candidate))
     merged.update(process_env)
-    for name in LEGACY_FLARESOLVERR_RATE_LIMIT_ENV_VARS:
-        merged.pop(name, None)
     return merged
 
 

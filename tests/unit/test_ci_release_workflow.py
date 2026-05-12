@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+PYPROJECT = REPO_ROOT / "pyproject.toml"
 
 
 def _job_block(workflow: str, job_name: str) -> str:
@@ -62,6 +63,30 @@ class CiReleaseWorkflowTests(unittest.TestCase):
             "offline-windows-x86-64",
         ):
             self.assertIn(f"- {job_name}", block)
+
+    def test_regular_pytest_jobs_keep_xdist_defaults(self) -> None:
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        pyproject = PYPROJECT.read_text(encoding="utf-8")
+
+        self.assertIn('addopts = "-n auto"', pyproject)
+
+        expected_commands = {
+            "unit": "python -m pytest tests/unit tests/devtools -q",
+            "integration": "python -m pytest tests/integration -q",
+            "full-golden": "python -m pytest tests/integration/test_golden_corpus.py -q",
+        }
+        for job_name, command in expected_commands.items():
+            block = _job_block(workflow, job_name)
+            self.assertIn(command, block)
+            self.assertNotIn("-n 0", block, job_name)
+
+    def test_live_mcp_pytest_documents_serial_execution(self) -> None:
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        block = _job_block(workflow, "live-mcp")
+
+        self.assertIn("pytest -n 0 tests/live/test_live_mcp.py", block)
+        self.assertIn("share external publisher/API state and secrets", block)
+        self.assertIn("regular unit/integration suites use xdist", block)
 
     def test_release_job_only_runs_for_tag_or_explicit_manual_release(self) -> None:
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")

@@ -61,11 +61,21 @@ def is_api_like_url(url: str | None) -> bool:
     path = parsed.path.lower()
     if not hostname:
         return False
-    if hostname in {"www.scopus.com", "scopus.com"}:
+    from .provider_catalog import is_declared_api_host
+
+    if is_declared_api_host(hostname):
         return True
     if hostname.startswith("api."):
         return True
-    return any(token in path for token in ("/content/abstract/", "/content/article/", "/inward/record.uri", "/inward/citedby.uri"))
+    return any(
+        token in path
+        for token in (
+            "/content/abstract/",
+            "/content/article/",
+            "/inward/record.uri",
+            "/inward/citedby.uri",
+        )
+    )
 
 
 def choose_public_landing_page_url(*values: Any) -> str | None:
@@ -147,13 +157,11 @@ def sanitize_filename(value: str) -> str:
 
 def provider_display_name(value: str) -> str:
     normalized = normalize_text(value).lower().replace("-", "_")
-    special_names = {
-        "arxiv": "arXiv",
-        "ieee": "IEEE",
-        "pnas": "PNAS",
-    }
-    if normalized in special_names:
-        return special_names[normalized]
+    from .provider_catalog import provider_display_names
+
+    catalog_names = provider_display_names()
+    if normalized in catalog_names:
+        return catalog_names[normalized]
     return normalized.replace("_", " ").title() if normalized else "Provider"
 
 
@@ -189,7 +197,9 @@ def dedupe_authors(authors: list[str]) -> list[str]:
     return deduped
 
 
-def extension_from_content_type(content_type: str | None, source_url: str | None = None) -> str:
+def extension_from_content_type(
+    content_type: str | None, source_url: str | None = None
+) -> str:
     normalized = (content_type or "").split(";", 1)[0].strip().lower()
     known = {
         "application/pdf": ".pdf",
@@ -284,7 +294,10 @@ def build_asset_output_path(
     suffix = (
         detected_suffix
         if detected_suffix != ".bin"
-        else (Path(candidate_name).suffix or extension_from_content_type(content_type, source_url or source_href))
+        else (
+            Path(candidate_name).suffix
+            or extension_from_content_type(content_type, source_url or source_href)
+        )
     )
     filename = f"{stem}{suffix}"
 

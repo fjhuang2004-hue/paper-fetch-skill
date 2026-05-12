@@ -5,16 +5,18 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from ...extraction.html.figure_links import inject_inline_figure_links
+from ...extraction.html.figure_links import (
+    inject_inline_figure_links,
+    rewrite_inline_figure_links as _rewrite_inline_figure_links,
+)
 from ...extraction.html.language import collect_html_abstract_blocks
 from ...extraction.html.semantics import normalize_heading, node_source_selector
 from ...extraction.html.shared import short_text as _short_text
 from ...extraction.html.tables import inject_inline_table_blocks
 from ...models import normalize_markdown_text
 from ...utils import normalize_text
-from .. import _science_pnas_postprocess
-from .._science_pnas_postprocess import normalize_browser_workflow_markdown
-from .._science_pnas_profiles import publisher_profile as _publisher_profile
+from .._atypon_browser_workflow_postprocess import normalize_browser_workflow_markdown
+from .._atypon_browser_workflow_profiles import publisher_profile as _publisher_profile
 from .normalization import _render_non_table_inline_text
 from .profile import (
     HEADING_TAG_PATTERN,
@@ -131,11 +133,6 @@ def _abstract_block_texts(node: Tag) -> list[str]:
 def _missing_abstract_markdown(container: Tag, markdown_text: str, *, publisher: str) -> str:
     existing_normalized = normalize_text(markdown_text)
     leading_semantic_text = _leading_semantic_markdown_text(markdown_text)
-    if publisher == "pnas" and _markdown_has_heading(markdown_text, "significance") and _markdown_has_heading(
-        markdown_text,
-        "abstract",
-    ):
-        return ""
     abstract_blocks: list[str] = []
     for payload in _abstract_section_payloads(container):
         heading_text = normalize_text(payload.get("heading")) or "Abstract"
@@ -149,9 +146,18 @@ def _missing_abstract_markdown(container: Tag, markdown_text: str, *, publisher:
 
     if not abstract_blocks:
         return ""
-    return clean_markdown(
+    abstract_markdown = clean_markdown(
         "\n\n".join(abstract_blocks),
         noise_profile=_noise_profile_for_publisher(publisher),
+    )
+    return str(
+        _apply_profile_markdown_postprocess(
+            abstract_markdown,
+            publisher=publisher,
+            stage="missing_abstract",
+            original_markdown=markdown_text,
+            has_heading=_markdown_has_heading,
+        )
     )
 
 
@@ -177,7 +183,7 @@ def rewrite_inline_figure_links(
     figure_assets: list[Mapping[str, Any]] | None,
     publisher: str,
 ) -> str:
-    return _science_pnas_postprocess.rewrite_inline_figure_links(
+    return _rewrite_inline_figure_links(
         markdown_text,
         figure_assets=figure_assets,
         clean_markdown_fn=lambda value: clean_markdown(
@@ -303,6 +309,13 @@ def _normalize_browser_workflow_markdown(markdown_text: str, *, publisher: str) 
     )
 
 
+def _apply_profile_markdown_postprocess(markdown_text: str, *, publisher: str, **context: Any) -> Any:
+    hook = _publisher_profile(publisher).markdown_postprocess
+    if hook is None:
+        return markdown_text
+    return hook(markdown_text, **context)
+
+
 def _postprocess_browser_workflow_markdown(
     markdown_text: str,
     *,
@@ -402,7 +415,7 @@ def _postprocess_browser_workflow_markdown(
         if not normalized_block:
             continue
         is_auxiliary_block = _looks_like_markdown_auxiliary_block(normalized_block)
-        if _looks_like_post_content_noise_block(normalized_block):
+        if _looks_like_post_content_noise_block(normalized_block, publisher=publisher):
             if started_content:
                 break
             continue
@@ -415,7 +428,17 @@ def _postprocess_browser_workflow_markdown(
                 and not is_auxiliary_block
                 and not _block_matches_known_abstract_text(block, known_abstract_blocks)
             ):
-                if publisher == "science" and abstract_prose_blocks_seen == 0:
+                keep_in_abstract = bool(
+                    _apply_profile_markdown_postprocess(
+                        "",
+                        publisher=publisher,
+                        stage="keep_first_unknown_abstract_block",
+                        block=block,
+                        abstract_prose_blocks_seen=abstract_prose_blocks_seen,
+                        known_abstract_blocks=known_abstract_blocks,
+                    )
+                )
+                if keep_in_abstract:
                     if not title_kept and normalized_title:
                         kept.insert(0, f"# {normalized_title}")
                         title_kept = True
@@ -450,7 +473,11 @@ def _postprocess_browser_workflow_markdown(
             continue
         if not started_content and is_auxiliary_block:
             continue
-        if not is_auxiliary_block and _looks_like_front_matter_paragraph(normalized_block, title=normalized_title or None):
+        if not is_auxiliary_block and _looks_like_front_matter_paragraph(
+            normalized_block,
+            title=normalized_title or None,
+            publisher=publisher,
+        ):
             continue
         if not started_content and not is_auxiliary_block and not _is_substantial_prose(normalized_block):
             continue

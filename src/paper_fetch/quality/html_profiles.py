@@ -26,6 +26,7 @@ from .html_signals import (
     load_pnas_datalayer as load_pnas_datalayer,
     load_wiley_datalayer as load_wiley_datalayer,
     looks_like_abstract_redirect as looks_like_abstract_redirect,
+    no_availability_overrides as no_availability_overrides,
     pnas_blocking_fallback_signals as pnas_blocking_fallback_signals,
     pnas_positive_signals as pnas_positive_signals,
     science_blocking_fallback_signals as science_blocking_fallback_signals,
@@ -46,6 +47,7 @@ class HtmlAvailabilityProfile:
     site_rule_overrides: Mapping[str, Any] = field(default_factory=dict)
     positive_signals: Callable[[str], tuple[list[str], list[str], list[str]]] = default_positive_signals
     blocking_fallback_signals: Callable[[str], list[str]] = lambda _html_text: []
+    availability_overrides: Callable[..., tuple[list[str], list[str], list[str]]] = no_availability_overrides
 
 
 GENERIC_AVAILABILITY_PROFILE = HtmlAvailabilityProfile()
@@ -58,6 +60,7 @@ def _availability_profile_from_rules(provider_name: str) -> HtmlAvailabilityProf
         site_rule_overrides=copy.deepcopy(dict(rules.availability_site_rule_overrides)),
         positive_signals=rules.positive_signals,
         blocking_fallback_signals=rules.blocking_fallback_signals,
+        availability_overrides=rules.availability_overrides,
     )
 
 
@@ -105,3 +108,11 @@ def provider_blocking_fallback_signals(
     html_text: str,
 ) -> list[str]:
     return list(availability_profile_for_publisher(publisher).blocking_fallback_signals(html_text))
+
+
+def provider_availability_overrides(
+    publisher: str | None,
+    *args: Any,
+    **kwargs: Any,
+) -> tuple[list[str], list[str], list[str]]:
+    return availability_profile_for_publisher(publisher).availability_overrides(*args, **kwargs)

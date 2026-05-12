@@ -37,6 +37,7 @@ from ._html_authors import (
     extract_jsonld_authors as extract_common_jsonld_authors,
     extract_meta_authors as extract_common_meta_authors,
     extract_selector_authors as extract_common_selector_authors,
+    looks_like_collective_author_text,
     looks_like_author_name,
 )
 from ._html_references import extract_numbered_references_from_html
@@ -78,7 +79,6 @@ SPRINGER_FIGURE_TRAILING_LINK_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 SPRINGER_AI_ALT_DISCLAIMER_ID_TOKEN = "ai-alt-disclaimer"
-SPRINGER_AI_ALT_DISCLAIMER_TEXT = "The alternative text for this image may have been generated using AI."
 SPRINGER_ARTICLE_JSONLD_TYPES = frozenset(
     {
         "article",
@@ -93,17 +93,6 @@ SPRINGER_IGNORED_AUTHOR_TEXT = {
     "author information",
     "authors and affiliations",
     "view author information",
-}
-SPRINGER_COLLECTIVE_AUTHOR_TOKENS = {
-    "collaboration",
-    "committee",
-    "consortium",
-    "group",
-    "initiative",
-    "network",
-    "project",
-    "society",
-    "team",
 }
 SPRINGER_SUPPLEMENTARY_SECTION_TITLES = frozenset(
     {
@@ -132,12 +121,7 @@ def decode_html(body: bytes) -> str:
 
 
 def _looks_like_collective_author_text(text: str) -> bool:
-    normalized = normalize_text(text).lower()
-    if not normalized:
-        return False
-    if "et al" in normalized:
-        return True
-    return any(token in normalized.split() for token in SPRINGER_COLLECTIVE_AUTHOR_TOKENS)
+    return looks_like_collective_author_text(text)
 
 
 def _normalize_display_author_name(name: str) -> str:
@@ -307,17 +291,6 @@ def _remove_springer_ai_alt_disclaimers(root: Any) -> None:
         if isinstance(node, Tag) and id(node) not in seen:
             removable_nodes.append(node)
             seen.add(id(node))
-
-    target_text = normalize_text(SPRINGER_AI_ALT_DISCLAIMER_TEXT).lower()
-    for text_node in list(root.find_all(string=True)):
-        if normalize_text(str(text_node)).lower() != target_text:
-            continue
-        parent = text_node.parent if isinstance(getattr(text_node, "parent", None), Tag) else None
-        if parent is None or not _springer_is_figure_or_illustration_context(parent):
-            continue
-        if id(parent) not in seen:
-            removable_nodes.append(parent)
-            seen.add(id(parent))
 
     for node in removable_nodes:
         node.decompose()
@@ -712,6 +685,14 @@ def extract_full_size_figure_image_url(html_text: str, source_url: str) -> str |
     return promoted_candidate or fallback_candidate
 
 
+def extract_formula_assets(html_text: str, source_url: str) -> list[dict[str, str]]:
+    return extract_generic_formula_assets(
+        html_text,
+        source_url,
+        noise_profile="springer_nature",
+    )
+
+
 def extract_figure_assets(html_text: str, source_url: str) -> list[dict[str, str]]:
     if BeautifulSoup is None:
         return extract_generic_figure_assets(html_text, source_url)
@@ -797,9 +778,9 @@ def extract_figure_assets(html_text: str, source_url: str) -> list[dict[str, str
 
 def extract_supplementary_assets(html_text: str, source_url: str) -> list[dict[str, str]]:
     if BeautifulSoup is None:
-        return extract_generic_supplementary_assets(html_text, source_url)
+        return extract_generic_supplementary_assets(html_text, source_url, noise_profile="springer_nature")
     assets: list[dict[str, str]] = []
-    for asset in extract_generic_supplementary_assets(html_text, source_url):
+    for asset in extract_generic_supplementary_assets(html_text, source_url, noise_profile="springer_nature"):
         heading = normalize_text(str(asset.get("heading") or ""))
         if _springer_asset_is_source_data(heading) or _springer_asset_is_peer_review(heading):
             continue
@@ -869,7 +850,11 @@ def extract_source_data_assets(html_text: str, source_url: str) -> list[dict[str
     assets: list[dict[str, str]] = []
 
     for section in source_data_sections:
-        assets.extend(_mark_source_data_assets(extract_generic_supplementary_assets(str(section), source_url)))
+        assets.extend(
+            _mark_source_data_assets(
+                extract_generic_supplementary_assets(str(section), source_url, noise_profile="springer_nature")
+            )
+        )
 
     for section in supplementary_sections:
         title_key = _springer_section_title_key(section)
@@ -882,9 +867,21 @@ def extract_source_data_assets(html_text: str, source_url: str) -> list[dict[str
             if target_id:
                 target = soup.find(id=target_id)
                 if isinstance(target, Tag):
-                    assets.extend(_mark_source_data_assets(extract_generic_supplementary_assets(str(target), source_url)))
+                    assets.extend(
+                        _mark_source_data_assets(
+                            extract_generic_supplementary_assets(
+                                str(target),
+                                source_url,
+                                noise_profile="springer_nature",
+                            )
+                        )
+                    )
                 continue
-            assets.extend(_mark_source_data_assets(extract_generic_supplementary_assets(str(anchor), source_url)))
+            assets.extend(
+                _mark_source_data_assets(
+                    extract_generic_supplementary_assets(str(anchor), source_url, noise_profile="springer_nature")
+                )
+            )
 
     return _dedupe_springer_supplementary_assets(assets)
 
@@ -968,7 +965,7 @@ def extract_scoped_html_assets(
         source_data_html_text=source_data_html_text,
         policy=HtmlAssetExtractionPolicy(
             figure_extractor=extract_figure_assets,
-            formula_extractor=extract_generic_formula_assets,
+            formula_extractor=extract_formula_assets,
             supplementary_extractor=extract_supplementary_assets,
             source_data_extractor=extract_source_data_assets,
             finalizer=_dedupe_springer_supplementary_assets,

@@ -47,8 +47,18 @@ resolve
 
 - 在 `PROVIDER_CATALOG` 增加 `ProviderSpec`。
 - 在 `SOURCE_PROVIDER_MAP` 增加所有公开 `source -> provider` 映射。
+- `SOURCE_PROVIDER_MAP` 只登记实际写入 `ArticleModel.source` / envelope `source` 的公开来源；provider 内部 route marker 不单独登记。例如 Springer HTML / PDF fallback 分别公开 `springer_html` / `springer_pdf`，二者都映射到 `springer` provider。
+- `domains` 只登记明确 host；需要覆盖同一注册域下持续新增子域时，用 `domain_suffixes`，例如 Copernicus 使用 `("copernicus.org",)` 而不是穷举 journal 子域。
+- `probe_capability` 必须描述 routing 能力：有可提前调用的官方 metadata API 时设为 `metadata_api`；只可作为 DOI/domain/publisher 路由信号时设为 `routing_signal`。通用 routing 会按该字段决定是否发起早期 metadata probe。
 - 选择默认 `asset_default`：公开 HTML/XML 路线通常是 `body`；metadata-only 或没有资产能力的是 `none`。
-- 选择 `abstract_only_policy`：provider 能可靠返回自己的摘要页时用 `provider_managed`；否则保留 metadata fallback。
+- 选择 `provider_managed_abstract_only`：provider 能可靠返回自己的摘要页时设为 `True`；否则保持 `False` 并走通用 metadata-only fallback。
+- Atypon/browser-workflow 以及 Springer Link 这类固定候选 URL 模板必须放在 `html_path_templates` / `pdf_path_templates` / `crossref_pdf_position` / `base_domains`。需要从 landing/source URL 派生 PDF 的路径转换放在 `pdf_source_path_templates`。provider-owned HTML 模块可以读取这些字段，但不能再维护第二份路径模板常量。
+- 需要 API endpoint 或 API-like landing 过滤时，在 `api_hosts` / `api_url_templates` 声明；不要在 provider 或通用 `utils` 里散落 host 与 URL 模板常量。
+- 需要 metadata probe 早出口时，在 `metadata_probe_short_circuit` 声明延迟回调路径或 callable，并在 provider 模块内注册回调；workflow 不按 provider 名称分支。
+- 需要保留 provider 原始 HTML artifact 时，用 `persist_provider_html=True` 声明；`ArtifactStore` 只读取 catalog 字段。
+- 需要从 XML 文件推断 provider 时，用 `xml_root_tags` / `xml_file_tokens` 声明；公式采样不会在 `formula/convert.py` 里维护 provider 名白名单。
+- 需要跳过通用 HTML managed fallback marker 时，用 `emits_html_managed_marker=False` 表达；不要在 workflow 中按 provider 名字分支。
+- 正文长度阈值统一走 `body_text_thresholds`。通用 HTML 使用默认阈值；确有差异的 provider 只覆盖差异字段。
 - `client_factory_path` 指向最终 client，例如 `paper_fetch.providers.mdpi:MdpiClient`。
 - `status_order` 插入稳定顺序，避免 UI / MCP status 抖动。
 
@@ -116,8 +126,10 @@ provider 内部多步骤 fallback 应使用 `paper_fetch.providers._waterfall.ru
 - HTML-to-Markdown 编排：`paper_fetch.extraction.html.renderer`
 - Fulltext / abstract-only 判定：`paper_fetch.quality.html_availability`
 - Section hints：`paper_fetch.extraction.section_hints`、`paper_fetch.extraction.html.semantics`
+- Access-gate 文案与匹配顺序：`paper_fetch.extraction.html.signals.ACCESS_GATE_PATTERNS`
+- Reference anchor 判定：`paper_fetch.extraction.html.semantics` 中的 `looks_like_reference_anchor()` / `has_explicit_reference_marker()` 以及底层 `paper_fetch.extraction.citation_anchors.looks_like_reference_href()`；不要在 provider 或 runtime 中复制 `data-test`、`role`、`class`、`href` fragment 规则。
 - HTML table：`paper_fetch.extraction.html.tables`
-- Citation cleanup：`paper_fetch.markdown.citations`
+- Citation cleanup：`paper_fetch.markdown.citations`，只负责 numeric payload / Markdown cleanup；reference href 判定委托 `citation_anchors`
 - Formula rules：`paper_fetch.extraction.html.formula_rules`、`paper_fetch.providers._article_markdown_math`
 - Image MIME / dimensions：`paper_fetch.extraction.image_payloads`
 - Asset discovery / download：`paper_fetch.extraction.html.assets`
@@ -127,8 +139,9 @@ Provider-specific 代码只负责：
 
 - 找到 publisher 的 article container 或 XML root。
 - 把 publisher DOM/XML 映射成已有中间结构。
-- 在 `paper_fetch.extraction.html.provider_rules` 注册 publisher cleanup profile、Markdown promo tokens、availability site rule、access-block tokens 和必要 alias；不要在 `_runtime.py` 或 `quality/html_profiles.py` 新增 provider 字典分支。
+- 在 `paper_fetch.extraction.html.provider_rules` 注册 publisher cleanup profile、Markdown promo tokens、availability site rule、access-block tokens、availability override callback、公式 container/selector、supplementary 文本扩展和必要 alias；authorless quality heading signature 属于 `paper_fetch.quality.html_signals`。不要在 `_runtime.py`、`formula_rules.py`、`assets/supplementary.py` 或 `quality/issues.py` 直接追加 publisher 私有 token。
 - Provider HTML availability signal 也通过 `paper_fetch.extraction.html.provider_rules` 注册，不再通过 `quality/html_profiles.py` 的 dict 分发。
+- 新 access-gate 文案先登记到共享 `ACCESS_GATE_PATTERNS`；provider markdown/postprocess break tokens 只放非访问门的站点 chrome。
 - 定义 asset scope 和 fallback 候选。
 - 把提取结果写入 `ProviderContent.diagnostics`，而不是塞进 legacy metadata。
 
@@ -143,6 +156,7 @@ Provider-specific 代码只负责：
 - `all`：在 `body` 基础上额外下载明确 supplementary / supporting / multimedia scope 中的附件。
 
 Supplementary discovery 必须来自明确附件 scope。不能在整篇正文里凭 `data`、`code`、`.csv`、`.zip`、`.mp4`、`.pdf` 等词面或后缀全局扫描并归为 supplementary。
+Publisher 私有的 supplementary 属性或埋点必须由 provider extractor 处理，不能放进通用 `paper_fetch.extraction.html.assets`。例如 Wiley 的 `data-test="supp-info-link"` / `data-track-action="view supplementary info"` 归 Wiley extractor 所有。
 
 资产输出和失败诊断必须保留：
 
@@ -220,6 +234,13 @@ Golden corpus 规则：
 
 ```bash
 PYTHONPATH=src python3 -m pytest tests/unit -q
+PYTHONPATH=src python3 -m pytest tests/integration -q
+```
+
+这两条常规 unit / integration 命令默认复用 `pyproject.toml` 中的 `pytest-xdist` 配置，不要额外加 `-n 0`。完整 golden corpus regression 也按 fixture 参数化运行，默认保持并行：
+
+```bash
+PAPER_FETCH_RUN_FULL_GOLDEN=1 PYTHONPATH=src python3 -m pytest tests/integration/test_golden_corpus.py -q
 ```
 
 如果改了 `docs/extraction-rules.md`，还必须运行：

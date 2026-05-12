@@ -1,10 +1,10 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
-from ._science_pnas_provider_support import *
+from ._atypon_browser_workflow_provider_support import *
 
 
-class SciencePnasProviderRetryTests(SciencePnasProviderTestCase):
+class AtyponBrowserWorkflowProviderRetryTests(AtyponBrowserWorkflowProviderTestCase):
     def test_browser_workflow_download_related_assets_retries_after_partial_failures(self) -> None:
         figure_url = "https://www.pnas.org/images/large/figure1.png"
         html = f"""

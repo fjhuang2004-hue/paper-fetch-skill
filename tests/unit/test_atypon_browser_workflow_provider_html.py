@@ -1,10 +1,10 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
-from ._science_pnas_provider_support import *
+from ._atypon_browser_workflow_provider_support import *
 
 
-class SciencePnasProviderHtmlTests(SciencePnasProviderTestCase):
+class AtyponBrowserWorkflowProviderHtmlTests(AtyponBrowserWorkflowProviderTestCase):
     def test_science_provider_prefers_html_route(self) -> None:
         client = science_provider.ScienceClient(transport=None, env={})
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -29,7 +29,7 @@ class SciencePnasProviderHtmlTests(SciencePnasProviderTestCase):
                 ),
                 mock.patch.object(
                     browser_workflow,
-                    "extract_science_pnas_markdown",
+                    "extract_atypon_browser_workflow_markdown",
                     return_value=(f"# {SCIENCE_SAMPLE.title}\n\n## Discussion\n\n" + ("Body text " * 120), {"title": SCIENCE_SAMPLE.title}),
                 ),
                 mock.patch.object(browser_workflow, "fetch_pdf_with_playwright") as mocked_pdf,

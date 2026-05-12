@@ -5,7 +5,7 @@ import unittest
 
 from bs4 import BeautifulSoup
 
-import paper_fetch.providers.springer_html as springer_html
+from paper_fetch.providers import _springer_html as springer_html
 from paper_fetch.providers import springer as springer_provider
 from paper_fetch.extraction.html.tables import render_table_markdown
 from paper_fetch.runtime import RuntimeContext

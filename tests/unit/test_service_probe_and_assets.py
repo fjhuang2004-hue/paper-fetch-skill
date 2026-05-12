@@ -358,6 +358,39 @@ class ServiceProbeAndAssetTests(unittest.TestCase):
         self.assertEqual(result.state, "likely_yes")
         self.assertEqual(result.title, "Official Elsevier Article")
         self.assertEqual(result.evidence, ["provider_probe:elsevier"])
+
+    def test_probe_has_fulltext_uses_catalog_metadata_probe_capability(self) -> None:
+        resolved = paper_fetch.ResolvedQuery(
+            query="10.48550/arxiv.2605.06663",
+            query_kind="doi",
+            doi="10.48550/arxiv.2605.06663",
+            confidence=1.0,
+        )
+        original_resolve = paper_fetch.resolve_paper
+        try:
+            paper_fetch.resolve_paper = lambda *args, **kwargs: resolved
+            result = _probe_has_fulltext(
+                "10.48550/arxiv.2605.06663",
+                clients={
+                    "arxiv": StubProvider(
+                        metadata={
+                            "provider": "arxiv",
+                            "doi": "10.48550/arxiv.2605.06663",
+                            "title": "Official arXiv Article",
+                            "landing_page_url": "https://arxiv.org/abs/2605.06663",
+                            "fulltext_links": [],
+                            "references": [],
+                        }
+                    ),
+                },
+            )
+        finally:
+            paper_fetch.resolve_paper = original_resolve
+
+        self.assertEqual(result.state, "likely_yes")
+        self.assertEqual(result.title, "Official arXiv Article")
+        self.assertEqual(result.evidence, ["provider_probe:arxiv"])
+
     def test_probe_has_fulltext_uses_landing_page_citation_pdf_url_signal(self) -> None:
         resolved = paper_fetch.ResolvedQuery(
             query="https://example.test/article",

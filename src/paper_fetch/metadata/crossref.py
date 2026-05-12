@@ -11,6 +11,7 @@ from ..errors import ProviderFailure
 from ..http import DEFAULT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
 from ..metadata.types import CrossrefMetadata, FulltextLink, ReferenceMetadata
 from ..publisher_identity import normalize_doi
+from ..providers.base import map_request_failure
 from ..utils import (
     date_parts_to_string,
     first_list_item,
@@ -20,19 +21,7 @@ from ..utils import (
 
 
 def _map_crossref_request_failure(exc: RequestFailure) -> ProviderFailure:
-    if exc.status_code in {401, 403}:
-        return ProviderFailure("no_access", str(exc))
-    if exc.status_code == 404:
-        return ProviderFailure("no_result", str(exc))
-    if exc.status_code == 429:
-        return ProviderFailure("rate_limited", str(exc), retry_after_seconds=exc.retry_after_seconds)
-    if exc.status_code in {400, 406, 422}:
-        return ProviderFailure("error", str(exc))
-    if exc.status_code is None:
-        return ProviderFailure("error", str(exc))
-    if exc.status_code >= 500:
-        return ProviderFailure("error", str(exc))
-    return ProviderFailure("error", str(exc))
+    return map_request_failure(exc)
 
 
 class CrossrefLookupClient:

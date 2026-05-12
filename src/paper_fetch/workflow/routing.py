@@ -7,12 +7,15 @@ from dataclasses import dataclass
 from typing import Any, Mapping, cast
 import urllib.parse
 
-from ..arxiv_id import arxiv_id_from_doi
 from ..config import build_user_agent
 from ..extraction.html.landing import fetch_landing_html
 from ..http import HttpTransport, RequestFailure
 from ..metadata.types import ProviderMetadata
-from ..provider_catalog import official_provider_names
+from ..provider_catalog import (
+    official_provider_names,
+    provider_metadata_probe_short_circuit,
+    provider_supports_metadata_api_probe,
+)
 from ..providers.base import ProviderFailure
 from ..providers.protocols import MetadataProvider
 from ..runtime import RUNTIME_UNSET, RuntimeContext, resolve_runtime_context
@@ -264,19 +267,17 @@ def probe_official_provider(
     clients: Mapping[str, object],
     context: RuntimeContext | None = None,
 ) -> RouteProbeResult:
-    if provider_name == "arxiv":
-        arxiv_id = arxiv_id_from_doi(doi)
-        if not arxiv_id:
-            return RouteProbeResult(provider=provider_name, state="negative")
-        from ..providers.arxiv import minimal_arxiv_metadata
-
-        return RouteProbeResult(
-            provider=provider_name,
-            state="positive",
-            metadata=minimal_arxiv_metadata(arxiv_id, doi=doi, metadata={}),
-        )
-    if provider_name not in {"elsevier", "arxiv"}:
+    if not provider_supports_metadata_api_probe(provider_name):
         return RouteProbeResult(provider=provider_name, state="unknown")
+    short_circuit = provider_metadata_probe_short_circuit(provider_name)
+    if short_circuit is not None:
+        try:
+            metadata = short_circuit(doi)
+        except ProviderFailure as exc:
+            return RouteProbeResult(provider=provider_name, state=classify_probe_state(exc))
+        if metadata:
+            return RouteProbeResult(provider=provider_name, state="positive", metadata=dict(metadata))
+        return RouteProbeResult(provider=provider_name, state="negative")
     if not isinstance(clients.get(provider_name), MetadataProvider):
         return RouteProbeResult(provider=provider_name, state="unknown")
     try:
@@ -291,6 +292,23 @@ def probe_official_provider(
     if metadata:
         return RouteProbeResult(provider=provider_name, state="positive", metadata=dict(metadata))
     return RouteProbeResult(provider=provider_name, state="negative")
+
+
+def metadata_api_probe_provider_names(
+    resolved,
+    *,
+    routing_metadata: Mapping[str, Any] | None,
+    strategy: FetchStrategy,
+) -> list[str]:
+    return [
+        provider_name
+        for provider_name, _signal in build_official_provider_candidates(
+            resolved,
+            routing_metadata=routing_metadata,
+            strategy=strategy,
+        )
+        if provider_supports_metadata_api_probe(provider_name)
+    ]
 
 
 def select_route_probe(probes: list[RouteProbeResult]) -> RouteProbeResult | None:
@@ -339,23 +357,22 @@ def probe_has_fulltext(
     crossref_client = client_registry.get("crossref")
 
     strategy = FetchStrategy()
-    initial_elsevier_probe = False
-    if doi:
-        initial_elsevier_probe = any(
-            provider_name == "elsevier"
-            for provider_name, _signal in build_official_provider_candidates(
-                resolved,
-                routing_metadata=None,
-                strategy=strategy,
-            )
+    initial_metadata_probe_providers = (
+        metadata_api_probe_provider_names(
+            resolved,
+            routing_metadata=None,
+            strategy=strategy,
         )
+        if doi
+        else []
+    )
 
     def fetch_crossref_metadata() -> ProviderMetadata | None:
         return fetch_crossref_metadata_with_session_cache(doi, crossref_client, context=runtime)
 
-    def fetch_elsevier_metadata() -> ProviderMetadata | None:
+    def fetch_provider_probe_metadata(provider_name: str) -> ProviderMetadata | None:
         return fetch_provider_metadata_probe_with_session_cache(
-            "elsevier",
+            provider_name,
             doi,
             clients=client_registry,
             context=runtime,
@@ -371,14 +388,18 @@ def probe_has_fulltext(
 
     landing_probe_by_url: dict[str, LandingPageCitationPdfProbeResult] = {}
     landing_probe_errors: dict[str, RequestFailure] = {}
-    elsevier_metadata: ProviderMetadata | None = None
-    elsevier_error: ProviderFailure | None = None
+    provider_probe_metadata: dict[str, ProviderMetadata] = {}
+    provider_probe_errors: dict[str, ProviderFailure] = {}
+    metadata_probe_provider_order: list[str] = list(initial_metadata_probe_providers)
     crossref_error: ProviderFailure | None = None
     initial_landing_url = choose_public_landing_page_url(resolved.landing_url)
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=max(1, 2 + len(initial_metadata_probe_providers))) as executor:
         crossref_future = executor.submit(fetch_crossref_metadata) if doi and isinstance(crossref_client, MetadataProvider) else None
-        elsevier_future = executor.submit(fetch_elsevier_metadata) if initial_elsevier_probe else None
+        provider_probe_futures = {
+            provider_name: executor.submit(fetch_provider_probe_metadata, provider_name)
+            for provider_name in initial_metadata_probe_providers
+        }
         landing_future = executor.submit(fetch_landing_probe, initial_landing_url) if initial_landing_url else None
 
         if crossref_future is not None:
@@ -386,11 +407,13 @@ def probe_has_fulltext(
                 crossref_metadata = crossref_future.result()
             except ProviderFailure as exc:
                 crossref_error = exc
-        if elsevier_future is not None:
+        for provider_name, future in provider_probe_futures.items():
             try:
-                elsevier_metadata = elsevier_future.result()
+                metadata = future.result()
+                if metadata:
+                    provider_probe_metadata[provider_name] = metadata
             except ProviderFailure as exc:
-                elsevier_error = exc
+                provider_probe_errors[provider_name] = exc
         if landing_future is not None and initial_landing_url:
             try:
                 landing_probe_by_url[initial_landing_url] = landing_future.result()
@@ -406,26 +429,32 @@ def probe_has_fulltext(
     elif crossref_error is not None and _is_unknown_has_fulltext_probe_failure(crossref_error):
         extend_unique(warnings, [_probe_warning("Crossref metadata probe unavailable", crossref_error.message)])
 
-    needs_elsevier_probe = False
-    if doi and elsevier_metadata is None and elsevier_error is None:
-        needs_elsevier_probe = any(
-            provider_name == "elsevier"
-            for provider_name, _signal in build_official_provider_candidates(
-                resolved,
-                routing_metadata=crossref_metadata,
-                strategy=strategy,
-            )
-        )
-    if needs_elsevier_probe:
-        try:
-            elsevier_metadata = fetch_elsevier_metadata()
-        except ProviderFailure as exc:
-            elsevier_error = exc
-    if elsevier_metadata:
-        extend_unique(evidence, ["provider_probe:elsevier"])
-        title = normalize_text((elsevier_metadata or {}).get("title")) or title
-    elif elsevier_error is not None and _is_unknown_has_fulltext_probe_failure(elsevier_error):
-        extend_unique(warnings, [_probe_warning("elsevier metadata probe unavailable", elsevier_error.message)])
+    if doi:
+        for provider_name in metadata_api_probe_provider_names(
+            resolved,
+            routing_metadata=crossref_metadata,
+            strategy=strategy,
+        ):
+            if provider_name not in metadata_probe_provider_order:
+                metadata_probe_provider_order.append(provider_name)
+            if provider_name in provider_probe_metadata or provider_name in provider_probe_errors:
+                continue
+            try:
+                metadata = fetch_provider_probe_metadata(provider_name)
+                if metadata:
+                    provider_probe_metadata[provider_name] = metadata
+            except ProviderFailure as exc:
+                provider_probe_errors[provider_name] = exc
+
+    for provider_name in metadata_probe_provider_order:
+        metadata = provider_probe_metadata.get(provider_name)
+        if metadata:
+            extend_unique(evidence, [f"provider_probe:{provider_name}"])
+            title = normalize_text(metadata.get("title")) or title
+            continue
+        error = provider_probe_errors.get(provider_name)
+        if error is not None and _is_unknown_has_fulltext_probe_failure(error):
+            extend_unique(warnings, [_probe_warning(f"{provider_name} metadata probe unavailable", error.message)])
 
     landing_url = choose_public_landing_page_url(
         resolved.landing_url,

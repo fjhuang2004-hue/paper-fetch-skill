@@ -2,12 +2,43 @@ from __future__ import annotations
 
 import unittest
 
-from paper_fetch.providers.science_pnas import extract_science_pnas_markdown
+from bs4 import BeautifulSoup
+
+from paper_fetch.providers.atypon_browser_workflow import extract_atypon_browser_workflow_markdown
+from paper_fetch.providers import _science_html
+from paper_fetch.providers.atypon_browser_workflow import (
+    normalization as atypon_browser_workflow_normalization,
+)
 from tests.golden_criteria import golden_criteria_scenario_asset
 
 
-class SciencePnasPostprocessUnitTests(unittest.TestCase):
-    def test_extract_science_pnas_markdown_normalizes_title_subscript_line_breaks(self) -> None:
+class AtyponBrowserWorkflowPostprocessUnitTests(unittest.TestCase):
+    def test_figure_like_nodes_uses_registered_teaser_filter(self) -> None:
+        soup = BeautifulSoup(
+            """
+<article>
+  <figure><figcaption>Figure. Front matter teaser.</figcaption></figure>
+  <section role="doc-abstract"><h2>Abstract</h2><p>Abstract text.</p></section>
+</article>
+""",
+            "html.parser",
+        )
+
+        self.assertEqual(
+            atypon_browser_workflow_normalization._figure_like_nodes(soup.article),
+            [soup.figure],
+        )
+        self.assertEqual(
+            atypon_browser_workflow_normalization._figure_like_nodes(
+                soup.article,
+                is_front_matter_teaser_figure=_science_html.is_front_matter_teaser_figure,
+            ),
+            [],
+        )
+
+    def test_extract_atypon_browser_workflow_markdown_normalizes_title_subscript_line_breaks(
+        self,
+    ) -> None:
         html = """
         <html><body>
         <article>
@@ -28,7 +59,7 @@ class SciencePnasPostprocessUnitTests(unittest.TestCase):
         </body></html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/science.example-subscript-title",
             "science",
@@ -41,7 +72,9 @@ class SciencePnasPostprocessUnitTests(unittest.TestCase):
         )
         self.assertNotIn("CO\n<sub>2</sub>", markdown)
 
-    def test_extract_science_pnas_markdown_flattens_multilevel_table_headers(self) -> None:
+    def test_extract_atypon_browser_workflow_markdown_flattens_multilevel_table_headers(
+        self,
+    ) -> None:
         html = """
         <html><body>
         <article>
@@ -94,11 +127,14 @@ class SciencePnasPostprocessUnitTests(unittest.TestCase):
         </body></html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/science.multiheader-table-example",
             "science",
-            metadata={"doi": "10.1126/science.multiheader-table-example", "title": "Science Multiheader Table Example"},
+            metadata={
+                "doi": "10.1126/science.multiheader-table-example",
+                "title": "Science Multiheader Table Example",
+            },
         )
 
         self.assertIn("**Table 1.** Spatial lag regressions.", markdown)
@@ -110,7 +146,9 @@ class SciencePnasPostprocessUnitTests(unittest.TestCase):
             r"\|\s*Spatial coefficient\s*\|\s*0\.90\s*\|\s*0\.000\s*\|\s*Spatial coefficient\s*\|\s*0\.824\s*\|\s*0\.000\s*\|\s*Spatial coefficient\s*\|\s*0\.773\s*\|\s*0\.000\s*\|",
         )
 
-    def test_extract_science_pnas_markdown_flattens_rowspan_table_body_cells(self) -> None:
+    def test_extract_atypon_browser_workflow_markdown_flattens_rowspan_table_body_cells(
+        self,
+    ) -> None:
         html = """
         <html><body>
         <article>
@@ -153,14 +191,19 @@ class SciencePnasPostprocessUnitTests(unittest.TestCase):
         </body></html>
         """
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://www.science.org/doi/full/10.1126/science.rowspan-table-example",
             "science",
-            metadata={"doi": "10.1126/science.rowspan-table-example", "title": "Science Rowspan Table Example"},
+            metadata={
+                "doi": "10.1126/science.rowspan-table-example",
+                "title": "Science Rowspan Table Example",
+            },
         )
 
-        self.assertIn("**Table 2.** CO<sub>2</sub> balance simulated in the scenarios.", markdown)
+        self.assertIn(
+            "**Table 2.** CO<sub>2</sub> balance simulated in the scenarios.", markdown
+        )
         self.assertRegex(
             markdown,
             r"\|\s*Metric\s*\|\s*Period\s*\|\s*Sustainable scenario\s*\|\s*Fragmentation scenario\s*\|",
@@ -174,17 +217,22 @@ class SciencePnasPostprocessUnitTests(unittest.TestCase):
             r"\|\s*CO<sub>2</sub>\s*\(Gt CO<sub>2</sub>\)\s*\|\s*2020–2050\s*\|\s*1\.31\s*\|\s*24\.07\s*\|",
         )
 
-    def test_extract_science_pnas_markdown_falls_back_complex_table_to_bullets(self) -> None:
+    def test_extract_atypon_browser_workflow_markdown_falls_back_complex_table_to_bullets(
+        self,
+    ) -> None:
         """rule: rule-table-flatten-or-list"""
-        html = golden_criteria_scenario_asset("table_flatten_or_list", "complex_table.html").read_text(
-            encoding="utf-8"
-        )
+        html = golden_criteria_scenario_asset(
+            "table_flatten_or_list", "complex_table.html"
+        ).read_text(encoding="utf-8")
 
-        markdown, _ = extract_science_pnas_markdown(
+        markdown, _ = extract_atypon_browser_workflow_markdown(
             html,
             "https://onlinelibrary.wiley.com/doi/full/10.1111/complex-table-example",
             "wiley",
-            metadata={"doi": "10.1111/complex-table-example", "title": "Complex Table Example"},
+            metadata={
+                "doi": "10.1111/complex-table-example",
+                "title": "Complex Table Example",
+            },
         )
 
         self.assertIn("**Table 1.** Complex grouped values.", markdown)

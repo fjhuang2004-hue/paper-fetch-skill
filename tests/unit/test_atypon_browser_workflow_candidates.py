@@ -2,14 +2,21 @@ from __future__ import annotations
 
 import unittest
 
-from paper_fetch.providers import _script_json, browser_workflow
-from paper_fetch.providers.science_pnas_profiles import (
+from paper_fetch.providers import (
+    _atypon_browser_workflow_profiles as atypon_profiles,
+    _script_json,
+    browser_workflow,
+)
+from paper_fetch.providers._atypon_browser_workflow_profiles import (
+    ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES,
     build_html_candidates,
     build_pdf_candidates,
     extract_pdf_url_from_crossref,
     preferred_html_candidate_from_landing_page,
     site_rule_for_publisher,
+    publisher_profile,
 )
+from paper_fetch.provider_catalog import PROVIDER_CATALOG
 from paper_fetch.providers.base import RawFulltextPayload
 from paper_fetch.providers.pnas import PnasClient
 from paper_fetch.providers.science import ScienceClient
@@ -22,11 +29,44 @@ WILEY_SAMPLE = provider_benchmark_sample("wiley")
 PNAS_SAMPLE = provider_benchmark_sample("pnas")
 
 
-class SciencePnasCandidateTests(unittest.TestCase):
+class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
+    def test_atypon_profile_scope_is_catalog_aligned(self) -> None:
+        self.assertEqual(
+            ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES, ("science", "pnas", "wiley")
+        )
+        self.assertTrue(
+            set(ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES) <= set(PROVIDER_CATALOG)
+        )
+        with self.assertRaisesRegex(
+            ValueError, "Unsupported Atypon browser-workflow HTML publisher"
+        ):
+            build_html_candidates("springer", "10.1007/example")
+
+    def test_atypon_profiles_register_provider_owned_callbacks(self) -> None:
+        for name in ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES:
+            with self.subTest(provider=name):
+                profile = publisher_profile(name)
+                self.assertIsNotNone(profile.dom_postprocess)
+                self.assertIsNotNone(profile.scoped_asset_extractor)
+
+        self.assertIsNotNone(publisher_profile("science").is_front_matter_teaser_figure)
+        self.assertIsNone(publisher_profile("springer").scoped_asset_extractor)
+
+    def test_atypon_profile_modules_are_resolved_from_provider_names(self) -> None:
+        self.assertFalse(hasattr(atypon_profiles, "_PUBLISHER_MODULES"))
+        for name in ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES:
+            with self.subTest(provider=name):
+                module = atypon_profiles._publisher_module(name)
+                self.assertIsNotNone(module)
+                self.assertEqual(module.__name__, f"paper_fetch.providers._{name}_html")
+
     def test_site_rule_merges_default_and_publisher_overrides(self) -> None:
         cases = {
             "science": {
-                "candidate_selectors": {".article__fulltext", "[itemprop='articleBody']"},
+                "candidate_selectors": {
+                    ".article__fulltext",
+                    "[itemprop='articleBody']",
+                },
                 "remove_selectors": {".article-header__access", ".cookie-banner"},
                 "drop_keywords": {"advert", "rightslink"},
                 "drop_text": {"Permissions", "Check for updates"},
@@ -38,7 +78,10 @@ class SciencePnasCandidateTests(unittest.TestCase):
                 "drop_text": {"Check for updates"},
             },
             "wiley": {
-                "candidate_selectors": {".article-section__content", "[itemprop='articleBody']"},
+                "candidate_selectors": {
+                    ".article-section__content",
+                    "[itemprop='articleBody']",
+                },
                 "remove_selectors": {".publicationHistory", ".cookie-banner"},
                 "drop_keywords": {"access-widget", "rightslink"},
                 "drop_text": {"Recommended articles", "Check for updates"},
@@ -95,7 +138,9 @@ class SciencePnasCandidateTests(unittest.TestCase):
         )
 
     def test_provider_profiles_match_candidate_builder_priority(self) -> None:
-        crossref_pdf_url = f"http://onlinelibrary.wiley.com/wol1/doi/{WILEY_SAMPLE.doi}/fullpdf"
+        crossref_pdf_url = (
+            f"http://onlinelibrary.wiley.com/wol1/doi/{WILEY_SAMPLE.doi}/fullpdf"
+        )
         cases = (
             ("science", ScienceClient(None, {}), SCIENCE_SAMPLE.doi, None),
             ("pnas", PnasClient(None, {}), PNAS_SAMPLE.doi, None),
@@ -113,7 +158,10 @@ class SciencePnasCandidateTests(unittest.TestCase):
                     ),
                 }
                 self.assertEqual(client.profile.name, provider)
-                self.assertEqual(client.html_candidates(doi, metadata), build_html_candidates(provider, doi))
+                self.assertEqual(
+                    client.html_candidates(doi, metadata),
+                    build_html_candidates(provider, doi),
+                )
                 self.assertEqual(
                     client.pdf_candidates(doi, metadata),
                     build_pdf_candidates(provider, doi, pdf_url),
@@ -152,11 +200,15 @@ class SciencePnasCandidateTests(unittest.TestCase):
         for client in clients:
             with self.subTest(provider=client.name):
                 self.assertIsInstance(client, browser_workflow.BrowserWorkflowClient)
-                self.assertIsInstance(client.profile, browser_workflow.ProviderBrowserProfile)
+                self.assertIsInstance(
+                    client.profile, browser_workflow.ProviderBrowserProfile
+                )
 
-    def test_science_pnas_client_alias_is_removed(self) -> None:
-        self.assertFalse(hasattr(browser_workflow, "SciencePnasClient"))
-        self.assertFalse(hasattr(browser_workflow, "preferred_html_candidate_from_landing_page"))
+    def test_atypon_browser_workflow_client_alias_is_removed(self) -> None:
+        self.assertFalse(hasattr(browser_workflow, "AtyponBrowserWorkflowClient"))
+        self.assertFalse(
+            hasattr(browser_workflow, "preferred_html_candidate_from_landing_page")
+        )
 
     def test_provider_profile_article_source_label_and_hooks(self) -> None:
         cases = (
@@ -167,8 +219,12 @@ class SciencePnasCandidateTests(unittest.TestCase):
 
         for client, article_source_name, label, markdown_publisher in cases:
             with self.subTest(provider=client.name):
-                self.assertEqual(client.profile.article_source_name, article_source_name)
-                self.assertEqual(client.article_source(), article_source_name or client.name)
+                self.assertEqual(
+                    client.profile.article_source_name, article_source_name
+                )
+                self.assertEqual(
+                    client.article_source(), article_source_name or client.name
+                )
                 self.assertEqual(client.provider_label(), label)
                 self.assertEqual(client.profile.markdown_publisher, markdown_publisher)
                 self.assertTrue(client.profile.shared_playwright_image_fetcher)
@@ -200,17 +256,37 @@ class SciencePnasCandidateTests(unittest.TestCase):
         </body></html>
         """
 
-        science_extract_authors = ScienceClient(None, {}).profile.fallback_author_extractor
+        science_extract_authors = ScienceClient(
+            None, {}
+        ).profile.fallback_author_extractor
         pnas_extract_authors = PnasClient(None, {}).profile.fallback_author_extractor
         wiley_extract_authors = WileyClient(None, {}).profile.fallback_author_extractor
         assert science_extract_authors is not None
         assert pnas_extract_authors is not None
         assert wiley_extract_authors is not None
 
-        self.assertEqual(science_extract_authors(science_html), ["Ada Lovelace", "Grace Hopper"])
+        self.assertEqual(
+            science_extract_authors(science_html), ["Ada Lovelace", "Grace Hopper"]
+        )
         self.assertEqual(pnas_extract_authors(pnas_html), ["PNAS DOM"])
-        self.assertEqual(pnas_extract_authors(pnas_meta_only_html), ["Edward Example", "Dana Creator"])
+        self.assertEqual(
+            pnas_extract_authors(pnas_meta_only_html),
+            ["Edward Example", "Dana Creator"],
+        )
         self.assertEqual(wiley_extract_authors(wiley_html), ["Meta Author"])
+
+        wiley_dom_only_html = """
+        <html><body>
+          <div class="accordion-tabbed">
+            <p class="author-name">Ada Author <a data-test="orcid-link" href="https://orcid.org/0000">ORCID</a></p>
+            <p class="author-name">Department of Biology, University of Example, Oxford, United Kingdom</p>
+            <p class="author-name">Grace Author <a data-test="author-search-link">Search for more papers by this author</a></p>
+          </div>
+        </body></html>
+        """
+        self.assertEqual(
+            wiley_extract_authors(wiley_dom_only_html), ["Ada Author", "Grace Author"]
+        )
 
     def test_script_json_helpers_extract_balanced_payloads(self) -> None:
         html = """
@@ -220,9 +296,13 @@ class SciencePnasCandidateTests(unittest.TestCase):
         </script></html>
         """
 
-        science_extract_authors = ScienceClient(None, {}).profile.fallback_author_extractor
+        science_extract_authors = ScienceClient(
+            None, {}
+        ).profile.fallback_author_extractor
         assert science_extract_authors is not None
-        self.assertEqual(science_extract_authors(html), ["Ada Lovelace", "Grace Hopper"])
+        self.assertEqual(
+            science_extract_authors(html), ["Ada Lovelace", "Grace Hopper"]
+        )
         self.assertEqual(
             _script_json.extract_function_call_json(html, "dataLayer.push"),
             {"event": "article", "authors": ["Ada Lovelace"]},
@@ -245,7 +325,9 @@ class SciencePnasCandidateTests(unittest.TestCase):
             },
         )
 
-        article = client.to_article_model({"doi": "10.1126/example", "title": "Example"}, raw_payload)
+        article = client.to_article_model(
+            {"doi": "10.1126/example", "title": "Example"}, raw_payload
+        )
 
         self.assertEqual(article.metadata.authors, ["Ada Lovelace", "Grace Hopper"])
 
@@ -294,7 +376,6 @@ class SciencePnasCandidateTests(unittest.TestCase):
                 f"https://www.pnas.org/doi/full/{PNAS_SAMPLE.doi}",
             ],
         )
-
 
 
 if __name__ == "__main__":

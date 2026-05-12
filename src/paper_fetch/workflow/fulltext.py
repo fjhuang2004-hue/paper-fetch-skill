@@ -11,7 +11,11 @@ from ..artifacts import ArtifactStore
 from ..http import HttpTransport
 from ..logging_utils import emit_structured_log
 from ..models import ArticleModel, AssetProfile, metadata_only_article
-from ..provider_catalog import is_official_provider, provider_managed_abstract_only_names
+from ..provider_catalog import (
+    is_official_provider,
+    provider_emits_html_managed_marker,
+    provider_managed_abstract_only_names,
+)
 from ..providers.base import ProviderArtifacts, ProviderFailure, ProviderFetchResult
 from ..providers.protocols import AssetProvider, FulltextProvider, RawFulltextProvider
 from ..runtime import RUNTIME_UNSET, RuntimeContext, resolve_runtime_context
@@ -192,7 +196,7 @@ def _try_official_provider(
     warnings: list[str],
     source_trail: list[str],
 ) -> ArticleModel | None:
-    if not doi or not provider_name or provider_name == "crossref":
+    if not doi or not is_official_provider(provider_name):
         return None
     if not provider_allowed(provider_name, strategy):
         extend_unique(source_trail, [fulltext_marker(provider_name, "skipped")])
@@ -403,7 +407,7 @@ def fetch_article(
         if article is not None:
             return article
 
-        if is_official_provider(provider_name) and provider_name != "copernicus":
+        if provider_emits_html_managed_marker(provider_name):
             extend_unique(source_trail, [fallback_marker(f"{provider_name}_html_managed_by_provider")])
 
         return _fallback_to_metadata_only(

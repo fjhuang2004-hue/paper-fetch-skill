@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from paper_fetch.extraction.html._metadata import parse_html_metadata
 from paper_fetch.extraction.html._runtime import body_metrics
-import paper_fetch.providers.springer_html as springer_html
+from paper_fetch.providers import _springer_html as springer_html
 from paper_fetch.providers import browser_workflow
+from paper_fetch.quality import html_availability as html_availability_module
 from paper_fetch.quality.html_availability import (
     HtmlQualityAssessor,
     assess_html_fulltext_availability,
@@ -123,7 +125,7 @@ def _extract_browser_workflow_markdown(
     *,
     metadata: dict[str, str] | None = None,
 ):
-    return browser_workflow.extract_science_pnas_markdown(
+    return browser_workflow.extract_atypon_browser_workflow_markdown(
         html_text,
         source_url,
         publisher,
@@ -164,6 +166,67 @@ class HtmlAvailabilityTests(unittest.TestCase):
         )
 
         self.assertEqual(via_assessor.to_dict(), direct.to_dict())
+
+    def test_assess_html_with_unknown_provider_uses_generic_availability_profile(self) -> None:
+        first_paragraph = (
+            "This body paragraph describes methods and results with enough repeated narrative text to be accepted. "
+            * 8
+        )
+        second_paragraph = (
+            "This second paragraph adds more narrative evidence for full text detection and provider scoring. "
+            * 8
+        )
+        html = """
+        <html><body><article id="article">
+          <h2>Methods</h2>
+          <p>{first_paragraph}</p>
+          <p>{second_paragraph}</p>
+        </article></body></html>
+        """.format(
+            first_paragraph=first_paragraph,
+            second_paragraph=second_paragraph,
+        )
+        markdown = (
+            "## Methods\n\n"
+            f"{first_paragraph}\n\n"
+            f"{second_paragraph}"
+        )
+        selected_publishers: list[str | None] = []
+        cleaned_publishers: list[str | None] = []
+        original_select_best_container = html_availability_module.select_best_container
+        original_clean_container = html_availability_module.clean_container
+
+        def capture_select_best_container(*args, **kwargs):
+            selected_publishers.append(args[1])
+            return original_select_best_container(*args, **kwargs)
+
+        def capture_clean_container(*args, **kwargs):
+            cleaned_publishers.append(args[1])
+            return original_clean_container(*args, **kwargs)
+
+        with (
+            patch.object(
+                html_availability_module,
+                "select_best_container",
+                side_effect=capture_select_best_container,
+            ),
+            patch.object(
+                html_availability_module,
+                "clean_container",
+                side_effect=capture_clean_container,
+            ),
+        ):
+            diagnostics = assess_html_fulltext_availability(
+                markdown,
+                {"title": "Generic Example", "doi": "10.1000/example"},
+                provider=None,
+                html_text=html,
+                title="Generic Example",
+            )
+
+        self.assertTrue(diagnostics.accepted)
+        self.assertEqual(selected_publishers, [None])
+        self.assertEqual(cleaned_publishers, [None])
 
     def _assert_rejected_browser_workflow_case(self, case_name: str) -> None:
         case = BROWSER_WORKFLOW_REJECT_CASES[case_name]
@@ -291,6 +354,87 @@ class HtmlAvailabilityTests(unittest.TestCase):
         self.assertTrue(diagnostics.accepted)
         self.assertIn("narrative_article_type", diagnostics.soft_positive_signals)
         self.assertEqual(diagnostics.body_metrics["body_run_paragraph_count"], 2)
+
+    def test_assess_html_uses_registered_science_perspective_availability_override(self) -> None:
+        first = "This perspective paragraph is concise. It still reads as article prose."
+        second = "A second concise paragraph keeps the narrative article body detectable. It adds another sentence."
+        html = (
+            "<html><body><article class='perspective'>"
+            "<h1>Science Perspective Example</h1>"
+            f"<p>{first}</p><p>{second}</p>"
+            "</article></body></html>"
+        )
+        diagnostics = assess_html_fulltext_availability(
+            f"# Science Perspective Example\n\n{first}\n\n{second}",
+            {"title": "Science Perspective Example", "doi": "10.1126/science.example"},
+            provider="science",
+            html_text=html,
+            title="Science Perspective Example",
+        )
+
+        self.assertTrue(diagnostics.accepted)
+        self.assertIn("narrative_article_type", diagnostics.soft_positive_signals)
+        self.assertEqual(diagnostics.body_metrics["body_run_paragraph_count"], 2)
+
+    def test_assess_html_fulltext_uses_registered_science_perspective_callback(self) -> None:
+        first = (
+            "This perspective paragraph gives enough narrative context to be treated as article body. "
+            "It remains short."
+        )
+        second = (
+            "The follow-up paragraph continues the argument with interpretation and evidence. "
+            "It also remains short."
+        )
+        html = (
+            "<html><body><article class='article-type-perspective'>"
+            "<h1>Perspective Example</h1>"
+            f"<p>{first}</p><p>{second}</p>"
+            "</article></body></html>"
+        )
+
+        diagnostics = assess_html_fulltext_availability(
+            f"# Perspective Example\n\n{first}\n\n{second}",
+            {"title": "Perspective Example", "doi": "10.1126/science.example"},
+            provider="science",
+            html_text=html,
+            title="Perspective Example",
+        )
+
+        self.assertTrue(diagnostics.accepted)
+        self.assertIn("narrative_article_type", diagnostics.soft_positive_signals)
+        self.assertEqual(diagnostics.body_metrics["body_run_paragraph_count"], 2)
+
+    def test_assess_html_fulltext_springer_preview_wall_does_not_block_body_run(self) -> None:
+        first = (
+            "This results paragraph is real article body after the abstract heading. "
+            "It has enough prose to mark the body run."
+        )
+        second = (
+            "A second body paragraph continues the article discussion after the heading. "
+            "It prevents the preview chrome from deciding availability."
+        )
+        html = (
+            "<html><body>"
+            "<aside><h2 class='app-article-access__heading'>Preview options</h2></aside>"
+            "<article><h1>Springer Body Run</h1>"
+            "<h2>Abstract</h2><p>Short abstract.</p>"
+            "<h2>Results</h2>"
+            f"<p>{first}</p><p>{second}</p>"
+            "</article></body></html>"
+        )
+
+        diagnostics = assess_html_fulltext_availability(
+            f"# Springer Body Run\n\n## Abstract\n\nShort abstract.\n\n## Results\n\n{first}\n\n{second}",
+            {"title": "Springer Body Run", "abstract": "Short abstract."},
+            provider="springer",
+            html_text=html,
+            title="Springer Body Run",
+            final_url="https://link.springer.com/article/10.1007/example",
+        )
+
+        self.assertTrue(diagnostics.accepted)
+        self.assertIn("post_abstract_body_run", diagnostics.strong_positive_signals)
+        self.assertNotIn("springer_access_preview_wall", diagnostics.blocking_fallback_signals)
 
     def test_assess_html_fulltext_rejects_access_gate_without_body_run(self) -> None:
         diagnostics = assess_html_fulltext_availability(

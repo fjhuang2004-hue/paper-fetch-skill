@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from ..config import build_user_agent, resolve_asset_download_concurrency
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
 from ..extraction.html.parsing import choose_parser
+from ..extraction.html.figure_links import rewrite_inline_figure_links
 from ..extraction.html.tables import inject_inline_table_blocks, render_table_markdown, table_placeholder
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
 from ..metadata.types import ProviderMetadata
@@ -25,8 +26,7 @@ from ..utils import (
     extend_unique,
     normalize_text,
 )
-from . import springer_html as _springer_html
-from .science_pnas import rewrite_inline_figure_links
+from . import _springer_html
 from ..extraction.html.assets import html_asset_identity_key
 from ._pdf_candidates import build_springer_pdf_candidates
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
@@ -1256,7 +1256,7 @@ class SpringerClient(ProviderClient):
                 else "Springer HTML retrieval did not produce usable Markdown."
             )
             return metadata_only_article(
-                source="springer_html",
+                source="springer_pdf" if route == "pdf_fallback" else "springer_html",
                 metadata=article_metadata,
                 doi=doi or None,
                 warnings=warnings,
@@ -1277,7 +1277,7 @@ class SpringerClient(ProviderClient):
                 markdown_text = rewrite_inline_figure_links(
                     markdown_text,
                     figure_assets=inline_figure_assets,
-                    publisher="springer",
+                    clean_markdown_fn=_springer_html.clean_markdown,
                 )
         availability_diagnostics = (
             dict(content.diagnostics.get("availability_diagnostics") or {})
@@ -1285,7 +1285,7 @@ class SpringerClient(ProviderClient):
             else None
         )
         return article_from_markdown(
-            source="springer_html",
+            source="springer_pdf" if route == "pdf_fallback" else "springer_html",
             metadata=article_metadata,
             doi=doi or None,
             markdown_text=markdown_text,

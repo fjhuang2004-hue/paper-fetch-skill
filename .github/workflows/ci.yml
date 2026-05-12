@@ -531,4 +531,6 @@ jobs:
             exit 0
           fi
 
+          # Live MCP tests share external publisher/API state and secrets, so they
+          # run serially even though regular unit/integration suites use xdist.
           pytest -n 0 tests/live/test_live_mcp.py

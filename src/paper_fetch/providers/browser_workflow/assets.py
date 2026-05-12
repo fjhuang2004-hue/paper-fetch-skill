@@ -11,26 +11,18 @@ from ...extraction.html.assets import (
     looks_like_full_size_asset_url,
 )
 from ...utils import normalize_text
-from .. import _wiley_html
+from .._atypon_browser_workflow_profiles import publisher_profile
 from . import html_extraction as _html_extraction
 
 
 def _cached_browser_workflow_assets(*args, **kwargs):
     client = args[0] if args else None
     provider_name = normalize_text(getattr(client, "name", "")).lower()
-    if provider_name == "wiley":
-        kwargs.setdefault(
-            "scoped_asset_extractor", _wiley_html.extract_scoped_html_assets
-        )
-    elif provider_name in {"science", "pnas"}:
-        from ..science_pnas import asset_scopes as science_pnas_asset_scopes
-
-        kwargs.setdefault(
-            "scoped_asset_extractor",
-            science_pnas_asset_scopes.extract_scoped_html_assets,
-        )
-    else:
-        kwargs.setdefault("scoped_asset_extractor", extract_scoped_html_assets)
+    profile = publisher_profile(provider_name)
+    kwargs.setdefault(
+        "scoped_asset_extractor",
+        profile.scoped_asset_extractor or extract_scoped_html_assets,
+    )
     return _html_extraction._cached_browser_workflow_assets(*args, **kwargs)
 
 

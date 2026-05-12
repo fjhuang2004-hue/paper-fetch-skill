@@ -72,6 +72,11 @@ class PublisherIdentityTests(unittest.TestCase):
             publisher_identity.infer_provider_from_url("https://www.pnas.org/doi/10.1073/pnas.81.23.7500"),
             "pnas",
         )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url("https://newjournal.copernicus.org/articles/1/1/2026/"),
+            "copernicus",
+        )
+        self.assertIsNone(publisher_identity.infer_provider_from_url("https://science.org.example.test/doi/test"))
 
     def test_infer_provider_from_signals_prefers_domain_then_publisher_then_doi(self) -> None:
         candidates = publisher_identity.ordered_provider_candidates(

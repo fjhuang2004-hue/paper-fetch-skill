@@ -631,6 +631,7 @@ class GoldenCriteriaLiveTests(unittest.TestCase):
 
     def test_authorless_briefing_does_not_trigger_metadata_loss(self) -> None:
         article = sample_article()
+        article.source = "springer_html"
         article.metadata.authors = []
         article.sections = [
             Section(heading="The question", level=2, kind="body", text="Question text " * 10),

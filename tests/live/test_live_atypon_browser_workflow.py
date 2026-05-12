@@ -37,7 +37,7 @@ def fetch_article(query: str, *, transport: HttpTransport, env: dict[str, str]):
     return envelope.article
 
 
-class LiveSciencePnasTests(unittest.TestCase):
+class LiveAtyponBrowserWorkflowTests(unittest.TestCase):
     needs_flaresolverr = True
     runtime_env_tempdir: tempfile.TemporaryDirectory | None = None
 

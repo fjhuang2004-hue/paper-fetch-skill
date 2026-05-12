@@ -1027,17 +1027,10 @@ def looks_like_mathml_element(element: ET.Element) -> bool:
 
 
 def infer_source_provider(root: ET.Element, xml_path: Path) -> str:
+    from ..provider_catalog import provider_for_xml_source
+
     root_name = xml_local_name(root.tag if isinstance(root.tag, str) else "")
-    if root_name == "full-text-retrieval-response":
-        return "elsevier"
-    if root_name == "article":
-        return "springer"
-    lower_name = xml_path.name.lower()
-    if "elsevier" in lower_name:
-        return "elsevier"
-    if "springer" in lower_name:
-        return "springer"
-    return "unknown"
+    return provider_for_xml_source(root_name, str(xml_path))
 
 
 def extract_formula_samples_from_xml(xml_path: Path, *, limit: int | None = None) -> list[FormulaSample]:

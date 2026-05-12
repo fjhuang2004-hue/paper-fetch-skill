@@ -30,7 +30,7 @@ Sample-type audit checklist:
 
 | Test area | Decision | Rationale |
 | --- | --- | --- |
-| `test_science_pnas_markdown.py` provider extraction over Science, PNAS, and Wiley article HTML | real fixture required | These tests assert article body, abstract, figure, table, formula, collateral noise, and availability behavior that depends on publisher DOM structure. Use `golden_criteria` or provider benchmark fixtures. |
+| `test_atypon_browser_workflow_markdown.py` provider extraction over Science, PNAS, and Wiley article HTML | real fixture required | These tests assert article body, abstract, figure, table, formula, collateral noise, and availability behavior that depends on publisher DOM structure. Use `golden_criteria` or provider benchmark fixtures. |
 | `test_springer_html_regressions.py` Nature/Springer article extraction, main-content traversal, figure/formula/table/back-matter behavior | real fixture required | These tests guard real Springer/Nature HTML layouts and should read canonical HTML fixtures whenever the assertion is about publisher structure. |
 | `test_springer_html_tables.py` table page parsing and inline table injection | real fixture required for successful publisher table extraction; synthetic retained for transport/error contracts | Real table HTML covers flattening and publisher structure. Fake transport responses are retained where the behavior is a minimal response contract, such as image response fallback, missing table degradation, and non-Extended Data Table guardrails. |
 | `test_html_availability.py` paywall/fulltext/abstract-only acceptance for provider pages | real fixture required | Provider availability outcomes must use block or golden fixtures so thresholds are calibrated against real access states. |
@@ -45,5 +45,5 @@ Synthetic retained because no stable fixture currently covers the behavior:
 
 - `test_springer_html_regressions.py::test_springer_markdown_preserves_subscripts_in_section_headings` keeps a minimal Springer section because the docs do not yet point to a stable Springer/Nature DOI sample with the exact section-heading subscript shape.
 - `test_springer_html_regressions.py::test_springer_mathjax_tex_normalizes_upgreek_macros` keeps a minimal MathJax block because the rule is macro normalization, not article layout.
-- `test_science_pnas_markdown.py` multilingual/nested article/browser-workflow tests keep small synthetic articles because they isolate language scoping, nested roots, and section-hint contracts that are hard to cover with one stable publisher replay.
+- `test_atypon_browser_workflow_markdown.py` multilingual/nested article/browser-workflow tests keep small synthetic articles because they isolate language scoping, nested roots, and section-hint contracts that are hard to cover with one stable publisher replay.
 - `test_html_shared_helpers.py` metadata and challenge-detection tests keep minimal snippets because they target hidden fields, redirect stubs, and HTTP response bodies rather than article-content semantics.

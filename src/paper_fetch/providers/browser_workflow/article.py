@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
-from ...extraction.html.signals import SciencePnasHtmlFailure
+from ...extraction.html.signals import HtmlExtractionFailure
 from ...metadata.types import ProviderMetadata
 from ...models import (
     article_from_markdown,
@@ -134,7 +134,7 @@ def browser_workflow_article_from_payload(
                     metadata=metadata,
                     context=context,
                 )
-            except SciencePnasHtmlFailure as exc:
+            except HtmlExtractionFailure as exc:
                 warnings.append(
                     f"{client.name} HTML content was not usable ({exc.message})."
                 )

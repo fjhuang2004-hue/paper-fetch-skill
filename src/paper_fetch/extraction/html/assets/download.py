@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from ....http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
-from ....models import AssetProfile, normalize_text
+from ....models.schema import AssetProfile
+from ....utils import normalize_text
 from ....utils import build_asset_output_path, empty_asset_results, sanitize_filename, save_payload
 from ..shared import (
     html_text_snippet as _html_text_snippet,
@@ -142,6 +143,7 @@ def _figure_asset_failure(
     canvas_error: str | None = None,
     error_type: str | None = None,
     error_message: str | None = None,
+    error_category: str | None = None,
 ) -> dict[str, Any]:
     failure: dict[str, Any] = {
         "kind": asset.get("kind", "figure"),
@@ -169,6 +171,8 @@ def _figure_asset_failure(
         failure["error_type"] = error_type
     if error_message:
         failure["error_message"] = error_message
+    if error_category:
+        failure["error_category"] = error_category
     return failure
 
 
@@ -466,15 +470,13 @@ def _figure_request_failure_attempt(
     return _AssetDownloadAttempt(
         candidate=candidate,
         failure=_asset_failure(
-            {
-                "kind": asset.get("kind", "figure"),
-                "heading": asset.get("heading", "Figure"),
-                "caption": asset.get("caption", ""),
-                "source_url": candidate.url,
-                "status": exc.status_code,
-                "reason": str(exc),
-                "section": asset.get("section") or "body",
-            }
+            _figure_asset_failure(
+                asset,
+                candidate.url,
+                status=exc.status_code,
+                reason=str(exc),
+                error_category=str(exc.error_category or ""),
+            )
         ),
     )
 

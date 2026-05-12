@@ -570,7 +570,7 @@ class ProviderManagedFallbackServiceTests(unittest.TestCase):
                         "springer": StubProvider(
                             metadata=paper_fetch.ProviderFailure("not_supported", "No official metadata."),
                             raw_payload=raw_payload,
-                            article_factory=_article_factory_with_source("springer_html"),
+                            article_factory=_article_factory_with_source("springer_pdf"),
                             related_asset_factory=lambda *args, **kwargs: (_ for _ in ()).throw(
                                 AssertionError("Springer PDF fallback should skip asset downloads.")
                             ),
@@ -581,7 +581,7 @@ class ProviderManagedFallbackServiceTests(unittest.TestCase):
         finally:
             paper_fetch.resolve_paper = original_resolve
 
-        self.assertEqual(article.source, "springer_html")
+        self.assertEqual(article.source, "springer_pdf")
         self.assertIn("download:springer_assets_skipped_text_only", article.quality.source_trail)
         self.assertTrue(any("Springer PDF fallback currently returns text-only" in warning for warning in article.quality.warnings))
 

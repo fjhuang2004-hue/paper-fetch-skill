@@ -3,10 +3,23 @@
 from __future__ import annotations
 
 import socket
+import ssl
 from collections.abc import Iterator
+from enum import StrEnum
 from typing import Mapping
 
 import urllib3
+
+
+class RequestErrorCategory(StrEnum):
+    """Stable transport-level category for network failures."""
+
+    NETWORK_ERROR = "network_error"
+    TIMEOUT = "timeout"
+    TLS_ERROR = "tls_error"
+    DNS_ERROR = "dns_error"
+    CONNECTION_RESET = "connection_reset"
+    CONNECTION_CLOSED = "connection_closed"
 
 
 class RequestFailure(Exception):
@@ -21,6 +34,7 @@ class RequestFailure(Exception):
         headers: Mapping[str, str] | None = None,
         url: str | None = None,
         retry_after_seconds: int | None = None,
+        error_category: RequestErrorCategory | str | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
@@ -28,6 +42,18 @@ class RequestFailure(Exception):
         self.headers = dict(headers or {})
         self.url = url
         self.retry_after_seconds = retry_after_seconds
+        self.error_category = _normalize_request_error_category(error_category)
+
+
+def _normalize_request_error_category(value: RequestErrorCategory | str | None) -> RequestErrorCategory | None:
+    if isinstance(value, RequestErrorCategory):
+        return value
+    if value is None:
+        return None
+    try:
+        return RequestErrorCategory(str(value))
+    except ValueError:
+        return None
 
 
 class RequestCancelledError(Exception):
@@ -67,6 +93,27 @@ def is_timeout_network_error(exc: Exception) -> bool:
         isinstance(item, (socket.timeout, TimeoutError, urllib3.exceptions.TimeoutError))
         for item in iter_network_error_causes(exc)
     )
+
+
+def classify_network_error(exc: Exception) -> RequestErrorCategory:
+    """Classify third-party network exceptions into stable retry categories."""
+
+    causes = list(iter_network_error_causes(exc))
+    if any(isinstance(item, (socket.timeout, TimeoutError, urllib3.exceptions.TimeoutError)) for item in causes):
+        return RequestErrorCategory.TIMEOUT
+    if any(isinstance(item, (ssl.SSLError, urllib3.exceptions.SSLError)) for item in causes):
+        return RequestErrorCategory.TLS_ERROR
+    if any(isinstance(item, socket.gaierror) for item in causes):
+        return RequestErrorCategory.DNS_ERROR
+
+    text = " ".join(str(item).lower() for item in causes if str(item).strip())
+    if "connection reset" in text:
+        return RequestErrorCategory.CONNECTION_RESET
+    if any(token in text for token in ("remote end closed", "connection aborted", "connection broken", "eof")):
+        return RequestErrorCategory.CONNECTION_CLOSED
+    if "temporary failure" in text and "name resolution" in text:
+        return RequestErrorCategory.DNS_ERROR
+    return RequestErrorCategory.NETWORK_ERROR
 
 
 def build_network_error_detail(exc: Exception) -> str:

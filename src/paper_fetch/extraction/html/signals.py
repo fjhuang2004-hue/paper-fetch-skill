@@ -20,7 +20,7 @@ CHALLENGE_PATTERNS = (
     "attention required",
     "cloudflare",
 )
-ACCESS_GATE_PATTERN_MAP = {
+ACCESS_GATE_PATTERNS = (
     "check access",
     "purchase access",
     "purchase digital access to this article",
@@ -29,16 +29,23 @@ ACCESS_GATE_PATTERN_MAP = {
     "login to your account",
     "subscribe to continue",
     "access through your institution",
+    "access provided by",
     "rent or buy",
     "purchase this article",
+    "purchase article",
     "access the full article",
     "get full access to this article",
+    "get access",
     "access this article",
     "buy article pdf",
     "buy now",
+    "sign in to access",
+    "view access options",
     "view all access options to continue reading this article",
-}
-PAYWALL_PATTERNS = tuple(ACCESS_GATE_PATTERN_MAP)
+    "institutional login",
+)
+ACCESS_GATE_PATTERN_MAP = ACCESS_GATE_PATTERNS
+PAYWALL_PATTERNS = ACCESS_GATE_PATTERNS
 NOT_FOUND_PATTERNS = (
     "doi not found",
     "page not found",
@@ -58,7 +65,7 @@ FAILURE_MESSAGES = {
 }
 
 
-class SciencePnasHtmlFailure(Exception):
+class HtmlExtractionFailure(Exception):
     def __init__(self, reason: str, message: str) -> None:
         super().__init__(message)
         self.reason = reason
@@ -80,7 +87,7 @@ def matched_access_gate_patterns(text: str) -> list[str]:
     normalized = normalize_text(text).lower()
     if not normalized:
         return []
-    return [pattern for pattern in ACCESS_GATE_PATTERN_MAP if pattern in normalized]
+    return [pattern for pattern in ACCESS_GATE_PATTERNS if pattern in normalized]
 
 
 def contains_access_gate_text(text: str) -> bool:
@@ -114,9 +121,9 @@ def detect_html_access_signals(
     return list(dict.fromkeys(signals))
 
 
-def detect_html_block(title: str, text: str, response_status: int | None) -> SciencePnasHtmlFailure | None:
+def detect_html_block(title: str, text: str, response_status: int | None) -> HtmlExtractionFailure | None:
     signals = detect_html_access_signals(title, text, response_status)
     if not signals:
         return None
     reason = signals[0]
-    return SciencePnasHtmlFailure(reason, html_failure_message(reason))
+    return HtmlExtractionFailure(reason, html_failure_message(reason))

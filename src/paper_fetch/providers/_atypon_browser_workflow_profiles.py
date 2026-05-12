@@ -1,31 +1,41 @@
-"""Compatibility wrappers and provider-owned behavior dispatch for browser workflow."""
+"""Atypon browser-workflow profile dispatch for Science, PNAS, and Wiley."""
 
 from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
+from functools import lru_cache
+from importlib import import_module
+from types import ModuleType
 from typing import Any, Callable, Mapping
 
+from ..provider_catalog import (
+    PROVIDER_CATALOG,
+    provider_base_domains,
+    provider_crossref_pdf_position,
+    provider_domains,
+    provider_html_path_templates,
+    provider_pdf_path_templates,
+)
 from ..quality import html_profiles as _html_profiles
 from ..utils import normalize_text
-from . import _pnas_html, _science_html, _wiley_html
 from .browser_workflow.shared import (
     build_browser_workflow_html_candidates,
     build_browser_workflow_pdf_candidates,
     extract_pdf_url_from_crossref,
     preferred_html_candidate_from_landing_page as _preferred_html_candidate_from_landing_page,
 )
+
 DEFAULT_SITE_RULE = _html_profiles.DEFAULT_SITE_RULE
-looks_like_abstract_redirect = _html_profiles.looks_like_abstract_redirect
 
 __all__ = [
     "DEFAULT_SITE_RULE",
+    "ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES",
     "GENERIC_PROFILE",
     "PublisherProfile",
     "build_html_candidates",
     "build_pdf_candidates",
     "extract_pdf_url_from_crossref",
-    "looks_like_abstract_redirect",
     "noise_profile_for_publisher",
     "preferred_html_candidate_from_landing_page",
     "provider_blocking_fallback_signals",
@@ -41,20 +51,40 @@ class PublisherProfile:
     hosts: tuple[str, ...]
     noise_profile: str = "generic"
     site_rule_overrides: Mapping[str, Any] = field(default_factory=dict)
-    positive_signals: Callable[[str], tuple[list[str], list[str], list[str]]] = _html_profiles.default_positive_signals
+    positive_signals: Callable[[str], tuple[list[str], list[str], list[str]]] = (
+        _html_profiles.default_positive_signals
+    )
     blocking_fallback_signals: Callable[[str], list[str]] = lambda _html_text: []
-    markdown_postprocess: Callable[[str], str] | None = None
-    dom_postprocess: Callable[[Any], None] | None = None
+    markdown_postprocess: Callable[..., Any] | None = None
+    dom_postprocess: Callable[..., None] | None = None
+    post_content_break_tokens: tuple[str, ...] = ()
     refine_selected_container: Callable[..., Any] | None = None
     select_content_nodes: Callable[..., list[Any]] | None = None
     finalize_extraction: Callable[..., tuple[str, dict[str, Any]]] | None = None
+    extract_asset_html_scopes: Callable[..., tuple[str, str]] | None = None
+    scoped_asset_extractor: Callable[..., list[dict[str, Any]]] | None = None
+    is_front_matter_teaser_figure: Callable[..., bool] | None = None
 
 
-_PUBLISHER_MODULES = {
-    "science": _science_html,
-    "pnas": _pnas_html,
-    "wiley": _wiley_html,
-}
+ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES = tuple(
+    name for name in ("science", "pnas", "wiley") if name in PROVIDER_CATALOG
+)
+
+
+def _unsupported_atypon_publisher_message(route_kind: str, publisher: str) -> str:
+    supported = ", ".join(ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES)
+    return (
+        f"Unsupported Atypon browser-workflow {route_kind} publisher: {publisher!r}. "
+        f"Supported provider-catalog names: {supported}."
+    )
+
+
+@lru_cache(maxsize=None)
+def _publisher_module(publisher: str | None) -> ModuleType | None:
+    normalized = normalize_text(publisher or "").lower()
+    if normalized not in ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES:
+        return None
+    return import_module(f"._{normalized}_html", package=__package__)
 
 
 def preferred_html_candidate_from_landing_page(
@@ -62,14 +92,13 @@ def preferred_html_candidate_from_landing_page(
     doi: str,
     landing_page_url: str | None,
 ) -> str | None:
-    module = _PUBLISHER_MODULES.get(normalize_text(publisher).lower())
-    if module is None:
+    normalized = normalize_text(publisher).lower()
+    if _publisher_module(normalized) is None:
         return None
-    hosts = tuple(getattr(module, "HOSTS", ()))
     return _preferred_html_candidate_from_landing_page(
         doi,
         landing_page_url,
-        hosts=hosts,
+        hosts=provider_domains(normalized),
     )
 
 
@@ -78,22 +107,30 @@ GENERIC_PROFILE = PublisherProfile(name="generic", hosts=tuple())
 
 def publisher_profile(publisher: str | None) -> PublisherProfile:
     normalized = normalize_text(publisher or "").lower()
-    module = _PUBLISHER_MODULES.get(normalized)
+    module = _publisher_module(normalized)
     if module is None:
         return GENERIC_PROFILE
     availability_profile = _html_profiles.availability_profile_for_publisher(normalized)
     return PublisherProfile(
         name=normalized,
-        hosts=tuple(getattr(module, "HOSTS", ())),
+        hosts=provider_domains(normalized),
         noise_profile=normalize_text(availability_profile.noise_profile) or "generic",
         site_rule_overrides=copy.deepcopy(availability_profile.site_rule_overrides),
         positive_signals=availability_profile.positive_signals,
         blocking_fallback_signals=availability_profile.blocking_fallback_signals,
         markdown_postprocess=getattr(module, "markdown_postprocess", None),
         dom_postprocess=getattr(module, "dom_postprocess", None),
+        post_content_break_tokens=tuple(
+            getattr(module, "POST_CONTENT_BREAK_TOKENS", ())
+        ),
         refine_selected_container=getattr(module, "refine_selected_container", None),
         select_content_nodes=getattr(module, "select_content_nodes", None),
         finalize_extraction=getattr(module, "finalize_extraction", None),
+        extract_asset_html_scopes=getattr(module, "extract_asset_html_scopes", None),
+        scoped_asset_extractor=getattr(module, "scoped_asset_extractor", None),
+        is_front_matter_teaser_figure=getattr(
+            module, "is_front_matter_teaser_figure", None
+        ),
     )
 
 
@@ -105,30 +142,34 @@ def noise_profile_for_publisher(publisher: str | None) -> str:
     return _html_profiles.noise_profile_for_publisher(publisher)
 
 
-def build_html_candidates(publisher: str, doi: str, landing_page_url: str | None = None) -> list[str]:
-    module = _PUBLISHER_MODULES.get(normalize_text(publisher).lower())
-    if module is None:
-        raise ValueError(f"Unsupported browser-workflow HTML publisher: {publisher!r}")
+def build_html_candidates(
+    publisher: str, doi: str, landing_page_url: str | None = None
+) -> list[str]:
+    normalized = normalize_text(publisher).lower()
+    if _publisher_module(normalized) is None:
+        raise ValueError(_unsupported_atypon_publisher_message("HTML", publisher))
     return build_browser_workflow_html_candidates(
         doi,
         landing_page_url,
-        hosts=tuple(getattr(module, "HOSTS", ())),
-        base_hosts=tuple(getattr(module, "BASE_HOSTS", ())),
-        path_templates=tuple(getattr(module, "HTML_PATH_TEMPLATES", ())),
+        hosts=provider_domains(normalized),
+        base_hosts=provider_base_domains(normalized),
+        path_templates=provider_html_path_templates(normalized),
     )
 
 
-def build_pdf_candidates(publisher: str, doi: str, crossref_pdf_url: str | None) -> list[str]:
-    module = _PUBLISHER_MODULES.get(normalize_text(publisher).lower())
-    if module is None:
-        raise ValueError(f"Unsupported browser-workflow PDF publisher: {publisher!r}")
-    crossref_pdf_position = int(getattr(module, "CROSSREF_PDF_POSITION", 0))
+def build_pdf_candidates(
+    publisher: str, doi: str, crossref_pdf_url: str | None
+) -> list[str]:
+    normalized = normalize_text(publisher).lower()
+    if _publisher_module(normalized) is None:
+        raise ValueError(_unsupported_atypon_publisher_message("PDF", publisher))
+    crossref_pdf_position = provider_crossref_pdf_position(normalized)
     return build_browser_workflow_pdf_candidates(
         doi,
         crossref_pdf_url,
-        hosts=tuple(getattr(module, "HOSTS", ())),
-        base_hosts=tuple(getattr(module, "BASE_HOSTS", ())),
-        path_templates=tuple(getattr(module, "PDF_PATH_TEMPLATES", ())),
+        hosts=provider_domains(normalized),
+        base_hosts=provider_base_domains(normalized),
+        path_templates=provider_pdf_path_templates(normalized),
         crossref_pdf_position=crossref_pdf_position,
         base_seed_url=crossref_pdf_url if crossref_pdf_position == 0 else None,
     )

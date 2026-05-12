@@ -27,6 +27,12 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     Tag = None
 
 FigurePageFetcher = Callable[[str], tuple[str, str] | None]
+NOISY_IMAGE_ALT_TEXTS = frozenset({"refer to caption"})
+
+
+def clean_noisy_image_alt_text(value: str | None) -> str:
+    normalized = normalize_text(str(value or ""))
+    return "" if normalized.lower() in NOISY_IMAGE_ALT_TEXTS else normalized
 
 
 class _FigureParser(HTMLParser):
@@ -75,7 +81,7 @@ class _FigureParser(HTMLParser):
                 images = [{"src": "", "image_id": "", "alt": ""}]
             for index, image in enumerate(images):
                 caption = _caption_for_image_index(captions, index)
-                alt_text = normalize_text(image.get("alt", ""))
+                alt_text = clean_noisy_image_alt_text(image.get("alt", ""))
                 self.assets.append(
                     {
                         "kind": "figure",
@@ -301,7 +307,7 @@ def _figure_assets_from_soup_node(node: Any, soup: Any, source_url: str) -> list
             absolute_full_size_url = absolute_preview_url
 
         caption = _caption_for_image_index(captions, index)
-        alt_text = normalize_text(str(image.get("alt") or ""))
+        alt_text = clean_noisy_image_alt_text(str(image.get("alt") or ""))
         heading = caption[:80] or alt_text or "Figure"
         if not caption and alt_text:
             caption = alt_text
@@ -509,6 +515,8 @@ def resolve_figure_download_url(
 
 __all__ = [
     "FigurePageFetcher",
+    "NOISY_IMAGE_ALT_TEXTS",
+    "clean_noisy_image_alt_text",
     "extract_figure_assets",
     "extract_full_size_figure_image_url",
     "figure_download_candidates",

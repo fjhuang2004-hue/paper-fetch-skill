@@ -7,6 +7,10 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 from ...utils import normalize_text
+from .provider_rules import (
+    provider_display_formula_selectors,
+    provider_formula_container_tokens,
+)
 
 try:
     from bs4 import Tag
@@ -17,14 +21,14 @@ FORMULA_IMAGE_URL_PATTERN = re.compile(
     r"(?:^|[-_/])(?:math|ieq|equ)[-_]?\d|_(?:IEq|Equ)\d|math-\d|equation",
     flags=re.IGNORECASE,
 )
-FORMULA_CONTAINER_TOKENS = (
+GENERIC_FORMULA_CONTAINER_TOKENS = (
     "inline-equation",
     "display-equation",
     "disp-formula",
     "display-formula",
-    "fallback__mathequation",
-    "c-article-equation",
-    "c-article-equation__content",
+)
+FORMULA_CONTAINER_TOKENS = (
+    *GENERIC_FORMULA_CONTAINER_TOKENS,
 )
 FORMULA_IMAGE_ATTRS = (
     "data-altimg",
@@ -46,16 +50,43 @@ FORMULA_IMAGE_ATTRS = (
     "location",
 )
 FORMULA_IMAGE_SRCSET_ATTRS = ("srcset", "data-srcset")
-DISPLAY_FORMULA_SELECTORS = (
+GENERIC_DISPLAY_FORMULA_SELECTORS = (
     ".display-formula",
     ".disp-formula",
     ".display-equation",
     ".inline-equation",
-    ".c-article-equation",
-    ".c-article-equation__content",
     "math[display='block']",
     "div[role='math']",
 )
+DISPLAY_FORMULA_SELECTORS = (
+    *GENERIC_DISPLAY_FORMULA_SELECTORS,
+)
+GENERIC_DISPLAY_FORMULA_IDENTITY_TOKENS = (
+    "display-equation",
+    "disp-formula",
+    "display-formula",
+)
+
+
+def display_formula_identity_tokens_for_profile(noise_profile: str | None) -> tuple[str, ...]:
+    return (
+        *GENERIC_DISPLAY_FORMULA_IDENTITY_TOKENS,
+        *(provider_formula_container_tokens(noise_profile) if noise_profile else ()),
+    )
+
+
+def formula_container_tokens_for_profile(noise_profile: str | None) -> tuple[str, ...]:
+    return (
+        *GENERIC_FORMULA_CONTAINER_TOKENS,
+        *(provider_formula_container_tokens(noise_profile) if noise_profile else ()),
+    )
+
+
+def display_formula_selectors_for_profile(noise_profile: str | None) -> tuple[str, ...]:
+    return (
+        *GENERIC_DISPLAY_FORMULA_SELECTORS,
+        *(provider_display_formula_selectors(noise_profile) if noise_profile else ()),
+    )
 
 
 def first_url_from_srcset(value: str | None) -> str:
@@ -108,15 +139,15 @@ def formula_ancestor_identity_text(node: Any, *, max_depth: int = 6) -> str:
     return " ".join(part for part in parts if part)
 
 
-def is_formula_container(node: Any) -> bool:
+def is_formula_container(node: Any, *, noise_profile: str | None = None) -> bool:
     if Tag is None or not isinstance(node, Tag):
         return False
     identity = formula_node_identity_text(node)
     role = normalize_text(str((getattr(node, "attrs", None) or {}).get("role") or "")).lower()
-    return role == "math" or any(token in identity for token in FORMULA_CONTAINER_TOKENS)
+    return role == "math" or any(token in identity for token in formula_container_tokens_for_profile(noise_profile))
 
 
-def is_display_formula_node(node: Any) -> bool:
+def is_display_formula_node(node: Any, *, noise_profile: str | None = None) -> bool:
     if Tag is None or not isinstance(node, Tag):
         return False
     attrs = getattr(node, "attrs", None) or {}
@@ -125,13 +156,7 @@ def is_display_formula_node(node: Any) -> bool:
     identity = formula_ancestor_identity_text(node)
     return any(
         token in identity
-        for token in (
-            "display-equation",
-            "disp-formula",
-            "display-formula",
-            "c-article-equation",
-            "c-article-equation__content",
-        )
+        for token in display_formula_identity_tokens_for_profile(noise_profile)
     ) or normalize_text(str(attrs.get("role") or "")).lower() == "math"
 
 
@@ -179,7 +204,7 @@ def formula_image_url_from_node(node: Any, *, include_adjacent: bool = False) ->
     return ""
 
 
-def looks_like_formula_image(node: Any, url: str | None = None) -> bool:
+def looks_like_formula_image(node: Any, url: str | None = None, *, noise_profile: str | None = None) -> bool:
     if Tag is None or not isinstance(node, Tag):
         return False
     if normalize_text(node.name or "").lower() != "img":
@@ -195,11 +220,11 @@ def looks_like_formula_image(node: Any, url: str | None = None) -> bool:
     return (
         bool(FORMULA_IMAGE_URL_PATTERN.search(candidate_url))
         or bool(FORMULA_IMAGE_URL_PATTERN.search(alt_blob))
-        or any(token in identity for token in FORMULA_CONTAINER_TOKENS)
+        or any(token in identity for token in formula_container_tokens_for_profile(noise_profile))
     )
 
 
-def formula_heading_for_image(node: Any, index: int) -> str:
+def formula_heading_for_image(node: Any, index: int, *, noise_profile: str | None = None) -> str:
     if Tag is None or not isinstance(node, Tag):
         return f"Formula {index}"
     current = node
@@ -207,7 +232,7 @@ def formula_heading_for_image(node: Any, index: int) -> str:
     while isinstance(current, Tag) and depth < 6:
         identity = formula_node_identity_text(current)
         candidate_id = normalize_text(str((getattr(current, "attrs", None) or {}).get("id") or ""))
-        if candidate_id and any(token in identity for token in FORMULA_CONTAINER_TOKENS):
+        if candidate_id and any(token in identity for token in formula_container_tokens_for_profile(noise_profile)):
             return candidate_id
         current = current.parent if isinstance(getattr(current, "parent", None), Tag) else None
         depth += 1
@@ -230,11 +255,11 @@ def mathml_element_from_html_node(node: Any) -> ET.Element | None:
             return None
 
 
-def display_formula_nodes(container: Any) -> list[Any]:
+def display_formula_nodes(container: Any, *, noise_profile: str | None = None) -> list[Any]:
     if Tag is None or not isinstance(container, Tag):
         return []
     nodes: list[Any] = []
-    for selector in DISPLAY_FORMULA_SELECTORS:
+    for selector in display_formula_selectors_for_profile(noise_profile):
         try:
             matches = container.select(selector)
         except Exception:

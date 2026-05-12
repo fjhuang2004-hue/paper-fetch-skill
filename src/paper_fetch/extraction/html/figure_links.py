@@ -174,3 +174,16 @@ def inject_inline_figure_links(
                 continue
         injected.append(block)
     return clean_markdown_fn("\n\n".join(injected))
+
+
+def rewrite_inline_figure_links(
+    markdown_text: str,
+    *,
+    figure_assets: list[Mapping[str, Any]] | None,
+    clean_markdown_fn: Callable[[str], str],
+) -> str:
+    return inject_inline_figure_links(
+        markdown_text,
+        figure_assets=figure_assets,
+        clean_markdown_fn=clean_markdown_fn,
+    )

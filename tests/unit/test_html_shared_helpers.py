@@ -13,10 +13,14 @@ from paper_fetch.extraction.html import _metadata as html_metadata
 from paper_fetch.extraction.html import _runtime as html_runtime
 from paper_fetch.extraction.html import shared as html_shared
 from paper_fetch.extraction.html.formula_rules import (
+    GENERIC_FORMULA_CONTAINER_TOKENS,
+    GENERIC_DISPLAY_FORMULA_SELECTORS,
+    formula_heading_for_image,
     formula_image_url_from_node,
     is_display_formula_node,
     looks_like_formula_image,
 )
+from paper_fetch.extraction.html.provider_rules import provider_html_rules
 from paper_fetch.extraction.html.inline import normalize_html_inline_text
 from paper_fetch.extraction.html.tables import render_table_markdown
 from paper_fetch.http import HttpTransport
@@ -25,9 +29,10 @@ from paper_fetch.providers._html_section_markdown import (
     render_container_markdown,
     render_heading_text_from_html,
 )
-import paper_fetch.providers.springer_html as springer_html
-import paper_fetch.providers.wiley_html as wiley_html
-from paper_fetch.providers.science_pnas import asset_scopes as science_pnas_asset_scopes
+from paper_fetch.providers import _springer_html as springer_html
+import paper_fetch.providers._wiley_html as wiley_html
+from paper_fetch.providers.atypon_browser_workflow import asset_scopes as atypon_browser_workflow_asset_scopes
+from paper_fetch.providers.atypon_browser_workflow import profile as atypon_browser_workflow_profile
 from tests.block_fixtures import block_asset
 from tests.golden_criteria import golden_criteria_asset, golden_criteria_scenario_asset
 
@@ -74,7 +79,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
         children = html_shared.direct_child_tags(article)
 
         self.assertEqual([child.name for child in children], ["p", "div"])
-        self.assertEqual(html_shared.class_tokens(article), {"core-container", "article"})
+        self.assertEqual(
+            html_shared.class_tokens(article), {"core-container", "article"}
+        )
         self.assertEqual(html_shared.short_text(article.find("p")), "First paragraph")
         self.assertIs(html_shared.soup_root(article), soup)
 
@@ -84,12 +91,16 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertIsNotNone(appended)
         self.assertEqual(appended.get_text(strip=True), "Appended text")
 
-    def test_shared_payload_helpers_unescape_html_snippets_and_detect_images(self) -> None:
+    def test_shared_payload_helpers_unescape_html_snippets_and_detect_images(
+        self,
+    ) -> None:
         body = b"<html><head><title>Sign&nbsp;in</title></head><body>A &amp; B</body></html>"
 
         self.assertEqual(html_shared.html_title_snippet(body), "Sign in")
         self.assertEqual(html_shared.html_text_snippet(body), "Sign in A & B")
-        self.assertEqual(html_shared.image_magic_type(b"\x89PNG\r\n\x1a\npayload"), "image/png")
+        self.assertEqual(
+            html_shared.image_magic_type(b"\x89PNG\r\n\x1a\npayload"), "image/png"
+        )
 
     def test_parse_html_metadata_reads_citation_fields(self) -> None:
         html = """
@@ -105,7 +116,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
 </html>
 """
 
-        metadata = html_metadata.parse_html_metadata(html, "https://example.test/article")
+        metadata = html_metadata.parse_html_metadata(
+            html, "https://example.test/article"
+        )
 
         self.assertEqual(metadata["title"], "Example HTML Article")
         self.assertEqual(metadata["authors"], ["Alice Example", "Bob Example"])
@@ -113,27 +126,36 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertEqual(metadata["journal_title"], "Journal of HTML")
         self.assertEqual(metadata["published"], "2026-01-15")
 
-    def test_parse_html_metadata_does_not_treat_generic_description_as_abstract(self) -> None:
+    def test_parse_html_metadata_does_not_treat_generic_description_as_abstract(
+        self,
+    ) -> None:
         """rule: rule-generic-metadata-boundaries"""
-        html = golden_criteria_scenario_asset("generic_metadata_boundaries", "generic_description.html").read_text(
-            encoding="utf-8"
-        )
+        html = golden_criteria_scenario_asset(
+            "generic_metadata_boundaries", "generic_description.html"
+        ).read_text(encoding="utf-8")
 
-        metadata = html_metadata.parse_html_metadata(html, "https://www.pnas.org/doi/full/10.1073/pnas.2317456120")
+        metadata = html_metadata.parse_html_metadata(
+            html, "https://www.pnas.org/doi/full/10.1073/pnas.2317456120"
+        )
 
         self.assertIsNone(metadata["abstract"])
 
     def test_parse_html_metadata_uses_redirect_stub_lookup_title(self) -> None:
         """rule: rule-generic-metadata-boundaries"""
-        html = golden_criteria_scenario_asset("generic_metadata_boundaries", "redirect_stub.html").read_text(
-            encoding="utf-8"
-        )
+        html = golden_criteria_scenario_asset(
+            "generic_metadata_boundaries", "redirect_stub.html"
+        ).read_text(encoding="utf-8")
 
-        metadata = html_metadata.parse_html_metadata(html, "https://linkinghub.elsevier.com/retrieve/pii/S0034425725000525")
+        metadata = html_metadata.parse_html_metadata(
+            html, "https://linkinghub.elsevier.com/retrieve/pii/S0034425725000525"
+        )
 
         self.assertEqual(metadata["title"], "Stub Article Title")
         self.assertEqual(metadata["lookup_title"], "Stub Article Title")
-        self.assertEqual(metadata["lookup_redirect_url"], "https://www.sciencedirect.com/science/article/pii/S0034425725000525")
+        self.assertEqual(
+            metadata["lookup_redirect_url"],
+            "https://www.sciencedirect.com/science/article/pii/S0034425725000525",
+        )
         self.assertEqual(metadata["identifier_value"], "S0034425725000525")
 
     def test_extract_figure_assets_reads_generic_figure_blocks(self) -> None:
@@ -155,7 +177,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertEqual(assets[0]["caption"], "Figure 1. Overview figure.")
         self.assertEqual(assets[0]["url"], "https://example.test/fig1.png")
 
-    def test_extract_figure_assets_reads_multi_image_multi_caption_figure_blocks(self) -> None:
+    def test_extract_figure_assets_reads_multi_image_multi_caption_figure_blocks(
+        self,
+    ) -> None:
         html = """
 <html>
   <body>
@@ -173,10 +197,23 @@ class SharedHtmlHelperTests(unittest.TestCase):
 
         self.assertEqual(len(assets), 2)
         self.assertEqual(
-            [(asset["caption"], asset["url"], asset["dom_id"], asset["image_id"]) for asset in assets],
             [
-                ("Figure 9. First result.", "https://example.test/fig9.png", "F10", "F10.g1"),
-                ("Figure 10. Second result.", "https://example.test/fig10.png", "F10", "F10.g2"),
+                (asset["caption"], asset["url"], asset["dom_id"], asset["image_id"])
+                for asset in assets
+            ],
+            [
+                (
+                    "Figure 9. First result.",
+                    "https://example.test/fig9.png",
+                    "F10",
+                    "F10.g1",
+                ),
+                (
+                    "Figure 10. Second result.",
+                    "https://example.test/fig10.png",
+                    "F10",
+                    "F10.g2",
+                ),
             ],
         )
 
@@ -195,7 +232,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
             "html.parser",
         )
         lines: list[str] = []
-        render_container_markdown(soup.article, lines, level=2, section_content_selectors=())
+        render_container_markdown(
+            soup.article, lines, level=2, section_content_selectors=()
+        )
         markdown = "\n".join(lines)
 
         self.assertIn("**Figure 9.** First result.", markdown)
@@ -211,13 +250,46 @@ class SharedHtmlHelperTests(unittest.TestCase):
 </html>
 """
 
-        assets = html_assets.extract_supplementary_assets(html, "https://example.test/article")
+        assets = html_assets.extract_supplementary_assets(
+            html, "https://example.test/article"
+        )
 
         self.assertEqual(len(assets), 1)
         self.assertEqual(assets[0]["heading"], "Supplementary Data")
         self.assertEqual(assets[0]["url"], "https://example.test/supplement.pdf")
 
-    def test_extract_scoped_html_assets_uses_separate_body_and_supplementary_scopes(self) -> None:
+    def test_wiley_supplementary_data_attributes_are_provider_owned(self) -> None:
+        html = """
+<html>
+  <body>
+    <a href="/doi/suppl/10.1111/example" data-test="supp-info-link" data-track-action="view supplementary info">Open</a>
+  </body>
+</html>
+"""
+
+        self.assertEqual(
+            html_assets.extract_supplementary_assets(
+                html, "https://example.test/article"
+            ),
+            [],
+        )
+        assets = wiley_html.extract_scoped_html_assets(
+            "",
+            "https://onlinelibrary.wiley.com/doi/full/10.1111/example",
+            asset_profile="all",
+            supplementary_html_text=html,
+        )
+
+        self.assertEqual(len(assets), 1)
+        self.assertEqual(assets[0]["heading"], "Open")
+        self.assertEqual(
+            assets[0]["url"],
+            "https://onlinelibrary.wiley.com/doi/suppl/10.1111/example",
+        )
+
+    def test_extract_scoped_html_assets_uses_separate_body_and_supplementary_scopes(
+        self,
+    ) -> None:
         body_html = """
 <html>
   <body>
@@ -248,7 +320,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
             [("figure", "body"), ("supplementary", "supplementary")],
         )
 
-    def test_wiley_asset_scopes_only_collect_supporting_information_downloads(self) -> None:
+    def test_wiley_asset_scopes_only_collect_supporting_information_downloads(
+        self,
+    ) -> None:
         """rule: rule-wiley-supporting-information-assets"""
         source_url = "https://onlinelibrary.wiley.com/doi/full/10.1111/example"
         html_text = """
@@ -290,10 +364,12 @@ class SharedHtmlHelperTests(unittest.TestCase):
 </html>
 """
 
-        body_html, supplementary_html = science_pnas_asset_scopes.extract_browser_workflow_asset_html_scopes(
-            html_text,
-            source_url,
-            "wiley",
+        body_html, supplementary_html = (
+            atypon_browser_workflow_asset_scopes.extract_browser_workflow_asset_html_scopes(
+                html_text,
+                source_url,
+                "wiley",
+            )
         )
         assets = wiley_html.extract_scoped_html_assets(
             body_html,
@@ -313,17 +389,29 @@ class SharedHtmlHelperTests(unittest.TestCase):
             "https://onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1111%2Fexample&file=example-sup-0001-DataS1.docx",
         )
         self.assertEqual(assets[1]["filename_hint"], "example-sup-0001-DataS1.docx")
-        self.assertFalse(any("fig-0001" in asset.get("url", "") for asset in assets if asset["kind"] == "supplementary"))
+        self.assertFalse(
+            any(
+                "fig-0001" in asset.get("url", "")
+                for asset in assets
+                if asset["kind"] == "supplementary"
+            )
+        )
 
-    def test_wiley_real_fixture_supporting_information_only_yields_true_supplementary_asset(self) -> None:
+    def test_wiley_real_fixture_supporting_information_only_yields_true_supplementary_asset(
+        self,
+    ) -> None:
         """rule: rule-wiley-supporting-information-assets"""
         source_url = "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16414"
-        html_text = golden_criteria_asset("10.1111/gcb.16414", "original.html").read_text(encoding="utf-8")
+        html_text = golden_criteria_asset(
+            "10.1111/gcb.16414", "original.html"
+        ).read_text(encoding="utf-8")
 
-        body_html, supplementary_html = science_pnas_asset_scopes.extract_browser_workflow_asset_html_scopes(
-            html_text,
-            source_url,
-            "wiley",
+        body_html, supplementary_html = (
+            atypon_browser_workflow_asset_scopes.extract_browser_workflow_asset_html_scopes(
+                html_text,
+                source_url,
+                "wiley",
+            )
         )
         assets = wiley_html.extract_scoped_html_assets(
             body_html,
@@ -332,7 +420,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
             supplementary_html_text=supplementary_html,
         )
         figure_assets = [asset for asset in assets if asset["kind"] == "figure"]
-        supplementary_assets = [asset for asset in assets if asset["kind"] == "supplementary"]
+        supplementary_assets = [
+            asset for asset in assets if asset["kind"] == "supplementary"
+        ]
 
         self.assertEqual(
             [asset["heading"] for asset in supplementary_assets],
@@ -348,11 +438,23 @@ class SharedHtmlHelperTests(unittest.TestCase):
             [asset["filename_hint"] for asset in supplementary_assets],
             ["gcb16414-sup-0001-FigureS1.docx"],
         )
-        self.assertTrue(any("gcb16414-fig-0001-m.jpg" in asset.get("url", "") for asset in figure_assets))
-        self.assertFalse(any("gcb16414-fig-" in asset.get("url", "") for asset in supplementary_assets))
+        self.assertTrue(
+            any(
+                "gcb16414-fig-0001-m.jpg" in asset.get("url", "")
+                for asset in figure_assets
+            )
+        )
+        self.assertFalse(
+            any(
+                "gcb16414-fig-" in asset.get("url", "")
+                for asset in supplementary_assets
+            )
+        )
         self.assertNotIn("gcb16414-sup-0001-FigureS1.docx", body_html)
 
-    def test_download_supplementary_assets_uses_wiley_filename_hint_for_octet_stream(self) -> None:
+    def test_download_supplementary_assets_uses_wiley_filename_hint_for_octet_stream(
+        self,
+    ) -> None:
         supplement_url = (
             "https://onlinelibrary.wiley.com/action/downloadSupplement?"
             "doi=10.1111%2Fgcb.16414&file=gcb16414-sup-0001-FigureS1.docx"
@@ -389,9 +491,13 @@ class SharedHtmlHelperTests(unittest.TestCase):
             )
 
         self.assertEqual(result["asset_failures"], [])
-        self.assertEqual(Path(result["assets"][0]["path"]).name, "gcb16414-sup-0001-FigureS1.docx")
+        self.assertEqual(
+            Path(result["assets"][0]["path"]).name, "gcb16414-sup-0001-FigureS1.docx"
+        )
 
-    def test_download_supplementary_assets_routes_source_data_into_subdirectory(self) -> None:
+    def test_download_supplementary_assets_routes_source_data_into_subdirectory(
+        self,
+    ) -> None:
         """rule: rule-springer-supplementary-scope"""
         responses = {
             "https://example.test/supplement.pdf": {
@@ -443,10 +549,15 @@ class SharedHtmlHelperTests(unittest.TestCase):
             self.assertEqual(result["asset_failures"], [])
             self.assertEqual(asset_paths[0].parent.name, "10.1000_example_assets")
             self.assertEqual(asset_paths[1].parent.name, "source_data")
-            self.assertEqual(asset_paths[1].parent.parent.name, "10.1000_example_assets")
+            self.assertEqual(
+                asset_paths[1].parent.parent.name, "10.1000_example_assets"
+            )
 
-    def test_download_supplementary_assets_with_only_source_data_creates_only_source_data_subdirectory(self) -> None:
+    def test_download_supplementary_assets_with_only_source_data_creates_only_source_data_subdirectory(
+        self,
+    ) -> None:
         """rule: rule-springer-supplementary-scope"""
+
         def opener_requester(opener, url, **kwargs):
             del opener, kwargs
             return {
@@ -481,10 +592,14 @@ class SharedHtmlHelperTests(unittest.TestCase):
             root_entries = sorted(path.name for path in asset_root.iterdir())
 
             self.assertEqual(result["asset_failures"], [])
-            self.assertEqual(Path(result["assets"][0]["path"]).parent.name, "source_data")
+            self.assertEqual(
+                Path(result["assets"][0]["path"]).parent.name, "source_data"
+            )
             self.assertEqual(root_entries, ["source_data"])
 
-    def test_wiley_body_figures_are_not_promoted_to_supplementary_without_supporting_information(self) -> None:
+    def test_wiley_body_figures_are_not_promoted_to_supplementary_without_supporting_information(
+        self,
+    ) -> None:
         """rule: rule-wiley-supporting-information-assets
         rule: rule-supplementary-discovery-explicit-scope"""
         body_html = """
@@ -508,8 +623,42 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertEqual([asset["kind"] for asset in assets], ["figure"])
         self.assertFalse(any(asset["kind"] == "supplementary" for asset in assets))
 
-    def test_extract_scoped_html_assets_empty_supplementary_scope_does_not_scan_body(self) -> None:
-        """rule: rule-science-pnas-supplementary-sections
+    def test_wiley_supplementary_assets_parse_path_and_filename_query(self) -> None:
+        supplementary_html = """
+<section class="article-section__supporting">
+  <a href="/action/track?next=/action/downloadSupplement">Tracking link</a>
+  <a href="/action/downloadSupplement?doi=10.1111%2Fexample&amp;download=true">Generic download</a>
+  <a href="/action/downloadSupplement?doi=10.1111%2Fexample&amp;attachment=example-sup-0002-DataS2.xlsx">Data S2</a>
+  <a href="/action/downloadSupplement?doi=10.1111%2Fexample&amp;filename=example-sup-0003-DataS3.csv">Data S3</a>
+  <a href="/action/downloadSupplement?doi=10.1111%2Fexample&amp;download=example-sup-0004-DataS4.zip">Data S4</a>
+</section>
+"""
+
+        assets = wiley_html.extract_scoped_html_assets(
+            "<article></article>",
+            "https://onlinelibrary.wiley.com/doi/full/10.1111/example",
+            asset_profile="all",
+            supplementary_html_text=supplementary_html,
+        )
+
+        self.assertEqual(len(assets), 4)
+        self.assertEqual(
+            assets[0]["url"],
+            "https://onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1111%2Fexample&download=true",
+        )
+        self.assertNotIn("filename_hint", assets[0])
+        self.assertEqual(
+            assets[1]["url"],
+            "https://onlinelibrary.wiley.com/action/downloadSupplement?doi=10.1111%2Fexample&attachment=example-sup-0002-DataS2.xlsx",
+        )
+        self.assertEqual(assets[1]["filename_hint"], "example-sup-0002-DataS2.xlsx")
+        self.assertEqual(assets[2]["filename_hint"], "example-sup-0003-DataS3.csv")
+        self.assertEqual(assets[3]["filename_hint"], "example-sup-0004-DataS4.zip")
+
+    def test_extract_scoped_html_assets_empty_supplementary_scope_does_not_scan_body(
+        self,
+    ) -> None:
+        """rule: rule-atypon-browser-workflow-supplementary-sections
         rule: rule-supplementary-discovery-explicit-scope"""
         body_html = """
 <html>
@@ -528,26 +677,34 @@ class SharedHtmlHelperTests(unittest.TestCase):
 
         self.assertFalse(any(asset["kind"] == "supplementary" for asset in assets))
 
-    def test_science_real_fixture_supplementary_comes_only_from_supplementary_section(self) -> None:
-        """rule: rule-science-pnas-supplementary-sections"""
+    def test_science_real_fixture_supplementary_comes_only_from_supplementary_section(
+        self,
+    ) -> None:
+        """rule: rule-atypon-browser-workflow-supplementary-sections"""
         source_url = "https://www.science.org/doi/full/10.1126/sciadv.adl6155"
-        html_text = golden_criteria_asset("10.1126/sciadv.adl6155", "original.html").read_text(
+        html_text = golden_criteria_asset(
+            "10.1126/sciadv.adl6155", "original.html"
+        ).read_text(
             encoding="utf-8",
             errors="ignore",
         )
 
-        body_html, supplementary_html = science_pnas_asset_scopes.extract_browser_workflow_asset_html_scopes(
-            html_text,
-            source_url,
-            "science",
+        body_html, supplementary_html = (
+            atypon_browser_workflow_asset_scopes.extract_browser_workflow_asset_html_scopes(
+                html_text,
+                source_url,
+                "science",
+            )
         )
-        assets = science_pnas_asset_scopes.extract_scoped_html_assets(
+        assets = atypon_browser_workflow_asset_scopes.extract_scoped_html_assets(
             body_html,
             source_url,
             asset_profile="all",
             supplementary_html_text=supplementary_html,
         )
-        supplementary_assets = [asset for asset in assets if asset["kind"] == "supplementary"]
+        supplementary_assets = [
+            asset for asset in assets if asset["kind"] == "supplementary"
+        ]
 
         self.assertIn("co2_gr_mlo.txt", body_html)
         self.assertNotIn("co2_gr_mlo.txt", supplementary_html)
@@ -559,26 +716,32 @@ class SharedHtmlHelperTests(unittest.TestCase):
             ],
         )
 
-    def test_pnas_real_fixture_supplementary_ignores_body_anchor_to_section(self) -> None:
-        """rule: rule-science-pnas-supplementary-sections"""
+    def test_pnas_real_fixture_supplementary_ignores_body_anchor_to_section(
+        self,
+    ) -> None:
+        """rule: rule-atypon-browser-workflow-supplementary-sections"""
         source_url = "https://www.pnas.org/doi/full/10.1073/pnas.2509692123"
         html_text = block_asset("10.1073/pnas.2509692123", "raw.html").read_text(
             encoding="utf-8",
             errors="ignore",
         )
 
-        body_html, supplementary_html = science_pnas_asset_scopes.extract_browser_workflow_asset_html_scopes(
-            html_text,
-            source_url,
-            "pnas",
+        body_html, supplementary_html = (
+            atypon_browser_workflow_asset_scopes.extract_browser_workflow_asset_html_scopes(
+                html_text,
+                source_url,
+                "pnas",
+            )
         )
-        assets = science_pnas_asset_scopes.extract_scoped_html_assets(
+        assets = atypon_browser_workflow_asset_scopes.extract_scoped_html_assets(
             body_html,
             source_url,
             asset_profile="all",
             supplementary_html_text=supplementary_html,
         )
-        supplementary_assets = [asset for asset in assets if asset["kind"] == "supplementary"]
+        supplementary_assets = [
+            asset for asset in assets if asset["kind"] == "supplementary"
+        ]
 
         self.assertIn("#supplementary-materials", body_html)
         self.assertNotIn("#supplementary-materials", supplementary_html)
@@ -594,7 +757,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
     def test_supplementary_response_block_reason_detects_challenge_html(self) -> None:
         body = b"<html><head><title>Just a moment...</title></head><body>Checking your browser before accessing</body></html>"
 
-        reason = html_assets.supplementary_response_block_reason("text/html; charset=utf-8", body)
+        reason = html_assets.supplementary_response_block_reason(
+            "text/html; charset=utf-8", body
+        )
 
         self.assertEqual(reason, "cloudflare_challenge")
 
@@ -620,11 +785,19 @@ class SharedHtmlHelperTests(unittest.TestCase):
 
         self.assertEqual(candidates[0], "https://example.test/full.png")
 
-    def test_download_figure_assets_resolves_http_candidates_in_parallel_but_writes_in_order(self) -> None:
+    def test_download_figure_assets_resolves_http_candidates_in_parallel_but_writes_in_order(
+        self,
+    ) -> None:
         urls = [f"https://example.test/fig{i}.png" for i in range(4)]
         transport = _DelayedAssetTransport({url: 0.05 for url in urls})
         assets = [
-            {"kind": "figure", "heading": f"Figure {index}", "caption": "", "url": url, "section": "body"}
+            {
+                "kind": "figure",
+                "heading": f"Figure {index}",
+                "caption": "",
+                "url": url,
+                "section": "body",
+            }
             for index, url in enumerate(urls)
         ]
 
@@ -639,14 +812,23 @@ class SharedHtmlHelperTests(unittest.TestCase):
             )
 
         self.assertGreater(transport.max_active, 1)
-        self.assertEqual([asset["heading"] for asset in result["assets"]], [asset["heading"] for asset in assets])
+        self.assertEqual(
+            [asset["heading"] for asset in result["assets"]],
+            [asset["heading"] for asset in assets],
+        )
         self.assertEqual(result["asset_failures"], [])
 
     def test_download_figure_assets_respects_explicit_concurrency_limit(self) -> None:
         urls = [f"https://example.test/serial-fig{i}.png" for i in range(3)]
         transport = _DelayedAssetTransport({url: 0.01 for url in urls})
         assets = [
-            {"kind": "figure", "heading": f"Figure {index}", "caption": "", "url": url, "section": "body"}
+            {
+                "kind": "figure",
+                "heading": f"Figure {index}",
+                "caption": "",
+                "url": url,
+                "section": "body",
+            }
             for index, url in enumerate(urls)
         ]
 
@@ -662,9 +844,14 @@ class SharedHtmlHelperTests(unittest.TestCase):
             )
 
         self.assertEqual(transport.max_active, 1)
-        self.assertEqual([asset["heading"] for asset in result["assets"]], [asset["heading"] for asset in assets])
+        self.assertEqual(
+            [asset["heading"] for asset in result["assets"]],
+            [asset["heading"] for asset in assets],
+        )
 
-    def test_download_supplementary_assets_resolves_files_in_parallel_but_writes_in_order(self) -> None:
+    def test_download_supplementary_assets_resolves_files_in_parallel_but_writes_in_order(
+        self,
+    ) -> None:
         urls = [f"https://example.test/supp{i}.pdf" for i in range(4)]
         state = {"active": 0, "max_active": 0}
         lock = threading.Lock()
@@ -687,7 +874,12 @@ class SharedHtmlHelperTests(unittest.TestCase):
                     state["active"] -= 1
 
         assets = [
-            {"kind": "supplementary", "heading": f"Supplement {index}", "url": url, "section": "supplementary"}
+            {
+                "kind": "supplementary",
+                "heading": f"Supplement {index}",
+                "url": url,
+                "section": "supplementary",
+            }
             for index, url in enumerate(urls)
         ]
 
@@ -704,10 +896,15 @@ class SharedHtmlHelperTests(unittest.TestCase):
             )
 
         self.assertGreater(state["max_active"], 1)
-        self.assertEqual([asset["heading"] for asset in result["assets"]], [asset["heading"] for asset in assets])
+        self.assertEqual(
+            [asset["heading"] for asset in result["assets"]],
+            [asset["heading"] for asset in assets],
+        )
         self.assertEqual(result["asset_failures"], [])
 
-    def test_download_supplementary_assets_respects_explicit_concurrency_limit(self) -> None:
+    def test_download_supplementary_assets_respects_explicit_concurrency_limit(
+        self,
+    ) -> None:
         urls = [f"https://example.test/serial-supp{i}.pdf" for i in range(3)]
         state = {"active": 0, "max_active": 0}
         lock = threading.Lock()
@@ -730,7 +927,12 @@ class SharedHtmlHelperTests(unittest.TestCase):
                     state["active"] -= 1
 
         assets = [
-            {"kind": "supplementary", "heading": f"Supplement {index}", "url": url, "section": "supplementary"}
+            {
+                "kind": "supplementary",
+                "heading": f"Supplement {index}",
+                "url": url,
+                "section": "supplementary",
+            }
             for index, url in enumerate(urls)
         ]
 
@@ -748,7 +950,10 @@ class SharedHtmlHelperTests(unittest.TestCase):
             )
 
         self.assertEqual(state["max_active"], 1)
-        self.assertEqual([asset["heading"] for asset in result["assets"]], [asset["heading"] for asset in assets])
+        self.assertEqual(
+            [asset["heading"] for asset in result["assets"]],
+            [asset["heading"] for asset in assets],
+        )
 
     def test_clean_html_for_extraction_removes_noise_but_keeps_sections(self) -> None:
         html = """
@@ -769,7 +974,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertIn("Important body text.", cleaned)
         self.assertNotIn("Skip to main content", cleaned)
 
-    def test_extract_html_section_hints_reads_structural_data_availability(self) -> None:
+    def test_extract_html_section_hints_reads_structural_data_availability(
+        self,
+    ) -> None:
         html = """
 <html>
   <body>
@@ -787,7 +994,9 @@ class SharedHtmlHelperTests(unittest.TestCase):
         self.assertEqual(hints[0]["heading"], "Availability Statement")
         self.assertEqual(hints[0]["kind"], "data_availability")
 
-    def test_extract_html_section_hints_reads_structural_code_availability(self) -> None:
+    def test_extract_html_section_hints_reads_structural_code_availability(
+        self,
+    ) -> None:
         html = """
 <html>
   <body>
@@ -823,13 +1032,17 @@ class SharedHtmlHelperTests(unittest.TestCase):
         original_trafilatura = html_runtime.trafilatura
         try:
             html_runtime.trafilatura = None
-            markdown = html_runtime.extract_article_markdown(html, "https://example.test/article")
+            markdown = html_runtime.extract_article_markdown(
+                html, "https://example.test/article"
+            )
         finally:
             html_runtime.trafilatura = original_trafilatura
 
         self.assertIn("## Results", markdown)
         self.assertIn("## Data Availability", markdown)
-        self.assertIn("The data are available from the corresponding author on request.", markdown)
+        self.assertIn(
+            "The data are available from the corresponding author on request.", markdown
+        )
 
     def test_clean_markdown_pnas_alerts_require_pnas_profile(self) -> None:
         markdown = """
@@ -848,8 +1061,32 @@ Important body text.
         self.assertIn("Sign up for PNAS alerts.", generic_cleaned)
         self.assertNotIn("Sign up for PNAS alerts.", pnas_cleaned)
 
-    def test_real_nature_fixture_keeps_source_data_without_chrome_sections(self) -> None:
-        source_data_html = golden_criteria_asset("10.1038/s41561-022-00912-7", "original.html").read_text(
+    def test_front_matter_publication_keywords_keep_atypon_browser_workflow_provider_scoped(
+        self,
+    ) -> None:
+        self.assertNotIn("science", html_runtime.FRONT_MATTER_PUBLICATION_KEYWORDS)
+        self.assertNotIn("pnas", html_runtime.FRONT_MATTER_PUBLICATION_KEYWORDS)
+        self.assertFalse(html_runtime._looks_like_publication_watermark("Science"))
+        self.assertFalse(html_runtime._looks_like_publication_watermark("PNAS Nexus"))
+        self.assertTrue(
+            html_runtime._looks_like_publication_watermark(
+                "Science Robotics",
+                noise_profile="science",
+            )
+        )
+        self.assertTrue(
+            atypon_browser_workflow_profile._looks_like_publication_watermark(
+                "PNAS Nexus",
+                publisher="pnas",
+            )
+        )
+
+    def test_real_nature_fixture_keeps_source_data_without_chrome_sections(
+        self,
+    ) -> None:
+        source_data_html = golden_criteria_asset(
+            "10.1038/s41561-022-00912-7", "original.html"
+        ).read_text(
             encoding="utf-8",
             errors="ignore",
         )
@@ -862,7 +1099,9 @@ Important body text.
 
         self.assertIn("Source data", source_data_markdown)
 
-        chrome_html = golden_criteria_asset("10.1038/nature13376", "original.html").read_text(
+        chrome_html = golden_criteria_asset(
+            "10.1038/nature13376", "original.html"
+        ).read_text(
             encoding="utf-8",
             errors="ignore",
         )
@@ -879,17 +1118,28 @@ Important body text.
         self.assertNotIn("## Open Access", chrome_markdown)
         self.assertNotIn("## Rights and permissions", chrome_markdown)
 
-    def test_inline_normalization_is_shared_for_body_heading_and_table_text(self) -> None:
+    def test_inline_normalization_is_shared_for_body_heading_and_table_text(
+        self,
+    ) -> None:
         """rule: rule-preserve-inline-semantics-in-body-and-tables"""
         raw_text = "CO <sub> 2 </sub> emission </sup> +"
 
-        self.assertEqual(normalize_html_inline_text("CO <sub> 2 </sub> emissions"), "CO<sub>2</sub> emissions")
-        self.assertEqual(normalize_html_inline_text("m <sup> -2 </sup> )", policy="body"), "m<sup>-2</sup>)")
+        self.assertEqual(
+            normalize_html_inline_text("CO <sub> 2 </sub> emissions"),
+            "CO<sub>2</sub> emissions",
+        )
+        self.assertEqual(
+            normalize_html_inline_text("m <sup> -2 </sup> )", policy="body"),
+            "m<sup>-2</sup>)",
+        )
         self.assertEqual(
             normalize_html_inline_text("m <sup> -2 </sup> )", policy="table_cell"),
             "m<sup>-2</sup> )",
         )
-        self.assertEqual(normalize_html_inline_text(raw_text, policy="heading"), "CO<sub>2</sub> emission</sup>+")
+        self.assertEqual(
+            normalize_html_inline_text(raw_text, policy="heading"),
+            "CO<sub>2</sub> emission</sup>+",
+        )
 
     def test_inline_normalization_preserves_isotope_superscript_spacing(self) -> None:
         """rule: rule-preserve-inline-semantics-in-body-and-tables"""
@@ -902,21 +1152,46 @@ Important body text.
             "states of <sup>6</sup>Li",
         )
 
-    def test_inline_normalization_tightens_high_confidence_sup_sub_spacing(self) -> None:
+    def test_inline_normalization_tightens_high_confidence_sup_sub_spacing(
+        self,
+    ) -> None:
         """rule: rule-preserve-inline-semantics-in-body-and-tables"""
-        self.assertEqual(normalize_html_inline_text("[ <sup>17</sup>]"), "[<sup>17</sup>]")
-        self.assertEqual(normalize_html_inline_text("m <sup> -2 </sup>"), "m<sup>-2</sup>")
-        self.assertEqual(normalize_html_inline_text("km <sup>2</sup>"), "km<sup>2</sup>")
-        self.assertEqual(normalize_html_inline_text("CO <sub>2</sub>"), "CO<sub>2</sub>")
-        self.assertEqual(normalize_html_inline_text("H <sub>2</sub>O"), "H<sub>2</sub>O")
-        self.assertEqual(normalize_html_inline_text("kg <sup>-1</sup>"), "kg<sup>-1</sup>")
-        self.assertEqual(normalize_html_inline_text("AB <sub>3</sub>"), "AB<sub>3</sub>")
+        self.assertEqual(
+            normalize_html_inline_text("[ <sup>17</sup>]"), "[<sup>17</sup>]"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("m <sup> -2 </sup>"), "m<sup>-2</sup>"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("km <sup>2</sup>"), "km<sup>2</sup>"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("CO <sub>2</sub>"), "CO<sub>2</sub>"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("H <sub>2</sub>O"), "H<sub>2</sub>O"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("kg <sup>-1</sup>"), "kg<sup>-1</sup>"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("AB <sub>3</sub>"), "AB<sub>3</sub>"
+        )
         self.assertEqual(normalize_html_inline_text("x <sup>2</sup>"), "x<sup>2</sup>")
-        self.assertEqual(normalize_html_inline_text("*h* <sub>0</sub>"), "*h*<sub>0</sub>")
-        self.assertEqual(normalize_html_inline_text("number of <sup>6</sup>Li"), "number of <sup>6</sup>Li")
-        self.assertEqual(normalize_html_inline_text("state of <sub>2</sub>"), "state of <sub>2</sub>")
+        self.assertEqual(
+            normalize_html_inline_text("*h* <sub>0</sub>"), "*h*<sub>0</sub>"
+        )
+        self.assertEqual(
+            normalize_html_inline_text("number of <sup>6</sup>Li"),
+            "number of <sup>6</sup>Li",
+        )
+        self.assertEqual(
+            normalize_html_inline_text("state of <sub>2</sub>"), "state of <sub>2</sub>"
+        )
 
-    def test_inline_token_joiner_is_shared_by_body_heading_and_table_cells(self) -> None:
+    def test_inline_token_joiner_is_shared_by_body_heading_and_table_cells(
+        self,
+    ) -> None:
         """rule: rule-preserve-inline-semantics-in-body-and-tables"""
         soup = BeautifulSoup(
             """
@@ -934,7 +1209,9 @@ Important body text.
         table_markdown = render_table_markdown(soup.table, label="", caption="")
 
         self.assertEqual(heading_text, "CO<sub>2</sub> and x<sup>2</sup>")
-        self.assertEqual(body_text, "kg<sup>-1</sup> flux and number of <sup>6</sup>Li atoms.")
+        self.assertEqual(
+            body_text, "kg<sup>-1</sup> flux and number of <sup>6</sup>Li atoms."
+        )
         self.assertIn("AB<sub>3</sub>", table_markdown)
 
     def test_table_header_flattening_removes_redundant_global_spanner(self) -> None:
@@ -957,7 +1234,9 @@ Important body text.
         self.assertIn("| Model | Parameters |", markdown)
         self.assertNotIn("Production MoE models / Model", markdown)
 
-    def test_table_header_flattening_lifts_full_width_title_and_keeps_pipe_rows_valid(self) -> None:
+    def test_table_header_flattening_lifts_full_width_title_and_keeps_pipe_rows_valid(
+        self,
+    ) -> None:
         soup = BeautifulSoup(
             r"""
 <table>
@@ -973,13 +1252,17 @@ Important body text.
         markdown = render_table_markdown(soup.table, label="", caption="")
         pipe_lines = [line for line in markdown.splitlines() if line.startswith("|")]
 
-        self.assertIn("Probability of quota violations with $(1,x,y)$ uniform", markdown)
+        self.assertIn(
+            "Probability of quota violations with $(1,x,y)$ uniform", markdown
+        )
         self.assertIn("| Method", markdown)
         self.assertFalse(markdown.splitlines()[0].startswith("|"))
         self.assertTrue(pipe_lines)
         self.assertEqual({line.count("|") for line in pipe_lines}, {6})
 
-    def test_table_header_flattening_preserves_distinguishing_group_spanners(self) -> None:
+    def test_table_header_flattening_preserves_distinguishing_group_spanners(
+        self,
+    ) -> None:
         soup = BeautifulSoup(
             """
 <table>
@@ -998,7 +1281,9 @@ Important body text.
         self.assertIn("Configuration / n_r", markdown)
         self.assertIn("Inference / MMLU", markdown)
 
-    def test_section_renderer_collapses_prose_hard_linebreaks_without_touching_blocks(self) -> None:
+    def test_section_renderer_collapses_prose_hard_linebreaks_without_touching_blocks(
+        self,
+    ) -> None:
         soup = BeautifulSoup(
             """
 <article>
@@ -1017,10 +1302,14 @@ Important body text.
             "html.parser",
         )
         lines: list[str] = []
-        render_container_markdown(soup.article, lines, level=2, section_content_selectors=())
+        render_container_markdown(
+            soup.article, lines, level=2, section_content_selectors=()
+        )
         markdown = "\n".join(lines)
 
-        self.assertIn("Drosophila melanogaster embryos possess coordinated cell cycles", markdown)
+        self.assertIn(
+            "Drosophila melanogaster embryos possess coordinated cell cycles", markdown
+        )
         self.assertNotIn("melanogaster\nembryos", markdown)
         self.assertIn("$$\nE = m\n$$", markdown)
         self.assertIn("- First item wraps across source lines.", markdown)
@@ -1037,7 +1326,9 @@ Important body text.
             "html.parser",
         )
         lines: list[str] = []
-        render_container_markdown(soup.article, lines, level=2, section_content_selectors=())
+        render_container_markdown(
+            soup.article, lines, level=2, section_content_selectors=()
+        )
         markdown = "\n".join(lines)
 
         self.assertIn("$s(s + 1)$", markdown)
@@ -1054,16 +1345,25 @@ Important body text.
 """,
             "html.parser",
         )
-        table_markdown = render_table_markdown(table.table, label="", caption="", render_inline_text=render_clean_text_from_html)
+        table_markdown = render_table_markdown(
+            table.table,
+            label="",
+            caption="",
+            render_inline_text=render_clean_text_from_html,
+        )
         self.assertIn("s + 1", table_markdown)
 
     def test_formula_rules_detect_real_formula_image_urls(self) -> None:
         """rule: rule-preserve-formula-image-fallbacks"""
-        wiley_html = golden_criteria_asset("10.1111/gcb.15322", "original.html").read_text(
+        wiley_html = golden_criteria_asset(
+            "10.1111/gcb.15322", "original.html"
+        ).read_text(
             encoding="utf-8",
             errors="ignore",
         )
-        nature_html = golden_criteria_asset("10.1038/nature12915", "original.html").read_text(
+        nature_html = golden_criteria_asset(
+            "10.1038/nature12915", "original.html"
+        ).read_text(
             encoding="utf-8",
             errors="ignore",
         )
@@ -1076,10 +1376,53 @@ Important body text.
 
         self.assertIn("gcb15322-math-0001.png", formula_image_url_from_node(image))
         self.assertTrue(looks_like_formula_image(image))
-        self.assertTrue(is_display_formula_node(nature_display))
+        self.assertFalse(is_display_formula_node(nature_display))
+        self.assertTrue(
+            is_display_formula_node(
+                nature_display,
+                noise_profile="springer_nature",
+            )
+        )
         self.assertIn("_Equ1_HTML.jpg", formula_image_url_from_node(nature_image))
         self.assertTrue(looks_like_formula_image(nature_image))
         self.assertFalse(looks_like_formula_image(figure_image))
+
+    def test_formula_publisher_tokens_are_registered_as_provider_extensions(
+        self,
+    ) -> None:
+        springer_rules = provider_html_rules("springer")
+        wiley_rules = provider_html_rules("wiley")
+
+        self.assertNotIn("c-article-equation", GENERIC_FORMULA_CONTAINER_TOKENS)
+        self.assertNotIn("fallback__mathequation", GENERIC_FORMULA_CONTAINER_TOKENS)
+        self.assertNotIn(".c-article-equation", GENERIC_DISPLAY_FORMULA_SELECTORS)
+        self.assertIn("c-article-equation", springer_rules.formula_container_tokens)
+        self.assertIn(".c-article-equation", springer_rules.display_formula_selectors)
+        self.assertIn("fallback__mathequation", wiley_rules.formula_container_tokens)
+
+    def test_provider_formula_container_tokens_require_explicit_profile(self) -> None:
+        soup = BeautifulSoup(
+            '<div id="EqCustom" class="c-article-equation"><img src="/rendered.png" alt="rendered"/></div>',
+            "html.parser",
+        )
+        image = soup.select_one("img")
+        self.assertIsNotNone(image)
+
+        self.assertFalse(looks_like_formula_image(image))
+        self.assertTrue(
+            looks_like_formula_image(
+                image,
+                noise_profile="springer_nature",
+            )
+        )
+        self.assertEqual(
+            formula_heading_for_image(
+                image,
+                1,
+                noise_profile="springer_nature",
+            ),
+            "EqCustom",
+        )
 
     def test_extract_formula_assets_reuses_shared_formula_rules(self) -> None:
         html = golden_criteria_asset("10.1038/nature12915", "original.html").read_text(
@@ -1087,13 +1430,63 @@ Important body text.
             errors="ignore",
         )
 
-        assets = html_assets.extract_formula_assets(html, "https://www.nature.com/articles/nature12915")
+        assets = html_assets.extract_formula_assets(
+            html,
+            "https://www.nature.com/articles/nature12915",
+            noise_profile="springer_nature",
+        )
 
         self.assertGreaterEqual(len(assets), 2)
         self.assertTrue(all(asset["kind"] == "formula" for asset in assets))
-        self.assertTrue(any(asset["heading"] == "Equ1" and "_Equ1_HTML.jpg" in asset["url"] for asset in assets))
-        self.assertTrue(any(asset["heading"] == "Equ2" and "_Equ2_HTML.jpg" in asset["url"] for asset in assets))
+        self.assertTrue(
+            any(
+                asset["heading"] == "Equ1" and "_Equ1_HTML.jpg" in asset["url"]
+                for asset in assets
+            )
+        )
+        self.assertTrue(
+            any(
+                asset["heading"] == "Equ2" and "_Equ2_HTML.jpg" in asset["url"]
+                for asset in assets
+            )
+        )
         self.assertFalse(any("Fig1_HTML" in asset["url"] for asset in assets))
+
+    def test_springer_formula_asset_extractor_injects_provider_profile(self) -> None:
+        html = (
+            '<div id="EqCustom" class="c-article-equation">'
+            '<img src="/rendered.png" alt="rendered"/>'
+            "</div>"
+        )
+
+        assets = springer_html.extract_scoped_html_assets(
+            html,
+            "https://www.nature.com/articles/example",
+            asset_profile="body",
+        )
+
+        formula_assets = [asset for asset in assets if asset["kind"] == "formula"]
+        self.assertEqual(len(formula_assets), 1)
+        self.assertEqual(formula_assets[0]["heading"], "EqCustom")
+        self.assertEqual(
+            formula_assets[0]["url"],
+            "https://www.nature.com/rendered.png",
+        )
+
+    def test_supplementary_nature_text_tokens_are_provider_extensions(self) -> None:
+        html = '<a href="/files/source-data">Source data</a>'
+
+        generic_assets = html_assets.extract_supplementary_assets(
+            html, "https://example.test/article"
+        )
+        springer_assets = html_assets.extract_supplementary_assets(
+            html,
+            "https://example.test/article",
+            noise_profile="springer_nature",
+        )
+
+        self.assertEqual(generic_assets, [])
+        self.assertEqual(springer_assets[0]["heading"], "Source data")
 
     def test_clean_markdown_registers_springer_nature_profile(self) -> None:
         """rule: rule-springer-article-root-chrome-pruning"""
@@ -1108,7 +1501,9 @@ Important body text.
 """
 
         generic_cleaned = html_runtime.clean_markdown(markdown)
-        springer_cleaned = html_runtime.clean_markdown(markdown, noise_profile="springer_nature")
+        springer_cleaned = html_runtime.clean_markdown(
+            markdown, noise_profile="springer_nature"
+        )
 
         self.assertIn("Sign up for alerts", generic_cleaned)
         self.assertNotIn("Sign up for alerts", springer_cleaned)

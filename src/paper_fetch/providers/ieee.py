@@ -23,6 +23,7 @@ from ..extraction.html.assets import (
     extract_scoped_html_assets,
     split_body_and_supplementary_assets,
 )
+from ..extraction.html.assets.supplementary import has_supplementary_file_suffix
 from ..extraction.html.landing import LandingRedirectLimitExceeded, fetch_landing_html
 from ..extraction.html.parsing import choose_parser
 from ..extraction.html.semantics import collect_html_section_hints
@@ -79,7 +80,11 @@ IEEE_BROWSER_HTML_REST_WAIT_TIMEOUT_MS = 15000
 IEEE_BROWSER_HTML_DOM_WAIT_TIMEOUT_MS = 5000
 MAX_IEEE_LANDING_REDIRECTS = 8
 IEEE_METADATA_ASSIGNMENT = "xplGlobal.document.metadata"
-IEEE_ARTICLE_NUMBER_PATTERN = re.compile(r"/document/(?P<article_number>\d+)(?:/|$)")
+# IEEE Xplore article numbers are parsed only from the provider-owned
+# `/document/{article_number}/` URL contract. Other IEEE URLs expose the same
+# number in query params or REST paths, but those are handled by metadata fields
+# or explicit route builders instead of this landing URL parser.
+IEEE_ARTICLE_NUMBER_PATH_PATTERN = re.compile(r"^/document/(?P<article_number>\d+)(?:/|$)")
 IEEE_SCRIPT_VALUE_PATTERN_TEMPLATE = r"""["']?{key}["']?\s*:\s*(?P<value>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|true|false|null|\d+)"""
 IEEE_SUPPORT_ICON_PATH = "/assets/img/icon.support.gif"
 IEEE_MEDIASTORE_PATH_PREFIX = "/mediastore/ieee/content/media/"
@@ -94,15 +99,7 @@ IEEE_SUPPLEMENTARY_SEMANTIC_TOKENS = (
     "supplement file",
     "supplemental item",
 )
-IEEE_SUPPLEMENTARY_FILE_SUFFIXES = (
-    ".pdf",
-    ".zip",
-    ".csv",
-    ".xlsx",
-    ".xls",
-    ".txt",
-    ".json",
-    ".xml",
+IEEE_SUPPLEMENTARY_EXTRA_FILE_SUFFIXES = (
     ".doc",
     ".docx",
     ".ps",
@@ -174,7 +171,7 @@ IEEE_ASSET_URL_ATTRS = (
 )
 IEEE_REFERENCE_PAGE_SIZE = 30
 IEEE_MAX_REFERENCE_PAGES = 20
-IEEE_SECTION_MARKER_PATTERN = re.compile(r"^SECTION\s+[IVXLCDM]+\.$", flags=re.IGNORECASE)
+IEEE_SECTION_MARKER_PATTERN = re.compile(r"^SECTION\s+(?:[IVXLCDM]+|\d+)\s*[.:]?$", flags=re.IGNORECASE)
 IEEE_REFERENCE_DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[^\s\"'<>]+", flags=re.IGNORECASE)
 
 
@@ -208,7 +205,8 @@ def _header_value(headers: Mapping[str, Any] | None, key: str, default: str = ""
 
 
 def _article_number_from_url(url: str | None) -> str:
-    match = IEEE_ARTICLE_NUMBER_PATTERN.search(normalize_text(url or ""))
+    parsed = urllib.parse.urlparse(normalize_text(url or ""))
+    match = IEEE_ARTICLE_NUMBER_PATH_PATTERN.match(parsed.path or "")
     return match.group("article_number") if match else ""
 
 
@@ -464,9 +462,28 @@ def _merge_ieee_metadata(base_metadata: Mapping[str, Any], landing_metadata: Map
     return merged
 
 
-def _looks_like_ieee_block_page(html_text: str) -> bool:
+def _scan_ieee_block_page_tokens(html_text: str) -> bool:
     lowered = normalize_text(html_text).lower()
     return any(token in lowered for token in IEEE_ACCESS_BLOCK_TEXT_TOKENS)
+
+
+def _looks_like_ieee_block_page(
+    html_text: str,
+    *,
+    context: RuntimeContext | None = None,
+    source_url: str | None = None,
+) -> bool:
+    if not isinstance(context, RuntimeContext):
+        return _scan_ieee_block_page_tokens(html_text)
+    key = context.build_parse_cache_key(
+        provider="ieee",
+        role="access_block_page",
+        source=source_url,
+        body=html_text,
+        parser="text-token-scan",
+        config={"tokens": IEEE_ACCESS_BLOCK_TEXT_TOKENS},
+    )
+    return bool(context.get_or_set_parse_cache(key, lambda: _scan_ieee_block_page_tokens(html_text)))
 
 
 def _clean_ieee_article(article: Tag) -> None:
@@ -569,10 +586,53 @@ def _ieee_asset_url_path(url: str) -> str:
 
 
 def _is_ignored_ieee_asset_url(url: str) -> bool:
+    # Kept as a fallback contract for the historical Xplore support icon path;
+    # DOM and asset heuristics below are the primary filters for new markup.
     return _ieee_asset_url_path(url).endswith(IEEE_SUPPORT_ICON_PATH)
 
 
+def _small_html_dimension(value: Any, *, max_size: int = 32) -> bool:
+    normalized = normalize_text(str(value or "")).lower().rstrip("px")
+    if not normalized:
+        return False
+    try:
+        return 0 < int(float(normalized)) <= max_size
+    except (TypeError, ValueError):
+        return False
+
+
+def _ieee_support_icon_text(value: str) -> bool:
+    normalized = normalize_text(value).lower()
+    if not normalized:
+        return False
+    tokens = set(normalized.replace("-", " ").replace("_", " ").split())
+    return "icon" in tokens and ("support" in tokens or "help" in tokens)
+
+
+def _looks_like_ieee_support_icon_node(node: Tag) -> bool:
+    attrs = getattr(node, "attrs", None) or {}
+    text_parts = [
+        normalize_text(str(attrs.get("alt") or "")),
+        normalize_text(str(attrs.get("title") or "")),
+        normalize_text(str(attrs.get("aria-label") or "")),
+        normalize_text(str(attrs.get("id") or "")),
+    ]
+    class_values = attrs.get("class")
+    if isinstance(class_values, (list, tuple, set)):
+        text_parts.extend(normalize_text(str(item)) for item in class_values)
+    else:
+        text_parts.append(normalize_text(str(class_values or "")))
+    semantic_match = _ieee_support_icon_text(" ".join(text_parts))
+    if not semantic_match:
+        return False
+    width_small = _small_html_dimension(attrs.get("width"))
+    height_small = _small_html_dimension(attrs.get("height"))
+    return width_small or height_small or normalize_text(getattr(node, "name", "")).lower() == "img"
+
+
 def _ieee_tag_has_ignored_asset_url(node: Tag) -> bool:
+    if _looks_like_ieee_support_icon_node(node):
+        return True
     for attr_name in IEEE_ASSET_URL_ATTRS:
         value = normalize_text(str(node.get(attr_name) or ""))
         if value and _is_ignored_ieee_asset_url(_absolute_ieee_asset_url(value, IEEE_BASE_URL)):
@@ -584,7 +644,13 @@ def _has_ieee_supplementary_file_suffix(url: str) -> bool:
     parsed = urllib.parse.urlparse(normalize_text(str(url or "")))
     path = urllib.parse.unquote(parsed.path).lower()
     query = urllib.parse.unquote(parsed.query).lower()
-    return any(path.endswith(suffix) or suffix in query for suffix in IEEE_SUPPLEMENTARY_FILE_SUFFIXES)
+    return has_supplementary_file_suffix(
+        path,
+        extra_suffixes=IEEE_SUPPLEMENTARY_EXTRA_FILE_SUFFIXES,
+    ) or has_supplementary_file_suffix(
+        query,
+        extra_suffixes=IEEE_SUPPLEMENTARY_EXTRA_FILE_SUFFIXES,
+    )
 
 
 def _supplementary_assets_from_ieee_multimedia_payload(
@@ -932,6 +998,14 @@ def _extract_ieee_body_media_assets(article_html: str, source_url: str) -> list[
 
 
 def _ieee_asset_has_ignored_url(asset: Mapping[str, Any]) -> bool:
+    semantic_text = " ".join(
+        normalize_text(str(asset.get(field) or ""))
+        for field in ("heading", "caption", "alt", "title", "aria_label", "filename_hint")
+    )
+    width = asset.get("width")
+    height = asset.get("height")
+    if _ieee_support_icon_text(semantic_text) and (_small_html_dimension(width) or _small_html_dimension(height)):
+        return True
     for field in (
         "url",
         "full_size_url",
@@ -1179,10 +1253,11 @@ def _extract_ieee_html(
     source_url: str,
     *,
     metadata: Mapping[str, Any],
+    context: RuntimeContext | None = None,
 ) -> IeeeHtmlExtraction:
     if BeautifulSoup is None:
         raise ProviderFailure("error", "IEEE HTML extraction requires BeautifulSoup.")
-    if _looks_like_ieee_block_page(html_text):
+    if _looks_like_ieee_block_page(html_text, context=context, source_url=source_url):
         raise ProviderFailure("no_result", "IEEE dynamic HTML endpoint returned an access, challenge, or unable page.")
 
     html_for_parse = re.sub(r"^\s*<\?xml[^>]*>\s*", "", html_text)
@@ -1549,7 +1624,12 @@ class IeeeClient(ProviderClient):
             landing_metadata=landing_metadata,
         )
 
-    def _fetch_dynamic_html_payload(self, landing_attempt: IeeeLandingAttempt) -> RawFulltextPayload:
+    def _fetch_dynamic_html_payload(
+        self,
+        landing_attempt: IeeeLandingAttempt,
+        *,
+        context: RuntimeContext | None = None,
+    ) -> RawFulltextPayload:
         article_number = landing_attempt.article_number
         document_url = self._document_url(article_number)
         rest_url = self._rest_url(article_number)
@@ -1570,6 +1650,7 @@ class IeeeClient(ProviderClient):
             html_text,
             response_url,
             metadata=landing_attempt.merged_metadata,
+            context=context,
         )
         diagnostics = HtmlQualityAssessor("ieee").assess(
             extraction.markdown_text,
@@ -1739,6 +1820,7 @@ class IeeeClient(ProviderClient):
             html_text,
             source_url,
             metadata=landing_attempt.merged_metadata,
+            context=context,
         )
         diagnostics = HtmlQualityAssessor("ieee").assess(
             extraction.markdown_text,
@@ -2004,7 +2086,7 @@ class IeeeClient(ProviderClient):
             [
                 ProviderWaterfallStep(
                     label="html",
-                    run=lambda _state: self._fetch_dynamic_html_payload(landing_attempt),
+                    run=lambda _state: self._fetch_dynamic_html_payload(landing_attempt, context=runtime_context),
                     failure_marker=fulltext_marker("ieee", "fail", route="html"),
                     continue_codes=IEEE_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
@@ -2047,8 +2129,7 @@ class IeeeClient(ProviderClient):
         metadata: Mapping[str, Any],
         context: RuntimeContext,
     ) -> tuple[str, Mapping[str, Any]]:
-        del context
-        extraction = _extract_ieee_html(html_text, source_url, metadata=metadata)
+        extraction = _extract_ieee_html(html_text, source_url, metadata=metadata, context=context)
         return extraction.markdown_text, {
             "abstract_sections": extraction.abstract_sections,
             "section_hints": extraction.section_hints,

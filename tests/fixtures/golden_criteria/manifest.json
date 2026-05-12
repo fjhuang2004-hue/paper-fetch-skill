@@ -2201,7 +2201,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_science_fixture_markdown_omits_frontmatter_and_collateral_noise",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_science_fixture_markdown_omits_frontmatter_and_collateral_noise",
       "anchors": [
         "rule-filter-publisher-ui-noise"
       ],
@@ -2210,7 +2210,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_science_fixture_keeps_data_availability_but_filters_teaser_figure",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_science_fixture_keeps_data_availability_but_filters_teaser_figure",
       "anchors": [
         "rule-keep-data-availability-once"
       ],
@@ -2219,7 +2219,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_pnas_abstract_fixture_is_rejected",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_pnas_abstract_fixture_is_rejected",
       "anchors": [
         "rule-html-availability-contract"
       ],
@@ -2228,7 +2228,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_pnas_full_fixture_omits_real_page_collateral_noise",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_pnas_full_fixture_omits_real_page_collateral_noise",
       "anchors": [
         "rule-filter-publisher-ui-noise"
       ],
@@ -2237,7 +2237,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_pnas_full_fixture_keeps_data_availability_and_renders_table_markdown",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_pnas_full_fixture_keeps_data_availability_and_renders_table_markdown",
       "anchors": [
         "rule-keep-data-availability-once",
         "rule-preserve-inline-semantics-in-body-and-tables"
@@ -2247,7 +2247,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_pnas_collateral_data_availability_fixture_is_not_duplicated",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_pnas_collateral_data_availability_fixture_is_not_duplicated",
       "anchors": [
         "rule-keep-data-availability-once"
       ],
@@ -2256,7 +2256,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_wiley_full_fixture_extracts_body_sections_from_real_html",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_wiley_full_fixture_extracts_body_sections_from_real_html",
       "anchors": [
         "rule-keep-semantic-parent-heading",
         "rule-preserve-inline-semantics-in-body-and-tables"
@@ -2266,7 +2266,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_wiley_full_fixture_omits_real_page_collateral_noise",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_wiley_full_fixture_omits_real_page_collateral_noise",
       "anchors": [
         "rule-filter-publisher-ui-noise"
       ],
@@ -2275,7 +2275,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_wiley_full_fixture_keeps_data_availability_but_filters_other_back_matter",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_wiley_full_fixture_keeps_data_availability_but_filters_other_back_matter",
       "anchors": [
         "rule-keep-data-availability-once"
       ],
@@ -2284,7 +2284,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_wiley_references_use_visible_citation_text_not_doi_only",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_wiley_references_use_visible_citation_text_not_doi_only",
       "anchors": [
         "rule-wiley-reference-text"
       ],
@@ -2294,7 +2294,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_science_perspective_fixture_extracts_fulltext_without_section_headings",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_science_perspective_fixture_extracts_fulltext_without_section_headings",
       "anchors": [
         "rule-keep-headingless-body-flat"
       ],
@@ -2303,7 +2303,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_markdown.py::test_science_adp0212_fixture_splits_display_equations_and_caption_sentences",
+      "test": "tests/unit/test_atypon_browser_workflow_markdown.py::test_science_adp0212_fixture_splits_display_equations_and_caption_sentences",
       "anchors": [
         "rule-readable-equation-caption-spacing"
       ],
@@ -2312,7 +2312,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_wiley_real_fixture_filters_frontmatter_and_viewer_noise",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_wiley_real_fixture_filters_frontmatter_and_viewer_noise",
       "anchors": [
         "rule-filter-publisher-ui-noise"
       ],
@@ -2321,7 +2321,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_wiley_real_fixture_appends_abbreviations_after_body_content",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_wiley_real_fixture_appends_abbreviations_after_body_content",
       "anchors": [
         "rule-wiley-abbreviations-trailing"
       ],
@@ -2330,7 +2330,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_wiley_abbreviations_scenario_moves_frontmatter_glossary_after_body",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_wiley_abbreviations_scenario_moves_frontmatter_glossary_after_body",
       "anchors": [
         "rule-wiley-abbreviations-trailing"
       ],
@@ -2339,7 +2339,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_wiley_real_fixture_keeps_methods_subcontent_in_body",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_wiley_real_fixture_keeps_methods_subcontent_in_body",
       "anchors": [
         "rule-keep-semantic-parent-heading"
       ],
@@ -2348,7 +2348,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_pnas_real_fixture_keeps_significance_and_abstract_before_main_text",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_pnas_real_fixture_keeps_significance_and_abstract_before_main_text",
       "anchors": [
         "rule-stable-frontmatter-order"
       ],
@@ -2357,7 +2357,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_pnas_real_fixture_preserves_figures_equations_and_heading_trimming",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_pnas_real_fixture_preserves_figures_equations_and_heading_trimming",
       "anchors": [
         "rule-readable-equation-caption-spacing"
       ],
@@ -2366,7 +2366,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_pnas_real_fixture_renders_table_and_inline_cell_formatting",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_pnas_real_fixture_renders_table_and_inline_cell_formatting",
       "anchors": [
         "rule-preserve-inline-semantics-in-body-and-tables"
       ],
@@ -2375,7 +2375,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_pnas_real_commentary_keeps_headingless_body_flat",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_pnas_real_commentary_keeps_headingless_body_flat",
       "anchors": [
         "rule-keep-headingless-body-flat"
       ],
@@ -2384,7 +2384,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_science_real_fixture_keeps_formula_and_figure_caption_spacing",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_science_real_fixture_keeps_formula_and_figure_caption_spacing",
       "anchors": [
         "rule-readable-equation-caption-spacing"
       ],
@@ -2393,7 +2393,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_shared_equation_normalization_handles_real_science_and_pnas_fixtures",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_shared_equation_normalization_handles_real_science_and_pnas_fixtures",
       "anchors": [
         "rule-readable-equation-caption-spacing"
       ],
@@ -2405,7 +2405,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_science_real_frontmatter_fixture_preserves_structured_summaries_and_main_text",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_science_real_frontmatter_fixture_preserves_structured_summaries_and_main_text",
       "anchors": [
         "rule-stable-frontmatter-order",
         "rule-preserve-subscripts-in-headings"
@@ -2415,21 +2415,21 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_rewrite_inline_figure_links_prefers_local_paths_for_existing_science_image_blocks",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_rewrite_inline_figure_links_prefers_local_paths_for_existing_science_image_blocks",
       "anchors": [
         "rule-rewrite-inline-figure-links"
       ],
       "samples": []
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_rewrite_inline_figure_links_is_data_driven_for_non_legacy_publisher",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_rewrite_inline_figure_links_is_data_driven_for_non_legacy_publisher",
       "anchors": [
         "rule-rewrite-inline-figure-links"
       ],
       "samples": []
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess.py::test_rewrite_inline_figure_links_ignores_cross_references_in_asset_captions",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess.py::test_rewrite_inline_figure_links_ignores_cross_references_in_asset_captions",
       "anchors": [
         "rule-rewrite-inline-figure-links"
       ],
@@ -2438,14 +2438,14 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_science_provider_rewrites_inline_figure_links_to_downloaded_local_assets",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_science_provider_rewrites_inline_figure_links_to_downloaded_local_assets",
       "anchors": [
         "rule-rewrite-inline-figure-links"
       ],
       "samples": []
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_science_provider_uses_extracted_dom_abstract_and_restores_lead_body_text",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_science_provider_uses_extracted_dom_abstract_and_restores_lead_body_text",
       "anchors": [
         "rule-provider-owned-authors"
       ],
@@ -2454,7 +2454,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_provider_owned_html_signals_populate_final_article_authors",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_provider_owned_html_signals_populate_final_article_authors",
       "anchors": [
         "rule-provider-owned-authors"
       ],
@@ -2465,7 +2465,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_science_provider_falls_back_to_dom_authors_when_datalayer_is_missing",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_science_provider_falls_back_to_dom_authors_when_datalayer_is_missing",
       "anchors": [
         "rule-provider-owned-authors"
       ],
@@ -2474,7 +2474,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_pnas_provider_renders_headingless_commentary_without_synthetic_title_section",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_pnas_provider_renders_headingless_commentary_without_synthetic_title_section",
       "anchors": [
         "rule-keep-headingless-body-flat"
       ],
@@ -2483,7 +2483,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_science_provider_keeps_frontmatter_sections_but_only_one_abstract_in_final_article",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_science_provider_keeps_frontmatter_sections_but_only_one_abstract_in_final_article",
       "anchors": [
         "rule-stable-frontmatter-order"
       ],
@@ -2492,7 +2492,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_science_provider_replay_for_adl6155_keeps_materials_and_methods_wrapper_heading",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_science_provider_replay_for_adl6155_keeps_materials_and_methods_wrapper_heading",
       "anchors": [
         "rule-keep-semantic-parent-heading"
       ],
@@ -2501,7 +2501,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_wiley_provider_deduplicates_near_matching_abstract_in_final_article_render",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_wiley_provider_deduplicates_near_matching_abstract_in_final_article_render",
       "anchors": [
         "rule-stable-frontmatter-order"
       ],
@@ -2510,7 +2510,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_wiley_provider_replay_for_2004gb002273_body_assets_avoid_trailing_figures_noise",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_wiley_provider_replay_for_2004gb002273_body_assets_avoid_trailing_figures_noise",
       "anchors": [
         "rule-no-trailing-figures-appendix",
         "rule-filter-publisher-ui-noise"
@@ -2520,7 +2520,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_html.py::test_pnas_provider_keeps_frontmatter_once_and_filters_collateral_noise_in_final_render",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_html.py::test_pnas_provider_keeps_frontmatter_once_and_filters_collateral_noise_in_final_render",
       "anchors": [
         "rule-filter-publisher-ui-noise",
         "rule-stable-frontmatter-order"
@@ -2530,7 +2530,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_provider_asset_failures.py::test_science_provider_replay_for_adz3492_saves_svg_body_asset",
+      "test": "tests/unit/test_atypon_browser_workflow_provider_asset_failures.py::test_science_provider_replay_for_adz3492_saves_svg_body_asset",
       "anchors": [
         "rule-image-download-validates-real-images"
       ],
@@ -2718,7 +2718,7 @@
       ]
     },
     {
-      "test": "tests/unit/test_science_pnas_postprocess_units.py::test_extract_science_pnas_markdown_falls_back_complex_table_to_bullets",
+      "test": "tests/unit/test_atypon_browser_workflow_postprocess_units.py::test_extract_atypon_browser_workflow_markdown_falls_back_complex_table_to_bullets",
       "anchors": [
         "rule-table-flatten-or-list"
       ],

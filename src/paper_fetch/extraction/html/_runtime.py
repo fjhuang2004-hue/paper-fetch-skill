@@ -6,22 +6,30 @@ import re
 from html.parser import HTMLParser
 from typing import Any, Mapping
 
-from ...extraction.html.language import collect_html_abstract_blocks, html_node_language_hint
+from ...extraction.html.language import (
+    collect_html_abstract_blocks,
+    html_node_language_hint,
+)
 from ...extraction.html.parsing import choose_parser
 from ...extraction.html.semantics import (
     collect_html_section_hints,
     coerce_html_section_hints,
+    looks_like_reference_anchor,
     markdown_heading_category,
     match_next_html_section_hint,
     parse_markdown_heading,
 )
 from ...extraction.html.signals import contains_access_gate_text
 from ...models import normalize_markdown_text, normalize_text
+from ...provider_catalog import provider_body_text_thresholds
 from ...publisher_identity import normalize_doi
 from ...publisher_identity import extract_doi as extract_doi_from_text
 from .provider_rules import (
     extraction_cleanup_selectors_for_profile,
     extraction_drop_keywords_for_profile,
+    front_matter_exact_texts_for_profile,
+    front_matter_footer_prefixes,
+    front_matter_publication_keywords_for_profile,
     markdown_promo_tokens_for_profile,
     normalize_noise_profile,
 )
@@ -39,6 +47,20 @@ except ImportError:  # pragma: no cover - exercised implicitly when dependency i
 
 HTML_ROOT_SELECTORS = ("article", "main", '[role="main"]')
 HTML_DROP_TAGS = ("script", "style", "svg", "noscript", "template")
+FRONT_MATTER_PUBLICATION_KEYWORDS = {
+    "advances",
+    "bulletin",
+    "communications",
+    "journal",
+    "journals",
+    "letters",
+    "proceedings",
+    "reports",
+    "review",
+    "reviews",
+    "sciences",
+    "transactions",
+}
 HTML_BLOCK_TAGS = {
     "address",
     "article",
@@ -136,14 +158,6 @@ MARKDOWN_CHROME_SECTION_HEADINGS = frozenset(
         "reprints and permissions",
     }
 )
-MARKDOWN_PROMO_TOKENS: tuple[str, ...] = ()
-HTML_BODY_MIN_CHARS = 800
-HTML_SHORT_BODY_MIN_CHARS = 300
-HTML_SHORT_BODY_MIN_WORDS = 60
-HTML_SINGLE_BLOCK_MIN_WORDS = 90
-HTML_CJK_MIN_CHARS = 120
-HTML_SINGLE_BLOCK_MIN_CJK_CHARS = 180
-HTML_CJK_MIN_RATIO = 0.20
 ARTICLE_TYPE_FRONT_MATTER_PREFIXES = (
     "regular paper",
     "research article",
@@ -178,7 +192,10 @@ class _FallbackMarkdownParser(HTMLParser):
             return
         class_attr = attributes.get("class", "").lower()
         id_attr = attributes.get("id", "").lower()
-        if any(token in f"{class_attr} {id_attr}" for token in ("cookie", "nav", "footer", "header", "share", "signin")):
+        if any(
+            token in f"{class_attr} {id_attr}"
+            for token in ("cookie", "nav", "footer", "header", "share", "signin")
+        ):
             self._skip_depth += 1
             return
         if lowered_tag in self.HEADING_TAGS:
@@ -191,7 +208,10 @@ class _FallbackMarkdownParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         lowered_tag = tag.lower()
-        if lowered_tag in {"script", "style", "nav", "footer", "header"} and self._skip_depth:
+        if (
+            lowered_tag in {"script", "style", "nav", "footer", "header"}
+            and self._skip_depth
+        ):
             self._skip_depth -= 1
             return
         if self._skip_depth:
@@ -242,7 +262,7 @@ def _normalize_noise_profile(noise_profile: str | None) -> str:
 
 def _markdown_promo_tokens(noise_profile: str | None) -> tuple[str, ...]:
     active_noise_profile = _normalize_noise_profile(noise_profile)
-    return MARKDOWN_PROMO_TOKENS + markdown_promo_tokens_for_profile(active_noise_profile)
+    return markdown_promo_tokens_for_profile(active_noise_profile)
 
 
 def select_html_content_root(root: Any):
@@ -258,35 +278,6 @@ def select_html_content_root(root: Any):
                 best_candidate = candidate
                 best_words = words
     return best_candidate
-
-
-def _looks_like_reference_anchor(element: Any) -> bool:
-    if BeautifulSoup is None or not isinstance(element, Tag):
-        return False
-    if normalize_text(getattr(element, "name", "")).lower() != "a":
-        return False
-
-    attrs = getattr(element, "attrs", None) or {}
-    if normalize_text(str(attrs.get("data-test") or "")).lower() == "citation-ref":
-        return True
-    if normalize_text(str(attrs.get("role") or "")).lower() == "doc-biblioref":
-        return True
-    if normalize_text(str(attrs.get("data-xml-rid") or "")):
-        return True
-
-    class_values = attrs.get("class")
-    if isinstance(class_values, list):
-        class_tokens = {normalize_text(str(item)).lower() for item in class_values if normalize_text(str(item))}
-    else:
-        class_tokens = {normalize_text(str(class_values or "")).lower()} if normalize_text(str(class_values or "")) else set()
-    if {"biblink", "to-citation"} & class_tokens:
-        return True
-
-    href = normalize_text(str(attrs.get("href") or "")).lower()
-    if not href or "#" not in href:
-        return False
-    fragment = href.split("#", 1)[1]
-    return bool(re.search(r"(?:^|[-_/])(?:ref|bib|cite|cr)\b", fragment))
 
 
 def prune_html_tree(root: Any, *, noise_profile: str | None = None) -> None:
@@ -313,7 +304,7 @@ def should_drop_html_element(element: Any, *, noise_profile: str | None = None) 
         return False
     if element.name and re.compile(r"^h[1-6]$").match(element.name):
         return False
-    if _looks_like_reference_anchor(element):
+    if looks_like_reference_anchor(element):
         return False
 
     text = normalize_text(element.get_text(separator=" ", strip=True))
@@ -333,7 +324,9 @@ def should_drop_html_element(element: Any, *, noise_profile: str | None = None) 
     element_name = normalize_text(getattr(element, "name", "")).lower()
     for key, value in element.attrs.items():
         key_name = str(key).lower()
-        if key_name in {"href", "src", "srcset"} or (key_name == "title" and element_name == "a"):
+        if key_name in {"href", "src", "srcset"} or (
+            key_name == "title" and element_name == "a"
+        ):
             continue
         if isinstance(value, str):
             attr_tokens.append(value.lower())
@@ -342,12 +335,17 @@ def should_drop_html_element(element: Any, *, noise_profile: str | None = None) 
     if attr_tokens:
         joined = " ".join(attr_tokens)
         profile_drop_keywords = extraction_drop_keywords_for_profile(noise_profile)
-        if any(token in joined for token in (*HTML_NOISE_ATTR_TOKENS, *profile_drop_keywords)):
+        if any(
+            token in joined
+            for token in (*HTML_NOISE_ATTR_TOKENS, *profile_drop_keywords)
+        ):
             return count_words(text) <= 80
     return False
 
 
-def prepare_html_extraction_tree(html_text: str, *, noise_profile: str | None = None) -> tuple[str, Any]:
+def prepare_html_extraction_tree(
+    html_text: str, *, noise_profile: str | None = None
+) -> tuple[str, Any]:
     if BeautifulSoup is None:
         return html_text, None
 
@@ -368,7 +366,9 @@ def extract_html_extraction_sidecars(
     noise_profile: str | None = None,
     title: str | None = None,
 ) -> dict[str, Any]:
-    cleaned_html, active_root = prepare_html_extraction_tree(html_text, noise_profile=noise_profile)
+    cleaned_html, active_root = prepare_html_extraction_tree(
+        html_text, noise_profile=noise_profile
+    )
     if active_root is None:
         return {
             "cleaned_html": cleaned_html,
@@ -381,13 +381,19 @@ def extract_html_extraction_sidecars(
         "section_hints": collect_html_section_hints(
             active_root,
             title=title,
-            language_hint_resolver=lambda node: html_node_language_hint(node, allow_soft_hints=True),
+            language_hint_resolver=lambda node: html_node_language_hint(
+                node, allow_soft_hints=True
+            ),
         ),
     }
 
 
-def clean_html_for_extraction(html_text: str, *, noise_profile: str | None = None) -> str:
-    cleaned_html, _ = prepare_html_extraction_tree(html_text, noise_profile=noise_profile)
+def clean_html_for_extraction(
+    html_text: str, *, noise_profile: str | None = None
+) -> str:
+    cleaned_html, _ = prepare_html_extraction_tree(
+        html_text, noise_profile=noise_profile
+    )
     return cleaned_html
 
 
@@ -397,7 +403,11 @@ def extract_html_abstract_blocks(
     noise_profile: str | None = None,
     title: str | None = None,
 ) -> list[dict[str, Any]]:
-    return list(extract_html_extraction_sidecars(html_text, noise_profile=noise_profile, title=title)["abstract_sections"])
+    return list(
+        extract_html_extraction_sidecars(
+            html_text, noise_profile=noise_profile, title=title
+        )["abstract_sections"]
+    )
 
 
 def extract_html_section_hints(
@@ -406,7 +416,11 @@ def extract_html_section_hints(
     noise_profile: str | None = None,
     title: str | None = None,
 ) -> list[dict[str, Any]]:
-    return list(extract_html_extraction_sidecars(html_text, noise_profile=noise_profile, title=title)["section_hints"])
+    return list(
+        extract_html_extraction_sidecars(
+            html_text, noise_profile=noise_profile, title=title
+        )["section_hints"]
+    )
 
 
 def extract_article_markdown(
@@ -417,7 +431,9 @@ def extract_article_markdown(
     noise_profile: str | None = None,
 ) -> str:
     active_noise_profile = _normalize_noise_profile(noise_profile)
-    cleaned_html, _ = prepare_html_extraction_tree(html_text, noise_profile=active_noise_profile)
+    cleaned_html, _ = prepare_html_extraction_tree(
+        html_text, noise_profile=active_noise_profile
+    )
     return extract_article_markdown_from_cleaned_html(
         cleaned_html,
         source_url,
@@ -437,7 +453,11 @@ def extract_article_markdown_from_cleaned_html(
 ) -> str:
     del source_url
     active_noise_profile = _normalize_noise_profile(noise_profile)
-    active_trafilatura = trafilatura if trafilatura_backend is _USE_MODULE_TRAFILATURA else trafilatura_backend
+    active_trafilatura = (
+        trafilatura
+        if trafilatura_backend is _USE_MODULE_TRAFILATURA
+        else trafilatura_backend
+    )
     if active_trafilatura is not None:
         for candidate_html in [cleaned_html, raw_html]:
             if not candidate_html:
@@ -493,7 +513,10 @@ def clean_markdown(markdown_text: str, *, noise_profile: str | None = None) -> s
             continue
         if any(token in normalized for token in markdown_promo_tokens):
             continue
-        if any(token in normalized for token in MARKDOWN_SHORT_NOISE_TOKENS) and count_words(normalized) <= 16:
+        if (
+            any(token in normalized for token in MARKDOWN_SHORT_NOISE_TOKENS)
+            and count_words(normalized) <= 16
+        ):
             continue
         cleaned_lines.append(line)
     cleaned = "\n".join(cleaned_lines)
@@ -509,7 +532,11 @@ def _canonical_text(value: str) -> str:
 
 
 def _split_markdown_blocks(markdown_text: str) -> list[str]:
-    return [normalize_markdown_text(block) for block in re.split(r"\n\s*\n", markdown_text) if normalize_text(block)]
+    return [
+        normalize_markdown_text(block)
+        for block in re.split(r"\n\s*\n", markdown_text)
+        if normalize_text(block)
+    ]
 
 
 def _heading_text(block: str) -> str | None:
@@ -545,8 +572,6 @@ def _looks_like_promo_block(text: str, *, noise_profile: str | None = None) -> b
     lowered = normalize_text(text).lower()
     if not lowered:
         return False
-    if lowered == "learn more":
-        return True
     return any(token in lowered for token in _markdown_promo_tokens(noise_profile))
 
 
@@ -563,7 +588,44 @@ def _looks_like_equation_label_block(text: str) -> bool:
     return normalize_text(text).lower().startswith("**equation")
 
 
-def _looks_like_front_matter_block(text: str, *, title: str | None = None) -> bool:
+def _front_matter_publication_keywords(noise_profile: str | None) -> set[str]:
+    return {
+        *FRONT_MATTER_PUBLICATION_KEYWORDS,
+        *front_matter_publication_keywords_for_profile(noise_profile),
+    }
+
+
+def _looks_like_publication_watermark(
+    text: str,
+    *,
+    noise_profile: str | None = None,
+) -> bool:
+    normalized = normalize_text(text)
+    if not normalized or len(normalized) > 64:
+        return False
+    if any(character in normalized for character in ".:;!?。！？"):
+        return False
+    tokens = normalized.split()
+    lowered_tokens = [token.lower().strip("&") for token in tokens]
+    if not tokens or len(tokens) > 5:
+        return False
+    if normalized.upper() == normalized and len(normalized) <= 8:
+        return True
+    publication_keywords = _front_matter_publication_keywords(noise_profile)
+    if not any(token in publication_keywords for token in lowered_tokens):
+        return False
+    return all(
+        token[:1].isupper() or token.lower() in {"and", "of", "the", "&"}
+        for token in tokens
+    )
+
+
+def _looks_like_front_matter_block(
+    text: str,
+    *,
+    title: str | None = None,
+    noise_profile: str | None = None,
+) -> bool:
     normalized = normalize_text(text)
     lowered = normalized.lower()
     if not normalized:
@@ -577,7 +639,7 @@ def _looks_like_front_matter_block(text: str, *, title: str | None = None) -> bo
             for prefix in ARTICLE_TYPE_FRONT_MATTER_PREFIXES:
                 if compact_text.startswith(re.sub(r"\s+", "", prefix)):
                     return True
-    if lowered.startswith("all content on this site") or lowered.startswith("copyright"):
+    if any(lowered.startswith(prefix) for prefix in front_matter_footer_prefixes()):
         return True
     if lowered.startswith("by "):
         return True
@@ -590,7 +652,12 @@ def _looks_like_front_matter_block(text: str, *, title: str | None = None) -> bo
         )
     ):
         return True
-    return lowered in {"authors", "author information", "affiliations"}
+    return lowered in front_matter_exact_texts_for_profile(
+        noise_profile
+    ) or _looks_like_publication_watermark(
+        normalized,
+        noise_profile=noise_profile,
+    )
 
 
 def _filtered_body_blocks(
@@ -627,13 +694,17 @@ def _filtered_body_blocks(
             normalized_heading = normalize_text(heading).lower().strip(" :")
             if title and normalized_heading == normalize_text(title).lower():
                 continue
-            matched_hint, next_hint_index = match_next_html_section_hint(coerced_section_hints, section_hint_index, heading)
+            matched_hint, next_hint_index = match_next_html_section_hint(
+                coerced_section_hints, section_hint_index, heading
+            )
             if matched_hint is not None:
                 section_hint_index = next_hint_index
             category = markdown_heading_category(
                 heading,
                 title=title or None,
-                section_hint_kind=matched_hint["kind"] if matched_hint is not None else None,
+                section_hint_kind=matched_hint["kind"]
+                if matched_hint is not None
+                else None,
             )
             if category == "abstract":
                 in_abstract = True
@@ -689,7 +760,13 @@ def _filtered_body_blocks(
             if normalized_block:
                 abstract_blocks.append(normalized_block)
             continue
-        if in_back_matter or in_front_matter or in_data_availability or in_auxiliary or in_formula:
+        if (
+            in_back_matter
+            or in_front_matter
+            or in_data_availability
+            or in_auxiliary
+            or in_formula
+        ):
             continue
         if (
             _looks_like_access_block(normalized_block)
@@ -697,10 +774,18 @@ def _filtered_body_blocks(
             or _looks_like_markdown_image_block(normalized_block)
             or _looks_like_caption_block(normalized_block)
             or _looks_like_equation_label_block(normalized_block)
-            or _looks_like_front_matter_block(normalized_block, title=title or None)
+            or _looks_like_front_matter_block(
+                normalized_block,
+                title=title or None,
+                noise_profile=noise_profile,
+            )
         ):
             continue
-        if abstract_canonical and block_canonical and block_canonical == abstract_canonical:
+        if (
+            abstract_canonical
+            and block_canonical
+            and block_canonical == abstract_canonical
+        ):
             abstract_blocks.append(normalized_block)
             continue
         filtered_blocks.append(block)
@@ -724,13 +809,21 @@ def body_metrics(
     section_hints: Any = None,
     noise_profile: str | None = None,
 ) -> dict[str, Any]:
-    filtered = _filtered_body_blocks(markdown_text, metadata, section_hints=section_hints, noise_profile=noise_profile)
+    filtered = _filtered_body_blocks(
+        markdown_text,
+        metadata,
+        section_hints=section_hints,
+        noise_profile=noise_profile,
+    )
     candidate = filtered["body_text"]
     char_count = len(candidate)
     word_count = count_words(candidate)
     cjk_chars = sum(1 for char in candidate if "\u4e00" <= char <= "\u9fff")
     cjk_ratio = (cjk_chars / char_count) if char_count else 0.0
-    has_doi = bool(normalize_doi(str(metadata.get("doi") or "")) or extract_doi_from_text(candidate))
+    has_doi = bool(
+        normalize_doi(str(metadata.get("doi") or ""))
+        or extract_doi_from_text(candidate)
+    )
     abstract_text = normalize_text(filtered["abstract_text"])
     abstract_word_count = count_words(abstract_text)
     abstract_char_count = len(abstract_text)
@@ -762,25 +855,43 @@ def has_sufficient_article_body(
     *,
     section_hints: Any = None,
     noise_profile: str | None = None,
+    provider: str | None = None,
 ) -> bool:
-    metrics = body_metrics(markdown_text, metadata, section_hints=section_hints, noise_profile=noise_profile)
-    if metrics["char_count"] < HTML_SHORT_BODY_MIN_CHARS:
+    metrics = body_metrics(
+        markdown_text,
+        metadata,
+        section_hints=section_hints,
+        noise_profile=noise_profile,
+    )
+    thresholds = provider_body_text_thresholds(provider or noise_profile)
+    if metrics["char_count"] < thresholds.short_body_min_chars:
         return False
-    has_body_structure = metrics["body_block_count"] >= 2 or metrics["body_heading_count"] >= 1
-    if metrics["cjk_chars"] >= HTML_CJK_MIN_CHARS and metrics["cjk_ratio"] >= HTML_CJK_MIN_RATIO:
+    has_body_structure = (
+        metrics["body_block_count"] >= 2 or metrics["body_heading_count"] >= 1
+    )
+    if (
+        metrics["cjk_chars"] >= thresholds.cjk_min_chars
+        and metrics["cjk_ratio"] >= thresholds.cjk_min_ratio
+    ):
         if has_body_structure:
             return True
         return (
             metrics["body_block_count"] == 1
-            and (not metrics["has_abstract"] or float(metrics.get("body_to_abstract_ratio") or 0.0) >= 1.5)
-            and metrics["cjk_chars"] >= HTML_SINGLE_BLOCK_MIN_CJK_CHARS
+            and (
+                not metrics["has_abstract"]
+                or float(metrics.get("body_to_abstract_ratio") or 0.0) >= 1.5
+            )
+            and metrics["cjk_chars"] >= thresholds.single_block_min_cjk_chars
         )
-    if metrics["word_count"] < HTML_SHORT_BODY_MIN_WORDS:
+    if metrics["word_count"] < thresholds.short_body_min_words:
         return False
     if has_body_structure:
         return True
     return (
         metrics["body_block_count"] == 1
-        and metrics["word_count"] >= HTML_SINGLE_BLOCK_MIN_WORDS
-        and (not metrics["has_abstract"] or float(metrics.get("body_to_abstract_ratio") or 0.0) >= 1.5)
+        and metrics["word_count"] >= thresholds.single_block_min_words
+        and (
+            not metrics["has_abstract"]
+            or float(metrics.get("body_to_abstract_ratio") or 0.0) >= 1.5
+        )
     )

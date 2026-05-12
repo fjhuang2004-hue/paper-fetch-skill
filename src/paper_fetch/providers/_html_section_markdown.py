@@ -19,7 +19,7 @@ from ..extraction.html.inline import (
     render_html_inline_node,
     render_inline_tokens,
 )
-from ..extraction.html.semantics import normalize_section_title
+from ..extraction.html.semantics import has_explicit_reference_marker, normalize_section_title
 from ..formula.convert import normalize_latex_macros
 from ..models import normalize_text
 from ._article_markdown_math import render_external_mathml_expression, render_mathml_expression
@@ -469,24 +469,7 @@ def render_figure_markdown(node: Any, lines: list[str]) -> None:
 
 
 def _has_explicit_citation_marker(node: Any) -> bool:
-    if not isinstance(node, Tag):
-        return False
-    attrs = getattr(node, "attrs", None) or {}
-    if "citation-ref" in attrs:
-        return True
-    if normalize_text(str(attrs.get("data-test") or "")).lower() == "citation-ref":
-        return True
-    if normalize_text(str(attrs.get("role") or "")).lower() == "doc-biblioref":
-        return True
-    if normalize_text(str(attrs.get("data-xml-rid") or "")):
-        return True
-    if normalize_text(str(attrs.get("ref-type") or "")).lower() == "bibr":
-        return True
-    for key in ("anchor", "data-range", "rid"):
-        value = normalize_text(str(attrs.get(key) or ""))
-        if re.fullmatch(r"ref\d+[a-z]?", value, flags=re.IGNORECASE):
-            return True
-    return False
+    return has_explicit_reference_marker(node)
 
 
 def _numeric_citation_payload_from_html(node: Any) -> str | None:

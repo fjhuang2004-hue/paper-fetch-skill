@@ -6,6 +6,13 @@ import urllib.parse
 from typing import Any, Mapping
 
 from ..extraction.html.parsing import choose_parser
+from ..provider_catalog import (
+    host_matches_domain,
+    provider_base_domains,
+    provider_domain_matches,
+    provider_pdf_path_templates,
+    provider_pdf_source_path_templates,
+)
 from ..utils import normalize_text
 
 try:
@@ -14,16 +21,21 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
 
 PDF_LINK_TEXT_TOKENS = ("pdf", "download pdf", "full text pdf", "view pdf")
-PDF_HREF_TOKENS = (".pdf", "/pdf", "/epdf", "/pdfdirect", "/pdfft", "download=true")
-BROWSER_WORKFLOW_PDF_URL_TOKENS = (
+PDF_URL_COMMON_TOKENS = (".pdf", "download=true")
+HTML_DISCOVERY_PDF_URL_TOKENS = ("/pdf", "/epdf", "/pdfdirect", "/pdfft")
+BROWSER_WORKFLOW_PDF_URL_PREFIX_TOKENS = (
     "/doi/pdf/",
     "/doi/pdfdirect/",
     "/doi/epdf/",
     "/fullpdf",
-    ".pdf",
-    "download=true",
 )
-SPRINGER_HOST_TOKENS = ("springer.com", "springernature.com", "nature.com", "biomedcentral.com")
+# HTML discovery accepts broad href shapes because labels/content types can
+# disambiguate; browser workflow Crossref links stay limited to known PDF lanes.
+PDF_HREF_TOKENS = (*PDF_URL_COMMON_TOKENS, *HTML_DISCOVERY_PDF_URL_TOKENS)
+BROWSER_WORKFLOW_PDF_URL_TOKENS = (
+    *PDF_URL_COMMON_TOKENS,
+    *BROWSER_WORKFLOW_PDF_URL_PREFIX_TOKENS,
+)
 
 
 def _append_candidate(candidates: list[str], candidate: str | None, *, source_url: str | None = None) -> None:
@@ -124,26 +136,91 @@ def extract_pdf_candidate_urls_from_html(html_text: str, source_url: str) -> lis
     return candidates
 
 
-def _nature_pdf_candidate(url: str | None) -> str | None:
-    normalized = normalize_text(url)
+def _format_pdf_path_template(
+    template: str,
+    *,
+    doi: str,
+    source_path: str = "",
+) -> str | None:
+    normalized_template = normalize_text(template)
+    if not normalized_template:
+        return None
+    try:
+        return normalized_template.format(
+            doi=doi,
+            doi_quoted=urllib.parse.quote(doi, safe=""),
+            source_path=source_path,
+            source_path_quoted=urllib.parse.quote(source_path, safe="/"),
+        )
+    except (KeyError, ValueError):
+        return None
+
+
+def _provider_pdf_template_host_matches(provider_name: str, hostname: str | None) -> bool:
+    if provider_domain_matches(provider_name, hostname):
+        return True
+    return any(host_matches_domain(hostname, domain) for domain in provider_base_domains(provider_name))
+
+
+def _append_provider_source_path_pdf_candidates(
+    candidates: list[str],
+    provider_name: str,
+    source_url: str | None,
+    *,
+    doi: str,
+) -> None:
+    normalized = normalize_text(source_url)
     if not normalized:
-        return None
+        return
     parsed = urllib.parse.urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return
     hostname = normalize_text(parsed.hostname).lower()
-    if "nature.com" not in hostname:
-        return None
-    path = parsed.path.rstrip("/")
-    if not path.startswith("/articles/") or path.endswith(".pdf"):
-        return None
-    return urllib.parse.urlunparse((parsed.scheme or "https", parsed.netloc, f"{path}.pdf", "", "", ""))
+    source_path = parsed.path.rstrip("/")
+    if not source_path or source_path.lower().endswith(".pdf"):
+        return
+
+    for template in provider_pdf_source_path_templates(provider_name):
+        if not host_matches_domain(hostname, template.domain):
+            continue
+        path_prefix = normalize_text(template.path_prefix)
+        if path_prefix and not source_path.startswith(path_prefix):
+            continue
+        candidate_path = _format_pdf_path_template(
+            template.path_template,
+            doi=doi,
+            source_path=source_path,
+        )
+        if not candidate_path:
+            continue
+        parsed_candidate = urllib.parse.urlparse(candidate_path)
+        if parsed_candidate.scheme in {"http", "https"}:
+            _append_candidate(candidates, candidate_path)
+            continue
+        if not candidate_path.startswith("/"):
+            candidate_path = f"/{candidate_path}"
+        _append_candidate(
+            candidates,
+            urllib.parse.urlunparse(
+                (parsed.scheme or "https", parsed.netloc, candidate_path, "", "", "")
+            ),
+        )
 
 
-def _springer_link_pdf_candidate(doi: str) -> str | None:
+def _append_provider_doi_pdf_candidates(
+    candidates: list[str],
+    provider_name: str,
+    doi: str,
+) -> None:
     normalized_doi = normalize_text(doi)
     if not normalized_doi:
-        return None
-    encoded = urllib.parse.quote(normalized_doi, safe="")
-    return f"https://link.springer.com/content/pdf/{encoded}.pdf"
+        return
+    for domain in provider_base_domains(provider_name):
+        base_url = f"https://{domain}"
+        for template in provider_pdf_path_templates(provider_name):
+            candidate_path = _format_pdf_path_template(template, doi=normalized_doi)
+            if candidate_path:
+                _append_candidate(candidates, urllib.parse.urljoin(base_url, candidate_path))
 
 
 def build_springer_pdf_candidates(
@@ -160,14 +237,14 @@ def build_springer_pdf_candidates(
             _append_candidate(candidates, candidate)
 
     for url in (source_url, normalize_text(metadata.get("landing_page_url"))):
-        _append_candidate(candidates, _nature_pdf_candidate(url))
+        _append_provider_source_path_pdf_candidates(candidates, "springer", url, doi=doi)
 
     landing_url = normalize_text(source_url or metadata.get("landing_page_url"))
     if landing_url:
         hostname = normalize_text(urllib.parse.urlparse(landing_url).hostname).lower()
-        if any(token in hostname for token in SPRINGER_HOST_TOKENS):
-            _append_candidate(candidates, _springer_link_pdf_candidate(doi))
+        if _provider_pdf_template_host_matches("springer", hostname):
+            _append_provider_doi_pdf_candidates(candidates, "springer", doi)
     else:
-        _append_candidate(candidates, _springer_link_pdf_candidate(doi))
+        _append_provider_doi_pdf_candidates(candidates, "springer", doi)
 
     return candidates

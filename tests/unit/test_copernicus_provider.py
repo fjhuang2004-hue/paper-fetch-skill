@@ -8,6 +8,7 @@ from paper_fetch.http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, RequestFailure
 from paper_fetch.providers.base import ProviderFailure
 from paper_fetch.providers.copernicus import CopernicusClient
 from paper_fetch.providers._article_markdown_copernicus import parse_copernicus_xml
+from paper_fetch.providers._article_markdown_jats import parse_jats_xml
 
 from tests.unit._paper_fetch_support import RecordingTransport, fulltext_pdf_bytes
 
@@ -410,9 +411,11 @@ class CopernicusProviderTests(unittest.TestCase):
     def test_xml_renderer_extracts_core_jats_structures(self) -> None:
         """rule: rule-copernicus-xml-jats-rendering"""
         extraction = parse_copernicus_xml(_xml_fixture(), source_url=XML_URL, base_metadata={"doi": DOI})
+        generic_extraction = parse_jats_xml(_xml_fixture(), source_url=XML_URL, base_metadata={"doi": DOI})
 
         self.assertIsNotNone(extraction)
         assert extraction is not None
+        self.assertIsNotNone(generic_extraction)
         self.assertEqual(extraction.metadata["doi"], DOI)
         self.assertIn("Introduction", extraction.markdown_text)
         self.assertIn("$$", extraction.markdown_text)

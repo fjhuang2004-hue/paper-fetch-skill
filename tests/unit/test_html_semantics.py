@@ -5,9 +5,12 @@ import unittest
 from bs4 import BeautifulSoup
 
 from paper_fetch.extraction.html.semantics import (
+    has_explicit_reference_marker,
     heading_category,
     identity_category,
     looks_like_explicit_body_container,
+    looks_like_reference_anchor,
+    looks_like_reference_href,
     markdown_heading_category,
     parse_markdown_heading,
 )
@@ -77,6 +80,29 @@ class HtmlSemanticsTests(unittest.TestCase):
     def test_looks_like_explicit_body_container_uses_shared_identity_rules(self) -> None:
         soup = BeautifulSoup("<section property='articleBody'>Body</section>", "html.parser")
         self.assertTrue(looks_like_explicit_body_container(soup.section))
+
+    def test_reference_anchor_semantics_cover_common_markers(self) -> None:
+        soup = BeautifulSoup(
+            """
+<p>
+  <a data-test="citation-ref" href="#x">1</a>
+  <a role="doc-biblioref" href="#x">2</a>
+  <a class="biblink" href="#x">3</a>
+  <a data-xml-rid="ref4" href="#x">4</a>
+  <a ref-type="bibr" rid="ref5" href="#x">5</a>
+  <a href="/article#core-collateral-r6">6</a>
+  <a href="#fig1">Figure</a>
+</p>
+""",
+            "html.parser",
+        )
+        anchors = soup.find_all("a")
+
+        self.assertTrue(all(looks_like_reference_anchor(anchor) for anchor in anchors[:6]))
+        self.assertTrue(has_explicit_reference_marker(anchors[4]))
+        self.assertTrue(looks_like_reference_href("/article#bib12"))
+        self.assertFalse(looks_like_reference_anchor(anchors[6]))
+        self.assertFalse(looks_like_reference_href("#fig1"))
 
     def test_markdown_heading_taxonomy_maps_article_sections(self) -> None:
         self.assertEqual(parse_markdown_heading("### Data Availability"), (3, "Data Availability"))

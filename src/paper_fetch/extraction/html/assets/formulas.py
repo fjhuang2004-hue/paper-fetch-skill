@@ -21,15 +21,30 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
     Tag = None
 
-def _looks_like_formula_image(tag: Any, url: str) -> bool:
-    return looks_like_formula_image(tag, url)
+def _looks_like_formula_image(
+    tag: Any,
+    url: str,
+    *,
+    noise_profile: str | None = None,
+) -> bool:
+    return looks_like_formula_image(tag, url, noise_profile=noise_profile)
 
 
-def _formula_heading_for_image(tag: Any, index: int) -> str:
-    return formula_heading_for_image(tag, index)
+def _formula_heading_for_image(
+    tag: Any,
+    index: int,
+    *,
+    noise_profile: str | None = None,
+) -> str:
+    return formula_heading_for_image(tag, index, noise_profile=noise_profile)
 
 
-def extract_formula_assets(html_text: str, source_url: str) -> list[dict[str, str]]:
+def extract_formula_assets(
+    html_text: str,
+    source_url: str,
+    *,
+    noise_profile: str | None = None,
+) -> list[dict[str, str]]:
     if BeautifulSoup is None:
         return []
 
@@ -44,13 +59,21 @@ def extract_formula_assets(html_text: str, source_url: str) -> list[dict[str, st
             *FORMULA_IMAGE_ATTRS,
             *FORMULA_IMAGE_SRCSET_ATTRS,
         )
-        if not url or not _looks_like_formula_image(image, url):
+        if not url or not _looks_like_formula_image(
+            image,
+            url,
+            noise_profile=noise_profile,
+        ):
             continue
         absolute_url = urllib.parse.urljoin(source_url, url)
         if not absolute_url or absolute_url in seen:
             continue
         seen.add(absolute_url)
-        heading = _formula_heading_for_image(image, len(assets) + 1)
+        heading = _formula_heading_for_image(
+            image,
+            len(assets) + 1,
+            noise_profile=noise_profile,
+        )
         assets.append(
             {
                 "kind": "formula",

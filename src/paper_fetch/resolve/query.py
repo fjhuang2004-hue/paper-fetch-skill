@@ -154,7 +154,6 @@ def resolve_query(
                 transport=active_transport,
                 headers=request_headers,
                 max_redirects=MAX_URL_REDIRECTS,
-                redirect_base="current_url",
                 retry_on_transient=True,
             )
         except RequestFailure as exc:

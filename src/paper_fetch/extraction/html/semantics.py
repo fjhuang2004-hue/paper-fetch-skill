@@ -6,6 +6,7 @@ import re
 from typing import Any, Callable
 
 from ...utils import normalize_text
+from ..citation_anchors import looks_like_reference_href
 from ..section_hints import (
     SECTION_HINT_KINDS as HTML_SECTION_HINT_KINDS,
     coerce_section_hint_dicts,
@@ -128,13 +129,6 @@ ANCILLARY_HEADINGS = frozenset(
         "share",
         "permissions",
         "eletters",
-        "access the full article",
-        "get full access to this article",
-        "purchase digital access to this article",
-        "access this article",
-        "buy article pdf",
-        "buy now",
-        "check access",
         "corresponding author",
         "additional information",
         "rights and permissions",
@@ -160,13 +154,6 @@ MARKDOWN_ABSTRACT_HEADINGS = frozenset(
 MARKDOWN_AUXILIARY_HEADINGS = frozenset(
     {
         "abbreviations",
-        "access the full article",
-        "get full access to this article",
-        "purchase digital access to this article",
-        "access this article",
-        "buy article pdf",
-        "buy now",
-        "check access",
         "open access",
         "permissions",
         "rights and permissions",
@@ -305,6 +292,8 @@ IDENTITY_ATTR_KEYS = (
 )
 SECTION_HEADING_PATTERN = re.compile(r"^h([1-6])$")
 SECTION_TITLE_NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
+REFERENCE_MARKER_VALUE_PATTERN = re.compile(r"(?:ref|bib|bibr|cite|citation|cr|r)\d+[a-z]?", flags=re.IGNORECASE)
+REFERENCE_ANCHOR_CLASS_TOKENS = frozenset({"biblink", "to-citation"})
 
 
 def normalize_heading(text: str) -> str:
@@ -404,6 +393,48 @@ def node_source_selector(node: Any) -> str:
     if classes:
         parts.append("." + ".".join(classes[:3]))
     return "".join(parts)
+
+
+def _node_class_tokens(node: Any) -> set[str]:
+    if Tag is None or not isinstance(node, Tag):
+        return set()
+    attrs = getattr(node, "attrs", None) or {}
+    class_values = attrs.get("class")
+    if isinstance(class_values, (list, tuple, set)):
+        return {normalize_text(str(item)).lower() for item in class_values if normalize_text(str(item))}
+    token = normalize_text(str(class_values or "")).lower()
+    return {token} if token else set()
+
+
+def has_explicit_reference_marker(node: Any) -> bool:
+    if Tag is None or not isinstance(node, Tag):
+        return False
+    attrs = getattr(node, "attrs", None) or {}
+    if "citation-ref" in attrs:
+        return True
+    if normalize_text(str(attrs.get("data-test") or "")).lower() == "citation-ref":
+        return True
+    if normalize_text(str(attrs.get("role") or "")).lower() == "doc-biblioref":
+        return True
+    if normalize_text(str(attrs.get("data-xml-rid") or "")):
+        return True
+    if normalize_text(str(attrs.get("ref-type") or "")).lower() == "bibr":
+        return True
+    if REFERENCE_ANCHOR_CLASS_TOKENS & _node_class_tokens(node):
+        return True
+    for key in ("anchor", "data-range", "rid"):
+        value = normalize_text(str(attrs.get(key) or ""))
+        if value and REFERENCE_MARKER_VALUE_PATTERN.fullmatch(value):
+            return True
+    return False
+
+
+def looks_like_reference_anchor(node: Any) -> bool:
+    if Tag is None or not isinstance(node, Tag):
+        return False
+    if normalize_text(getattr(node, "name", "")).lower() != "a":
+        return False
+    return has_explicit_reference_marker(node) or looks_like_reference_href(str(node.get("href") or ""))
 
 
 def section_hint_kind_for_category(category: str) -> str | None:

@@ -12,18 +12,16 @@ from .normalize_journal_name import normalize_journal_name
 from .provider_catalog import (
     PROVIDER_CATALOG,
     doi_prefix_provider_map,
-    provider_display_names,
-    url_provider_tokens,
+    ordered_provider_specs,
+    provider_domain_matches,
 )
 
-PROVIDER_DISPLAY_NAMES = provider_display_names()
 PUBLISHER_PROVIDER_MAP = {
     normalize_journal_name(alias): spec.name
     for spec in PROVIDER_CATALOG.values()
     for alias in spec.publisher_aliases
 }
 DOI_PREFIX_PROVIDER_MAP = doi_prefix_provider_map()
-URL_PROVIDER_TOKENS = url_provider_tokens()
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[^\s\"'<>]+", flags=re.IGNORECASE)
 DOI_DASH_TRANSLATION = str.maketrans(
     {
@@ -93,10 +91,10 @@ def infer_provider_from_publisher(publisher: str | None) -> str | None:
 def infer_provider_from_url(url: str | None) -> str | None:
     if not url:
         return None
-    hostname = urllib.parse.urlparse(url).netloc.lower()
-    for provider, tokens in URL_PROVIDER_TOKENS.items():
-        if any(token in hostname for token in tokens):
-            return provider
+    hostname = (urllib.parse.urlparse(url).hostname or "").lower()
+    for spec in ordered_provider_specs():
+        if provider_domain_matches(spec.name, hostname):
+            return spec.name
     return None
 
 

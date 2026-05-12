@@ -8,7 +8,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from paper_fetch.http import HttpTransport
-import paper_fetch.providers.springer_html as springer_html
+from paper_fetch.providers import _springer_html as springer_html
 from paper_fetch.providers import html_springer_nature, springer as springer_provider
 from paper_fetch.markdown.citations import normalize_inline_citation_markdown
 from paper_fetch.quality.html_availability import assess_html_fulltext_availability
@@ -27,6 +27,51 @@ from tests.golden_criteria import (
 
 
 class SpringerHtmlRegressionTests(unittest.TestCase):
+    def test_springer_ai_alt_disclaimer_cleanup_uses_id_contract_not_full_text(self) -> None:
+        soup = BeautifulSoup(
+            """
+            <article>
+              <figure>
+                <img src="fig1.png" aria-describedby="caption ai-alt-disclaimer-1">
+                <p id="ai-alt-disclaimer-1">Updated provider disclaimer text.</p>
+              </figure>
+              <figure>
+                <p>The alternative text for this image may have been generated using AI.</p>
+              </figure>
+            </article>
+            """,
+            "html.parser",
+        )
+
+        springer_html._remove_springer_ai_alt_disclaimers(soup)
+
+        self.assertIsNone(soup.find(id="ai-alt-disclaimer-1"))
+        self.assertEqual(soup.find("img").get("aria-describedby"), "caption")
+        self.assertIn("alternative text for this image", soup.get_text(" ", strip=True))
+
+    def test_springer_nature_license_cleanup_uses_creative_commons_link(self) -> None:
+        soup = BeautifulSoup(
+            """
+            <article>
+              <p id="license">This article is licensed under
+                <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>.
+              </p>
+              <p id="body">The phrase creative commons alone is body text here.</p>
+            </article>
+            """,
+            "html.parser",
+        )
+
+        html_springer_nature._prune_springer_nature_chrome(soup)
+
+        self.assertIsNone(soup.find(id="license"))
+        self.assertIsNotNone(soup.find(id="body"))
+
+    def test_springer_nature_heading_normalization_comes_from_provider_rules(self) -> None:
+        soup = BeautifulSoup('<section><h2>Online Methods</h2><p>Protocol.</p></section>', "html.parser")
+
+        self.assertEqual(html_springer_nature._normalized_nature_section_heading(soup.section), "Methods")
+
     def test_extract_numbered_references_from_springer_html_preserves_labels(self) -> None:
         html = """
         <section aria-labelledby="Bib1" data-title="References">

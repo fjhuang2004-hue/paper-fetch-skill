@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Mapping
 
-from ....http import RequestFailure
+from ....http import RequestFailure, classify_network_error
 from ....models import normalize_text
 
 
@@ -112,6 +112,7 @@ def request_with_opener(
             None,
             f"Failed to download {failure_label}: {exc.reason or exc}",
             url=url,
+            error_category=classify_network_error(exc),
         ) from exc
 
 

@@ -39,9 +39,11 @@ from .cache import (
 )
 from .errors import (
     RequestCancelledError,
+    RequestErrorCategory,
     RequestFailure,
     build_http_error_message,
     build_network_error_detail,
+    classify_network_error,
     is_timeout_network_error,
     iter_network_error_causes,
 )
@@ -90,6 +92,7 @@ __all__ = [
     "REDACTED_CACHE_HEADER_DIGEST_PREFIX",
     "REDACTED_CACHE_VALUE",
     "RequestCancelledError",
+    "RequestErrorCategory",
     "RequestFailure",
     "SENSITIVE_CACHE_HEADER_NAMES",
     "SENSITIVE_QUERY_PARAM_NAMES",
@@ -102,6 +105,7 @@ __all__ = [
     "build_http_error_message",
     "build_network_error_detail",
     "build_text_preview",
+    "classify_network_error",
     "decompress_gzip_body",
     "is_textual_content_type",
     "is_timeout_network_error",

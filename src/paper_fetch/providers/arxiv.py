@@ -36,10 +36,11 @@ from ..extraction.html.tables import (
     table_placeholder,
 )
 from ..formula.convert import normalize_latex
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
+from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestErrorCategory, RequestFailure
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..models.markdown import normalize_markdown_text
+from ..provider_catalog import register_metadata_probe_short_circuit
 from ..quality.html_availability import assess_plain_text_fulltext_availability
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
@@ -96,23 +97,137 @@ _ARXIV_WATERMARK_PATTERN = re.compile(
 _ARXIV_AUTHOR_LABEL_PATTERN = re.compile(
     r"(?P<name>[^\d,;]+?)\s+(?:\d+(?:\s*,\s*\d+)*)\b"
 )
-_ARXIV_AUTHOR_BOUNDARY_PATTERN = re.compile(
-    r"\b(?:Department|University|Institute|Instituto|School|College|Faculty|Laboratory|Laboratories|"
-    r"Lab|Center|Centre|Consortium|Technologies|Company|Corporation|Inc\.?|LLC|Ltd\.?|GmbH|"
-    r"France|USA|U\.S\.A\.|United States|United Kingdom|China|Germany|Canada|Australia|Italy|Spain|"
-    r"Japan|Korea|Singapore|Switzerland|Netherlands|Belgium|India)\b",
+_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_TOKENS = (
+    "Department",
+    "University",
+    "Institute",
+    "Instituto",
+    "School",
+    "College",
+    "Faculty",
+    "Laboratory",
+    "Laboratories",
+    "Lab",
+    "Center",
+    "Centre",
+    "Consortium",
+    "Technologies",
+    "Company",
+    "Corporation",
+    "Inc.?",
+    "LLC",
+    "Ltd.?",
+    "GmbH",
+)
+_ARXIV_AUTHOR_COUNTRY_BOUNDARY_TOKENS = (
+    "Argentina",
+    "Australia",
+    "Belgium",
+    "Brazil",
+    "Canada",
+    "China",
+    "Denmark",
+    "Egypt",
+    "Finland",
+    "France",
+    "Germany",
+    "Greece",
+    "India",
+    "Israel",
+    "Italy",
+    "Japan",
+    "Korea",
+    "Mexico",
+    "Netherlands",
+    "Norway",
+    "Poland",
+    "Russia",
+    "Singapore",
+    "South Africa",
+    "Spain",
+    "Sweden",
+    "Switzerland",
+    "Turkey",
+    "U\\.S\\.A\\.?",
+    "U\\.K\\.?",
+    "USA",
+    "United Kingdom",
+    "United States",
+)
+_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_PATTERN = re.compile(
+    r"(?<![A-Za-z])(?:"
+    + "|".join(_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_TOKENS)
+    + r")(?![A-Za-z])",
     flags=re.IGNORECASE,
 )
+_ARXIV_AUTHOR_COUNTRY_BOUNDARY_PATTERN = re.compile(
+    r"[,;]\s*(?:"
+    + "|".join(_ARXIV_AUTHOR_COUNTRY_BOUNDARY_TOKENS)
+    + r")(?![A-Za-z])",
+    flags=re.IGNORECASE,
+)
+_ARXIV_AUTHOR_ADDRESS_BOUNDARY_PATTERN = re.compile(r"[,;]\s*(?:[A-Z]{1,3}[- ]?)?\d{3,}\b")
+_ARXIV_AUTHOR_COUNTRY_CODE_BOUNDARY_PATTERN = re.compile(r"[,;]\s*[A-Z]{2,3}\.?\s*$")
 _ARXIV_EMAIL_PATTERN = re.compile(r"\b\S+@\S+\b")
 _ARXIV_ORCID_PATTERN = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b", flags=re.IGNORECASE)
 _ARXIV_INITIAL_TOKEN_PATTERN = re.compile(r"^[A-Z]\.?$")
-_ARXIV_BIBLIOGRAPHY_SELECTORS = (
-    "section.ltx_bibliography",
-    "section#bib",
-)
-_ARXIV_BIBITEM_SELECTORS = (
-    ".ltx_bibitem",
-    "li.ltx_bibitem",
+_ARXIV_AR5IV_SELECTORS: Mapping[str, tuple[str, ...]] = {
+    "watermark": ("#watermark-tr", ".ltx_page_header", ".ltx_page_footer"),
+    "frontmatter_noise": (
+        "script",
+        "style",
+        "math",
+        ".ltx_note",
+        ".ltx_contact",
+        ".ltx_author_notes",
+        ".ltx_role_email",
+        ".ltx_role_orcid",
+        ".ltx_role_affiliation",
+        "a[href^='mailto:']",
+        ".ltx_font_typewriter",
+    ),
+    "author_creators": (".ltx_creator.ltx_role_author",),
+    "author_person_names": (".ltx_personname",),
+    "document_title": ("h1.ltx_title_document",),
+    "abstract": ("div.ltx_abstract",),
+    "abstract_heading": (".ltx_title_abstract", "h1", "h2", "h3", "h4", "h5", "h6"),
+    "bibliography_containers": ("section.ltx_bibliography", "section#bib"),
+    "bibliography_items": (".ltx_bibitem", "li.ltx_bibitem"),
+    "reference_noise": ("script", "style", ".ltx_bib_cited", ".ltx_bib_links"),
+    "reference_links": (".ltx_bib_links", ".ltx_bib_cited"),
+    "reference_blocks": (".ltx_bibblock",),
+    "reference_year": (".ltx_bib_year",),
+    "reference_title": (".ltx_bib_title",),
+    "algorithm_listing": ("div.ltx_listing",),
+    "latexml_error_nodes": (".ltx_ERROR", ".undefined"),
+    "math_nodes": ("math.ltx_Math",),
+    "note_nodes": ("span.ltx_note",),
+    "note_markers": (".ltx_note_mark", ".ltx_tag_note"),
+    "note_content": (".ltx_note_content",),
+    "listing_noise": (".ltx_rule", ".ltx_linenumber"),
+    "listing_lines": (".ltx_listingline",),
+    "article_root": ("article.ltx_document",),
+    "article_chrome": (
+        "script",
+        "style",
+        "nav",
+        "header",
+        "footer",
+        "h1.ltx_title_document",
+        "div.ltx_authors",
+        "div.ltx_dates",
+        "span.ltx_note.ltx_role_thanks",
+        "span.ltx_note.ltx_note_frontmatter",
+        "span.ltx_role_submissionid",
+        "span.ltx_role_journal",
+        "span.ltx_role_ccs",
+        ".ltx_pagination",
+    ),
+}
+# These strings document the ar5iv/LaTeXML fallback-page contract that arXiv
+# official HTML currently exposes when server-side conversion fails.
+_ARXIV_AR5IV_FATAL_ERROR_TEXTS = (
+    "an error in the conversion from latex to xml has occurred",
 )
 _ARXIV_UNDEFINED_MACRO_PATTERN = re.compile(r"^\\[A-Za-z@]+\*?$")
 _ARXIV_TABLE_ID_PATTERN = re.compile(r"(?:^|[.])T(?P<number>\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
@@ -131,9 +246,21 @@ _ARXIV_FIGURE_ID_PATTERN = re.compile(
 )
 _ARXIV_PLACEHOLDER_PATTERN = re.compile(rf"\b{re.escape('PAPER_FETCH_TABLE_PLACEHOLDER_')}\d{{4}}\b")
 _ARXIV_UNESCAPED_DOLLAR_PATTERN = re.compile(r"(?<!\\)\$")
-_ARXIV_NOISY_IMAGE_ALT_TEXTS = {"refer to caption"}
+_ARXIV_RETRYABLE_ASSET_ERROR_CATEGORIES = frozenset(
+    {
+        RequestErrorCategory.NETWORK_ERROR.value,
+        RequestErrorCategory.TIMEOUT.value,
+        RequestErrorCategory.TLS_ERROR.value,
+        RequestErrorCategory.DNS_ERROR.value,
+        RequestErrorCategory.CONNECTION_RESET.value,
+        RequestErrorCategory.CONNECTION_CLOSED.value,
+    }
+)
 _ARXIV_HTML_FATAL_ERROR_PATTERNS = (
-    re.compile(r"an\s+error\s+in\s+the\s+conversion\s+from\s+latex\s+to\s+xml\s+has\s+occurred", re.IGNORECASE),
+    *(
+        re.compile(r"\s+".join(re.escape(part) for part in text.split()), re.IGNORECASE)
+        for text in _ARXIV_AR5IV_FATAL_ERROR_TEXTS
+    ),
 )
 _ARXIV_SECTION_HINT_SKIP_CLASS_TOKENS = {
     "ltx_toc",
@@ -184,6 +311,59 @@ class ArxivSemanticPreparation:
     entries: list[dict[str, Any]]
     diagnostics: dict[str, Any]
     warnings: list[str]
+
+
+def _arxiv_ar5iv_selectors(name: str) -> tuple[str, ...]:
+    return _ARXIV_AR5IV_SELECTORS.get(name, ())
+
+
+def _arxiv_select(node: Any, selector_group: str) -> list[Any]:
+    if Tag is None or not isinstance(node, Tag):
+        return []
+    matches: list[Any] = []
+    for selector in _arxiv_ar5iv_selectors(selector_group):
+        matches.extend(node.select(selector))
+    return matches
+
+
+def _arxiv_select_one(node: Any, selector_group: str) -> Any:
+    if Tag is None or not isinstance(node, Tag):
+        return None
+    for selector in _arxiv_ar5iv_selectors(selector_group):
+        match = node.select_one(selector)
+        if isinstance(match, Tag):
+            return match
+    return None
+
+
+def _arxiv_author_boundary_start(text: str) -> int | None:
+    normalized = normalize_text(text)
+    if not normalized:
+        return None
+    matches = [
+        match
+        for match in (
+            _ARXIV_AUTHOR_INSTITUTION_BOUNDARY_PATTERN.search(normalized),
+            _ARXIV_AUTHOR_COUNTRY_BOUNDARY_PATTERN.search(normalized),
+            _ARXIV_AUTHOR_ADDRESS_BOUNDARY_PATTERN.search(normalized),
+            _ARXIV_AUTHOR_COUNTRY_CODE_BOUNDARY_PATTERN.search(normalized),
+        )
+        if match is not None
+    ]
+    if not matches:
+        return None
+    return min(match.start() for match in matches)
+
+
+def _arxiv_author_text_has_boundary(text: str) -> bool:
+    return _arxiv_author_boundary_start(text) is not None
+
+
+def _trim_arxiv_author_text_at_boundary(text: str) -> str:
+    boundary_start = _arxiv_author_boundary_start(text)
+    if boundary_start is None:
+        return normalize_text(text)
+    return normalize_text(text[:boundary_start])
 
 
 def _first_header_value(headers: Mapping[str, Any] | None, key: str, default: str = "") -> str:
@@ -349,6 +529,16 @@ def minimal_arxiv_metadata(
     return _minimal_arxiv_metadata(normalized, doi=doi, metadata=metadata or {})
 
 
+def arxiv_metadata_probe_short_circuit(doi: str) -> ProviderMetadata | None:
+    arxiv_id = arxiv_id_from_doi(doi)
+    if not arxiv_id:
+        return None
+    return minimal_arxiv_metadata(arxiv_id, doi=doi, metadata={})
+
+
+register_metadata_probe_short_circuit("arxiv", arxiv_metadata_probe_short_circuit)
+
+
 def _clean_arxiv_frontmatter_text(node: Any, *, remove_line_breaks: bool = True) -> str:
     if BeautifulSoup is None or Tag is None or not isinstance(node, Tag):
         return ""
@@ -356,19 +546,7 @@ def _clean_arxiv_frontmatter_text(node: Any, *, remove_line_breaks: bool = True)
     clone = clone_soup.find()
     if not isinstance(clone, Tag):
         return ""
-    for selector in (
-        "script",
-        "style",
-        "math",
-        ".ltx_note",
-        ".ltx_contact",
-        ".ltx_author_notes",
-        ".ltx_role_email",
-        ".ltx_role_orcid",
-        ".ltx_role_affiliation",
-        "a[href^='mailto:']",
-        ".ltx_font_typewriter",
-    ):
+    for selector in _arxiv_ar5iv_selectors("frontmatter_noise"):
         for match in clone.select(selector):
             match.decompose()
     separator = " " if remove_line_breaks else "\n"
@@ -394,7 +572,7 @@ def _extract_arxiv_watermark_metadata(root: Any) -> dict[str, Any]:
     if Tag is None or not isinstance(root, Tag):
         return {}
     candidates = []
-    for selector in ("#watermark-tr", ".ltx_page_header", ".ltx_page_footer"):
+    for selector in _arxiv_ar5iv_selectors("watermark"):
         candidates.extend(root.select(selector))
     candidates.append(root)
     for node in candidates:
@@ -421,19 +599,7 @@ def _candidate_arxiv_author_text_from_person_node(node: Any) -> str:
     clone = clone_soup.find()
     if not isinstance(clone, Tag):
         return ""
-    for selector in (
-        "script",
-        "style",
-        "math",
-        ".ltx_note",
-        ".ltx_contact",
-        ".ltx_author_notes",
-        ".ltx_role_email",
-        ".ltx_role_orcid",
-        ".ltx_role_affiliation",
-        "a[href^='mailto:']",
-        ".ltx_font_typewriter",
-    ):
+    for selector in _arxiv_ar5iv_selectors("frontmatter_noise"):
         for match in clone.select(selector):
             match.decompose()
 
@@ -447,13 +613,13 @@ def _candidate_arxiv_author_text_from_person_node(node: Any) -> str:
             if child_name == "br":
                 pieces.append(";")
                 continue
-            if pieces and _ARXIV_AUTHOR_BOUNDARY_PATTERN.search(child_text):
+            if pieces and _arxiv_author_text_has_boundary(child_text):
                 break
             if child_text:
                 pieces.append(child_text)
         else:
             child_text = normalize_text(str(child))
-            if pieces and _ARXIV_AUTHOR_BOUNDARY_PATTERN.search(child_text):
+            if pieces and _arxiv_author_text_has_boundary(child_text):
                 break
             if child_text:
                 pieces.append(child_text)
@@ -461,8 +627,8 @@ def _candidate_arxiv_author_text_from_person_node(node: Any) -> str:
     text = normalize_text(" ".join(pieces).replace("\u200b", " "))
     text = _ARXIV_EMAIL_PATTERN.sub(" ", text)
     text = _ARXIV_ORCID_PATTERN.sub(" ", text)
-    text = re.split(_ARXIV_AUTHOR_BOUNDARY_PATTERN, text, maxsplit=1)[0]
-    text = re.sub(r"\s*;\s*", "; ", text)
+    text = _trim_arxiv_author_text_at_boundary(text)
+    text = re.sub(r"\s*;\s*", " ; ", text)
     return normalize_text(text)
 
 
@@ -470,7 +636,7 @@ def _looks_like_arxiv_author_name(text: str) -> bool:
     normalized = normalize_text(text).strip(" ,;")
     if not normalized or "@" in normalized:
         return False
-    if _ARXIV_AUTHOR_BOUNDARY_PATTERN.search(normalized):
+    if _arxiv_author_text_has_boundary(normalized):
         return False
     tokens = [token for token in normalized.split() if token]
     if not tokens or len(tokens) > 6:
@@ -534,11 +700,11 @@ def _split_arxiv_author_text(text: str) -> list[str]:
 def _extract_arxiv_html_authors(article: Any) -> list[str]:
     if Tag is None or not isinstance(article, Tag):
         return []
-    creators = [node for node in article.select(".ltx_creator.ltx_role_author") if isinstance(node, Tag)]
+    creators = [node for node in _arxiv_select(article, "author_creators") if isinstance(node, Tag)]
     if len(creators) > 1:
         authors: list[str] = []
         for creator in creators:
-            person_node = creator.select_one(".ltx_personname") or creator
+            person_node = _arxiv_select_one(creator, "author_person_names") or creator
             candidate = _clean_arxiv_frontmatter_text(person_node)
             if _looks_like_arxiv_author_name(candidate):
                 authors.append(candidate)
@@ -546,10 +712,49 @@ def _extract_arxiv_html_authors(article: Any) -> list[str]:
             return dedupe_authors(authors)
 
     authors = []
-    for person_node in article.select(".ltx_personname"):
+    for person_node in _arxiv_select(article, "author_person_names"):
         candidate_text = _candidate_arxiv_author_text_from_person_node(person_node)
         authors.extend(_split_arxiv_author_text(candidate_text))
     return dedupe_authors(authors)
+
+
+def _arxiv_node_identity_text(node: Any) -> str:
+    if Tag is None or not isinstance(node, Tag):
+        return ""
+    attrs = getattr(node, "attrs", None) or {}
+    parts = [normalize_text(getattr(node, "name", "") or "")]
+    for key in ("id", "aria-label", "aria-labelledby", "data-title"):
+        parts.append(normalize_text(str(attrs.get(key) or "")))
+    class_values = attrs.get("class")
+    if isinstance(class_values, (list, tuple, set)):
+        parts.extend(normalize_text(str(item)) for item in class_values)
+    else:
+        parts.append(normalize_text(str(class_values or "")))
+    return " ".join(part.lower() for part in parts if part)
+
+
+def _select_arxiv_title_node(article: Any) -> Any:
+    title_node = _arxiv_select_one(article, "document_title")
+    if isinstance(title_node, Tag):
+        return title_node
+    return article.find("h1") if Tag is not None and isinstance(article, Tag) else None
+
+
+def _select_arxiv_abstract_node(article: Any) -> Any:
+    abstract_node = _arxiv_select_one(article, "abstract")
+    if isinstance(abstract_node, Tag):
+        return abstract_node
+    if Tag is None or not isinstance(article, Tag):
+        return None
+    for candidate in article.find_all(["section", "div"]):
+        if not isinstance(candidate, Tag):
+            continue
+        identity = _arxiv_node_identity_text(candidate)
+        heading_node = candidate.find(SECTION_HEADING_PATTERN)
+        title = normalize_text(render_heading_text_from_html(heading_node) if isinstance(heading_node, Tag) else "").lower()
+        if "abstract" in identity or title.strip(" .:") == "abstract":
+            return candidate
+    return None
 
 
 def _extract_arxiv_html_frontmatter(
@@ -568,15 +773,18 @@ def _extract_arxiv_html_frontmatter(
     watermark_metadata = _extract_arxiv_watermark_metadata(soup)
     arxiv_id = normalize_arxiv_id(watermark_metadata.get("arxiv_id")) or arxiv_id
 
-    title_node = article.select_one("h1.ltx_title_document")
+    title_node = _select_arxiv_title_node(article)
     title = _clean_arxiv_frontmatter_text(title_node) if isinstance(title_node, Tag) else ""
-    abstract_node = article.select_one("div.ltx_abstract")
+    abstract_node = _select_arxiv_abstract_node(article)
     abstract = ""
     if isinstance(abstract_node, Tag):
         abstract_soup = BeautifulSoup(str(abstract_node), "html.parser")
         abstract_clone = abstract_soup.find()
         if isinstance(abstract_clone, Tag):
-            for heading in abstract_clone.select(".ltx_title_abstract, h1, h2, h3, h4, h5, h6"):
+            for heading_selector in _arxiv_ar5iv_selectors("abstract_heading"):
+                for heading in abstract_clone.select(heading_selector):
+                    heading.decompose()
+            for heading in abstract_clone.find_all(SECTION_HEADING_PATTERN):
                 heading.decompose()
             abstract = _clean_arxiv_frontmatter_text(abstract_clone)
 
@@ -683,6 +891,9 @@ def _asset_candidate_urls(asset: Mapping[str, Any]) -> set[str]:
 def _is_retryable_arxiv_asset_failure(failure: Mapping[str, Any]) -> bool:
     if failure.get("status") is not None:
         return False
+    error_category = normalize_text(str(failure.get("error_category") or "")).lower()
+    if error_category:
+        return error_category in _ARXIV_RETRYABLE_ASSET_ERROR_CATEGORIES
     reason = normalize_text(str(failure.get("reason") or "")).lower()
     if not reason or "unsupported asset url scheme" in reason:
         return False
@@ -788,7 +999,7 @@ def _extract_reference_doi(node: Any) -> str | None:
 
 def _extract_reference_year(text: str, node: Any) -> str | None:
     if Tag is not None and isinstance(node, Tag):
-        year_node = node.select_one(".ltx_bib_year")
+        year_node = _arxiv_select_one(node, "reference_year")
         year_text = normalize_text(year_node.get_text(" ", strip=True) if isinstance(year_node, Tag) else "")
         year_match = _REFERENCE_YEAR_PATTERN.search(year_text)
         if year_match is not None:
@@ -800,7 +1011,7 @@ def _extract_reference_year(text: str, node: Any) -> str | None:
 def _extract_reference_title(node: Any) -> str | None:
     if Tag is None or not isinstance(node, Tag):
         return None
-    title_node = node.select_one(".ltx_bib_title")
+    title_node = _arxiv_select_one(node, "reference_title")
     title = normalize_text(title_node.get_text(" ", strip=True) if isinstance(title_node, Tag) else "")
     return title or None
 
@@ -813,12 +1024,12 @@ def _clean_arxiv_reference_node(node: Any) -> Any:
     if not isinstance(clone, Tag):
         return None
 
-    for selector in ("script", "style", ".ltx_bib_cited", ".ltx_bib_links"):
+    for selector in _arxiv_ar5iv_selectors("reference_noise"):
         for match in clone.select(selector):
             match.decompose()
-    for block in clone.select(".ltx_bibblock"):
+    for block in _arxiv_select(clone, "reference_blocks"):
         block_text = normalize_text(block.get_text(" ", strip=True)).lower()
-        if block.select_one(".ltx_bib_links, .ltx_bib_cited") is not None:
+        if _arxiv_select_one(block, "reference_links") is not None:
             block.decompose()
             continue
         if block_text.startswith(("external links", "cited by")):
@@ -840,26 +1051,51 @@ def _arxiv_reference_text(node: Any) -> str:
     return _normalize_reference_text(clone.get_text(" ", strip=True))
 
 
-def _candidate_arxiv_bibitems(root: Any) -> list[Any]:
+def _candidate_arxiv_bibliography_containers(root: Any) -> list[Any]:
     if Tag is None or not isinstance(root, Tag):
         return []
     containers: list[Any] = []
-    seen_containers: set[int] = set()
-    for selector in _ARXIV_BIBLIOGRAPHY_SELECTORS:
+    seen: set[int] = set()
+    for selector in _arxiv_ar5iv_selectors("bibliography_containers"):
         for container in root.select(selector):
-            if isinstance(container, Tag) and id(container) not in seen_containers:
-                seen_containers.add(id(container))
+            if isinstance(container, Tag) and id(container) not in seen:
+                seen.add(id(container))
                 containers.append(container)
+    if containers:
+        return containers
+    for candidate in root.find_all(["section", "div"]):
+        if not isinstance(candidate, Tag):
+            continue
+        heading = candidate.find(SECTION_HEADING_PATTERN)
+        if not isinstance(heading, Tag):
+            continue
+        title = normalize_text(render_heading_text_from_html(heading)).lower().strip(" .:")
+        if title in {"references", "bibliography"} and id(candidate) not in seen:
+            seen.add(id(candidate))
+            containers.append(candidate)
+    return containers
+
+
+def _candidate_arxiv_bibitems(root: Any) -> list[Any]:
+    if Tag is None or not isinstance(root, Tag):
+        return []
+    containers = _candidate_arxiv_bibliography_containers(root)
     scopes = containers or [root]
 
     items: list[Any] = []
     seen_items: set[int] = set()
     for scope in scopes:
-        for selector in _ARXIV_BIBITEM_SELECTORS:
+        for selector in _arxiv_ar5iv_selectors("bibliography_items"):
             for item in scope.select(selector):
                 if isinstance(item, Tag) and id(item) not in seen_items:
                     seen_items.add(id(item))
                     items.append(item)
+        if items:
+            continue
+        for item in scope.find_all("li"):
+            if isinstance(item, Tag) and id(item) not in seen_items:
+                seen_items.add(id(item))
+                items.append(item)
     return items
 
 
@@ -931,10 +1167,7 @@ def _arxiv_figure_label_from_dom_id(dom_id: Any) -> str:
 
 
 def _clean_arxiv_asset_caption(text: Any) -> str:
-    caption = normalize_text(str(text or "").replace("\n", " "))
-    if caption.lower() in _ARXIV_NOISY_IMAGE_ALT_TEXTS:
-        return ""
-    return caption
+    return html_assets.clean_noisy_image_alt_text(str(text or "").replace("\n", " "))
 
 
 def _postprocess_arxiv_html_asset(asset: Mapping[str, Any]) -> dict[str, Any]:
@@ -954,7 +1187,7 @@ def _postprocess_arxiv_html_asset(asset: Mapping[str, Any]) -> dict[str, Any]:
 def _arxiv_node_classes(node: Any) -> set[str]:
     if Tag is None or not isinstance(node, Tag):
         return set()
-    raw_classes = node.get("class") or []
+    raw_classes = (getattr(node, "attrs", None) or {}).get("class") or []
     if isinstance(raw_classes, str):
         return {normalize_text(item).lower() for item in raw_classes.split() if normalize_text(item)}
     return {normalize_text(str(item)).lower() for item in raw_classes if normalize_text(str(item))}
@@ -988,7 +1221,7 @@ def _is_arxiv_algorithm_figure(node: Any) -> bool:
     classes = _arxiv_node_classes(node)
     if "ltx_algorithm" not in classes and "ltx_float" not in classes:
         return False
-    return node.select_one("div.ltx_listing") is not None
+    return _arxiv_select_one(node, "algorithm_listing") is not None
 
 
 def _is_arxiv_inline_figure_container(node: Any) -> bool:
@@ -1274,7 +1507,7 @@ def _clean_official_html_latexml_noise(article: Any) -> dict[str, int]:
         }
 
     removed_error_nodes = 0
-    for node in list(article.select(".ltx_ERROR, .undefined")):
+    for node in list(_arxiv_select(article, "latexml_error_nodes")):
         if not isinstance(node, Tag):
             continue
         classes = _arxiv_node_classes(node)
@@ -1291,7 +1524,7 @@ def _clean_official_html_latexml_noise(article: Any) -> dict[str, int]:
         if not isinstance(image, Tag):
             continue
         alt_text = normalize_text(str(image.get("alt") or ""))
-        if alt_text.lower() in _ARXIV_NOISY_IMAGE_ALT_TEXTS:
+        if alt_text and not html_assets.clean_noisy_image_alt_text(alt_text):
             del image["alt"]
             removed_alt_placeholders += 1
 
@@ -1372,7 +1605,7 @@ def _normalize_official_html_latexml_math_nodes(article: Any) -> int:
     if BeautifulSoup is None or Tag is None or not isinstance(article, Tag):
         return 0
     normalized_count = 0
-    for node in list(article.select("math.ltx_Math")):
+    for node in list(_arxiv_select(article, "math_nodes")):
         if not isinstance(node, Tag):
             continue
         replacement = _arxiv_math_markdown(node)
@@ -1387,15 +1620,15 @@ def _normalize_official_html_latexml_notes(article: Any) -> int:
     if BeautifulSoup is None or Tag is None or not isinstance(article, Tag):
         return 0
     normalized_count = 0
-    for note in list(article.select("span.ltx_note")):
+    for note in list(_arxiv_select(article, "note_nodes")):
         if not isinstance(note, Tag):
             continue
         classes = _arxiv_node_classes(note)
         if "ltx_role_footnote" not in classes and "ltx_role_endnote" not in classes:
             continue
-        marker_node = note.select_one(".ltx_note_mark, .ltx_tag_note")
+        marker_node = _arxiv_select_one(note, "note_markers")
         marker = normalize_text(marker_node.get_text(" ", strip=True) if isinstance(marker_node, Tag) else "")
-        content_node = note.select_one(".ltx_note_content")
+        content_node = _arxiv_select_one(note, "note_content")
         if not isinstance(content_node, Tag):
             continue
 
@@ -1403,7 +1636,7 @@ def _normalize_official_html_latexml_notes(article: Any) -> int:
         content = content_soup.find()
         if not isinstance(content, Tag):
             continue
-        for duplicate_marker in content.select(".ltx_note_mark, .ltx_tag_note"):
+        for duplicate_marker in _arxiv_select(content, "note_markers"):
             duplicate_marker.decompose()
         content_text = normalize_text(render_clean_text_from_html(content).replace("\n", " "))
         if not marker and not content_text:
@@ -1495,7 +1728,7 @@ def _clean_arxiv_listing_line_node(line_node: Any) -> Any:
     clone = clone_soup.find()
     if not isinstance(clone, Tag):
         return None
-    for selector in (".ltx_rule", ".ltx_linenumber"):
+    for selector in _arxiv_ar5iv_selectors("listing_noise"):
         for node in clone.select(selector):
             node.decompose()
     return clone
@@ -1505,7 +1738,7 @@ def _render_arxiv_listing_lines(listing_node: Any) -> list[str]:
     if Tag is None or not isinstance(listing_node, Tag):
         return []
     lines: list[str] = []
-    for line_node in listing_node.select(".ltx_listingline"):
+    for line_node in _arxiv_select(listing_node, "listing_lines"):
         clone = _clean_arxiv_listing_line_node(line_node)
         text = render_clean_text_from_html(clone) if clone is not None else ""
         text = normalize_text(text.replace("\n", " "))
@@ -1520,7 +1753,7 @@ def _render_arxiv_listing_lines(listing_node: Any) -> list[str]:
 def _render_arxiv_listing_block(node: Any) -> tuple[str, bool]:
     if Tag is None or not isinstance(node, Tag):
         return "", False
-    listing = node.select_one("div.ltx_listing") if node.name == "figure" else node
+    listing = _arxiv_select_one(node, "algorithm_listing") if node.name == "figure" else node
     if not isinstance(listing, Tag):
         return "", False
     label, caption = _arxiv_caption_label_and_text(node, default_label="Algorithm")
@@ -1792,7 +2025,7 @@ def _extract_arxiv_html_markdown(
     if BeautifulSoup is None:
         raise ProviderFailure("not_configured", "beautifulsoup4 is not installed; cannot parse arXiv HTML.")
     soup = BeautifulSoup(html_text, "html.parser")
-    article = soup.select_one("article.ltx_document") or soup.find("article")
+    article = _arxiv_select_one(soup, "article_root") or soup.find("article")
     if not isinstance(article, Tag):
         raise ProviderFailure("no_result", "arXiv official HTML did not expose a LaTeXML article body.")
 
@@ -1808,22 +2041,7 @@ def _extract_arxiv_html_markdown(
     semantic_preparation = _prepare_arxiv_semantic_blocks(article, soup)
     inline_figure_diagnostics = _annotate_arxiv_inline_figure_images(article, extracted_assets, source_url)
 
-    for selector in (
-        "script",
-        "style",
-        "nav",
-        "header",
-        "footer",
-        "h1.ltx_title_document",
-        "div.ltx_authors",
-        "div.ltx_dates",
-        "span.ltx_note.ltx_role_thanks",
-        "span.ltx_note.ltx_note_frontmatter",
-        "span.ltx_role_submissionid",
-        "span.ltx_role_journal",
-        "span.ltx_role_ccs",
-        ".ltx_pagination",
-    ):
+    for selector in _arxiv_ar5iv_selectors("article_chrome"):
         for node in article.select(selector):
             node.decompose()
 
@@ -2354,6 +2572,7 @@ class ArxivClient(ProviderClient):
 __all__ = [
     "ArxivClient",
     "ArxivHtmlExtraction",
+    "arxiv_metadata_probe_short_circuit",
     "metadata_from_arxiv_result",
     "minimal_arxiv_metadata",
 ]

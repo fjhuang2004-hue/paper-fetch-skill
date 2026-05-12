@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Callable, Mapping, Pattern
 
 from ..extraction.html.parsing import choose_parser
@@ -13,6 +14,20 @@ try:
 except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
     Tag = None
+
+COMMON_COLLECTIVE_AUTHOR_TOKENS = frozenset(
+    {
+        "collaboration",
+        "committee",
+        "consortium",
+        "group",
+        "initiative",
+        "network",
+        "project",
+        "society",
+        "team",
+    }
+)
 
 
 class AuthorExtractionPipeline:
@@ -27,7 +42,9 @@ class AuthorExtractionPipeline:
         return []
 
 
-def load_json_assignment(html_text: str, pattern: Pattern[str]) -> Mapping[str, Any] | None:
+def load_json_assignment(
+    html_text: str, pattern: Pattern[str]
+) -> Mapping[str, Any] | None:
     payload = extract_assignment_json(html_text, pattern)
     return payload if isinstance(payload, Mapping) else None
 
@@ -45,12 +62,44 @@ def looks_like_author_name(text: str) -> bool:
     return bool(normalized) and any(character.isalpha() for character in normalized)
 
 
+def looks_like_collective_author_text(text: str) -> bool:
+    normalized = normalize_text(text).lower()
+    if not normalized:
+        return False
+    if "et al" in normalized:
+        return True
+    return any(token in normalized.split() for token in COMMON_COLLECTIVE_AUTHOR_TOKENS)
+
+
+AFFILIATION_TEXT_PATTERN = re.compile(
+    r"(\bacademy\b|\bcenter\b|\bcentre\b|\bclinic\b|\bcollege\b|\bdepartment\b|\bdivision\b|"
+    r"\bfaculty\b|\bfoundation\b|\bhospital\b|\binstitute\b|\blaborator(?:y|ies)\b|\blab\b|"
+    r"\bmedical center\b|\bschool\b|\buniversit(?:y|é|a|à)\b|"
+    r"大学|学院|研究所|研究院|研究中心|医院|病院|大学院"
+    r")",
+    flags=re.IGNORECASE,
+)
+CONTRIBUTION_TEXT_PATTERN = re.compile(r"\bcontributions?\s*:", flags=re.IGNORECASE)
+
+
+def looks_like_affiliation_text(text: str) -> bool:
+    normalized = normalize_text(text)
+    if not normalized:
+        return False
+    if CONTRIBUTION_TEXT_PATTERN.search(normalized):
+        return True
+    if AFFILIATION_TEXT_PATTERN.search(normalized):
+        return True
+    return False
+
+
 def is_ignored_author_text(
     text: str,
     *,
     ignored_text: set[str],
     count_pattern: Pattern[str] | None = None,
     reject_email: bool = False,
+    reject_affiliation: bool = False,
     reject_affiliation_prefixes: tuple[str, ...] = (),
 ) -> bool:
     normalized = normalize_text(text).lower()
@@ -64,7 +113,9 @@ def is_ignored_author_text(
         return True
     if reject_email and ("@" in normalized or normalized.startswith("mailto:")):
         return True
-    return any(normalized.startswith(prefix) for prefix in reject_affiliation_prefixes)
+    if any(normalized.startswith(prefix) for prefix in reject_affiliation_prefixes):
+        return True
+    return reject_affiliation and looks_like_affiliation_text(text)
 
 
 def jsonld_types(node: Mapping[str, Any]) -> set[str]:
@@ -186,7 +237,9 @@ def extract_meta_authors(html_text: str, *, keys: set[str]) -> list[str]:
     for meta in soup.find_all("meta"):
         if Tag is not None and not isinstance(meta, Tag):
             continue
-        key = normalize_text(str(meta.get("name") or meta.get("property") or "")).lower()
+        key = normalize_text(
+            str(meta.get("name") or meta.get("property") or "")
+        ).lower()
         if key not in keys:
             continue
         candidate = normalize_text(str(meta.get("content") or ""))
@@ -216,8 +269,12 @@ def extract_property_authors(
             " ".join(
                 part
                 for part in (
-                    given_node.get_text(" ", strip=True) if isinstance(given_node, Tag) else "",
-                    family_node.get_text(" ", strip=True) if isinstance(family_node, Tag) else "",
+                    given_node.get_text(" ", strip=True)
+                    if isinstance(given_node, Tag)
+                    else "",
+                    family_node.get_text(" ", strip=True)
+                    if isinstance(family_node, Tag)
+                    else "",
                 )
                 if normalize_text(part)
             )
@@ -252,6 +309,7 @@ def extract_selector_authors(
     node_text: Callable[[Any], str],
     count_pattern: Pattern[str] | None = None,
     reject_email: bool = False,
+    reject_affiliation: bool = False,
     reject_affiliation_prefixes: tuple[str, ...] = (),
 ) -> list[str]:
     if BeautifulSoup is None:
@@ -272,6 +330,7 @@ def extract_selector_authors(
                 ignored_text=ignored_text,
                 count_pattern=count_pattern,
                 reject_email=reject_email,
+                reject_affiliation=reject_affiliation,
                 reject_affiliation_prefixes=reject_affiliation_prefixes,
             ):
                 continue

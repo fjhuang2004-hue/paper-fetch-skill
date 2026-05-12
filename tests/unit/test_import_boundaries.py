@@ -13,6 +13,10 @@ BOUNDARY_PATHS = [
     *sorted((PAPER_FETCH_ROOT / "extraction" / "html").rglob("*.py")),
     *sorted((PAPER_FETCH_ROOT / "quality").glob("*.py")),
 ]
+HTML_ASSET_IMPORT_BOUNDARY_PATHS = [
+    PAPER_FETCH_ROOT / "extraction" / "html" / "assets" / "download.py",
+    PAPER_FETCH_ROOT / "extraction" / "html" / "assets" / "supplementary.py",
+]
 FORBIDDEN_PREFIX = "paper_fetch.providers._"
 REMOVED_PROVIDER_COMPATIBILITY_MODULES = frozenset(
     {
@@ -24,20 +28,15 @@ REMOVED_PROVIDER_COMPATIBILITY_MODULES = frozenset(
         "paper_fetch.providers._html_tables",
         "paper_fetch.providers._html_text",
         "paper_fetch.providers._language_filter",
-        "paper_fetch.providers._science_pnas",
-        "paper_fetch.providers._science_pnas_html",
+        "paper_fetch.providers._atypon_browser_workflow",
+        "paper_fetch.providers._atypon_browser_workflow_html",
         "paper_fetch.providers.html_assets",
+        "paper_fetch.providers.pnas_html",
+        "paper_fetch.providers.science_html",
+        "paper_fetch.providers.springer_html",
+        "paper_fetch.providers.wiley_html",
         "paper_fetch.extraction.html._assets",
         "paper_fetch.resolve.crossref",
-    }
-)
-PRIVATE_PROVIDER_HTML_MODULES = frozenset(
-    {
-        "paper_fetch.providers._pnas_html",
-        "paper_fetch.providers._science_html",
-        "paper_fetch.providers._science_pnas_profiles",
-        "paper_fetch.providers._springer_html",
-        "paper_fetch.providers._wiley_html",
     }
 )
 
@@ -97,13 +96,6 @@ def _uses_removed_compatibility_module(imported_module: str) -> bool:
     )
 
 
-def _uses_private_provider_html_module(imported_module: str) -> bool:
-    return any(
-        imported_module == private or imported_module.startswith(f"{private}.")
-        for private in PRIVATE_PROVIDER_HTML_MODULES
-    )
-
-
 class ImportBoundaryTests(unittest.TestCase):
     def test_provider_neutral_modules_do_not_import_provider_private_helpers(self) -> None:
         offenders: list[str] = []
@@ -128,15 +120,12 @@ class ImportBoundaryTests(unittest.TestCase):
 
         self.assertEqual(offenders, [], "\n".join(offenders))
 
-    def test_tests_use_public_provider_html_facades(self) -> None:
+    def test_html_asset_modules_do_not_import_public_models_package(self) -> None:
         offenders: list[str] = []
-        for path in _iter_python_files(TESTS_ROOT):
-            module_name = ".".join(path.relative_to(REPO_ROOT).with_suffix("").parts)
-            for imported_module, lineno in _imported_modules(path, module_name=module_name):
-                if _uses_private_provider_html_module(imported_module):
-                    offenders.append(
-                        f"{path.relative_to(REPO_ROOT)}:{lineno} imports {imported_module}"
-                    )
+        for path in HTML_ASSET_IMPORT_BOUNDARY_PATHS:
+            for imported_module, lineno in _imported_modules(path):
+                if imported_module == "paper_fetch.models":
+                    offenders.append(f"{path.relative_to(SRC_DIR)}:{lineno} imports {imported_module}")
 
         self.assertEqual(offenders, [], "\n".join(offenders))
 

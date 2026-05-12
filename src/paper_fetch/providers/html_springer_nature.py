@@ -7,14 +7,21 @@ import urllib.parse
 from typing import Any
 
 from ..extraction.html.parsing import choose_parser
+from ..extraction.html.provider_rules import normalize_provider_heading
 from ..models import normalize_text
+from ..provider_catalog import matching_provider_domain, provider_domain_matches
 from ..extraction.html.semantics import (
     heading_category,
     identity_category,
     node_identity_text,
     normalize_section_title,
 )
-from ..markdown.citations import clean_citation_markers, normalize_inline_citation_markdown
+from ..markdown.citations import (
+    COMMON_FIGURE_LINE_PATTERN,
+    COMMON_LABEL_PATTERN,
+    clean_citation_markers,
+    normalize_inline_citation_markdown,
+)
 from ._html_section_markdown import (
     extract_section_title,
     render_heading_text_from_html,
@@ -30,12 +37,6 @@ except ImportError:  # pragma: no cover - exercised implicitly when dependency i
     BeautifulSoup = None
     Tag = None
 
-SPRINGER_NATURE_HOST_SUFFIXES = (
-    "nature.com",
-    "springer.com",
-    "springernature.com",
-    "biomedcentral.com",
-)
 SPRINGER_NATURE_ROOT_SELECTORS = (
     "article",
     "main article",
@@ -71,11 +72,7 @@ SPRINGER_NATURE_SCIENTIFIC_BACK_MATTER_TITLES = {
     "funding",
     "supplementary information",
 }
-SPRINGER_NATURE_LICENSE_TOKENS = (
-    "creative commons",
-    "this article is licensed under",
-    "the images or other third party material in this article",
-)
+SPRINGER_NATURE_LICENSE_WORD_LIMIT = 180
 SPRINGER_NATURE_CHROME_ATTR_TOKENS = (
     "article-actions",
     "article-metrics",
@@ -83,16 +80,39 @@ SPRINGER_NATURE_CHROME_ATTR_TOKENS = (
     "save-article",
     "submit-manuscript",
 )
+SPRINGER_NATURE_INLINE_ARTICLE_LINK_PATTERN = re.compile(
+    r"\[([^\]]+)\]\((?:/(?:article|articles)/[^)]+|#[^)]+)\)"
+)
+SPRINGER_NATURE_INLINE_LINK_UNWRAP_PATTERNS = (
+    SPRINGER_NATURE_INLINE_ARTICLE_LINK_PATTERN,
+)
+SPRINGER_NATURE_EXTENDED_DATA_LABEL_PATTERN = re.compile(
+    r"\b((?:Extended Data\s+(?:Fig|Figs|Tab|Tabs)|Extended Data))\.?\s+(\d+[A-Za-z]?)\b",
+    flags=re.IGNORECASE,
+)
+SPRINGER_NATURE_CITATION_LABEL_PATTERNS = (
+    SPRINGER_NATURE_EXTENDED_DATA_LABEL_PATTERN,
+    COMMON_LABEL_PATTERN,
+)
+SPRINGER_NATURE_EXTENDED_DATA_FIGURE_LINE_PATTERN = re.compile(
+    r"(?im)^extended data\s+fig\.\s*[a-z0-9.-]+:.*$"
+)
+SPRINGER_NATURE_SOURCE_DATA_LINE_PATTERN = re.compile(r"(?im)^\s*source data\s*$")
+SPRINGER_NATURE_FIGURE_LINE_PATTERNS = (
+    COMMON_FIGURE_LINE_PATTERN,
+    SPRINGER_NATURE_EXTENDED_DATA_FIGURE_LINE_PATTERN,
+    SPRINGER_NATURE_SOURCE_DATA_LINE_PATTERN,
+)
 
 
 def is_springer_nature_url(url: str) -> bool:
-    hostname = urllib.parse.urlparse(url).netloc.lower()
-    return any(hostname == suffix or hostname.endswith(f".{suffix}") for suffix in SPRINGER_NATURE_HOST_SUFFIXES)
+    hostname = urllib.parse.urlparse(url).hostname
+    return provider_domain_matches("springer", hostname)
 
 
 def is_nature_url(url: str) -> bool:
-    hostname = urllib.parse.urlparse(url).netloc.lower()
-    return hostname == "nature.com" or hostname.endswith(".nature.com")
+    hostname = urllib.parse.urlparse(url).hostname
+    return matching_provider_domain("springer", hostname) == "nature.com"
 
 
 def _candidate_score(node: Any) -> int:
@@ -175,6 +195,23 @@ def _is_scientific_back_matter_title(title_key: str) -> bool:
     return title_key in SPRINGER_NATURE_SCIENTIFIC_BACK_MATTER_TITLES or _is_availability_section_title(title_key)
 
 
+def _has_creative_commons_license_link(node: Any) -> bool:
+    if not isinstance(node, Tag):
+        return False
+    for anchor in node.find_all("a", href=True, recursive=False):
+        if not isinstance(anchor, Tag):
+            continue
+        href = normalize_text(str(anchor.get("href") or ""))
+        parsed = urllib.parse.urlparse(href)
+        hostname = parsed.netloc.lower()
+        path = parsed.path.lower()
+        if (hostname == "creativecommons.org" or hostname.endswith(".creativecommons.org")) and path.startswith(
+            "/licenses/"
+        ):
+            return True
+    return False
+
+
 def _prune_springer_nature_chrome(root: Any) -> None:
     if BeautifulSoup is None or not isinstance(root, Tag):
         return
@@ -193,7 +230,12 @@ def _prune_springer_nature_chrome(root: Any) -> None:
         if normalize_section_title(extract_section_title(node)) == "open access":
             node.decompose()
             continue
-        if any(token in lowered for token in SPRINGER_NATURE_LICENSE_TOKENS) and count_words(text) <= 180:
+        node_name = normalize_text(getattr(node, "name", "") or "").lower()
+        if (
+            node_name not in {"html", "body", "main", "article"}
+            and _has_creative_commons_license_link(node)
+            and count_words(text) <= SPRINGER_NATURE_LICENSE_WORD_LIMIT
+        ):
             node.decompose()
             continue
         attrs = getattr(node, "attrs", None) or {}
@@ -266,10 +308,7 @@ def clean_springer_nature_text_fragment(text: str) -> str:
 
 def _normalized_nature_section_heading(section: Any) -> str:
     title = extract_section_title(section)
-    normalized = normalize_section_title(title)
-    if normalized == "online methods":
-        return "Methods"
-    return title
+    return normalize_provider_heading("springer_nature", title)
 
 
 def _is_renderable_nature_body_div(node: Any) -> bool:
@@ -404,7 +443,9 @@ def postprocess_springer_nature_markdown(markdown_text: str) -> str:
     cleaned = clean_citation_markers(
         markdown_text,
         unwrap_inline_links=True,
+        inline_link_patterns=SPRINGER_NATURE_INLINE_LINK_UNWRAP_PATTERNS,
         normalize_labels=True,
+        label_patterns=SPRINGER_NATURE_CITATION_LABEL_PATTERNS,
         drop_figure_lines=False,
     )
     cleaned = re.sub(r"(?m)^\s*[-*]\s*$", "", cleaned)

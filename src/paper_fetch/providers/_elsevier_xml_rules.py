@@ -19,6 +19,11 @@ class ElsevierElementRule:
     notes: str = ""
 
 
+@dataclass(frozen=True)
+class ElsevierXmlRules:
+    ignored_section_titles: frozenset[str]
+
+
 ELSEVIER_ELEMENT_RULES: dict[str, ElsevierElementRule] = {
     "sections": ElsevierElementRule(
         category="structure",
@@ -139,12 +144,16 @@ ELSEVIER_ELEMENT_RULES: dict[str, ElsevierElementRule] = {
 }
 
 
-ELSEVIER_IGNORED_SECTION_TITLES = frozenset(
-    {
-        "graphical abstract",
-        "supplementary data",
-    }
+ELSEVIER_XML_RULES = ElsevierXmlRules(
+    ignored_section_titles=frozenset(
+        {
+            "graphical abstract",
+            "supplementary data",
+        }
+    )
 )
+
+ELSEVIER_IGNORED_SECTION_TITLES = ELSEVIER_XML_RULES.ignored_section_titles
 
 ELSEVIER_IMAGE_ASSET_TYPES = frozenset(
     {
@@ -154,12 +163,12 @@ ELSEVIER_IMAGE_ASSET_TYPES = frozenset(
     }
 )
 
-_ASSET_GROUP_PATTERN = re.compile(r"(gr\d+|ga\d+|mmc\d+|tbl\d+|fx\d+|sup\d+|si\d+|am)", flags=re.IGNORECASE)
+_ASSET_GROUP_PATTERN = re.compile(r"(gr\d+|ga\d+|mmc\d+|tbl\d+|fx\d+|sup\d+|si\d+|am\d+)", flags=re.IGNORECASE)
 _BODY_IMAGE_PATTERN = re.compile(r"gr\d+\Z", flags=re.IGNORECASE)
 _APPENDIX_IMAGE_PATTERN = re.compile(r"fx\d+\Z", flags=re.IGNORECASE)
 _GRAPHICAL_ABSTRACT_PATTERN = re.compile(r"ga\d+\Z", flags=re.IGNORECASE)
 _TABLE_ASSET_PATTERN = re.compile(r"tbl\d+\Z", flags=re.IGNORECASE)
-_SUPPLEMENTARY_ASSET_PATTERN = re.compile(r"(mmc\d+|si\d+|sup\d+|am)\Z", flags=re.IGNORECASE)
+_SUPPLEMENTARY_ASSET_PATTERN = re.compile(r"(mmc\d+|si\d+|sup\d+|am\d+)\Z", flags=re.IGNORECASE)
 
 
 def get_elsevier_element_rule(local_name: str) -> ElsevierElementRule:
@@ -178,7 +187,7 @@ def normalize_elsevier_section_title(value: str | None) -> str:
 
 
 def should_ignore_elsevier_section_title(value: str | None) -> bool:
-    return normalize_elsevier_section_title(value) in ELSEVIER_IGNORED_SECTION_TITLES
+    return normalize_elsevier_section_title(value) in ELSEVIER_XML_RULES.ignored_section_titles
 
 
 def infer_elsevier_asset_group_key(value: str) -> str:

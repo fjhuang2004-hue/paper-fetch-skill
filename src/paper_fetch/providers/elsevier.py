@@ -5,14 +5,21 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 import json
+import mimetypes
 import urllib.parse
 import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from ..config import build_user_agent, resolve_asset_download_concurrency
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure, is_xml_content_type
+from ..http import (
+    DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
+    HttpTransport,
+    RequestErrorCategory,
+    RequestFailure,
+    is_xml_content_type,
+)
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, article_from_structure, metadata_only_article
 from ..publisher_identity import normalize_doi
@@ -55,6 +62,44 @@ from .base import (
     build_provider_status_check,
     map_request_failure,
     summarize_capability_status,
+)
+
+
+_ELSEVIER_RETRYABLE_BODY_ASSET_TYPES = frozenset({"image", "table_asset"})
+_ELSEVIER_RETRYABLE_ASSET_ERROR_CATEGORIES = frozenset(
+    {
+        RequestErrorCategory.NETWORK_ERROR.value,
+        RequestErrorCategory.TIMEOUT.value,
+        RequestErrorCategory.TLS_ERROR.value,
+        RequestErrorCategory.DNS_ERROR.value,
+        RequestErrorCategory.CONNECTION_RESET.value,
+        RequestErrorCategory.CONNECTION_CLOSED.value,
+    }
+)
+_ELSEVIER_NON_RETRYABLE_ASSET_REASON_TOKENS = (
+    "unsupported asset url scheme",
+    "non-http",
+    "non http",
+    "unauthorized",
+    "forbidden",
+    "authentication",
+    "authorization",
+    "permission",
+    "access denied",
+    "access gate",
+    "license",
+)
+_ELSEVIER_RETRYABLE_ASSET_REASON_TOKENS = (
+    "network error",
+    "timeout",
+    "timed out",
+    "ssl",
+    "eof",
+    "connection reset",
+    "connection aborted",
+    "connection broken",
+    "remote end closed",
+    "temporary failure",
 )
 
 
@@ -225,17 +270,9 @@ def extract_elsevier_asset_references(
         mimetype = None
         extension = (first_xml_child_text(element, "extension") or "").strip().lower()
         if extension:
-            guessed_content_type = {
-                "jpg": "image/jpeg",
-                "jpeg": "image/jpeg",
-                "gif": "image/gif",
-                "png": "image/png",
-                "pdf": "application/pdf",
-                "xls": "application/vnd.ms-excel",
-                "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "zip": "application/zip",
-            }
-            mimetype = guessed_content_type.get(extension)
+            clean_extension = extension.lstrip(".")
+            filename_for_guess = filename if filename.lower().endswith(f".{clean_extension}") else f"attachment.{clean_extension}"
+            mimetype = mimetypes.guess_type(filename_for_guess)[0]
 
         if not attachment_eid:
             continue
@@ -290,6 +327,111 @@ def elsevier_asset_result_section(asset_type: str | None) -> str:
     return "body"
 
 
+def _elsevier_asset_heading(reference: Mapping[str, Any]) -> str:
+    return str(reference.get("filename_hint") or reference.get("source_ref") or "Asset")
+
+
+def _is_retryable_elsevier_body_asset_failure(failure: Mapping[str, Any]) -> bool:
+    if failure.get("status") is not None:
+        return False
+    asset_type = normalize_text(str(failure.get("asset_type") or "")).lower()
+    if asset_type not in _ELSEVIER_RETRYABLE_BODY_ASSET_TYPES:
+        return False
+    if normalize_text(str(failure.get("section") or "")).lower() not in {"", "body"}:
+        return False
+
+    failure_url = normalize_text(
+        str(failure.get("source_url") or failure.get("url") or failure.get("download_url") or "")
+    )
+    if failure_url:
+        parsed_url = urllib.parse.urlparse(failure_url)
+        if parsed_url.scheme and parsed_url.scheme.lower() not in {"http", "https"}:
+            return False
+
+    reason = normalize_text(str(failure.get("reason") or "")).lower()
+    if reason and any(token in reason for token in _ELSEVIER_NON_RETRYABLE_ASSET_REASON_TOKENS):
+        return False
+
+    error_category = normalize_text(str(failure.get("error_category") or "")).lower()
+    if error_category:
+        return error_category in _ELSEVIER_RETRYABLE_ASSET_ERROR_CATEGORIES
+
+    if not reason:
+        return False
+    return any(token in reason for token in _ELSEVIER_RETRYABLE_ASSET_REASON_TOKENS)
+
+
+def _elsevier_reference_matches_failure(reference: Mapping[str, Any], failure: Mapping[str, Any]) -> bool:
+    reference_url = normalize_text(str(reference.get("source_url") or ""))
+    failure_url = normalize_text(
+        str(failure.get("source_url") or failure.get("url") or failure.get("download_url") or "")
+    )
+    if reference_url and reference_url == failure_url:
+        return True
+
+    reference_ref = normalize_text(str(reference.get("source_ref") or ""))
+    failure_ref = normalize_text(str(failure.get("source_ref") or ""))
+    if reference_ref and reference_ref == failure_ref:
+        return True
+
+    reference_heading = normalize_text(_elsevier_asset_heading(reference))
+    failure_heading = normalize_text(str(failure.get("heading") or ""))
+    return bool(reference_heading and reference_heading == failure_heading)
+
+
+def _elsevier_reference_identity(reference: Mapping[str, Any]) -> tuple[str, str, str]:
+    return (
+        normalize_text(str(reference.get("asset_type") or "")).lower(),
+        normalize_text(str(reference.get("source_ref") or "")),
+        normalize_text(str(reference.get("source_url") or "")),
+    )
+
+
+def _elsevier_body_references_for_network_retry(
+    references: Sequence[Mapping[str, Any]],
+    failures: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    retry_failures = [failure for failure in failures if _is_retryable_elsevier_body_asset_failure(failure)]
+    if not retry_failures:
+        return []
+
+    retry_references: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for reference in references:
+        if normalize_text(str(reference.get("asset_type") or "")).lower() not in _ELSEVIER_RETRYABLE_BODY_ASSET_TYPES:
+            continue
+        if not any(_elsevier_reference_matches_failure(reference, failure) for failure in retry_failures):
+            continue
+        identity = _elsevier_reference_identity(reference)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        retry_references.append(dict(reference))
+    return retry_references
+
+
+def _merge_elsevier_body_asset_download_results(
+    initial_result: Mapping[str, list[dict[str, Any]]],
+    retry_result: Mapping[str, list[dict[str, Any]]],
+    *,
+    retried_references: Sequence[Mapping[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    initial_assets = [dict(item) for item in (initial_result.get("assets") or [])]
+    retry_assets = [dict(item) for item in (retry_result.get("assets") or [])]
+    retry_failures = [dict(item) for item in (retry_result.get("asset_failures") or [])]
+    retained_initial_failures: list[dict[str, Any]] = []
+    for failure in initial_result.get("asset_failures") or []:
+        if _is_retryable_elsevier_body_asset_failure(failure) and any(
+            _elsevier_reference_matches_failure(reference, failure) for reference in retried_references
+        ):
+            continue
+        retained_initial_failures.append(dict(failure))
+    return {
+        "assets": [*initial_assets, *retry_assets],
+        "asset_failures": [*retained_initial_failures, *retry_failures],
+    }
+
+
 def download_elsevier_related_assets(
     transport: HttpTransport,
     *,
@@ -340,57 +482,89 @@ def download_elsevier_related_assets(
                 retry_on_transient=True,
             )
         except RequestFailure as exc:
-            return reference, None, {
+            failure = {
                 "kind": elsevier_asset_result_kind(reference.get("asset_type")),
                 "asset_type": reference["asset_type"],
                 "source_kind": reference["source_kind"],
                 "source_ref": reference["source_ref"],
                 "source_url": reference["source_url"],
+                "heading": _elsevier_asset_heading(reference),
                 "status": exc.status_code,
                 "reason": str(exc),
                 "section": elsevier_asset_result_section(reference.get("asset_type")),
             }
+            if exc.error_category is not None:
+                failure["error_category"] = exc.error_category.value
+            return reference, None, failure
         return reference, dict(response), None
 
-    resolved_body_results: list[tuple[Mapping[str, Any], dict[str, Any] | None, dict[str, Any] | None]] = []
-    if body_references:
-        with ThreadPoolExecutor(max_workers=min(active_asset_download_concurrency, len(body_references))) as executor:
-            futures = [executor.submit(fetch_body_reference, reference) for reference in body_references]
+    def download_body_references(
+        references_to_download: list[Mapping[str, Any]],
+        *,
+        concurrency: int,
+    ) -> dict[str, list[dict[str, Any]]]:
+        if not references_to_download:
+            return empty_asset_results()
+
+        resolved_body_results: list[tuple[Mapping[str, Any], dict[str, Any] | None, dict[str, Any] | None]] = []
+        with ThreadPoolExecutor(max_workers=min(max(1, concurrency), len(references_to_download))) as executor:
+            futures = [executor.submit(fetch_body_reference, reference) for reference in references_to_download]
             for future in futures:
                 resolved_body_results.append(future.result())
 
-    for reference, response, failure in resolved_body_results:
-        if failure is not None:
-            failures.append(failure)
-            continue
-        assert response is not None
+        body_downloads: list[dict[str, Any]] = []
+        body_failures: list[dict[str, Any]] = []
+        for reference, response, failure in resolved_body_results:
+            if failure is not None:
+                body_failures.append(failure)
+                continue
+            assert response is not None
 
-        content_type = response["headers"].get("content-type", reference.get("content_type"))
-        asset_type = reference.get("asset_type")
-        output_path = build_asset_output_path(
-            asset_dir,
-            reference.get("filename_hint"),
-            content_type,
-            response["url"],
-            used_names,
+            content_type = response["headers"].get("content-type", reference.get("content_type"))
+            asset_type = reference.get("asset_type")
+            output_path = build_asset_output_path(
+                asset_dir,
+                reference.get("filename_hint"),
+                content_type,
+                response["url"],
+                used_names,
+            )
+            body_downloads.append(
+                {
+                    "kind": elsevier_asset_result_kind(asset_type),
+                    "heading": _elsevier_asset_heading(reference),
+                    "caption": "",
+                    "asset_type": asset_type,
+                    "source_kind": reference["source_kind"],
+                    "source_ref": reference["source_ref"],
+                    "download_url": reference["source_url"],
+                    "source_url": response["url"],
+                    "content_type": content_type,
+                    "path": save_payload(output_path, response["body"]),
+                    "downloaded_bytes": len(response["body"]),
+                    "section": elsevier_asset_result_section(asset_type),
+                    "download_tier": "object_reference",
+                }
+            )
+        return {
+            "assets": body_downloads,
+            "asset_failures": body_failures,
+        }
+
+    body_result = download_body_references(body_references, concurrency=active_asset_download_concurrency)
+    retry_references = _elsevier_body_references_for_network_retry(
+        body_references,
+        body_result.get("asset_failures") or [],
+    )
+    if retry_references:
+        retry_result = download_body_references(retry_references, concurrency=1)
+        body_result = _merge_elsevier_body_asset_download_results(
+            body_result,
+            retry_result,
+            retried_references=retry_references,
         )
-        downloads.append(
-            {
-                "kind": elsevier_asset_result_kind(asset_type),
-                "heading": reference.get("filename_hint") or reference.get("source_ref") or "Asset",
-                "caption": "",
-                "asset_type": asset_type,
-                "source_kind": reference["source_kind"],
-                "source_ref": reference["source_ref"],
-                "download_url": reference["source_url"],
-                "source_url": response["url"],
-                "content_type": content_type,
-                "path": save_payload(output_path, response["body"]),
-                "downloaded_bytes": len(response["body"]),
-                "section": elsevier_asset_result_section(asset_type),
-                "download_tier": "object_reference",
-            }
-        )
+    downloads.extend(list(body_result.get("assets") or []))
+    failures.extend(list(body_result.get("asset_failures") or []))
 
     supplementary_result = download_generic_supplementary_assets(
         transport,
@@ -508,14 +682,14 @@ class ElsevierClient(ProviderClient):
                 retry_on_transient=True,
             )
         except RequestFailure as exc:
-            if exc.status_code in {404, 406, 415}:
-                if exc.status_code == 404:
-                    raise ProviderFailure("no_result", str(exc)) from exc
-                raise ProviderFailure(
-                    "no_result",
-                    "Elsevier official XML representation is not available for this article.",
-                ) from exc
-            raise map_request_failure(exc) from exc
+            raise map_request_failure(
+                exc,
+                no_result_status_codes=frozenset({404, 406, 415}),
+                no_result_messages={
+                    406: "Elsevier official XML representation is not available for this article.",
+                    415: "Elsevier official XML representation is not available for this article.",
+                },
+            ) from exc
 
         content_type = str((response.get("headers") or {}).get("content-type") or "text/xml")
         if not is_xml_content_type(content_type):
@@ -547,14 +721,14 @@ class ElsevierClient(ProviderClient):
                 retry_on_transient=True,
             )
         except RequestFailure as exc:
-            if exc.status_code in {404, 406, 415}:
-                if exc.status_code == 404:
-                    raise ProviderFailure("no_result", str(exc)) from exc
-                raise ProviderFailure(
-                    "no_result",
-                    "Elsevier official PDF representation is not available for this article.",
-                ) from exc
-            raise map_request_failure(exc) from exc
+            raise map_request_failure(
+                exc,
+                no_result_status_codes=frozenset({404, 406, 415}),
+                no_result_messages={
+                    406: "Elsevier official PDF representation is not available for this article.",
+                    415: "Elsevier official PDF representation is not available for this article.",
+                },
+            ) from exc
 
         final_url = str(response.get("url") or url)
         try:

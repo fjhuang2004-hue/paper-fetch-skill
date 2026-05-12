@@ -21,6 +21,7 @@ from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLim
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
+from ..provider_catalog import provider_body_text_thresholds
 from ..publisher_identity import normalize_doi
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
@@ -58,7 +59,7 @@ COPERNICUS_WATERFALL_CONTINUE_CODES = (
     "not_configured",
     "not_supported",
 )
-MIN_BODY_CHARS = 500
+MIN_BODY_CHARS = provider_body_text_thresholds("copernicus").min_chars
 COPERNICUS_XML_DOI_PATTERN = re.compile(
     r"^10\.5194/(?P<journal>[a-z0-9]+)-(?P<volume>\d+)-(?P<page>.+)-(?P<year>\d{4})$",
     flags=re.IGNORECASE,

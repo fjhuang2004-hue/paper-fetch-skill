@@ -5,6 +5,15 @@ from ._ieee_provider_support import *
 
 
 class IeeeProviderAssetExtractionTests(unittest.TestCase):
+    def test_ieee_supplementary_suffixes_reuse_generic_source_with_ieee_extras(self) -> None:
+        self.assertTrue(ieee_provider._has_ieee_supplementary_file_suffix("https://example.test/supplement.csv"))
+        self.assertTrue(
+            ieee_provider._has_ieee_supplementary_file_suffix("https://example.test/supplement.docx")
+        )
+        self.assertTrue(
+            ieee_provider._has_ieee_supplementary_file_suffix("https://example.test/archive.tar.gz")
+        )
+
     def test_ieee_figure_full_media_assets_are_body_assets(self) -> None:
         """rule: rule-ieee-mediastore-body-assets
         rule: rule-ieee-supplementary-scope
@@ -94,6 +103,28 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
             [item["url"] for item in supplementary_assets],
             ["https://ieeexplore.ieee.org/documents/appendix.pdf"],
         )
+
+    def test_ieee_support_icon_filter_uses_structure_and_section_marker_variants(self) -> None:
+        rest_url = "https://ieeexplore.ieee.org/rest/document/10388355/?logAccess=true"
+        paragraph = "This IEEE body paragraph has enough article words for extraction. "
+        html = (
+            '<?xml version="1.0" encoding="UTF-8"?><response><accessType>Open Access</accessType>'
+            '<div id="BodyWrapper"><div id="article">'
+            '<div class="section" id="sec1">'
+            '<span class="kicker">Section 1</span><h2>Introduction</h2><p>'
+            + paragraph * 20
+            + '</p><figure><img src="/assets/img/icon.support-new.gif" alt="Support icon" width="16" height="16"></figure>'
+            '</div><div id="supplementary-materials"><h2>Supplementary Materials</h2>'
+            '<a href="/documents/extra.png">Supplementary image</a></div>'
+            "</div></div></response>"
+        )
+
+        extraction = ieee_provider._extract_ieee_html(html, rest_url, metadata={"title": "IEEE Dynamic Article"})
+
+        self.assertNotIn("Section 1", extraction.markdown_text)
+        self.assertNotIn("icon.support-new.gif", json.dumps(extraction.extracted_assets))
+        self.assertIn("https://ieeexplore.ieee.org/documents/extra.png", json.dumps(extraction.extracted_assets))
+
     def test_real_ieee_multimedia_fixture_yields_supplementary_asset_from_explicit_scope(self) -> None:
         """rule: rule-ieee-supplementary-scope
         rule: rule-supplementary-discovery-explicit-scope"""

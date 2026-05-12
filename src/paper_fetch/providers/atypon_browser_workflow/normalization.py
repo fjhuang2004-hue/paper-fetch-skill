@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import Any
+from typing import Any, Callable
 
 from ...extraction.html.formula_rules import (
     display_formula_nodes,
@@ -13,17 +13,20 @@ from ...extraction.html.formula_rules import (
     looks_like_formula_image,
     mathml_element_from_html_node,
 )
-from ...extraction.html.inline import normalize_html_inline_text, render_html_inline_node
+from ...extraction.html.inline import (
+    normalize_html_inline_text,
+    render_html_inline_node,
+)
 from ...extraction.html.semantics import (
     ABSTRACT_ATTR_TOKENS as ABSTRACT_TOKENS,
     ANCILLARY_TOKENS,
     BACK_MATTER_TOKENS,
+    has_explicit_reference_marker,
     node_identity_text,
     normalize_heading,
 )
 from ...extraction.html.shared import (
     append_text_block as _append_text_block,
-    class_tokens as _class_tokens,
     short_text as _short_text,
     soup_root as _soup_root,
 )
@@ -46,13 +49,12 @@ from ...extraction.html.tables import (
 from ...markdown.citations import is_citation_link, numeric_citation_payload
 from ...utils import normalize_text
 from .._article_markdown_math import render_external_mathml_expression
-from .._science_pnas_profiles import publisher_profile as _publisher_profile
+from .._atypon_browser_workflow_profiles import publisher_profile as _publisher_profile
 from .profile import (
     HEADING_TAG_PATTERN,
     _abstract_nodes,
     _ancestor_identity_text,
     _dedupe_top_level_nodes,
-    _drop_promotional_blocks,
     _is_descendant,
 )
 
@@ -63,7 +65,9 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     NavigableString = None
     Tag = None
 
-FIGURE_LABEL_PATTERN = re.compile(r"\bfig(?:ure)?\.?\s*(\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
+FIGURE_LABEL_PATTERN = re.compile(
+    r"\bfig(?:ure)?\.?\s*(\d+[A-Za-z]?)\b", flags=re.IGNORECASE
+)
 
 
 TABLE_LABEL_PATTERN = re.compile(r"\btable\.?\s*(\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
@@ -77,17 +81,7 @@ def _normalize_table_inline_text(value: str) -> str:
 
 
 def _has_explicit_bibliography_marker(node: Tag) -> bool:
-    attrs = getattr(node, "attrs", None) or {}
-    if "citation-ref" in attrs:
-        return True
-    if normalize_text(str(attrs.get("data-test") or "")).lower() == "citation-ref":
-        return True
-    if normalize_text(str(attrs.get("role") or "")).lower() == "doc-biblioref":
-        return True
-    if normalize_text(str(attrs.get("data-xml-rid") or "")):
-        return True
-    class_tokens = _class_tokens(node)
-    return bool({"biblink", "to-citation"} & class_tokens)
+    return has_explicit_reference_marker(node)
 
 
 def _numeric_citation_payload_from_inline_node(node: Any) -> str | None:
@@ -98,11 +92,15 @@ def _numeric_citation_payload_from_inline_node(node: Any) -> str | None:
     if payload is None:
         return None
     href = normalize_text(str(node.get("href") or ""))
-    if node.name == "a" and (_has_explicit_bibliography_marker(node) or is_citation_link(href, text)):
+    if node.name == "a" and (
+        _has_explicit_bibliography_marker(node) or is_citation_link(href, text)
+    ):
         return payload
     if node.name in {"sup", "i", "em"}:
         anchors = [match for match in node.find_all("a") if isinstance(match, Tag)]
-        if anchors and all(_numeric_citation_payload_from_inline_node(anchor) for anchor in anchors):
+        if anchors and all(
+            _numeric_citation_payload_from_inline_node(anchor) for anchor in anchors
+        ):
             return payload
     return None
 
@@ -123,7 +121,9 @@ def _normalize_non_table_inline_text(value: str) -> str:
     return normalize_html_inline_text(value, policy="body")
 
 
-def _render_non_table_inline_fragment(node: Any, *, text_style: str | None = None) -> str:
+def _render_non_table_inline_fragment(
+    node: Any, *, text_style: str | None = None
+) -> str:
     return _render_non_table_inline_node(node, text_style=text_style)
 
 
@@ -138,7 +138,11 @@ def _render_non_table_inline_node(node: Any, *, text_style: str | None = None) -
 
 
 def _non_table_raw_markdown_from_node(node: Any) -> str | None:
-    if isinstance(node, Tag) and normalize_text(node.name or "").lower() == "img" and _looks_like_formula_image_node(node):
+    if (
+        isinstance(node, Tag)
+        and normalize_text(node.name or "").lower() == "img"
+        and _looks_like_formula_image_node(node)
+    ):
         return _formula_image_markdown(node)
     return None
 
@@ -156,7 +160,9 @@ def _join_non_table_text_fragments(fragments: list[str]) -> str:
         if (
             joined
             and not joined.endswith((" ", "\n", "<br>", "(", "[", "{", "/"))
-            and not normalized_fragment.startswith((".", ",", ";", ":", ")", "]", "}", "%", "<br>"))
+            and not normalized_fragment.startswith(
+                (".", ",", ";", ":", ")", "]", "}", "%", "<br>")
+            )
         ):
             joined += " "
         joined += normalized_fragment
@@ -185,7 +191,13 @@ def _is_non_table_paragraph_node(node: Tag) -> bool:
     name = normalize_text(node.name or "").lower()
     if name in {"p", "li"}:
         return True
-    if name == "div" and normalize_text(str((getattr(node, "attrs", None) or {}).get("role") or "")).lower() == "paragraph":
+    if (
+        name == "div"
+        and normalize_text(
+            str((getattr(node, "attrs", None) or {}).get("role") or "")
+        ).lower()
+        == "paragraph"
+    ):
         return True
     return False
 
@@ -194,7 +206,9 @@ def _normalize_non_table_inline_blocks(container: Tag) -> None:
     candidates = [
         node
         for node in container.find_all(["p", "li", "div"])
-        if isinstance(node, Tag) and node.parent is not None and _is_non_table_paragraph_node(node)
+        if isinstance(node, Tag)
+        and node.parent is not None
+        and _is_non_table_paragraph_node(node)
     ]
     for node in _dedupe_top_level_nodes(candidates):
         if node.find_parent("table") is not None:
@@ -231,7 +245,9 @@ def _mathml_element_from_node(node: Tag | None):
 def _latex_from_math_node(node: Tag, *, display_mode: bool) -> str:
     element = _mathml_element_from_node(node)
     if element is not None:
-        expression = normalize_text(render_external_mathml_expression(element, display_mode=display_mode))
+        expression = normalize_text(
+            render_external_mathml_expression(element, display_mode=display_mode)
+        )
         if expression:
             return expression
     return _short_text(node)
@@ -266,7 +282,11 @@ def _equation_label(node: Tag) -> str:
             candidates.append(_short_text(candidate))
     node_id = normalize_text(str((getattr(node, "attrs", None) or {}).get("id") or ""))
     if node_id:
-        id_match = re.search(r"(?:^|[-_])(?:disp|eq|equation)[-_]?0*([0-9]+[A-Za-z]?)$", node_id, flags=re.IGNORECASE)
+        id_match = re.search(
+            r"(?:^|[-_])(?:disp|eq|equation)[-_]?0*([0-9]+[A-Za-z]?)$",
+            node_id,
+            flags=re.IGNORECASE,
+        )
         if id_match:
             return f"Equation {id_match.group(1)}."
         candidates.append(node_id)
@@ -310,10 +330,14 @@ def _clone_shallow_tag(node: Tag, soup: BeautifulSoup) -> Tag:
     return clone
 
 
-def _insert_split_paragraph(parent: Tag, children: list[Any], soup: BeautifulSoup) -> None:
+def _insert_split_paragraph(
+    parent: Tag, children: list[Any], soup: BeautifulSoup
+) -> None:
     segment = _clone_shallow_tag(parent, soup)
     for child in children:
-        if (NavigableString is not None and isinstance(child, NavigableString)) or isinstance(child, Tag):
+        if (
+            NavigableString is not None and isinstance(child, NavigableString)
+        ) or isinstance(child, Tag):
             segment.append(child.extract())
     if normalize_text(segment.get_text(" ", strip=True)):
         parent.insert_before(segment)
@@ -425,7 +449,13 @@ def _caption_label(node: Tag, *, kind: str) -> str:
 
 
 def _caption_text(node: Tag) -> str:
-    for selector in (".figure__caption-text", "figcaption", ".figure__caption", "[role='doc-caption']", ".caption"):
+    for selector in (
+        ".figure__caption-text",
+        "figcaption",
+        ".figure__caption",
+        "[role='doc-caption']",
+        ".caption",
+    ):
         candidate = node.select_one(selector)
         if isinstance(candidate, Tag):
             text = _render_caption_text(candidate)
@@ -447,7 +477,13 @@ def _strip_caption_label(text: str, label: str) -> str:
 
 
 def _table_caption_text(node: Tag, label: str) -> str:
-    for selector in (".article-table-caption", ".caption", "figcaption", "caption", "header"):
+    for selector in (
+        ".article-table-caption",
+        ".caption",
+        "figcaption",
+        "caption",
+        "header",
+    ):
         candidate = node.select_one(selector)
         if isinstance(candidate, Tag):
             text = _strip_caption_label(_render_caption_text(candidate), label)
@@ -501,9 +537,9 @@ def _first_abstract_node(container: Tag) -> Tag | None:
     return nodes[0] if nodes else None
 
 
-def _is_front_matter_teaser_figure(node: Tag, *, publisher: str, abstract_anchor: Tag | None = None) -> bool:
-    if publisher != "science":
-        return False
+def _is_front_matter_teaser_figure(
+    node: Tag, *, abstract_anchor: Tag | None = None
+) -> bool:
     if _caption_label(node, kind="Figure") != "Figure":
         return False
     if any(token in _ancestor_identity_text(node) for token in ABSTRACT_TOKENS):
@@ -513,12 +549,14 @@ def _is_front_matter_teaser_figure(node: Tag, *, publisher: str, abstract_anchor
     return abstract_anchor in node.find_all_next()
 
 
-def _drop_front_matter_teaser_figures(container: Tag, publisher: str) -> None:
+def _drop_front_matter_teaser_figures(container: Tag) -> None:
     abstract_anchor = _first_abstract_node(container)
     if abstract_anchor is None:
         return
     for node in list(container.find_all("figure")):
-        if isinstance(node, Tag) and _is_front_matter_teaser_figure(node, publisher=publisher, abstract_anchor=abstract_anchor):
+        if isinstance(node, Tag) and _is_front_matter_teaser_figure(
+            node, abstract_anchor=abstract_anchor
+        ):
             node.decompose()
 
 
@@ -528,7 +566,11 @@ def _drop_table_blocks(container: Tag) -> None:
             node.decompose()
 
 
-def _figure_like_nodes(container: Tag) -> list[Tag]:
+def _figure_like_nodes(
+    container: Tag,
+    *,
+    is_front_matter_teaser_figure: Callable[..., bool] | None = None,
+) -> list[Tag]:
     table_nodes = _table_like_nodes(container)
     abstract_anchor = _first_abstract_node(container)
     nodes: list[Tag] = []
@@ -541,13 +583,23 @@ def _figure_like_nodes(container: Tag) -> list[Tag]:
             if not isinstance(match, Tag):
                 continue
             if any(
-                match is table_node or _is_descendant(match, table_node) or _is_descendant(table_node, match)
+                match is table_node
+                or _is_descendant(match, table_node)
+                or _is_descendant(table_node, match)
                 for table_node in table_nodes
             ):
                 continue
-            if _is_front_matter_teaser_figure(match, publisher="science", abstract_anchor=abstract_anchor):
+            if (
+                is_front_matter_teaser_figure is not None
+                and is_front_matter_teaser_figure(
+                    match, abstract_anchor=abstract_anchor
+                )
+            ):
                 continue
-            if any(token in _ancestor_identity_text(match) for token in BACK_MATTER_TOKENS + ANCILLARY_TOKENS):
+            if any(
+                token in _ancestor_identity_text(match)
+                for token in BACK_MATTER_TOKENS + ANCILLARY_TOKENS
+            ):
                 continue
             if match.find("table") is not None:
                 continue
@@ -568,7 +620,9 @@ def _table_header_row_count(table: Tag, rows: list[list[dict[str, Any]]]) -> int
     return table_header_row_count(table, rows)
 
 
-def _expanded_table_matrix(rows: list[list[dict[str, Any]]]) -> list[list[dict[str, Any]]] | None:
+def _expanded_table_matrix(
+    rows: list[list[dict[str, Any]]],
+) -> list[list[dict[str, Any]]] | None:
     return expanded_table_matrix(rows)
 
 
@@ -576,7 +630,9 @@ def _flatten_table_header_rows(rows: list[list[dict[str, Any]]]) -> list[str]:
     return flatten_table_header_rows(rows)
 
 
-def _table_headers_and_data(table: Tag) -> tuple[list[str], list[list[dict[str, Any]]], bool]:
+def _table_headers_and_data(
+    table: Tag,
+) -> tuple[list[str], list[list[dict[str, Any]]], bool]:
     return table_headers_and_data(table, render_inline_text=_render_table_inline_text)
 
 
@@ -623,11 +679,15 @@ def _normalize_table_blocks(container: Tag) -> list[dict[str, str]]:
     return entries
 
 
-def _normalize_figure_blocks(container: Tag) -> None:
+def _normalize_figure_blocks(container: Tag, publisher: str) -> None:
     soup = _soup_root(container)
     if soup is None:
         return
-    for node in _figure_like_nodes(container):
+    profile = _publisher_profile(publisher)
+    for node in _figure_like_nodes(
+        container,
+        is_front_matter_teaser_figure=profile.is_front_matter_teaser_figure,
+    ):
         if not isinstance(node, Tag) or node.parent is None:
             continue
         label = _caption_label(node, kind="Figure")
@@ -640,19 +700,22 @@ def _normalize_figure_blocks(container: Tag) -> None:
 
 
 def _normalize_special_blocks(container: Tag, publisher: str) -> list[dict[str, str]]:
-    _drop_promotional_blocks(container, publisher)
+    _apply_dom_postprocess(container, publisher, stage="before_block_normalization")
     _normalize_abstract_blocks(container)
-    _drop_front_matter_teaser_figures(container, publisher)
     _normalize_display_formula_blocks(container)
     _normalize_inline_math_nodes(container)
     _normalize_inline_formula_image_nodes(container)
     table_entries = _normalize_table_blocks(container)
-    _normalize_figure_blocks(container)
+    _normalize_figure_blocks(container, publisher)
     _normalize_non_table_inline_blocks(container)
+    _apply_dom_postprocess(container, publisher, stage="after_block_normalization")
+    return table_entries
+
+
+def _apply_dom_postprocess(container: Tag, publisher: str, *, stage: str) -> None:
     profile = _publisher_profile(publisher)
     if profile.dom_postprocess is not None:
-        profile.dom_postprocess(container)
-    return table_entries
+        profile.dom_postprocess(container, stage=stage)
 
 
 __all__ = [
@@ -702,6 +765,7 @@ __all__ = [
     "_drop_front_matter_teaser_figures",
     "_drop_table_blocks",
     "_figure_like_nodes",
+    "_apply_dom_postprocess",
     "_table_cell_data",
     "_table_rows",
     "_table_header_row_count",

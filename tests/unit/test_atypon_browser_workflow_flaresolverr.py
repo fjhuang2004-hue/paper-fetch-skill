@@ -8,7 +8,7 @@ from unittest import mock
 from paper_fetch.providers import _flaresolverr
 
 
-class SciencePnasFlareSolverrTests(unittest.TestCase):
+class AtyponBrowserWorkflowFlareSolverrTests(unittest.TestCase):
     def setUp(self) -> None:
         _flaresolverr.reset_session_registry_for_tests()
 
@@ -197,6 +197,10 @@ class SciencePnasFlareSolverrTests(unittest.TestCase):
 
         self.assertEqual(config.provider, "wiley")
         self.assertFalse(hasattr(config, "max_requests_per_hour"))
+
+    def test_status_probe_uses_non_doi_sentinel(self) -> None:
+        self.assertEqual(_flaresolverr.FLARESOLVERR_STATUS_PROBE_ID, "probe://flaresolverr/status")
+        self.assertFalse(_flaresolverr.FLARESOLVERR_STATUS_PROBE_ID.startswith("10."))
 
     def test_health_check_accepts_ok_payload(self) -> None:
         with mock.patch.object(_flaresolverr, "post_to_flaresolverr", return_value={"status": "ok"}):

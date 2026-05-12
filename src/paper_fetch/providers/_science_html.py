@@ -5,11 +5,22 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
-from ..extraction.html.provider_rules import SCIENCE_SITE_RULE_OVERRIDES, provider_html_rules
+from ..provider_catalog import (
+    provider_base_domains,
+    provider_crossref_pdf_position,
+    provider_domains,
+    provider_html_path_templates,
+    provider_pdf_path_templates,
+)
+from ..extraction.html.provider_rules import (
+    SCIENCE_SITE_RULE_OVERRIDES,
+    provider_html_rules,
+)
 from ..quality.html_profiles import (
     science_blocking_fallback_signals,
     science_positive_signals,
 )
+from ..quality.html_signals import AAAS_DATALAYER_PATTERN
 from ..utils import dedupe_authors, normalize_text
 from ._html_authors import (
     AuthorExtractionPipeline,
@@ -19,16 +30,17 @@ from ._html_authors import (
 from ._html_references import extract_numbered_references_from_html
 from ._script_json import extract_assignment_json
 
-HOSTS: tuple[str, ...] = ("www.science.org", "science.org")
-BASE_HOSTS: tuple[str, ...] = HOSTS
-HTML_PATH_TEMPLATES: tuple[str, ...] = ("/doi/full/{doi}", "/doi/{doi}")
-PDF_PATH_TEMPLATES: tuple[str, ...] = ("/doi/epdf/{doi}", "/doi/pdf/{doi}", "/doi/pdf/{doi}?download=true")
-CROSSREF_PDF_POSITION = 0
+HOSTS: tuple[str, ...] = provider_domains("science")
+BASE_HOSTS: tuple[str, ...] = provider_base_domains("science")
+HTML_PATH_TEMPLATES: tuple[str, ...] = provider_html_path_templates("science")
+PDF_PATH_TEMPLATES: tuple[str, ...] = provider_pdf_path_templates("science")
+CROSSREF_PDF_POSITION = provider_crossref_pdf_position("science")
 NOISE_PROFILE = provider_html_rules("science").noise_profile
 SITE_RULE_OVERRIDES: dict[str, Any] = SCIENCE_SITE_RULE_OVERRIDES
-AAAS_DATALAYER_PATTERN = re.compile(r"\bAAASdataLayer\s*=")
 SCIENCE_AUTHOR_COUNT_PATTERN = re.compile(r"^\+\s*\d+\s+authors?$", flags=re.IGNORECASE)
-SCIENCE_STRUCTURED_SUBHEADING_PATTERN = re.compile(r"(?m)^###\s+([A-Z][A-Z0-9 /-]*)\s*$")
+SCIENCE_STRUCTURED_SUBHEADING_PATTERN = re.compile(
+    r"(?m)^###\s+([A-Z][A-Z0-9 /-]*)\s*$"
+)
 SCIENCE_IGNORED_AUTHOR_TEXT = {
     "authors info & affiliations",
     "fewer",
@@ -37,6 +49,20 @@ SCIENCE_IGNORED_AUTHOR_TEXT = {
 }
 SCIENCE_CANONICAL_ABSTRACT_HEADING = "abstract"
 SCIENCE_STRUCTURED_ABSTRACT_HEADING = "structured abstract"
+POST_CONTENT_BREAK_TOKENS = (
+    "purchase access to other journals in the science family",
+    "become a aaas member",
+    "activate your aaas id",
+)
+SCIENCE_CITATION_TOKEN_PATTERN = r"(?:\d+[A-Za-z]*|[A-Za-z]+\d+[A-Za-z0-9]*)"
+SCIENCE_CITATION_ITALIC_PATTERNS = (
+    re.compile(
+        rf"\*(?P<left>{SCIENCE_CITATION_TOKEN_PATTERN})\*\*(?P<sep>[\u2013,;])\*\s*\*(?P<right>{SCIENCE_CITATION_TOKEN_PATTERN})\*"
+    ),
+    re.compile(
+        rf"\*(?P<left>{SCIENCE_CITATION_TOKEN_PATTERN})\*(?P<sep>\s*[\u2013,;]\s*)\*(?P<right>{SCIENCE_CITATION_TOKEN_PATTERN})\*"
+    ),
+)
 
 
 def _load_aaas_datalayer(html_text: str) -> Mapping[str, Any] | None:
@@ -89,7 +115,10 @@ def _science_abstract_role(section: Mapping[str, Any]) -> str:
     source_selector = _normalize_science_heading(section.get("source_selector"))
     if "#editor-abstract" in source_selector:
         return "teaser"
-    if "#structured-abstract" in source_selector or heading == SCIENCE_STRUCTURED_ABSTRACT_HEADING:
+    if (
+        "#structured-abstract" in source_selector
+        or heading == SCIENCE_STRUCTURED_ABSTRACT_HEADING
+    ):
         return "structured"
     if "#abstract" in source_selector or heading == SCIENCE_CANONICAL_ABSTRACT_HEADING:
         return "canonical"
@@ -109,7 +138,8 @@ def _rebuild_science_section_hints(
                 "kind": "body",
                 "order": order,
                 "language": normalize_text(section.get("language")) or None,
-                "source_selector": normalize_text(section.get("source_selector")) or None,
+                "source_selector": normalize_text(section.get("source_selector"))
+                or None,
             }
         )
     base_order = len(rebuilt)
@@ -181,25 +211,95 @@ def _flatten_structured_abstract_markdown(markdown_text: str) -> str:
     match = re.search(r"(?m)^##\s+Structured Abstract\s*$", markdown_text)
     if match is None:
         return markdown_text
-    tail = markdown_text[match.end():]
+    tail = markdown_text[match.end() :]
     next_heading = re.search(r"(?m)^##\s+", tail)
-    block_end = match.end() + next_heading.start() if next_heading is not None else len(markdown_text)
-    block = markdown_text[match.end():block_end]
+    block_end = (
+        match.end() + next_heading.start()
+        if next_heading is not None
+        else len(markdown_text)
+    )
+    block = markdown_text[match.end() : block_end]
     flattened = SCIENCE_STRUCTURED_SUBHEADING_PATTERN.sub(
         lambda item: f"**{item.group(1)}.**",
         block,
     )
-    return markdown_text[:match.end()] + flattened + markdown_text[block_end:]
+    return markdown_text[: match.end()] + flattened + markdown_text[block_end:]
 
 
 def positive_signals(html_text: str) -> tuple[list[str], list[str], list[str]]:
     return science_positive_signals(html_text)
 
 
-def markdown_postprocess(markdown_text: str) -> str:
-    from ._science_pnas_postprocess import merge_science_citation_italics
+def is_front_matter_teaser_figure(
+    node: Any, *, abstract_anchor: Any | None = None
+) -> bool:
+    from .atypon_browser_workflow.normalization import _is_front_matter_teaser_figure
 
+    return _is_front_matter_teaser_figure(node, abstract_anchor=abstract_anchor)
+
+
+def dom_postprocess(container: Any, *, stage: str | None = None) -> None:
+    if normalize_text(stage).lower() not in {
+        "asset_body_container",
+        "asset_figure_extraction",
+        "before_block_normalization",
+    }:
+        return
+
+    from .atypon_browser_workflow.normalization import _drop_front_matter_teaser_figures
+
+    _drop_front_matter_teaser_figures(container)
+
+
+def extract_asset_html_scopes(
+    body_container: Any,
+    supplementary_container: Any,
+    *,
+    publisher: str,
+    content_fragment_html,
+    atypon_browser_workflow_supplementary_sections,
+) -> tuple[str, str]:
+    for node in list(atypon_browser_workflow_supplementary_sections(body_container)):
+        node.decompose()
+
+    supplementary_html = "\n".join(
+        str(node)
+        for node in atypon_browser_workflow_supplementary_sections(supplementary_container)
+        if normalize_text(node.get_text(" ", strip=True))
+    )
+    return content_fragment_html(
+        body_container, publisher=publisher
+    ), supplementary_html
+
+
+def markdown_postprocess(
+    markdown_text: str, *, stage: str | None = None, **context: Any
+) -> str | bool:
+    if stage == "keep_first_unknown_abstract_block":
+        return int(context.get("abstract_prose_blocks_seen") or 0) == 0
     return merge_science_citation_italics(markdown_text)
+
+
+def merge_science_citation_italics(markdown_text: str) -> str:
+    def render_separator(separator_text: str) -> str:
+        separator = normalize_text(separator_text)
+        if separator in {",", ";"}:
+            return f"{separator} "
+        return separator
+
+    merged = markdown_text
+    changed = True
+    while changed:
+        changed = False
+        for pattern in SCIENCE_CITATION_ITALIC_PATTERNS:
+            merged, replacements = pattern.subn(
+                lambda match: (
+                    f"*{match.group('left')}{render_separator(match.group('sep'))}{match.group('right')}*"
+                ),
+                merged,
+            )
+            changed = changed or replacements > 0
+    return merged
 
 
 def finalize_extraction(
@@ -222,3 +322,9 @@ def finalize_extraction(
     if needs_frontmatter_flatten:
         markdown_text = _flatten_structured_abstract_markdown(markdown_text)
     return markdown_text, finalized
+
+
+def scoped_asset_extractor(*args: Any, **kwargs: Any) -> list[dict[str, str]]:
+    from .atypon_browser_workflow.asset_scopes import extract_scoped_html_assets
+
+    return extract_scoped_html_assets(*args, **kwargs)

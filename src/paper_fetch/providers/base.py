@@ -314,7 +314,15 @@ def summarize_capability_status(
     )
 
 
-def map_request_failure(exc: RequestFailure) -> ProviderFailure:
+def map_request_failure(
+    exc: RequestFailure,
+    *,
+    no_result_status_codes: set[int] | frozenset[int] | None = None,
+    no_result_messages: Mapping[int, str] | None = None,
+) -> ProviderFailure:
+    if exc.status_code in (no_result_status_codes or set()):
+        message = normalize_text(str((no_result_messages or {}).get(exc.status_code) or "")) or str(exc)
+        return ProviderFailure("no_result", message)
     if exc.status_code in {401, 403}:
         return ProviderFailure("no_access", str(exc))
     if exc.status_code == 404:

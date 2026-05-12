@@ -15,7 +15,11 @@ from paper_fetch.extraction.html.assets import _core as asset_impl
 from paper_fetch.providers import _flaresolverr, browser_workflow
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
 from paper_fetch.providers.crossref import CrossrefClient
-from paper_fetch.providers.elsevier import ElsevierClient, download_elsevier_related_assets, filter_elsevier_asset_references
+from paper_fetch.providers.elsevier import (
+    ElsevierClient,
+    download_elsevier_related_assets,
+    filter_elsevier_asset_references,
+)
 from paper_fetch.providers.springer import SpringerClient
 from paper_fetch.providers.wiley import WileyClient
 from paper_fetch.runtime import RuntimeContext
@@ -50,6 +54,20 @@ class _FakeQueuedImagePage:
 
 def png_body(label: bytes) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + label
+
+
+def elsevier_body_asset_xml(urls: list[str]) -> bytes:
+    return (
+        b"<?xml version='1.0'?><full-text-retrieval-response>"
+        + b"".join(
+            (
+                f"<object type='IMAGE-HIGH-RES' mimetype='image/png' ref='fig{index}'>"
+                f"{url}</object>"
+            ).encode("utf-8")
+            for index, url in enumerate(urls)
+        )
+        + b"</full-text-retrieval-response>"
+    )
 
 
 class ProviderRequestOptionsTests(unittest.TestCase):
@@ -216,7 +234,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             ),
             mock.patch.object(
                 browser_workflow,
-                "extract_science_pnas_markdown",
+                "extract_atypon_browser_workflow_markdown",
                 return_value=("# Example Wiley Article\n\n## Results\n\n" + ("Body text " * 120), {"title": "Example"}),
             ),
             mock.patch.object(browser_workflow, "fetch_pdf_with_playwright") as mocked_pdf,
@@ -271,7 +289,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             ) as mocked_fetch,
             mock.patch.object(
                 browser_workflow,
-                "extract_science_pnas_markdown",
+                "extract_atypon_browser_workflow_markdown",
                 return_value=("# Example Wiley Article\n\n## Results\n\n" + ("Body text " * 120), {"title": "Example"}),
             ),
         ):
@@ -335,9 +353,9 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             ) as mocked_fetch,
             mock.patch.object(
                 browser_workflow,
-                "extract_science_pnas_markdown",
+                "extract_atypon_browser_workflow_markdown",
                 side_effect=[
-                    browser_workflow.SciencePnasHtmlFailure(
+                    browser_workflow.HtmlExtractionFailure(
                         "insufficient_body",
                         "HTML extraction did not produce enough article body text.",
                     ),
@@ -657,6 +675,156 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(state["max_active"], 1)
         self.assertEqual([asset["download_url"] for asset in result["assets"]], urls)
         self.assertEqual(result["asset_failures"], [])
+
+    def test_elsevier_body_asset_transient_failure_is_retried_once_and_removed(self) -> None:
+        urls = [f"https://api.elsevier.com/content/object/eid/fig{index}" for index in range(4)]
+        failed_url = urls[2]
+        transport = RecordingTransport(
+            {
+                ("GET", urls[0]): {
+                    "status_code": 200,
+                    "headers": {"content-type": "image/png"},
+                    "body": png_body(b"fig0"),
+                    "url": urls[0],
+                },
+                ("GET", urls[1]): {
+                    "status_code": 200,
+                    "headers": {"content-type": "image/png"},
+                    "body": png_body(b"fig1"),
+                    "url": urls[1],
+                },
+                ("GET", failed_url): [
+                    RequestFailure(None, "Network error: timed out", error_category="timeout"),
+                    {
+                        "status_code": 200,
+                        "headers": {"content-type": "image/png"},
+                        "body": png_body(b"fig2-retry"),
+                        "url": failed_url,
+                    },
+                ],
+                ("GET", urls[3]): {
+                    "status_code": 200,
+                    "headers": {"content-type": "image/png"},
+                    "body": png_body(b"fig3"),
+                    "url": urls[3],
+                },
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = download_elsevier_related_assets(
+                transport,
+                doi="10.1016/test",
+                xml_body=elsevier_body_asset_xml(urls),
+                output_dir=Path(tmpdir),
+                headers={"User-Agent": "unit-test", "X-ELS-APIKey": "secret"},
+                asset_profile="body",
+            )
+
+        self.assertEqual(result["asset_failures"], [])
+        self.assertEqual(len(result["assets"]), 4)
+        self.assertEqual([asset["download_url"] for asset in result["assets"]], [urls[0], urls[1], urls[3], urls[2]])
+        self.assertEqual([call["url"] for call in transport.calls].count(failed_url), 2)
+
+    def test_elsevier_body_asset_http_status_failure_is_not_retried(self) -> None:
+        url = "https://api.elsevier.com/content/object/eid/fig0"
+        transport = RecordingTransport(
+            {
+                ("GET", url): RequestFailure(403, "HTTP 403 for Elsevier object", url=url),
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = download_elsevier_related_assets(
+                transport,
+                doi="10.1016/test",
+                xml_body=elsevier_body_asset_xml([url]),
+                output_dir=Path(tmpdir),
+                headers={"User-Agent": "unit-test", "X-ELS-APIKey": "secret"},
+                asset_profile="body",
+            )
+
+        self.assertEqual(result["assets"], [])
+        self.assertEqual(len(result["asset_failures"]), 1)
+        self.assertEqual(result["asset_failures"][0]["status"], 403)
+        self.assertEqual([call["url"] for call in transport.calls], [url])
+
+    def test_elsevier_body_asset_retry_failure_replaces_initial_failure(self) -> None:
+        url = "https://api.elsevier.com/content/object/eid/fig0"
+        transport = RecordingTransport(
+            {
+                ("GET", url): [
+                    RequestFailure(None, "Network error: timed out", error_category="timeout"),
+                    RequestFailure(None, "connection reset by peer", error_category="connection_reset"),
+                ],
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = download_elsevier_related_assets(
+                transport,
+                doi="10.1016/test",
+                xml_body=elsevier_body_asset_xml([url]),
+                output_dir=Path(tmpdir),
+                headers={"User-Agent": "unit-test", "X-ELS-APIKey": "secret"},
+                asset_profile="body",
+            )
+
+        self.assertEqual(result["assets"], [])
+        self.assertEqual(len(result["asset_failures"]), 1)
+        self.assertIn("connection reset", result["asset_failures"][0]["reason"])
+        self.assertEqual(result["asset_failures"][0]["error_category"], "connection_reset")
+        self.assertEqual([call["url"] for call in transport.calls], [url, url])
+
+    def test_elsevier_body_asset_retry_successes_are_appended_in_reference_order(self) -> None:
+        urls = [f"https://api.elsevier.com/content/object/eid/fig{index}" for index in range(4)]
+        transport = RecordingTransport(
+            {
+                ("GET", urls[0]): [
+                    RequestFailure(None, "Network error: timed out", error_category="timeout"),
+                    {
+                        "status_code": 200,
+                        "headers": {"content-type": "image/png"},
+                        "body": png_body(b"fig0-retry"),
+                        "url": urls[0],
+                    },
+                ],
+                ("GET", urls[1]): {
+                    "status_code": 200,
+                    "headers": {"content-type": "image/png"},
+                    "body": png_body(b"fig1"),
+                    "url": urls[1],
+                },
+                ("GET", urls[2]): [
+                    RequestFailure(None, "temporary failure in name resolution", error_category="dns_error"),
+                    {
+                        "status_code": 200,
+                        "headers": {"content-type": "image/png"},
+                        "body": png_body(b"fig2-retry"),
+                        "url": urls[2],
+                    },
+                ],
+                ("GET", urls[3]): {
+                    "status_code": 200,
+                    "headers": {"content-type": "image/png"},
+                    "body": png_body(b"fig3"),
+                    "url": urls[3],
+                },
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = download_elsevier_related_assets(
+                transport,
+                doi="10.1016/test",
+                xml_body=elsevier_body_asset_xml(urls),
+                output_dir=Path(tmpdir),
+                headers={"User-Agent": "unit-test", "X-ELS-APIKey": "secret"},
+                asset_profile="body",
+            )
+
+        self.assertEqual(result["asset_failures"], [])
+        self.assertEqual([asset["download_url"] for asset in result["assets"]], [urls[1], urls[3], urls[0], urls[2]])
 
     def test_playwright_image_page_fetch_is_abortable_and_does_not_cache_challenge_pages(self) -> None:
         page = _FakeImagePage({"ok": False, "error": "AbortError", "timedOut": True})

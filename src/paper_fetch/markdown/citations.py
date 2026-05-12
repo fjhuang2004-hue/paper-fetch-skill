@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-import urllib.parse
+from collections.abc import Sequence
 
+from ..extraction.citation_anchors import looks_like_reference_href
 from ..utils import normalize_text
 from .inline_spacing import normalize_inline_sup_sub_tag_bodies
 
@@ -23,19 +24,13 @@ PARENTHETICAL_CITATION_PATTERN = re.compile(r"\((?P<inner>[^()\n]{1,160})\)")
 ADJACENT_SENTINEL_RUN_PATTERN = re.compile(
     rf"{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@(?:\s*[,–-]\s*{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@)+"
 )
-INLINE_ARTICLE_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\((?:/(?:article|articles)/[^)]+|#[^)]+)\)")
-LABEL_PATTERN = re.compile(r"\b((?:Extended Data|Fig|Figs|Tab|Tabs|Eq|Eqs|Ref|Refs))\s+(\d+[A-Za-z]?)\b")
-FIGURE_LINE_PATTERN = re.compile(r"(?im)^(?:extended data\s+)?fig\.\s*[a-z0-9.-]+:.*$")
-REFERENCE_FRAGMENT_PATTERN = re.compile(
-    r"(?:"
-    r"(?:.*(?:ref|bib|cite)[-_\w]*)"
-    r"|(?:core-collateral-r\d+[a-z0-9-]*)"
-    r"|(?:r\d+[a-z0-9-]*)"
-    r"|(?:cr\d+[a-z0-9-]*)"
-    r")$",
+COMMON_LABEL_PATTERN = re.compile(
+    r"(?<!Extended Data )\b((?:Fig|Figs|Tab|Tabs|Eq|Eqs|Ref|Refs))\.?\s+(\d+[A-Za-z]?)\b",
     flags=re.IGNORECASE,
 )
-
+COMMON_LABEL_PATTERNS = (COMMON_LABEL_PATTERN,)
+COMMON_FIGURE_LINE_PATTERN = re.compile(r"(?im)^fig\.\s*[a-z0-9.-]+:.*$")
+COMMON_FIGURE_LINE_PATTERNS = (COMMON_FIGURE_LINE_PATTERN,)
 
 def numeric_citation_payload(text: str) -> str | None:
     normalized = normalize_text(text).replace("−", "–").replace("—", "–")
@@ -156,16 +151,7 @@ def is_citation_text(text: str) -> bool:
 
 
 def is_reference_href(href: str) -> bool:
-    normalized_href = normalize_text(href)
-    if not normalized_href:
-        return False
-    parsed = urllib.parse.urlparse(normalized_href)
-    fragment = normalize_text(parsed.fragment or "")
-    if fragment:
-        return bool(REFERENCE_FRAGMENT_PATTERN.search(fragment))
-    if not normalized_href.startswith("#"):
-        return False
-    return bool(REFERENCE_FRAGMENT_PATTERN.search(normalized_href[1:]))
+    return looks_like_reference_href(href)
 
 
 def is_citation_link(href: str, text: str) -> bool:
@@ -180,20 +166,25 @@ def clean_citation_markers(
     text: str,
     *,
     unwrap_inline_links: bool = False,
+    inline_link_patterns: Sequence[re.Pattern[str]] | None = None,
     normalize_labels: bool = False,
+    label_patterns: Sequence[re.Pattern[str]] | None = None,
     drop_figure_lines: bool = False,
+    figure_line_patterns: Sequence[re.Pattern[str]] | None = None,
 ) -> str:
     if not text:
         return ""
 
     cleaned = text
     if drop_figure_lines:
-        cleaned = FIGURE_LINE_PATTERN.sub("", cleaned)
-        cleaned = re.sub(r"(?im)^\s*source data\s*$", "", cleaned)
+        for pattern in figure_line_patterns or COMMON_FIGURE_LINE_PATTERNS:
+            cleaned = pattern.sub("", cleaned)
     if unwrap_inline_links:
-        cleaned = INLINE_ARTICLE_LINK_PATTERN.sub(r"\1", cleaned)
+        for pattern in inline_link_patterns or ():
+            cleaned = pattern.sub(r"\1", cleaned)
     if normalize_labels:
-        cleaned = LABEL_PATTERN.sub(_join_label_reference, cleaned)
+        for pattern in label_patterns or COMMON_LABEL_PATTERNS:
+            cleaned = pattern.sub(_join_label_reference, cleaned)
     cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)
     cleaned = re.sub(r"([(\[])\s+", r"\1", cleaned)
     cleaned = re.sub(r"\s+([)\]])", r"\1", cleaned)

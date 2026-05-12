@@ -24,7 +24,8 @@ from paper_fetch.models import (
     metadata_only_article,
     normalize_markdown_text,
 )
-import paper_fetch.providers.springer_html as springer_html
+from paper_fetch.models.render import is_table_like_figure_asset
+from paper_fetch.providers import _springer_html as springer_html
 from tests.golden_criteria import golden_criteria_asset, golden_criteria_scenario_asset
 
 from ._paper_fetch_support import sample_article
@@ -116,6 +117,11 @@ class ModelsRenderTests(unittest.TestCase):
         self.assertNotIn("Table 1", markdown)
         self.assertIn("## Additional Tables", markdown)
         self.assertIn("![Table 2](downloads/table-2.png)", markdown)
+
+    def test_table_like_figure_detection_keeps_nature_extended_data_as_explicit_extension(self) -> None:
+        figure_asset = Asset(kind="figure", heading="Extended Data Table 1", caption="", path="downloads/table.png")
+
+        self.assertTrue(is_table_like_figure_asset(figure_asset))
 
     def test_to_ai_markdown_full_text_defaults_to_all_references(self) -> None:
         article = sample_article()
