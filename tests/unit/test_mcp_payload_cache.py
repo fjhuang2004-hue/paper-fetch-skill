@@ -180,6 +180,9 @@ class McpPayloadCacheTests(unittest.TestCase):
 
             saved_path = download_dir / "custom.md"
             self.assertEqual(payload["saved_markdown_path"], str(saved_path))
+            self.assertIsNone(payload["markdown"])
+            self.assertIsNone(payload["article"])
+            self.assertEqual(payload["metadata"]["title"], "Example Article")
             self.assertTrue(saved_path.exists())
             self.assertIn("# Example Article", saved_path.read_text(encoding="utf-8"))
             self.assertEqual(captured["modes"], {"article", "markdown"})
@@ -211,6 +214,8 @@ class McpPayloadCacheTests(unittest.TestCase):
                 )
 
             self.assertNotIn("saved_markdown_path", payload)
+            self.assertIsNone(payload["markdown"])
+            self.assertIsNone(payload["article"])
             self.assertFalse((download_dir / "10.1000_example.md").exists())
             self.assertIn("download:markdown_skipped_no_fulltext", payload["source_trail"])
             self.assertTrue(any("nothing written to disk" in warning for warning in payload["warnings"]))
@@ -242,6 +247,8 @@ class McpPayloadCacheTests(unittest.TestCase):
             self.assertFalse((download_dir / "10.1000_example.xml").exists())
             self.assertFalse((download_dir / "10.1000_example_assets").exists())
             self.assertEqual(payload["saved_markdown_path"], str(download_dir / "10.1000_example.md"))
+            self.assertIsNone(payload["markdown"])
+            self.assertIsNone(payload["article"])
             listed = mcp_tools.list_cached_payload(download_dir=download_dir)
             self.assertEqual([entry["kind"] for entry in listed["entries"]], ["markdown"])
     def test_fetch_paper_payload_normalizes_preferred_providers(self) -> None:
@@ -312,6 +319,36 @@ class McpPayloadCacheTests(unittest.TestCase):
 
         self.assertEqual(payload["doi"], "10.1000/example")
         self.assertEqual(payload["markdown"], "# Example Article\n\nExample body.\n")
+        self.assertIn(QUALITY_FLAG_CACHED_WITH_CURRENT_REVISION, payload["quality"]["flags"])
+        mocked_fetch.assert_not_called()
+    def test_fetch_paper_payload_save_markdown_compacts_cached_sidecar_response(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            download_dir = Path(tmpdir)
+            create_cached_fetch_envelope(download_dir, "10.1000/example")
+
+            with (
+                mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
+                mock.patch.object(
+                    mcp_tools,
+                    "service_resolve_paper",
+                    return_value=sample_resolved_query("10.1000/example"),
+                ),
+                mock.patch.object(mcp_tools, "service_fetch_paper") as mocked_fetch,
+            ):
+                payload = mcp_tools.fetch_paper_payload(
+                    query="10.1000/example",
+                    modes=["markdown"],
+                    prefer_cache=True,
+                    save_markdown=True,
+                    download_dir=download_dir,
+                )
+
+            saved_path = download_dir / "10.1000_example.md"
+            self.assertEqual(payload["saved_markdown_path"], str(saved_path))
+            self.assertTrue(saved_path.exists())
+        self.assertIsNone(payload["markdown"])
+        self.assertIsNone(payload["article"])
+        self.assertEqual(payload["metadata"]["title"], "Example Article")
         self.assertIn(QUALITY_FLAG_CACHED_WITH_CURRENT_REVISION, payload["quality"]["flags"])
         mocked_fetch.assert_not_called()
     def test_fetch_paper_payload_prefer_cache_falls_back_on_mode_mismatch(self) -> None:

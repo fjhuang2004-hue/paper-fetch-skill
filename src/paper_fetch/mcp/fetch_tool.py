@@ -215,6 +215,19 @@ def _fetch_envelope_cache_path(download_dir: Path, doi: str) -> Path:
     return fetch_envelope_cache_path(download_dir, doi)
 
 
+def _response_payload_from_envelope(envelope: FetchEnvelope, request: FetchPaperRequest) -> dict[str, Any]:
+    payload = _payload_from_envelope(envelope, request)
+    if not request.save_markdown:
+        return payload
+
+    article_payload = payload.get("article")
+    if payload.get("metadata") is None and isinstance(article_payload, Mapping):
+        payload["metadata"] = article_payload.get("metadata")
+    payload["markdown"] = None
+    payload["article"] = None
+    return payload
+
+
 def resolve_paper_payload(
     *,
     query: str | None = None,
@@ -290,7 +303,7 @@ def fetch_paper_payload(
         download_dir=download_dir,
         context=context,
     )
-    payload = _payload_from_envelope(envelope, request)
+    payload = _response_payload_from_envelope(envelope, request)
     if saved_markdown_path is not None:
         payload["saved_markdown_path"] = str(saved_markdown_path)
     return payload
@@ -443,7 +456,7 @@ def build_fetch_tool_result(
     *,
     saved_markdown_path: Path | None = None,
 ) -> CallToolResult:
-    payload = _payload_from_envelope(envelope, request)
+    payload = _response_payload_from_envelope(envelope, request)
     if saved_markdown_path is not None:
         payload["saved_markdown_path"] = str(saved_markdown_path)
     extra_content: list[TextContent | ImageContent] = []
@@ -452,7 +465,7 @@ def build_fetch_tool_result(
         request.strategy.asset_profile,
         source_name=envelope.source,
     )
-    if resolved_asset_profile in {"body", "all"}:
+    if not request.save_markdown and resolved_asset_profile in {"body", "all"}:
         extra_content, image_warnings = _inline_image_contents(
             envelope.article,
             budget=request.strategy.resolved_inline_image_budget(),

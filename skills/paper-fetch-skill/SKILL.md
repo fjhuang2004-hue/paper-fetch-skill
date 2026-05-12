@@ -41,6 +41,7 @@ BLOCKING：⛔ BLOCKING。只要以下任一信息缺失，就必须暂停并等
 
 1. 如果用户没有明确要求保存，在实际抓取前先确认3个问题：是否需要保存、保存到哪里、是否需要下载图片资源。
 2. 将“是否保存”映射到 `save_markdown` / `no_download` 的选择；将“保存到哪里”映射到 `markdown_output_dir` 或 `download_dir`；将“是否下载图片”映射到 `strategy.asset_profile` 是否使用 `body` 或 `all`。
+3. 当用户选择保存 Markdown 时，默认使用 `save_markdown=true`；此时 MCP 响应只返回保存路径和诊断字段，不直接返回全文 `markdown` 或包含正文 sections 的 `article`。后续需要正文时，从 `saved_markdown_path` 读取所需片段。
 
 ### 第 2 步：给出CLI操作
 GATE：仅当第 1 步已经完成参数映射后，才能判断是否需要建议 CLI；判断依据是当前任务是否要处理 `>=3` 篇文献，或是否明显属于成批抓取/核验场景。若用户已经明确表示坚持不用 CLI，则本步只需简短说明“仍可直接抓取”，随后进入第 3 步。
@@ -68,7 +69,7 @@ BLOCKING：默认非 BLOCKING，可连续执行抓取与后续处理；但遇到
 9. 如果只需要低成本判断能否读取全文，调用 `has_fulltext(query)`。
 10. 如果目标 provider 是 `wiley`、`science` 或 `pnas`，在第一次抓取前先启动 FlareSolverr；随后调用 `provider_status()` 或仓库现成的状态脚本确认本地浏览器运行时健康。
 11. 如果提供方凭证、Wiley / Science / PNAS 的本地运行时状态，或 IEEE Xplore 访问上下文可能影响结果，在第一次抓取前调用 `provider_status()`。
-12. 当你需要适合 AI 的 Markdown、结构化文章数据或元数据时，调用 `fetch_paper(query, modes, strategy, include_refs, max_tokens, prefer_cache, no_download, save_markdown, markdown_output_dir, markdown_filename, download_dir)`。
+12. 当你需要适合 AI 的 Markdown、结构化文章数据或元数据时，调用 `fetch_paper(query, modes, strategy, include_refs, max_tokens, prefer_cache, no_download, save_markdown, markdown_output_dir, markdown_filename, download_dir)`；如果 `save_markdown=true`，把返回结果视为路径和质量诊断，不要期待本轮工具结果携带全文。
 13. 如果浏览器链路抓取失败，先检查 `provider_status()`、确认运行时健康，并优先以 `prefer_cache=false` 重试；总重试次数最多 `2` 次，不要无限重跑。
 14. 不要仅因为本地没有 PDF 或缓存文本文件，就断定“不可读”。
 15. 如果拿不到全文，也要继续利用返回的仅摘要或仅元数据结果，并明确告诉用户当前基于元数据或摘要工作。
