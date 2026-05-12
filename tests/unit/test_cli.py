@@ -81,6 +81,128 @@ class CliTests(unittest.TestCase):
         finally:
             paper_fetch_cli.fetch_paper = original_fetch
 
+    def test_main_saves_formatted_markdown_copy_when_format_and_output_dir_are_explicit(self) -> None:
+        article = sample_article()
+        captured: dict[str, object] = {}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "papers"
+            asset_dir = output_dir / "10.1016_test_assets"
+            asset_dir.mkdir(parents=True)
+            figure_path = asset_dir / "figure-1.png"
+            figure_path.write_bytes(b"figure")
+            article.assets = [
+                Asset(kind="figure", heading="Figure 1", caption="Body figure.", path=str(figure_path), section="body")
+            ]
+
+            def fake_fetch(*args, **kwargs):
+                captured.update(kwargs)
+                return paper_fetch.build_fetch_envelope(article, modes=kwargs["modes"], render=kwargs["render"])
+
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            original_argv = sys.argv
+            sys.argv = [
+                "paper_fetch.py",
+                "--query",
+                "10.1016/test",
+                "--format",
+                "markdown",
+                "--output-dir",
+                str(output_dir),
+                "--asset-profile",
+                "body",
+            ]
+            try:
+                with (
+                    mock.patch.object(paper_fetch_cli, "build_runtime_env", return_value={}),
+                    mock.patch.object(paper_fetch_cli, "fetch_paper", side_effect=fake_fetch),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    exit_code = paper_fetch_cli.main()
+            finally:
+                sys.argv = original_argv
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("# Example Article", stdout.getvalue())
+            self.assertEqual(captured["modes"], {"article", "markdown"})
+            saved_path = output_dir / "10.1016_test.md"
+            self.assertTrue(saved_path.exists())
+            rendered = saved_path.read_text(encoding="utf-8")
+            self.assertIn("![Figure 1](10.1016_test_assets/figure-1.png)", rendered)
+            self.assertNotIn(str(figure_path), rendered)
+
+    def test_main_does_not_auto_save_formatted_copy_when_format_is_implicit(self) -> None:
+        article = sample_article()
+        captured: dict[str, object] = {}
+
+        def fake_fetch(*args, **kwargs):
+            captured.update(kwargs)
+            return paper_fetch.build_fetch_envelope(article, modes=kwargs["modes"], render=kwargs["render"])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "papers"
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            original_argv = sys.argv
+            sys.argv = ["paper_fetch.py", "--query", "10.1016/test", "--output-dir", str(output_dir)]
+            try:
+                with (
+                    mock.patch.object(paper_fetch_cli, "build_runtime_env", return_value={}),
+                    mock.patch.object(paper_fetch_cli, "fetch_paper", side_effect=fake_fetch),
+                    contextlib.redirect_stdout(stdout),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    exit_code = paper_fetch_cli.main()
+            finally:
+                sys.argv = original_argv
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("# Example Article", stdout.getvalue())
+            self.assertEqual(captured["modes"], {"markdown"})
+            self.assertFalse((output_dir / "10.1016_test.md").exists())
+
+    def test_main_saves_json_and_both_copies_when_format_and_output_dir_are_explicit(self) -> None:
+        article = sample_article()
+
+        for output_format, expected_name in (("json", "10.1016_test.json"), ("both", "10.1016_test.both.json")):
+            with self.subTest(output_format=output_format), tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir) / "papers"
+
+                def fake_fetch(*args, **kwargs):
+                    return paper_fetch.build_fetch_envelope(article, modes=kwargs["modes"], render=kwargs["render"])
+
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                original_argv = sys.argv
+                sys.argv = [
+                    "paper_fetch.py",
+                    "--query",
+                    "10.1016/test",
+                    "--format",
+                    output_format,
+                    "--output-dir",
+                    str(output_dir),
+                ]
+                try:
+                    with (
+                        mock.patch.object(paper_fetch_cli, "build_runtime_env", return_value={}),
+                        mock.patch.object(paper_fetch_cli, "fetch_paper", side_effect=fake_fetch),
+                        contextlib.redirect_stdout(stdout),
+                        contextlib.redirect_stderr(stderr),
+                    ):
+                        exit_code = paper_fetch_cli.main()
+                finally:
+                    sys.argv = original_argv
+
+                self.assertEqual(exit_code, 0)
+                self.assertEqual(stderr.getvalue(), "")
+                self.assertTrue((output_dir / expected_name).exists())
+                self.assertEqual(json.loads(stdout.getvalue()), json.loads((output_dir / expected_name).read_text(encoding="utf-8")))
+
     def test_main_uses_resolved_default_download_dir_for_save_markdown(self) -> None:
         article = sample_article()
         captured: dict[str, object] = {}

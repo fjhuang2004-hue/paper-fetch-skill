@@ -396,6 +396,8 @@ python3 -m pip install .
 paper-fetch --query "10.1186/1471-2105-11-421"
 ```
 
+CLI 输出参数的语义是：`--format` 控制 stdout / `--output` 的序列化格式，`--output` 控制格式化结果的文件路径，`--output-dir` 控制 provider HTML/PDF/图片等本地资源目录。为避免 `--format markdown --output-dir ./papers` 只打印 Markdown 而不保存 Markdown 的误解，当用户显式传入 `--format`、保留默认 `--output -` 且指定 `--output-dir` 时，CLI 会额外在该目录保存同格式文档。
+
 如果你在仓库源码目录里做 repo-local 验证，先安装测试依赖，并推荐显式带上 `PYTHONPATH=src`。默认 `pytest` 覆盖 `tests/unit` + `tests/integration` + `tests/devtools` 并启用多进程并行；`tests/live` 需要显式指定路径并串行运行：
 
 ```bash

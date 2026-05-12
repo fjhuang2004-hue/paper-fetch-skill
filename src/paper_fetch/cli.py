@@ -7,10 +7,12 @@ import json
 import sys
 from pathlib import Path
 
+from .artifacts import ArtifactStore
 from .config import build_runtime_env, resolve_cli_download_dir
 from .models import FetchEnvelope, RenderOptions
 from .providers.base import ProviderFailure
 from .service import FetchStrategy, PaperFetchFailure, fetch_paper
+from .utils import sanitize_filename
 from .workflow.pipeline import FetchPipeline, MarkdownSaveSpec
 from .workflow.request_builder import build_fetch_pipeline_request
 from .workflow.rendering import rewrite_markdown_asset_links
@@ -48,6 +50,51 @@ def write_output(serialized: str, output: str) -> None:
     Path(output).write_text(serialized, encoding="utf-8")
 
 
+def _has_explicit_option(argv: list[str], option: str) -> bool:
+    return any(value == option or value.startswith(f"{option}=") for value in argv)
+
+
+def _should_save_formatted_output_copy(args: argparse.Namespace, *, explicit_format: bool) -> bool:
+    return bool(explicit_format and args.output == "-" and args.output_dir)
+
+
+def _formatted_output_filename(envelope: FetchEnvelope, *, output_format: str) -> str:
+    identifier = envelope.doi
+    if not identifier and envelope.article is not None:
+        identifier = envelope.article.metadata.title
+    if not identifier and envelope.metadata is not None:
+        identifier = envelope.metadata.title
+    stem = sanitize_filename(identifier or "article")
+    suffix = {
+        "markdown": ".md",
+        "json": ".json",
+        "both": ".both.json",
+    }[output_format]
+    return f"{stem}{suffix}"
+
+
+def save_formatted_output_copy(
+    envelope: FetchEnvelope,
+    *,
+    output_dir: Path,
+    output_format: str,
+    render: RenderOptions,
+) -> Path:
+    target = output_dir / _formatted_output_filename(envelope, output_format=output_format)
+    markdown_override = (
+        rewrite_markdown_asset_links(
+            envelope.markdown or "",
+            envelope,
+            target_path=target,
+            render=render,
+        )
+        if output_format in {"markdown", "both"}
+        else None
+    )
+    serialized = serialize_envelope(envelope, output_format=output_format, markdown_override=markdown_override)
+    return ArtifactStore.from_download_dir(output_dir).write_text_file(target, serialized, encoding="utf-8")
+
+
 def parse_max_tokens(value: str) -> int | str:
     normalized = value.strip().lower()
     if normalized == "full_text":
@@ -67,7 +114,7 @@ def _compute_modes(args: argparse.Namespace) -> set[str]:
     # Writing Markdown to a file or saving an extra Markdown copy needs the
     # structured article payload so we can rewrite local asset links relative
     # to the target path and decide whether full text was actually usable.
-    if args.format == "markdown" and args.output != "-":
+    if args.format == "markdown" and (args.output != "-" or getattr(args, "save_output_copy", False)):
         modes.add("article")
     if args.format == "both" or args.save_markdown:
         modes.add("markdown")
@@ -96,13 +143,22 @@ def exit_code_for_error(error: Exception) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Fetch AI-friendly full text for a paper by DOI, URL, or title.")
     parser.add_argument("--query", required=True, help="DOI, paper landing URL, or title query")
-    parser.add_argument("--format", choices=("markdown", "json", "both"), default="markdown")
+    parser.add_argument(
+        "--format",
+        choices=("markdown", "json", "both"),
+        default="markdown",
+        help=(
+            "Serialization format for stdout or --output. When explicitly set with --output-dir "
+            "and stdout output, a same-format copy is also saved under --output-dir."
+        ),
+    )
     parser.add_argument("--output", default="-", help="Output destination. Use - for stdout.")
     parser.add_argument(
         "--output-dir",
         help=(
-            "Directory for saving raw provider downloads such as Wiley PDFs. "
-            "Defaults to PAPER_FETCH_DOWNLOAD_DIR or the user data downloads directory."
+            "Directory for raw provider downloads, HTML, and assets. Also receives the formatted "
+            "output copy when --format is explicit and --output is stdout. Defaults to "
+            "PAPER_FETCH_DOWNLOAD_DIR or the user data downloads directory."
         ),
     )
     parser.add_argument("--no-download", action="store_true", help="Do not write provider PDF/binary payloads to disk.")
@@ -123,9 +179,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args()
+    raw_args = sys.argv[1:] if argv is None else list(argv)
+    args = parser.parse_args(raw_args)
+    args.save_output_copy = _should_save_formatted_output_copy(
+        args,
+        explicit_format=_has_explicit_option(raw_args, "--format"),
+    )
 
     try:
         runtime_env = build_runtime_env()
@@ -171,6 +232,13 @@ def main() -> int:
             else None
         )
         serialized = serialize_envelope(envelope, output_format=args.format, markdown_override=markdown_override)
+        if args.save_output_copy:
+            save_formatted_output_copy(
+                envelope,
+                output_dir=output_dir,
+                output_format=args.format,
+                render=render_options,
+            )
         write_output(serialized, args.output)
         return 0
     except PaperFetchFailure as exc:

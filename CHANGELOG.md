@@ -4,6 +4,15 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 ## Unreleased
 
+_No unreleased changes._
+
+## 1.4 - 2026-05-12
+
+### Added
+
+- Added the `arxiv` provider for `arxiv.org` and DOI prefix `10.48550/`, publishing `arxiv_html` on official HTML success with text-only PDF fallback as `arxiv_pdf`.
+- Added 10 real arXiv replay fixtures: 8 official HTML success samples and 2 official HTML 404 -> real PDF fallback samples, each with arXiv API metadata replay.
+
 ### Changed
 
 - Reworked Phase 1 routing/extraction internals: Copernicus URL identity now uses catalog `domain_suffixes`, early metadata probes are driven by `ProviderSpec.probe_capability`, reference-anchor detection is centralized in HTML semantics, Wiley supplementary data attributes are handled by the Wiley extractor, and Science/PNAS figure teaser filtering now receives the actual publisher.
@@ -16,6 +25,11 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 - Moved Atypon browser HTML/PDF candidate templates into `ProviderSpec` and removed the `paper_fetch.providers.science_html`, `paper_fetch.providers.pnas_html`, and `paper_fetch.providers.wiley_html` compatibility facades.
 - Completed Phase 5 Atypon/Wiley cleanup: Wiley owns abbreviations and supplementary filename contracts, datalayer signal parsing uses schema field maps, and Atypon browser workflow scope is documented as Science/PNAS/Wiley catalog entries only.
 - Documented Phase 8 CI/test policy updates: regular unit/integration jobs and full golden regression continue to use pytest-xdist defaults, while live FlareSolverr/MCP paths document their required serial execution.
+- Clarified CLI output semantics: explicit `--format` with `--output-dir` and stdout output now also writes a same-format document copy under `--output-dir`, while `--output` remains the explicit formatted-output file path.
+- Golden criteria live review now treats `arxiv` as a supported provider, records arXiv provider status, preserves derived-URL fallback when arXiv API metadata has transient failures, and classifies arXiv asset partial-download diagnostics as `asset_download_failure`.
+- arXiv HTML asset downloads now use a provider-specific lower concurrency cap and retry network-exception failures once sequentially while preserving non-retryable failures in `quality.asset_failures`.
+- arXiv fulltext routing is now fixed to official HTML first with direct text-only PDF fallback; retired local source-conversion fallback code and related asset handling are no longer part of the supported route.
+- arXiv official HTML Markdown cleanup now folds ordinary prose hard line breaks, sanitizes nested `$...$` delimiters inside LaTeXML TeX annotations, and lifts full-width table title rows out of GFM pipe table headers.
 - Completed Phase 2 callback cleanup: Atypon DOM postprocess and scoped asset extraction are now provider-registered callbacks, and provider display names resolve through the catalog-backed `provider_display_name()` helper.
 - Completed Phase 3 catalog field cleanup: Springer/Nature PDF candidates, arXiv metadata probe short-circuiting, provider HTML artifact persistence, XML source inference, provider-managed abstract-only handling, and PDF URL token semantics are now catalog/callback driven instead of provider-name hardcoded.
 - Completed Phase 5 Atypon browser workflow rename: the old Science/PNAS package/profile/postprocess names were moved to `atypon_browser_workflow`, the legacy profiles facade was removed, Atypon profile dispatch now dynamically imports provider HTML modules from `ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES`, shared figure-link and abstract-redirect helpers live in neutral modules, and Science citation-italic repair now belongs to `_science_html.py`.
@@ -27,8 +41,6 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 ### Added
 
 - Added the `copernicus` XML-first provider for Copernicus Publications DOI prefix `10.5194/`, publishing `copernicus_xml` on NLM/JATS XML success with text-only PDF fallback as `copernicus_pdf`.
-- Added the `arxiv` provider for `arxiv.org` and DOI prefix `10.48550/`, publishing `arxiv_html` on official HTML success with text-only PDF fallback as `arxiv_pdf`.
-- Added 10 real arXiv replay fixtures: 8 official HTML success samples and 2 official HTML 404 -> real PDF fallback samples, each with arXiv API metadata replay.
 - Added 8 Copernicus XML golden fixtures across ACP, HESS, GMD, TC, ESSD, NHESS, AMT, and BG, plus 4 older Copernicus PDF-fallback golden fixtures whose XML is abstract-level only; live smoke sample coverage remains behind `PAPER_FETCH_RUN_LIVE=1`.
 - Hardened Copernicus fallback handling for older articles whose XML only exposes abstract-level content: those XML failures now continue directly to text-only PDF fallback, and PDF discovery includes DOI-derived `.pdf` candidates when the landing page omits PDF metadata.
 
@@ -41,10 +53,6 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 - Copernicus XML extraction now reuses the parsed XML root through validation and article assembly, validates usable body paragraphs with a named threshold, and continues with DOI-derived XML/PDF URLs when landing HTML cannot be fetched.
 - Copernicus XML assets now use `original_url` as the canonical remote URL while shared asset download mirrors the compatibility URL fields after download; table assets are emitted directly as `kind="table"` with `table_render_kind`.
-- Golden criteria live review now treats `arxiv` as a supported provider, records arXiv provider status, preserves derived-URL fallback when arXiv API metadata has transient failures, and classifies arXiv asset partial-download diagnostics as `asset_download_failure`.
-- arXiv HTML asset downloads now use a provider-specific lower concurrency cap and retry network-exception failures once sequentially while preserving non-retryable failures in `quality.asset_failures`.
-- arXiv fulltext routing is now fixed to official HTML first with direct text-only PDF fallback; retired local source-conversion fallback code and related asset handling are no longer part of the supported route.
-- arXiv official HTML Markdown cleanup now folds ordinary prose hard line breaks, sanitizes nested `$...$` delimiters inside LaTeXML TeX annotations, and lifts full-width table title rows out of GFM pipe table headers.
 - 安装器结束摘要现在会明确提示 Elsevier 全文抓取需要从 <https://dev.elsevier.com/> 申请并配置 `ELSEVIER_API_KEY`，并指向对应 `.env` 文件。
 - Windows 离线发布产物改为 `paper-fetch-skill-windows-x86_64-setup.exe`，内置 CPython 3.13 x64、Python 依赖、Playwright Chromium、formula tools、FlareSolverr runtime、Codex / Claude Code skill 和 MCP 注册 helper。
 - GitHub Actions 在 `v*` tag push 或显式手动发布时，会等常规验证、完整 Linux 离线包矩阵和 Windows x86_64 setup exe 成功后创建 GitHub Release，并上传 4 个 Linux tarball 加 1 个 Windows 安装器 release asset。

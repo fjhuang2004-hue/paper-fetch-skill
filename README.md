@@ -236,6 +236,31 @@ paper-fetch --query "10.1186/1471-2105-11-421"
 paper-fetch-mcp
 ```
 
+### CLI 行为速查
+
+`paper-fetch` 的三个输出相关参数分工如下：
+
+- `--format markdown|json|both` 指定 stdout 或 `--output` 的序列化格式，默认是 `markdown`。
+- `--output <path>` 把这份格式化结果写到指定文件；默认 `--output -` 表示打印到终端。
+- `--output-dir <dir>` 是 provider HTML、PDF、图片等本地资源的保存目录。当用户显式传入 `--format` 且没有把 `--output` 改成文件路径时，CLI 也会在 `--output-dir` 下额外写一份同格式文档：`markdown` 写 `<doi>.md`，`json` 写 `<doi>.json`，`both` 写 `<doi>.both.json`。
+
+例如：
+
+```bash
+paper-fetch --query "https://www.nature.com/articles/s41559-026-03039-9" \
+  --format markdown \
+  --output-dir ./papers
+```
+
+这会继续把 Markdown 打印到终端，同时在 `./papers` 保存一份 Markdown，并把 provider HTML / 图片资源也放到 `./papers`。如果只想控制格式化结果的文件路径，显式使用 `--output`：
+
+```bash
+paper-fetch --query "10.1186/1471-2105-11-421" \
+  --format markdown \
+  --output ./papers/article.md \
+  --output-dir ./papers
+```
+
 安装脚本结束时会提示 Elsevier 官方 API 配置入口。抓取 Elsevier 全文前，需要从 <https://dev.elsevier.com/> 申请 key，并在配置文件中填写 `ELSEVIER_API_KEY`。
 
 ### 配置文件
