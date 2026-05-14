@@ -52,7 +52,7 @@ resolve
 - `probe_capability` 必须描述 routing 能力：有可提前调用的官方 metadata API 时设为 `metadata_api`；只可作为 DOI/domain/publisher 路由信号时设为 `routing_signal`。通用 routing 会按该字段决定是否发起早期 metadata probe。
 - 选择默认 `asset_default`：公开 HTML/XML 路线通常是 `body`；metadata-only 或没有资产能力的是 `none`。
 - 选择 `provider_managed_abstract_only`：provider 能可靠返回自己的摘要页时设为 `True`；否则保持 `False` 并走通用 metadata-only fallback。
-- Atypon/browser-workflow 以及 Springer Link 这类固定候选 URL 模板必须放在 `html_path_templates` / `pdf_path_templates` / `crossref_pdf_position` / `base_domains`。需要从 landing/source URL 派生 PDF 的路径转换放在 `pdf_source_path_templates`。provider-owned HTML 模块可以读取这些字段，但不能再维护第二份路径模板常量。
+- Atypon/browser-workflow、Springer Link 以及 Copernicus DOI-derived route 这类固定候选 URL 模板必须放在 `html_path_templates` / `xml_path_templates` / `landing_path_templates` / `pdf_path_templates` / `crossref_pdf_position` / `base_domains`。需要从 landing/source URL 派生 PDF 的路径转换放在 `pdf_source_path_templates`。provider-owned HTML/XML 模块可以读取这些字段，但不能再维护第二份路径模板常量。
 - 需要 API endpoint 或 API-like landing 过滤时，在 `api_hosts` / `api_url_templates` 声明；不要在 provider 或通用 `utils` 里散落 host 与 URL 模板常量。
 - 需要 metadata probe 早出口时，在 `metadata_probe_short_circuit` 声明延迟回调路径或 callable，并在 provider 模块内注册回调；workflow 不按 provider 名称分支。
 - 需要保留 provider 原始 HTML artifact 时，用 `persist_provider_html=True` 声明；`ArtifactStore` 只读取 catalog 字段。

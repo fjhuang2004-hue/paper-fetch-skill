@@ -51,6 +51,8 @@ class ProviderSpec:
     domain_suffixes: tuple[str, ...] = ()
     base_domains: tuple[str, ...] = ()
     html_path_templates: tuple[str, ...] = ()
+    xml_path_templates: tuple[str, ...] = ()
+    landing_path_templates: tuple[str, ...] = ()
     pdf_path_templates: tuple[str, ...] = ()
     pdf_source_path_templates: tuple[PdfSourcePathTemplate, ...] = ()
     crossref_pdf_position: int = 0
@@ -244,6 +246,9 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         client_factory_path="paper_fetch.providers.copernicus:CopernicusClient",
         status_order=8,
         domain_suffixes=("copernicus.org",),
+        xml_path_templates=("/articles/{volume}/{page}/{year}/{suffix}.xml",),
+        landing_path_templates=("/articles/{volume}/{page}/{year}/",),
+        pdf_path_templates=("/articles/{volume}/{page}/{year}/{suffix}.pdf",),
         emits_html_managed_marker=False,
         xml_root_tags=("article",),
         xml_file_tokens=("copernicus", "10.5194"),
@@ -339,6 +344,18 @@ def provider_html_path_templates(provider_name: str | None) -> tuple[str, ...]:
     normalized = _normalize_catalog_token(provider_name)
     spec = PROVIDER_CATALOG.get(normalized)
     return spec.html_path_templates if spec is not None else ()
+
+
+def provider_xml_path_templates(provider_name: str | None) -> tuple[str, ...]:
+    normalized = _normalize_catalog_token(provider_name)
+    spec = PROVIDER_CATALOG.get(normalized)
+    return spec.xml_path_templates if spec is not None else ()
+
+
+def provider_landing_path_templates(provider_name: str | None) -> tuple[str, ...]:
+    normalized = _normalize_catalog_token(provider_name)
+    spec = PROVIDER_CATALOG.get(normalized)
+    return spec.landing_path_templates if spec is not None else ()
 
 
 def provider_pdf_path_templates(provider_name: str | None) -> tuple[str, ...]:

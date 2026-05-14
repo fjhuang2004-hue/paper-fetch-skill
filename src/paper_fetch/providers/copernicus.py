@@ -23,11 +23,22 @@ from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_H
 from ..http.headers import header_value
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
-from ..provider_catalog import provider_body_text_thresholds
+from ..provider_catalog import (
+    provider_body_text_thresholds,
+    provider_domains,
+    provider_landing_path_templates,
+    provider_pdf_path_templates,
+    provider_xml_path_templates,
+)
 from ..publisher_identity import normalize_doi
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
-from ..utils import choose_public_landing_page_url, empty_asset_results, normalize_text
+from ..utils import (
+    choose_public_landing_page_url,
+    empty_asset_results,
+    extend_unique,
+    normalize_text,
+)
 from ._article_markdown_common import first_child, first_descendant, iter_descendants, xml_local_name
 from ._article_markdown_copernicus import CopernicusExtraction, parse_copernicus_xml
 from ._payloads import build_provider_payload
@@ -76,48 +87,35 @@ class CopernicusLandingAttempt:
     source_trail: list[str] | None = None
 
 
-def _dedupe_urls(values: list[str] | tuple[str, ...]) -> list[str]:
+def _candidate_urls(doi: str, *, templates: tuple[str, ...]) -> list[str]:
+    match = COPERNICUS_XML_DOI_PATTERN.match(normalize_doi(doi))
+    if not match:
+        return []
+    normalized_doi = normalize_doi(doi)
+    journal = match.group("journal").lower()
+    fields = {
+        "doi": normalized_doi,
+        "journal": journal,
+        "volume": match.group("volume"),
+        "page": match.group("page"),
+        "year": match.group("year"),
+        "suffix": normalized_doi.split("/", 1)[1],
+    }
     urls: list[str] = []
-    for value in values:
-        normalized = normalize_text(value)
-        if normalized and normalized not in urls:
-            urls.append(normalized)
+    for host in provider_domains("copernicus"):
+        candidate_host = (
+            f"{journal}.{host}" if host == "copernicus.org" else host.format(**fields)
+        )
+        for template in templates:
+            url = f"https://{candidate_host}{template.format(**fields)}"
+            if url not in urls:
+                urls.append(url)
     return urls
 
 
-def _doi_xml_candidate(doi: str) -> str:
-    match = COPERNICUS_XML_DOI_PATTERN.match(normalize_doi(doi))
-    if not match:
-        return ""
-    journal = match.group("journal").lower()
-    suffix = normalize_doi(doi).split("/", 1)[1]
-    return (
-        f"https://{journal}.copernicus.org/articles/"
-        f"{match.group('volume')}/{match.group('page')}/{match.group('year')}/{suffix}.xml"
-    )
-
-
-def _doi_pdf_candidate(doi: str) -> str:
-    match = COPERNICUS_XML_DOI_PATTERN.match(normalize_doi(doi))
-    if not match:
-        return ""
-    journal = match.group("journal").lower()
-    suffix = normalize_doi(doi).split("/", 1)[1]
-    return (
-        f"https://{journal}.copernicus.org/articles/"
-        f"{match.group('volume')}/{match.group('page')}/{match.group('year')}/{suffix}.pdf"
-    )
-
-
-def _doi_landing_candidate(doi: str) -> str:
-    match = COPERNICUS_XML_DOI_PATTERN.match(normalize_doi(doi))
-    if not match:
-        return ""
-    journal = match.group("journal").lower()
-    return (
-        f"https://{journal}.copernicus.org/articles/"
-        f"{match.group('volume')}/{match.group('page')}/{match.group('year')}/"
-    )
+def _first_candidate_url(doi: str, *, templates: tuple[str, ...]) -> str:
+    candidates = _candidate_urls(doi, templates=templates)
+    return candidates[0] if candidates else ""
 
 
 def _raw_meta_urls(metadata: Mapping[str, Any], key: str, base_url: str) -> list[str]:
@@ -146,7 +144,9 @@ def _discover_link_urls(html_text: str, base_url: str, *, suffix: str) -> list[s
         path = urllib.parse.urlparse(value).path.lower()
         if path.endswith(suffix):
             urls.append(urllib.parse.urljoin(base_url, value))
-    return _dedupe_urls(urls)
+    deduped: list[str] = []
+    extend_unique(deduped, urls)
+    return deduped
 
 
 def _merge_assets(
@@ -251,7 +251,10 @@ class CopernicusClient(ProviderClient):
         return (
             choose_public_landing_page_url(
                 metadata.get("landing_page_url"),
-                _doi_landing_candidate(normalized_doi),
+                _first_candidate_url(
+                    normalized_doi,
+                    templates=provider_landing_path_templates("copernicus"),
+                ),
                 doi_url,
             )
             or doi_url
@@ -284,7 +287,13 @@ class CopernicusClient(ProviderClient):
         landing_url: str,
         landing_failure: ProviderFailure,
     ) -> CopernicusLandingAttempt:
-        response_url = _doi_landing_candidate(normalized_doi) or landing_url
+        response_url = (
+            _first_candidate_url(
+                normalized_doi,
+                templates=provider_landing_path_templates("copernicus"),
+            )
+            or landing_url
+        )
         merged_metadata = dict(metadata)
         if not merged_metadata.get("doi"):
             merged_metadata["doi"] = normalized_doi
@@ -301,10 +310,19 @@ class CopernicusClient(ProviderClient):
             html_text="",
             response={},
             merged_metadata=merged_metadata,
-            xml_candidates=_dedupe_urls([_doi_xml_candidate(normalized_doi)]),
-            pdf_candidates=_dedupe_urls([_doi_pdf_candidate(normalized_doi)]),
+            xml_candidates=_candidate_urls(
+                normalized_doi,
+                templates=provider_xml_path_templates("copernicus"),
+            ),
+            pdf_candidates=_candidate_urls(
+                normalized_doi,
+                templates=provider_pdf_path_templates("copernicus"),
+            ),
             warnings=[warning, *landing_failure.warnings],
-            source_trail=[fulltext_marker(self.name, "fail", route="landing"), *landing_failure.source_trail],
+            source_trail=[
+                fulltext_marker(self.name, "fail", route="landing"),
+                *landing_failure.source_trail,
+            ],
         )
 
     def _prepare_landing_attempt(self, doi: str, metadata: Mapping[str, Any]) -> CopernicusLandingAttempt:
@@ -326,19 +344,37 @@ class CopernicusClient(ProviderClient):
             merged_metadata["doi"] = normalized_doi
         if not merged_metadata.get("landing_page_url"):
             merged_metadata["landing_page_url"] = landing.final_url
-        xml_candidates = _dedupe_urls(
-            [
-                *_raw_meta_urls(merged_metadata, "citation_xml_url", landing.final_url),
-                *_discover_link_urls(landing.html_text, landing.final_url, suffix=".xml"),
-                _doi_xml_candidate(normalized_doi),
-            ]
+        xml_candidates: list[str] = []
+        extend_unique(
+            xml_candidates,
+            _raw_meta_urls(merged_metadata, "citation_xml_url", landing.final_url),
         )
-        pdf_candidates = _dedupe_urls(
-            [
-                *_raw_meta_urls(merged_metadata, "citation_pdf_url", landing.final_url),
-                *_discover_link_urls(landing.html_text, landing.final_url, suffix=".pdf"),
-                _doi_pdf_candidate(normalized_doi),
-            ]
+        extend_unique(
+            xml_candidates,
+            _discover_link_urls(landing.html_text, landing.final_url, suffix=".xml"),
+        )
+        extend_unique(
+            xml_candidates,
+            _candidate_urls(
+                normalized_doi,
+                templates=provider_xml_path_templates("copernicus"),
+            ),
+        )
+        pdf_candidates: list[str] = []
+        extend_unique(
+            pdf_candidates,
+            _raw_meta_urls(merged_metadata, "citation_pdf_url", landing.final_url),
+        )
+        extend_unique(
+            pdf_candidates,
+            _discover_link_urls(landing.html_text, landing.final_url, suffix=".pdf"),
+        )
+        extend_unique(
+            pdf_candidates,
+            _candidate_urls(
+                normalized_doi,
+                templates=provider_pdf_path_templates("copernicus"),
+            ),
         )
         return CopernicusLandingAttempt(
             normalized_doi=normalized_doi,
