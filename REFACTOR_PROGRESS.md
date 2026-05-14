@@ -56,7 +56,10 @@
   - commit: ac4b669
   - 摘要: 新增 AI onboarding README、ProviderManifest JSON Schema/字段说明、`known-providers.yml`，以及 `arxiv` / `copernicus` / `wiley` 三份现有 provider replay manifest；dev 依赖加入 `jsonschema`，测试校验 schema 合法、manifest 样例、禁用占位值和 known-providers 与 runtime catalog 同步。
   - 验收: S11 文件/禁词 grep 通过；`test_provider_manifest_schema.py` / `test_known_providers_sync.py` 5 passed；`python3 -m ruff check .` 通过；`validate_extraction_rules.py` 通过；全量 unit 1205 passed + 264 subtests。
-- [ ] S12: scaffold --from-manifest
+- [x] S12: scaffold --from-manifest
+  - commit: b246ab7
+  - 摘要: `scaffold_provider.py` 增加 `--from-manifest`，先按 ProviderManifest schema 校验输入，再从 manifest 生成 ProviderSpec routing/probe/asset 占位、manifest 顺序的 `waterfall_steps`、多 DOI fixture `.gitkeep`、capture command 清单、docs/changelog 占位和 JSON artifact summary；legacy flags 保留为 fallback，但禁止与 manifest 输入混用。
+  - 验收: S12 help/gitreps 通过；真实 `arxiv.yml` `/tmp` scaffold probe 输出 JSON summary；`test_scaffold_provider_from_manifest.py` / `test_scaffold_provider.py` 18 passed；S11 manifest/schema/known-provider 回归 7 passed；`python3 -m ruff check .` 通过；`validate_extraction_rules.py` 通过；全量 unit 1217 passed + 264 subtests。
 - [ ] S13: manifest ↔ bundle 同步 lint（含 sync-back）
 
 ### 阶段 C：批量调度与自动恢复（S14-S16）
