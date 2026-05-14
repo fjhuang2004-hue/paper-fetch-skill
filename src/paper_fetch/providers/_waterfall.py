@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 from ..tracing import source_trail_from_trace, trace_from_markers
 from .base import ProviderFailure, RawFulltextPayload, combine_provider_failures
@@ -44,12 +44,12 @@ class ProviderWaterfallState:
 
 
 WarningFactory = Callable[[ProviderFailure, ProviderWaterfallState], str | None]
-StepRunner = Callable[[ProviderWaterfallState], RawFulltextPayload]
+StepRunner = Callable[..., RawFulltextPayload]
 FinalFailureFactory = Callable[[ProviderWaterfallState], ProviderFailure]
 
 
 @dataclass(frozen=True)
-class ProviderWaterfallStep:
+class WaterfallStep:
     label: str
     run: StepRunner
     failure_marker: str | None = None
@@ -58,6 +58,25 @@ class ProviderWaterfallStep:
     failure_warning: str | WarningFactory | None = None
     success_warning: str | None = None
     include_failure_trail_on_success: bool = True
+
+
+ProviderWaterfallStep = WaterfallStep
+
+
+def _run_step(
+    step: WaterfallStep,
+    state: ProviderWaterfallState,
+    doi: str | None,
+    metadata: Mapping[str, Any] | None,
+    *,
+    context: Any = None,
+    client: Any = None,
+) -> RawFulltextPayload:
+    if doi is None:
+        return step.run(state)
+    if client is not None:
+        return step.run(client, doi, metadata or {}, context=context)
+    return step.run(doi, metadata or {}, context=context)
 
 
 def _append_unique_text(target: list[str], values: list[str] | tuple[str, ...]) -> None:
@@ -128,8 +147,12 @@ def _default_final_failure(state: ProviderWaterfallState) -> ProviderFailure:
 
 
 def run_provider_waterfall(
-    steps: list[ProviderWaterfallStep] | tuple[ProviderWaterfallStep, ...],
+    steps: list[WaterfallStep] | tuple[WaterfallStep, ...],
+    doi: str | None = None,
+    metadata: Mapping[str, Any] | None = None,
     *,
+    context: Any = None,
+    client: Any = None,
     initial_warnings: list[str] | tuple[str, ...] | None = None,
     initial_source_trail: list[str] | tuple[str, ...] | None = None,
     final_failure_factory: FinalFailureFactory | None = None,
@@ -140,7 +163,7 @@ def run_provider_waterfall(
 
     for step in steps:
         try:
-            payload = step.run(state)
+            payload = _run_step(step, state, doi, metadata, context=context, client=client)
         except ProviderFailure as exc:
             failure = _failure_with_marker(exc, step.failure_marker)
             if failure.code not in step.continue_codes:

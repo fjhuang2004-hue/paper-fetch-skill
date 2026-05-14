@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 import time
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from ..artifacts import ArtifactStore
 from ..extraction.html import render_html_markdown
@@ -15,6 +15,9 @@ from ..runtime import RuntimeContext
 from ..tracing import TraceEvent, download_marker, source_trail_from_trace, trace_from_markers
 from ..utils import empty_asset_results, normalize_text, provider_display_name
 from ..reason_codes import ERROR, NO_ACCESS, NO_RESULT, NOT_CONFIGURED, NOT_SUPPORTED, OK, PARTIAL, RATE_LIMITED, READY
+
+if TYPE_CHECKING:
+    from ._waterfall import WaterfallStep
 
 
 class ProviderFailure(Exception):
@@ -385,6 +388,7 @@ class ProviderClient:
 
     name = "provider"
     official_provider = True
+    waterfall_steps: tuple[WaterfallStep, ...] = ()
 
     def fetch_metadata(self, query: Mapping[str, str | None]) -> dict[str, Any]:
         raise ProviderFailure(NOT_SUPPORTED, f"{self.name} metadata retrieval is not available.")
@@ -640,8 +644,20 @@ class ProviderClient:
         *,
         context: RuntimeContext | None = None,
     ) -> RawFulltextPayload:
-        del context
-        raise ProviderFailure(NOT_SUPPORTED, f"{self.name} raw full-text retrieval is not available.")
+        if self.waterfall_steps:
+            from ._waterfall import run_provider_waterfall
+
+            return run_provider_waterfall(
+                self.waterfall_steps,
+                doi,
+                metadata,
+                context=context,
+                client=self,
+            )
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must override fetch_raw_fulltext() "
+            "or declare waterfall_steps."
+        )
 
     def to_article_model(
         self,

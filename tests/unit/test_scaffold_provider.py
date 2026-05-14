@@ -78,6 +78,14 @@ def test_scaffold_provider_generates_repo_like_structure(tmp_path: Path) -> None
         "assets": {},
     }
 
+    client_text = client_module.read_text(encoding="utf-8")
+    assert "WaterfallStep" in client_text
+    assert "waterfall_steps = (" in client_text
+    assert "newpub_fetch_html_step" in client_text
+
+    html_text = html_module.read_text(encoding="utf-8")
+    assert "def newpub_fetch_html_step(client" in html_text
+
 
 def test_scaffold_provider_places_bundle_registration_after_imports(
     tmp_path: Path,
@@ -205,3 +213,41 @@ def test_scaffold_provider_refuses_existing_files_and_manifest_samples(
 
     assert result.returncode == 2
     assert "refusing to overwrite existing path" in result.stderr
+
+
+def test_scaffold_provider_fulltext_client_imports(tmp_path: Path) -> None:
+    _run_scaffold(
+        tmp_path,
+        "--name",
+        "newpub",
+        "--doi",
+        "10.1234/sample",
+        "--fulltext-client",
+    )
+
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"""
+import importlib
+from pathlib import Path
+
+import paper_fetch.providers as provider_entries
+
+provider_entries.__path__ = [
+    str(Path({str(tmp_path)!r}) / "src/paper_fetch/providers"),
+    *list(provider_entries.__path__),
+]
+module = importlib.import_module("paper_fetch.providers.newpub")
+assert module.NewpubClient.waterfall_steps
+assert module.NewpubClient.waterfall_steps[1].label == "html"
+""",
+        ],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+    )
+    assert probe.returncode == 0, probe.stderr

@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from pathlib import Path
 
 
@@ -116,6 +115,13 @@ def _html_module_content(
                 "from ..extraction.html.provider_rules import ProviderHtmlRules",
             ]
         )
+    if fulltext_client:
+        imports.extend(
+            [
+                "from ..reason_codes import NOT_SUPPORTED",
+                "from .base import ProviderFailure",
+            ]
+        )
     imports.extend(
         [
             "from ..provider_catalog import ProviderSpec",
@@ -142,6 +148,32 @@ def _html_module_content(
             "",
         ]
     )
+    if fulltext_client:
+        imports.extend(
+            [
+                "",
+                "",
+                f"def {name}_fetch_landing_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
+                "    del client, doi, metadata, context",
+                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} landing fallback is not implemented yet.")',
+                "",
+                "",
+                f"def {name}_fetch_html_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
+                "    del client, doi, metadata, context",
+                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} HTML fallback is not implemented yet.")',
+                "",
+                "",
+                f"def {name}_fetch_xml_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
+                "    del client, doi, metadata, context",
+                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} XML fallback is not implemented yet.")',
+                "",
+                "",
+                f"def {name}_fetch_pdf_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
+                "    del client, doi, metadata, context",
+                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} PDF fallback is not implemented yet.")',
+                "",
+            ]
+        )
     return "\n".join(imports)
 
 
@@ -154,11 +186,42 @@ def _client_module_content(name: str) -> str:
             "from __future__ import annotations",
             "",
             f"from . import _{name}_html as _provider_rules",
+            "from ._waterfall import DEFAULT_WATERFALL_CONTINUE_CODES, WaterfallStep",
             "from .base import ProviderClient",
             "",
             "",
             f"class {class_name}(ProviderClient):",
             f'    name = "{name}"',
+            "    waterfall_steps = (",
+            "        WaterfallStep(",
+            '            label="landing",',
+            f"            run=_provider_rules.{name}_fetch_landing_step,",
+            f'            failure_marker="fulltext:{name}_landing_failed",',
+            f'            success_markers=("fulltext:{name}_landing_ok",),',
+            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
+            "        ),",
+            "        WaterfallStep(",
+            '            label="html",',
+            f"            run=_provider_rules.{name}_fetch_html_step,",
+            f'            failure_marker="fulltext:{name}_html_failed",',
+            f'            success_markers=("fulltext:{name}_html_ok",),',
+            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
+            "        ),",
+            "        WaterfallStep(",
+            '            label="xml",',
+            f"            run=_provider_rules.{name}_fetch_xml_step,",
+            f'            failure_marker="fulltext:{name}_xml_failed",',
+            f'            success_markers=("fulltext:{name}_xml_ok",),',
+            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
+            "        ),",
+            "        WaterfallStep(",
+            '            label="pdf",',
+            f"            run=_provider_rules.{name}_fetch_pdf_step,",
+            f'            failure_marker="fulltext:{name}_pdf_failed",',
+            f'            success_markers=("fulltext:{name}_pdf_ok",),',
+            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
+            "        ),",
+            "    )",
             "",
             "",
             f"__all__ = [\"{class_name}\"]",

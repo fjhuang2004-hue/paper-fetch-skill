@@ -104,15 +104,51 @@ python3 scripts/scaffold_provider.py --name newpub --doi 10.1234/sample [--fullt
 
 ## 3. Client Contract
 
-优先继承 `paper_fetch.providers.base.ProviderClient`，只覆盖必要 hook：
+优先继承 `paper_fetch.providers.base.ProviderClient`。新 provider 的全文主链默认声明为 class-level `waterfall_steps`，只在确有特殊模板流程时覆盖必要 hook：
 
-- `fetch_raw_fulltext(doi, metadata, *, context=None) -> RawFulltextPayload`
 - `to_article_model(metadata, raw_payload, *, downloaded_assets=None, asset_failures=None, context=None)`
 - `html_to_markdown(html_text, source_url, *, metadata, context)`，仅 HTML 路线需要
 - `download_related_assets(...)`，仅有资产能力时实现
 - `probe_status()`
 - `describe_artifacts()`，仅 text-only fallback 或特殊 artifact 策略需要覆盖
 - `maybe_recover_fetch_result_payload()`，仅 HTML 抽取后发现 abstract-only 还需要继续 PDF fallback 时覆盖
+
+推荐 client 模板：
+
+```python
+from . import _newpub_html as _provider_rules
+from ._waterfall import DEFAULT_WATERFALL_CONTINUE_CODES, WaterfallStep
+from .base import ProviderClient
+
+
+class NewpubClient(ProviderClient):
+    name = "newpub"
+    waterfall_steps = (
+        WaterfallStep(
+            label="html",
+            run=_provider_rules.newpub_fetch_html_step,
+            failure_marker="fulltext:newpub_html_failed",
+            success_markers=("fulltext:newpub_html_ok",),
+            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
+        ),
+        WaterfallStep(
+            label="xml",
+            run=_provider_rules.newpub_fetch_xml_step,
+            failure_marker="fulltext:newpub_xml_failed",
+            success_markers=("fulltext:newpub_xml_ok",),
+            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
+        ),
+        WaterfallStep(
+            label="pdf",
+            run=_provider_rules.newpub_fetch_pdf_step,
+            failure_marker="fulltext:newpub_pdf_failed",
+            success_markers=("fulltext:newpub_pdf_ok",),
+            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
+        ),
+    )
+```
+
+step 函数放在 provider-owned 模块中，签名使用 `def newpub_fetch_html_step(client, doi, metadata, *, context)`，成功时返回 `RawFulltextPayload`，失败时抛 `ProviderFailure`。如果 `waterfall_steps` 为空，`ProviderClient.fetch_raw_fulltext()` 会抛 `NotImplementedError`，提示子类声明 steps 或覆盖方法。
 
 `ProviderClient.fetch_result()` 已经负责：
 
@@ -123,11 +159,11 @@ python3 scripts/scaffold_provider.py --name newpub --doi 10.1234/sample [--fullt
 - 组装 `ProviderFetchResult`
 - 合并 warnings、trace 和 artifacts
 
-新 provider 不应绕开这条 template method 自己拼最终结果。
+新 provider 不应绕开这条 template method 自己拼最终结果。旧 provider 已有复杂 `fetch_raw_fulltext()` 覆盖实现时可以保留；新增 scaffold 默认使用 `waterfall_steps`。
 
 ## 4. Fulltext Waterfall
 
-provider 内部多步骤 fallback 应使用 `paper_fetch.providers._waterfall.run_provider_waterfall()`，而不是散落嵌套 `try/except`。
+provider 内部多步骤 fallback 应声明 `paper_fetch.providers._waterfall.WaterfallStep` 序列，并由 `ProviderClient.fetch_raw_fulltext()` 默认调用 `run_provider_waterfall()`，而不是散落嵌套 `try/except`。旧 provider 如已覆盖 `fetch_raw_fulltext()`，可在覆盖方法内部继续局部调用 `run_provider_waterfall()`。
 
 每个 step 要定义：
 
@@ -450,7 +486,7 @@ Fixtures（按附录 A 11 维清单）
 
 实现
 - [ ] ProviderClient 子类只覆盖必要 hook，未绕过 fetch_result() template
-- [ ] Waterfall step 用 run_provider_waterfall()，不是嵌套 try/except
+- [ ] Fulltext fallback 声明为 `waterfall_steps`；旧 provider 覆盖实现中才局部调用 `run_provider_waterfall()`
 - [ ] asset_profile 三模式（none / body / all）行为明确
 - [ ] probe_status() 实现，覆盖 ready / not_configured / partial
 
