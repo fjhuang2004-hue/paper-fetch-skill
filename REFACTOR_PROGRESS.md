@@ -42,7 +42,10 @@
   - commit: 7fe6c2a
   - 摘要: 新增 owner-reuse grep pattern helper 与 `test_provider_owner_reuse.py`，从 provider bundle 枚举 provider，扫描 `X.py` / `_X_html.py` 中附录 B 的重复 owner helper；仅允许同行或上一行带非空 `# OWNER_REUSE_EXCEPTION: ...` 的命中。
   - 验收: S9 文件存在检查通过；`test_provider_owner_reuse.py` 6 passed；`validate_extraction_rules.py` 通过；ruff 新增测试文件通过；全量 unit 1187 passed + 264 subtests。
-- [ ] S10: docs 占位生成 + probe_status 默认实现
+- [x] S10: docs 占位生成 + probe_status 默认实现
+  - commit: a20c28b
+  - 摘要: `ProviderSpec` 增加 `env_requirements` / `requires_playwright` / `requires_flaresolverr`，`ProviderClient.probe_status()` 默认基于 catalog 做轻量本地状态检查；`scaffold_provider.py` 默认同步 `docs/providers.md` / `docs/extraction-rules.md` / `CHANGELOG.md` 占位并支持 `--no-sync-docs`；三份 docs 增加 `SCAFFOLD` marker。
+  - 验收: S10 grep 和 scaffold `/tmp` 探针通过；`test_probe_status_default.py` / `test_scaffold_docs_sync.py` / `test_scaffold_provider.py` 12 passed；catalog/bundle 相关目标测试 57 passed + 16 subtests；`validate_extraction_rules.py` 通过；`python3 -m ruff check .` 通过；全量 unit 1193 passed + 264 subtests。
 
 ### 阶段 B：AI 接入最小闭环（S11A-S13）
 - [ ] S11A: AI Manifest Discovery
