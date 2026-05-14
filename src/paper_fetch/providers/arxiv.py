@@ -17,6 +17,8 @@ from ..arxiv_id import (
 )
 from ..config import build_user_agent
 from ..extraction.html import assets as html_assets
+from ..extraction.html.availability_policy import AvailabilityPolicy
+from ..extraction.html.provider_rules import ProviderHtmlRules
 from ..http import (
     DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
     HttpTransport,
@@ -93,6 +95,10 @@ register_provider_bundle(
                 "arxiv_metadata_probe_short_circuit"
             ),
             persist_provider_html=True,
+        ),
+        html_rules=ProviderHtmlRules(
+            name="arxiv",
+            availability=AvailabilityPolicy(name="arxiv", no_signals=True),
         ),
         asset_retry=ARXIV_ASSET_RETRY_POLICY,
         sources=("arxiv_html", "arxiv_pdf"),

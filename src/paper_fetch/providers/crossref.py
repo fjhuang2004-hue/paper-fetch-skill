@@ -32,6 +32,7 @@ register_provider_bundle(
             provider_managed_abstract_only=False,
             client_factory_path="paper_fetch.providers.crossref:CrossrefClient",
             status_order=0,
+            html_capable=False,
             sensitive_headers=("cr-clickthrough-client-token",),
         ),
         sources=("crossref_meta",),

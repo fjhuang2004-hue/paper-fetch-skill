@@ -38,7 +38,7 @@ class AvailabilityContainerRules:
 class AvailabilityPolicy:
     """Provider-owned availability rules kept separate from cleanup policy."""
 
-    name: str
+    name: str = ""
     container_rules: AvailabilityContainerRules = field(
         default_factory=AvailabilityContainerRules
     )
@@ -46,4 +46,5 @@ class AvailabilityPolicy:
     datalayer_signal_set: DatalayerSignalSet | None = None
     text_marker_signal_set: TextMarkerSignalSet | None = None
     overrides: AvailabilityOverrides | None = None
+    no_signals: bool = False
     access_block_text_tokens: tuple[str, ...] = ()

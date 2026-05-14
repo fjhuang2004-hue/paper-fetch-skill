@@ -91,6 +91,7 @@ register_provider_bundle(
             landing_path_templates=("/articles/{volume}/{page}/{year}/",),
             pdf_path_templates=("/articles/{volume}/{page}/{year}/{suffix}.pdf",),
             emits_html_managed_marker=False,
+            html_capable=False,
             xml_root_tags=("article",),
             xml_file_tokens=("copernicus", "10.5194"),
             body_text_thresholds=BodyTextThresholds(min_chars=500),

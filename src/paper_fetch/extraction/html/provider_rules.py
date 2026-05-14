@@ -318,6 +318,7 @@ def _availability_policy_with_defaults(
         datalayer_signal_set=availability.datalayer_signal_set,
         text_marker_signal_set=availability.text_marker_signal_set,
         overrides=availability.overrides,
+        no_signals=availability.no_signals,
         access_block_text_tokens=(
             availability.access_block_text_tokens or cleanup.access_block_text_tokens
         ),

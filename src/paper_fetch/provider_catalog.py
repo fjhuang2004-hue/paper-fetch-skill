@@ -54,7 +54,7 @@ class ProviderSpec:
     persist_provider_html: bool = False
     xml_root_tags: tuple[str, ...] = ()
     xml_file_tokens: tuple[str, ...] = ()
-    emits_html_managed_marker: bool = True
+    emits_html_managed_marker: bool = True; html_capable: bool = True
     body_text_thresholds: BodyTextThresholds = DEFAULT_BODY_TEXT_THRESHOLDS
 _METADATA_PROBE_SHORT_CIRCUITS: dict[str, MetadataProbeShortCircuit] = {}
 _PROVIDER_CATALOG_CACHE: MappingABC[str, ProviderSpec] | None = None
