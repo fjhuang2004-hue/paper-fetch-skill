@@ -20,6 +20,7 @@ from ..extraction.html.assets import (
 )
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_HEADER, PDF_MIME_TYPE, RequestFailure
+from ..http.headers import header_value
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..provider_catalog import provider_body_text_thresholds
@@ -73,14 +74,6 @@ class CopernicusLandingAttempt:
     pdf_candidates: list[str]
     warnings: list[str] | None = None
     source_trail: list[str] | None = None
-
-
-def _header_value(headers: Mapping[str, Any] | None, key: str, default: str = "") -> str:
-    lowered = key.lower()
-    for raw_key, value in (headers or {}).items():
-        if str(raw_key).lower() == lowered:
-            return str(value or default)
-    return default
 
 
 def _dedupe_urls(values: list[str] | tuple[str, ...]) -> list[str]:
@@ -373,7 +366,7 @@ class CopernicusClient(ProviderClient):
             raise map_request_failure(exc) from exc
         body = bytes(response.get("body") or b"")
         response_url = urllib.parse.urljoin(url, normalize_text(str(response.get("url") or "")) or url)
-        content_type = _header_value(response.get("headers"), "content-type", "application/xml")
+        content_type = header_value(response.get("headers"), "content-type", "application/xml")
         return body, response_url, content_type
 
     def _validate_xml_extraction(

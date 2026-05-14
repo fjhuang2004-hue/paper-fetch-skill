@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from ....http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
+from ....http.headers import header_value
 from ....models.schema import AssetProfile
 from ....utils import build_asset_output_path, empty_asset_results, normalize_text, sanitize_filename, save_payload
 from ._kind import (
@@ -25,7 +26,6 @@ from .dom import (
     SUPPLEMENTARY_BLOCKING_TITLE_TOKENS,
     _CLOUDFLARE_CHALLENGE_TOKENS,
     _response_dimensions,
-    _response_header,
     looks_like_full_size_asset_url,
     preview_dimensions_are_acceptable,
 )
@@ -70,7 +70,7 @@ def _fetch_document_fallback(
     body = response.get("body", b"")
     if not isinstance(body, (bytes, bytearray)):
         return None
-    content_type = _response_header(response, "content-type")
+    content_type = header_value(response.get("headers"), "content-type")
     if not kind.accepts_response(content_type, bytes(body)):
         return None
     return dict(response)
@@ -152,7 +152,7 @@ def _request_failure_attempt(
     candidate: _AssetDownloadCandidate,
     exc: RequestFailure,
 ) -> _AssetDownloadAttempt:
-    content_type = _response_header({"headers": exc.headers}, "content-type")
+    content_type = header_value(exc.headers, "content-type")
     body = exc.body if isinstance(exc.body, (bytes, bytearray)) else b""
     return _AssetDownloadAttempt(
         candidate=candidate,
@@ -189,7 +189,7 @@ def _blocked_response_attempt(
                 asset,
                 source_url,
                 status=response.get("status_code"),
-                content_type=_response_header(response, "content-type"),
+                content_type=header_value(response.get("headers"), "content-type"),
                 final_url=normalize_text(str(response.get("url") or source_url)),
                 body=body,
                 reason=reason,
@@ -275,7 +275,7 @@ def _retry_seeded_figure_candidate(
     body = response.get("body", b"")
     if not isinstance(body, (bytes, bytearray)):
         body = b""
-    block_reason = kind.response_block_reason(_response_header(response, "content-type"), bytes(body))
+    block_reason = kind.response_block_reason(header_value(response.get("headers"), "content-type"), bytes(body))
     if block_reason:
         return _blocked_response_attempt(kind, asset, candidate, response, candidate.url, block_reason), None
     return last_attempt, _resolution_from_attempt(
@@ -396,7 +396,7 @@ def resolve_asset_download(
         body = response.get("body", b"")
         if not isinstance(body, (bytes, bytearray)):
             body = b""
-        content_type = _response_header(response, "content-type")
+        content_type = header_value(response.get("headers"), "content-type")
         block_reason = kind.response_block_reason(content_type, bytes(body))
         if block_reason:
             last_attempt = _blocked_response_attempt(kind, asset, candidate, response, candidate_url, block_reason)
@@ -481,13 +481,13 @@ def save_asset_resolution(
                 asset,
                 source_url,
                 status=response.get("status_code") if isinstance(response, Mapping) else None,
-                content_type=_response_header(response, "content-type"),
+                content_type=header_value(response.get("headers"), "content-type"),
                 final_url=normalize_text(str(response.get("url") or source_url)),
                 reason="empty_response_body",
             )
         )
 
-    content_type = _response_header(response, "content-type")
+    content_type = header_value(response.get("headers"), "content-type")
     output_subdir = kind.output_subdir(asset)
     target_asset_dir = asset_dir / output_subdir if output_subdir is not None else asset_dir
     target_asset_dir.mkdir(parents=True, exist_ok=True)

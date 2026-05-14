@@ -69,17 +69,6 @@ FIGURE_PAGE_HINTS = (
 _CLOUDFLARE_CHALLENGE_TOKENS = CLOUDFLARE_CHALLENGE_TITLE_TOKENS
 
 
-def _response_header(response: Mapping[str, Any], name: str) -> str:
-    headers = response.get("headers") or {}
-    if not isinstance(headers, Mapping):
-        return ""
-    lowered = name.lower()
-    for key, value in headers.items():
-        if str(key).lower() == lowered:
-            return normalize_text(str(value or ""))
-    return ""
-
-
 def _image_dimensions(body: bytes | bytearray | None) -> tuple[int, int] | None:
     return image_dimensions_from_bytes(body)
 
@@ -204,7 +193,6 @@ __all__ = [
     "ACCEPTABLE_WIDE_PREVIEW_MIN_WIDTH",
     "ACCEPTABLE_WIDE_PREVIEW_MIN_HEIGHT",
     "FIGURE_PAGE_HINTS",
-    "_response_header",
     "_image_dimensions",
     "_response_dimensions",
     "supplementary_response_block_reason",

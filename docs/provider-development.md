@@ -136,6 +136,7 @@ provider 内部多步骤 fallback 应使用 `paper_fetch.providers._waterfall.ru
 - Formula rules：`paper_fetch.extraction.html.formula_rules`、`paper_fetch.providers._article_markdown_math`
 - Image MIME / dimensions：`paper_fetch.extraction.image_payloads`
 - Asset discovery / download：`paper_fetch.extraction.html.assets`
+- HTTP header lookup：`paper_fetch.http.headers.header_value`，provider / asset / PDF fallback 不再维护本地大小写不敏感 header helper。
 - Final rendering：`paper_fetch.models`
 
 Provider-specific 代码只负责：

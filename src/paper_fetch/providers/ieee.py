@@ -11,6 +11,7 @@ from ..config import build_user_agent
 from ..extraction.html import decode_html
 from ..extraction.html.landing import LandingRedirectLimitExceeded, fetch_landing_html
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYPE, RequestFailure
+from ..http.headers import header_value
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile
 from ..publisher_identity import normalize_doi
@@ -48,14 +49,6 @@ __all__ = ["IeeeClient"]
 
 IEEE_PDF_FALLBACK_ARTIFACT_DIR_NAME = "ieee_pdf_fallback"
 MAX_IEEE_LANDING_REDIRECTS = 8
-
-
-def _header_value(headers: Mapping[str, Any] | None, key: str, default: str = "") -> str:
-    lowered_key = key.lower()
-    for raw_key, value in (headers or {}).items():
-        if str(raw_key).lower() == lowered_key:
-            return str(value or default)
-    return default
 
 
 def _pdf_failure_diagnostics(failure: PdfFetchFailure | None) -> dict[str, Any] | None:
@@ -290,7 +283,7 @@ class IeeeClient(ProviderClient):
         )
         if not diagnostics.accepted:
             raise ProviderFailure(NO_RESULT, availability_failure_message(diagnostics))
-        content_type = _header_value(response.get("headers"), "content-type", "text/html")
+        content_type = header_value(response.get("headers"), "content-type", "text/html")
         cleaned_body = extraction.html_text.encode("utf-8")
         extracted_assets = self._html_extraction_assets_with_landing_payloads(extraction, landing_attempt)
         return build_provider_payload(

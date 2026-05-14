@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ..extraction.html import decode_html
+from ..http.headers import header_value
 from ..quality.html_availability import HtmlQualityAssessor, availability_failure_message
 from ..reason_codes import ERROR, NO_RESULT
 from ..runtime import RuntimeContext
@@ -200,7 +201,7 @@ def fetch_ieee_browser_html_payload(
     )
     if not diagnostics.accepted:
         raise ProviderFailure(NO_RESULT, availability_failure_message(diagnostics))
-    content_type = _header_value(response_headers, "content-type", "text/html")
+    content_type = header_value(response_headers, "content-type", "text/html")
     extracted_assets = extraction_assets(extraction, landing_attempt)
     return build_provider_payload(
         provider=provider_name,
@@ -237,11 +238,3 @@ def fetch_ieee_browser_html_payload(
             fulltext_marker("ieee", "ok", route="html"),
         ],
     )
-
-
-def _header_value(headers: dict[str, str], key: str, default: str = "") -> str:
-    lowered_key = key.lower()
-    for raw_key, value in headers.items():
-        if str(raw_key).lower() == lowered_key:
-            return str(value or default)
-    return default

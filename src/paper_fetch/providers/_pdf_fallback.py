@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_HEADER, RequestFailure
+from ..http.headers import header_value
 from ..extraction.html.shared import html_text_snippet, html_title_snippet
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..runtime import RuntimeContext
@@ -52,14 +53,6 @@ class PdfFallbackStrategy:
         )
 
 
-def _header_value(headers: Mapping[str, Any] | None, key: str) -> str:
-    lowered_key = key.lower()
-    for raw_key, value in (headers or {}).items():
-        if str(raw_key).lower() == lowered_key:
-            return str(value or "")
-    return ""
-
-
 def _pdf_failure_details_from_response(
     *,
     source_url: str,
@@ -69,7 +62,7 @@ def _pdf_failure_details_from_response(
     body: bytes | bytearray | None,
 ) -> dict[str, Any]:
     body_bytes = bytes(body or b"") if isinstance(body, (bytes, bytearray)) else b""
-    content_type = _header_value(headers, "content-type")
+    content_type = header_value(headers, "content-type")
     title = html_title_snippet(body_bytes)
     summary = html_text_snippet(body_bytes)
     details: dict[str, Any] = {
@@ -533,7 +526,7 @@ def fetch_pdf_over_http(
         final_url = str(response.get("url") or url)
         response_headers = response.get("headers") or {}
         pdf_bytes = response.get("body", b"")
-        content_type = _header_value(response_headers, "content-type")
+        content_type = header_value(response_headers, "content-type")
         if not isinstance(pdf_bytes, (bytes, bytearray)) or not looks_like_pdf_payload(
             content_type,
             bytes(pdf_bytes),
