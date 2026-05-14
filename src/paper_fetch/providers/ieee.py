@@ -9,13 +9,25 @@ from typing import Any, Mapping
 
 from ..config import build_user_agent
 from ..extraction.html import decode_html
+from ..extraction.html.availability_policy import AvailabilityPolicy
 from ..extraction.html.landing import LandingRedirectLimitExceeded, fetch_landing_html
+from ..extraction.html.provider_rules import (
+    IEEE_ACCESS_BLOCK_TEXT_TOKENS,
+    IEEE_AVAILABILITY_DROP_KEYWORDS,
+    IEEE_EXTRACTION_CLEANUP_SELECTORS,
+    IEEE_MARKDOWN_PROMO_TOKENS,
+    IEEE_SITE_RULE_OVERRIDES,
+    ProviderCleanupRules,
+    ProviderHtmlRules,
+)
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYPE, RequestFailure
 from ..http.headers import header_value
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile
+from ..provider_catalog import ProviderSpec
 from ..publisher_identity import normalize_doi
 from ..quality.html_availability import HtmlQualityAssessor, availability_failure_message
+from ..quality.html_signals import IEEE_AVAILABILITY_OVERRIDES, IEEE_TEXT_MARKER_SIGNAL_SET
 from ..reason_codes import ABSTRACT_ONLY, ERROR, NO_RESULT, NOT_SUPPORTED, OK, PDF_FALLBACK
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
@@ -27,12 +39,8 @@ from . import _ieee_supplementary as ieee_supplementary
 from . import _ieee_url as ieee_url
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http, fetch_pdf_with_playwright
 from ._payloads import build_provider_payload
-from ._waterfall import (
-    DEFAULT_WATERFALL_CONTINUE_CODES,
-    ProviderWaterfallStep,
-    ProviderWaterfallState,
-    run_provider_waterfall,
-)
+from ._registry import ProviderBundle, register_provider_bundle
+from ._waterfall import DEFAULT_WATERFALL_CONTINUE_CODES, ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
 from .base import (
     ProviderArtifacts,
     ProviderClient,
@@ -46,6 +54,34 @@ from .base import (
 )
 
 __all__ = ["IeeeClient"]
+
+register_provider_bundle(
+    ProviderBundle(
+        catalog=ProviderSpec(
+            name="ieee", display_name="IEEE", official=True,
+            domains=("ieeexplore.ieee.org",), doi_prefixes=("10.1109/",),
+            publisher_aliases=("ieee", "institute of electrical and electronics engineers"),
+            asset_default="body", probe_capability="routing_signal",
+            provider_managed_abstract_only=True,
+            client_factory_path="paper_fetch.providers.ieee:IeeeClient", status_order=6,
+        ),
+        html_rules=ProviderHtmlRules(
+            name="ieee", noise_profile="ieee",
+            cleanup=ProviderCleanupRules(
+                markdown_promo_tokens=IEEE_MARKDOWN_PROMO_TOKENS,
+                extraction_cleanup_selectors=IEEE_EXTRACTION_CLEANUP_SELECTORS,
+                extraction_drop_keywords=IEEE_AVAILABILITY_DROP_KEYWORDS,
+                access_block_text_tokens=IEEE_ACCESS_BLOCK_TEXT_TOKENS,
+            ),
+            availability=AvailabilityPolicy(
+                name="ieee", site_rule_overrides=IEEE_SITE_RULE_OVERRIDES,
+                text_marker_signal_set=IEEE_TEXT_MARKER_SIGNAL_SET,
+                overrides=IEEE_AVAILABILITY_OVERRIDES,
+            ),
+        ),
+        asset_retry=ieee_html.IEEE_ASSET_RETRY_POLICY, sources=("ieee_html", "ieee_pdf"),
+    )
+)
 
 IEEE_PDF_FALLBACK_ARTIFACT_DIR_NAME = "ieee_pdf_fallback"
 MAX_IEEE_LANDING_REDIRECTS = 8

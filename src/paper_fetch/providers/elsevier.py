@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..config import build_user_agent, resolve_asset_download_concurrency
+from ..extraction.html.availability_policy import AvailabilityPolicy
 from ..http import (
     DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
     HttpTransport,
@@ -22,6 +23,7 @@ from ..http import (
 )
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, article_from_structure, metadata_only_article
+from ..provider_catalog import ProviderSpec
 from ..publisher_identity import normalize_doi
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
@@ -53,6 +55,7 @@ from ._pdf_common import (
     pdf_fetch_result_from_response,
 )
 from ._payloads import build_provider_payload
+from ._registry import ProviderBundle, register_provider_bundle
 from ._retry_categories import (
     DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
     NETWORK_RETRYABLE_REASON_TOKENS,
@@ -63,6 +66,8 @@ from ..quality.html_availability import (
     assess_plain_text_fulltext_availability,
     assess_structured_article_fulltext_availability,
 )
+from ..quality.html_signals import ELSEVIER_AVAILABILITY_OVERRIDES
+from ..extraction.html.provider_rules import ProviderHtmlRules
 from ..extraction.html.assets import SUPPLEMENTARY_KIND, download_assets
 from ..extraction.html.signals import ASSET_BLOCKING_REASON_TOKENS
 from .base import (
@@ -74,6 +79,42 @@ from .base import (
     build_provider_status_check,
     map_request_failure,
     summarize_capability_status,
+)
+
+
+register_provider_bundle(
+    ProviderBundle(
+        catalog=ProviderSpec(
+            name="elsevier",
+            display_name="Elsevier",
+            official=True,
+            domains=("sciencedirect.com", "elsevier.com"),
+            doi_prefixes=("10.1016/",),
+            publisher_aliases=(
+                "elsevier",
+                "elsevier bv",
+                "elsevier ltd",
+                "elsevier masson sas",
+            ),
+            asset_default="none",
+            probe_capability="metadata_api",
+            provider_managed_abstract_only=False,
+            client_factory_path="paper_fetch.providers.elsevier:ElsevierClient",
+            status_order=1,
+            api_hosts=("scopus.com", "www.scopus.com"),
+            sensitive_headers=("x-els-apikey", "x-els-insttoken"),
+            xml_root_tags=("full-text-retrieval-response",),
+            xml_file_tokens=("elsevier", "10.1016"),
+        ),
+        html_rules=ProviderHtmlRules(
+            name="elsevier",
+            availability=AvailabilityPolicy(
+                name="elsevier",
+                overrides=ELSEVIER_AVAILABILITY_OVERRIDES,
+            ),
+        ),
+        sources=("elsevier_xml", "elsevier_pdf"),
+    )
 )
 
 

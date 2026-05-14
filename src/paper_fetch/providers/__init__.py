@@ -25,6 +25,24 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "xml_local_name": (".elsevier", "xml_local_name"),
 }
 
+_PROVIDER_ENTRY_MODULES = (
+    ".crossref",
+    ".elsevier",
+    ".springer",
+    ".wiley",
+    ".science",
+    ".pnas",
+    ".ieee",
+    ".arxiv",
+    ".copernicus",
+    ".ams",
+)
+
+_PROVIDER_ENTRY_IMPORTS_COMPLETE = False
+for _module_name in _PROVIDER_ENTRY_MODULES:
+    import_module(_module_name, __name__)
+_PROVIDER_ENTRY_IMPORTS_COMPLETE = True
+
 __all__ = sorted(_EXPORTS)
 
 

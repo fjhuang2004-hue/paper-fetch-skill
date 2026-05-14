@@ -58,10 +58,6 @@ FLARESOLVERR_STATUS_PROBE_ID = "probe://flaresolverr/status"
 logger = logging.getLogger("paper_fetch.providers.flaresolverr")
 
 _BROWSER_WORKFLOW_PROVIDERS = ("wiley", "science", "pnas", "ams")
-_BROWSER_WORKFLOW_LABELS = {
-    provider: f"{provider_display_name(provider)} browser workflow"
-    for provider in _BROWSER_WORKFLOW_PROVIDERS
-}
 
 _POSIX_FLARESOLVERR_WORKFLOW_FILES = (
     "setup_flaresolverr_source.sh",
@@ -136,7 +132,10 @@ class FlareSolverrFailure(Exception):
 
 
 def _browser_workflow_label(provider: str) -> str:
-    return _BROWSER_WORKFLOW_LABELS.get(provider, f"{provider} browser workflow")
+    normalized = normalize_text(provider).lower()
+    if normalized in _BROWSER_WORKFLOW_PROVIDERS:
+        return f"{provider_display_name(normalized)} browser workflow"
+    return f"{normalized or provider} browser workflow"
 
 
 def _default_flaresolverr_workflow_files() -> tuple[str, ...]:

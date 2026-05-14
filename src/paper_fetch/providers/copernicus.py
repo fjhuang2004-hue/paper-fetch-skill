@@ -24,7 +24,8 @@ from ..http.headers import header_value
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..provider_catalog import (
-    provider_body_text_thresholds,
+    BodyTextThresholds,
+    ProviderSpec,
     provider_domains,
     provider_landing_path_templates,
     provider_pdf_path_templates,
@@ -43,6 +44,7 @@ from ._article_markdown_common import first_child, first_descendant, iter_descen
 from ._article_markdown_copernicus import CopernicusExtraction, parse_copernicus_xml
 from ._payloads import build_provider_payload
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
+from ._registry import ProviderBundle, register_provider_bundle
 from ._waterfall import (
     DEFAULT_WATERFALL_CONTINUE_CODES,
     ProviderWaterfallState,
@@ -66,7 +68,38 @@ from .base import (
 from bs4 import BeautifulSoup, Tag
 
 
-MIN_BODY_CHARS = provider_body_text_thresholds("copernicus").min_chars
+register_provider_bundle(
+    ProviderBundle(
+        catalog=ProviderSpec(
+            name="copernicus",
+            display_name="Copernicus",
+            official=True,
+            domains=(),
+            doi_prefixes=("10.5194/",),
+            publisher_aliases=(
+                "copernicus",
+                "copernicus publications",
+                "copernicus gmbh",
+            ),
+            asset_default="body",
+            probe_capability="routing_signal",
+            provider_managed_abstract_only=False,
+            client_factory_path="paper_fetch.providers.copernicus:CopernicusClient",
+            status_order=8,
+            domain_suffixes=("copernicus.org",),
+            xml_path_templates=("/articles/{volume}/{page}/{year}/{suffix}.xml",),
+            landing_path_templates=("/articles/{volume}/{page}/{year}/",),
+            pdf_path_templates=("/articles/{volume}/{page}/{year}/{suffix}.pdf",),
+            emits_html_managed_marker=False,
+            xml_root_tags=("article",),
+            xml_file_tokens=("copernicus", "10.5194"),
+            body_text_thresholds=BodyTextThresholds(min_chars=500),
+        ),
+        sources=("copernicus_xml", "copernicus_pdf"),
+    )
+)
+
+MIN_BODY_CHARS = 500
 COPERNICUS_XML_DOI_PATTERN = re.compile(
     r"^10\.5194/(?P<journal>[a-z0-9]+)-(?P<volume>\d+)-(?P<page>.+)-(?P<year>\d{4})$",
     flags=re.IGNORECASE,

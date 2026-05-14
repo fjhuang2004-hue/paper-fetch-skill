@@ -10,18 +10,13 @@ import idutils
 
 from .normalize_journal_name import normalize_journal_name
 from .provider_catalog import (
-    PROVIDER_CATALOG,
     doi_prefix_provider_map,
     ordered_provider_specs,
     provider_domain_matches,
 )
 
-PUBLISHER_PROVIDER_MAP = {
-    normalize_journal_name(alias): spec.name
-    for spec in PROVIDER_CATALOG.values()
-    for alias in spec.publisher_aliases
-}
-DOI_PREFIX_PROVIDER_MAP = doi_prefix_provider_map()
+PUBLISHER_PROVIDER_MAP: dict[str, str] | None = None
+DOI_PREFIX_PROVIDER_MAP: dict[str, str] | None = None
 DOI_CORE_PATTERN = r"10\.\d{4,9}/[^\s\"'<>]+"
 ASCII_DOI_CORE_PATTERN = r"10\.\d{4,9}/[!-~]+"
 DOI_PATTERN = re.compile(DOI_CORE_PATTERN, flags=re.IGNORECASE)
@@ -77,6 +72,9 @@ def extract_doi(text: str | None) -> str | None:
 
 def infer_provider_from_doi(doi: str | None) -> str | None:
     normalized = normalize_doi(doi)
+    global DOI_PREFIX_PROVIDER_MAP
+    if DOI_PREFIX_PROVIDER_MAP is None:
+        DOI_PREFIX_PROVIDER_MAP = doi_prefix_provider_map()
     for prefix, provider in DOI_PREFIX_PROVIDER_MAP.items():
         if normalized.startswith(prefix):
             return provider
@@ -87,6 +85,13 @@ def infer_provider_from_publisher(publisher: str | None) -> str | None:
     if not publisher:
         return None
     normalized = normalize_journal_name(publisher)
+    global PUBLISHER_PROVIDER_MAP
+    if PUBLISHER_PROVIDER_MAP is None:
+        PUBLISHER_PROVIDER_MAP = {
+            normalize_journal_name(alias): spec.name
+            for spec in ordered_provider_specs()
+            for alias in spec.publisher_aliases
+        }
     return PUBLISHER_PROVIDER_MAP.get(normalized)
 
 

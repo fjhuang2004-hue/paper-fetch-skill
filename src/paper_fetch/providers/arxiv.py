@@ -26,6 +26,7 @@ from ..http import (
 )
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
+from ..provider_catalog import ProviderSpec
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
 from ..utils import empty_asset_results, normalize_text
@@ -53,6 +54,7 @@ from ._arxiv_metadata import (
 )
 from ._payloads import build_provider_payload
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
+from ._registry import ProviderBundle, register_provider_bundle
 from ._waterfall import (
     DEFAULT_WATERFALL_CONTINUE_CODES,
     ProviderWaterfallStep,
@@ -69,6 +71,32 @@ from .base import (
     build_provider_status_check,
     map_request_failure,
     summarize_capability_status,
+)
+
+
+register_provider_bundle(
+    ProviderBundle(
+        catalog=ProviderSpec(
+            name="arxiv",
+            display_name="arXiv",
+            official=True,
+            domains=("arxiv.org",),
+            doi_prefixes=("10.48550/",),
+            publisher_aliases=("arxiv",),
+            asset_default="body",
+            probe_capability="metadata_api",
+            provider_managed_abstract_only=False,
+            client_factory_path="paper_fetch.providers.arxiv:ArxivClient",
+            status_order=7,
+            metadata_probe_short_circuit=(
+                "paper_fetch.providers._arxiv_metadata:"
+                "arxiv_metadata_probe_short_circuit"
+            ),
+            persist_provider_html=True,
+        ),
+        asset_retry=ARXIV_ASSET_RETRY_POLICY,
+        sources=("arxiv_html", "arxiv_pdf"),
+    )
 )
 
 

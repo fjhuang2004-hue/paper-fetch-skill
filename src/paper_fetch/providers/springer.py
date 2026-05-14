@@ -14,6 +14,7 @@ from ..common_patterns import (
     table_label_prefix_for_match,
 )
 from ..config import build_user_agent, resolve_asset_download_concurrency
+from ..extraction.html.availability_policy import AvailabilityPolicy
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
 from ..extraction.html.parsing import choose_parser
 from ..extraction.html.figure_links import rewrite_inline_figure_links
@@ -22,6 +23,7 @@ from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYP
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..publisher_identity import normalize_doi
+from ..provider_catalog import PdfSourcePathTemplate, ProviderSpec
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, merge_trace, source_trail_from_trace, trace_from_markers
 from ..utils import (
@@ -50,6 +52,24 @@ from ._waterfall import (
 from ..reason_codes import ABSTRACT_ONLY, ERROR, NO_RESULT, NOT_SUPPORTED, OK, PDF_FALLBACK
 from ..quality.reason_codes import FULLTEXT
 from ..quality.html_availability import HtmlQualityAssessor, availability_failure_message
+from ..quality.html_signals import SPRINGER_AVAILABILITY_OVERRIDES
+from ..extraction.html.provider_rules import (
+    ProviderAssetRules,
+    ProviderCleanupRules,
+    ProviderFormulaRules,
+    ProviderHeadingRules,
+    ProviderHtmlRules,
+    SPRINGER_NATURE_CHROME_ATTR_TOKENS,
+    SPRINGER_NATURE_CHROME_SECTION_HEADINGS,
+    SPRINGER_NATURE_DISPLAY_FORMULA_SELECTORS,
+    SPRINGER_NATURE_FORMULA_CONTAINER_TOKENS,
+    SPRINGER_NATURE_LICENSE_LINK_HOSTS,
+    SPRINGER_NATURE_LICENSE_LINK_PATH_PREFIXES,
+    SPRINGER_NATURE_LICENSE_WORD_LIMIT,
+    SPRINGER_NATURE_MARKDOWN_PROMO_TOKENS,
+    SPRINGER_NATURE_SUPPLEMENTARY_TEXT_TOKENS,
+)
+from ._registry import ProviderBundle, register_provider_bundle
 from .base import (
     PreparedFetchResultPayload,
     ProviderArtifacts,
@@ -65,6 +85,67 @@ from .base import (
 )
 
 from bs4 import BeautifulSoup, Tag
+
+
+register_provider_bundle(
+    ProviderBundle(
+        catalog=ProviderSpec(
+            name="springer",
+            display_name="Springer",
+            official=True,
+            domains=("springer.com", "springernature.com", "nature.com", "biomedcentral.com"),
+            doi_prefixes=("10.1038/", "10.1007/", "10.1186/"),
+            publisher_aliases=(
+                "springer",
+                "springer nature",
+                "springer science and business media llc",
+            ),
+            asset_default="body",
+            probe_capability="routing_signal",
+            provider_managed_abstract_only=True,
+            client_factory_path="paper_fetch.providers.springer:SpringerClient",
+            status_order=2,
+            base_domains=("link.springer.com",),
+            pdf_path_templates=("/content/pdf/{doi_quoted}.pdf",),
+            pdf_source_path_templates=(
+                PdfSourcePathTemplate(
+                    domain="nature.com",
+                    path_prefix="/articles/",
+                    path_template="{source_path}.pdf",
+                ),
+            ),
+            persist_provider_html=True,
+            xml_root_tags=("article",),
+            xml_file_tokens=("springer", "nature", "10.1038", "10.1007", "10.1186"),
+        ),
+        html_rules=ProviderHtmlRules(
+            name="springer_nature",
+            aliases=("springer", "nature"),
+            noise_profile="springer_nature",
+            cleanup=ProviderCleanupRules(
+                markdown_promo_tokens=SPRINGER_NATURE_MARKDOWN_PROMO_TOKENS,
+                chrome_section_headings=SPRINGER_NATURE_CHROME_SECTION_HEADINGS,
+                chrome_attr_tokens=SPRINGER_NATURE_CHROME_ATTR_TOKENS,
+                license_link_hosts=SPRINGER_NATURE_LICENSE_LINK_HOSTS,
+                license_link_path_prefixes=SPRINGER_NATURE_LICENSE_LINK_PATH_PREFIXES,
+                license_word_limit=SPRINGER_NATURE_LICENSE_WORD_LIMIT,
+            ),
+            formula=ProviderFormulaRules(
+                container_tokens=SPRINGER_NATURE_FORMULA_CONTAINER_TOKENS,
+                display_selectors=SPRINGER_NATURE_DISPLAY_FORMULA_SELECTORS,
+            ),
+            assets=ProviderAssetRules(
+                supplementary_text_tokens=SPRINGER_NATURE_SUPPLEMENTARY_TEXT_TOKENS,
+            ),
+            heading=ProviderHeadingRules(normalizations={"online methods": "Methods"}),
+            availability=AvailabilityPolicy(
+                name="springer_nature",
+                overrides=SPRINGER_AVAILABILITY_OVERRIDES,
+            ),
+        ),
+        sources=("springer_html", "springer_pdf"),
+    )
+)
 
 MAX_SPRINGER_HTML_REDIRECTS = 5
 MARKDOWN_TEXT_KEY = "markdown_text"

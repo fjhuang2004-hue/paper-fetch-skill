@@ -38,7 +38,6 @@ CACHE_STAT_KEYS = (
 SENSITIVE_CACHE_HEADER_NAMES = {
     "authorization",
     "proxy-authorization",
-    *provider_sensitive_header_names(),
 }
 CACHE_KEY_HEADER_NAMES = {
     "accept",
@@ -59,6 +58,14 @@ SENSITIVE_QUERY_PARAM_NAMES = {
 REDACTED_CACHE_VALUE = "***"
 REDACTED_CACHE_HEADER_DIGEST_PREFIX = "sha256:"
 _CacheKey = tuple[str, str, tuple[tuple[str, str], ...]]
+
+
+def _sensitive_cache_header_names() -> frozenset[str]:
+    return frozenset(SENSITIVE_CACHE_HEADER_NAMES) | provider_sensitive_header_names()
+
+
+def _cache_key_header_names() -> frozenset[str]:
+    return frozenset(CACHE_KEY_HEADER_NAMES) | _sensitive_cache_header_names()
 
 
 @dataclass(frozen=True)
@@ -113,14 +120,14 @@ class CacheMixin:
             sorted(
                 (str(key).lower(), self._normalize_header_value_for_cache(str(key), str(value)))
                 for key, value in headers.items()
-                if str(key).lower() in CACHE_KEY_HEADER_NAMES
+                if str(key).lower() in _cache_key_header_names()
             )
         )
         return (method.upper(), redact_url_for_cache(url), normalized_headers)
 
     def _normalize_header_value_for_cache(self, key: str, value: str) -> str:
         normalized_key = key.lower()
-        if normalized_key in SENSITIVE_CACHE_HEADER_NAMES:
+        if normalized_key in _sensitive_cache_header_names():
             digest = hashlib.sha256(f"{normalized_key}\0{value}".encode("utf-8")).hexdigest()[:16]
             return f"{REDACTED_CACHE_HEADER_DIGEST_PREFIX}{digest}"
         if normalized_key in UNSTABLE_CACHE_HEADER_NAMES:

@@ -5,11 +5,26 @@ from __future__ import annotations
 import urllib.parse
 from typing import Any, Mapping
 
+from ..extraction.html.availability_policy import AvailabilityPolicy
+from ..extraction.html.provider_rules import (
+    ATYPON_FRONT_MATTER_CONTAINS_TOKENS,
+    ProviderCleanupRules,
+    ProviderFormulaRules,
+    ProviderFrontMatterRules,
+    ProviderHtmlRules,
+    DomHooks,
+    WILEY_FORMULA_CONTAINER_TOKENS,
+    WILEY_FRONT_MATTER_EXACT_TEXTS,
+    WILEY_SITE_RULE_OVERRIDES,
+)
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, PDF_ACCEPT_HEADER, PDF_MIME_TYPE, RequestFailure
 from ..extraction.html.landing import REDIRECT_STATUS_CODES
 from ..provider_catalog import (
+    ATYPON_DEFAULT_PDF_PATH_TEMPLATES,
+    ProviderSpec,
     provider_api_url_template,
 )
+from ..quality.html_signals import WILEY_SIGNAL_SET
 from ..runtime import RuntimeContext
 from ..tracing import fulltext_marker
 from ..utils import normalize_text
@@ -22,6 +37,7 @@ from ._waterfall import (
     ProviderWaterfallState,
     run_provider_waterfall,
 )
+from ._registry import ProviderBundle, register_provider_bundle
 from ..reason_codes import NO_RESULT, NOT_CONFIGURED, OK, PDF_FALLBACK
 from .base import (
     ProviderContent,
@@ -30,6 +46,66 @@ from .base import (
     RawFulltextPayload,
     build_provider_status_check,
     summarize_capability_status,
+)
+
+register_provider_bundle(
+    ProviderBundle(
+        catalog=ProviderSpec(
+            name="wiley",
+            display_name="Wiley",
+            official=True,
+            domains=("onlinelibrary.wiley.com", "wiley.com", "www.wiley.com"),
+            doi_prefixes=("10.1002/", "10.1111/"),
+            publisher_aliases=(
+                "wiley",
+                "wiley blackwell",
+                "john wiley and sons",
+                "john wiley sons",
+            ),
+            asset_default="body",
+            probe_capability="routing_signal",
+            provider_managed_abstract_only=True,
+            client_factory_path="paper_fetch.providers.wiley:WileyClient",
+            status_order=3,
+            base_domains=("onlinelibrary.wiley.com",),
+            html_path_templates=("/doi/full/{doi}", "/doi/{doi}"),
+            pdf_path_templates=(
+                *ATYPON_DEFAULT_PDF_PATH_TEMPLATES,
+                "/doi/pdfdirect/{doi}",
+                "/wol1/doi/{doi}/fullpdf",
+            ),
+            crossref_pdf_position=1,
+            api_url_templates=(
+                ("tdm_pdf", "https://api.wiley.com/onlinelibrary/tdm/v1/articles/{doi}"),
+            ),
+            sensitive_headers=("wiley-tdm-client-token",),
+        ),
+        html_rules=ProviderHtmlRules(
+            name="wiley",
+            cleanup=ProviderCleanupRules(
+                extraction_drop_keywords=("citation-tools", "publicationhistory"),
+            ),
+            formula=ProviderFormulaRules(
+                container_tokens=WILEY_FORMULA_CONTAINER_TOKENS,
+            ),
+            availability=AvailabilityPolicy(
+                name="wiley",
+                site_rule_overrides=WILEY_SITE_RULE_OVERRIDES,
+                datalayer_signal_set=WILEY_SIGNAL_SET,
+            ),
+            front_matter=ProviderFrontMatterRules(
+                exact_texts=WILEY_FRONT_MATTER_EXACT_TEXTS,
+                contains_tokens=ATYPON_FRONT_MATTER_CONTAINS_TOKENS,
+            ),
+            dom_hooks=DomHooks(
+                before_block_normalization=_wiley_html.wiley_before_block_normalization,
+                after_block_normalization=_wiley_html.wiley_after_block_normalization,
+                body_container=_wiley_html.wiley_body_container,
+                asset_body_container=_wiley_html.wiley_asset_body_container,
+            ),
+        ),
+        sources=("wiley_browser",),
+    )
 )
 
 WILEY_TDM_CLIENT_TOKEN_ENV_VAR = "WILEY_TDM_CLIENT_TOKEN"

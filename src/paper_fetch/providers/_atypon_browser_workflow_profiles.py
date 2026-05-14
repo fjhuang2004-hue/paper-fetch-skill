@@ -11,7 +11,6 @@ from typing import Any, Callable, Mapping
 
 from ..extraction.html.provider_rules import DomHooks, MarkdownHooks, provider_html_rules
 from ..provider_catalog import (
-    PROVIDER_CATALOG,
     provider_base_domains,
     provider_crossref_pdf_position,
     provider_domains,
@@ -71,9 +70,7 @@ class PublisherProfile:
     is_front_matter_teaser_figure: Callable[..., bool] | None = None
 
 
-ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES = tuple(
-    name for name in ("science", "pnas", "wiley", "ams") if name in PROVIDER_CATALOG
-)
+ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES = ("science", "pnas", "wiley", "ams")
 
 
 def _unsupported_atypon_publisher_message(route_kind: str, publisher: str) -> str:

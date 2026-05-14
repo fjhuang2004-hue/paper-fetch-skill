@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import get_args
 import unittest
 
@@ -292,23 +291,9 @@ class ProviderCatalogTests(unittest.TestCase):
             ],
         )
 
-    def test_arxiv_metadata_probe_special_case_is_catalog_gated(self) -> None:
-        original = PROVIDER_CATALOG["arxiv"]
-        try:
-            PROVIDER_CATALOG["arxiv"] = replace(
-                original, probe_capability="routing_signal"
-            )
-
-            result = routing.probe_official_provider(
-                "arxiv",
-                doi="10.48550/arxiv.2605.06663",
-                clients={},
-            )
-        finally:
-            PROVIDER_CATALOG["arxiv"] = original
-
-        self.assertEqual(result.state, "unknown")
-        self.assertIsNone(result.metadata)
+    def test_provider_catalog_mapping_is_read_only(self) -> None:
+        with self.assertRaises(TypeError):
+            PROVIDER_CATALOG["arxiv"] = PROVIDER_CATALOG["arxiv"]  # type: ignore[index]
 
     def test_arxiv_metadata_probe_short_circuit_is_catalog_derived(self) -> None:
         callback = provider_metadata_probe_short_circuit("arxiv")

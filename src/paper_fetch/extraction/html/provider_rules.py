@@ -9,17 +9,6 @@ from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
 from ...common_patterns import EXTENDED_DATA_LABEL
-from ...quality.html_signals import (
-    AMS_TEXT_MARKER_SIGNAL_SET,
-    ELSEVIER_AVAILABILITY_OVERRIDES,
-    IEEE_AVAILABILITY_OVERRIDES,
-    IEEE_TEXT_MARKER_SIGNAL_SET,
-    PNAS_SIGNAL_SET,
-    SCIENCE_AVAILABILITY_OVERRIDES,
-    SCIENCE_SIGNAL_SET,
-    SPRINGER_AVAILABILITY_OVERRIDES,
-    WILEY_SIGNAL_SET,
-)
 from ...utils import normalize_text
 from .html_tags import HTML_DROP_TAGS
 from .signals import COMMON_ACCESS_BLOCK_TOKENS as SHARED_COMMON_ACCESS_BLOCK_TOKENS
@@ -406,170 +395,21 @@ _PROVIDER_HTML_RULES_CACHE: Mapping[str, ProviderHtmlRules] | None = None
 
 
 def _build_provider_html_rules() -> Mapping[str, ProviderHtmlRules]:
-    from paper_fetch.providers import (
-        _ams_html as _ams,
-        _pnas_html as _pnas,
-        _science_html as _science,
-        _wiley_html as _wiley,
-    )
+    from ...provider_catalog import _registered_provider_bundles
 
     return MappingProxyType(
-    {
-        "science": ProviderHtmlRules(
-            name="science",
-            aliases=("aaas",),
-            cleanup=ProviderCleanupRules(
-                post_content_break_tokens=SCIENCE_POST_CONTENT_BREAK_TOKENS,
-            ),
-            availability=AvailabilityPolicy(
-                name="science",
-                site_rule_overrides=SCIENCE_SITE_RULE_OVERRIDES,
-                datalayer_signal_set=SCIENCE_SIGNAL_SET,
-                overrides=SCIENCE_AVAILABILITY_OVERRIDES,
-            ),
-            front_matter=ProviderFrontMatterRules(
-                exact_texts=SCIENCE_FRONT_MATTER_EXACT_TEXTS,
-                contains_tokens=ATYPON_FRONT_MATTER_CONTAINS_TOKENS,
-                publication_keywords=SCIENCE_FRONT_MATTER_PUBLICATION_KEYWORDS,
-            ),
-            dom_hooks=DomHooks(
-                before_block_normalization=_science.science_before_block_normalization,
-                asset_body_container=_science.science_asset_body_container,
-                asset_figure_extraction=_science.science_asset_figure_extraction,
-            ),
-            markdown_hooks=MarkdownHooks(
-                normalize_markdown=_science.science_normalize_markdown,
-                keep_unknown_abstract_block=_science.science_keep_unknown_abstract_block,
-            ),
-        ),
-        "pnas": ProviderHtmlRules(
-            name="pnas",
-            noise_profile="pnas",
-            cleanup=ProviderCleanupRules(
-                markdown_promo_tokens=PNAS_MARKDOWN_PROMO_TOKENS,
-                extraction_drop_keywords=("signup-alert-ad", "tab-nav"),
-            ),
-            availability=AvailabilityPolicy(
-                name="pnas",
-                site_rule_overrides=PNAS_SITE_RULE_OVERRIDES,
-                datalayer_signal_set=PNAS_SIGNAL_SET,
-            ),
-            front_matter=ProviderFrontMatterRules(
-                exact_texts=PNAS_FRONT_MATTER_EXACT_TEXTS,
-                contains_tokens=ATYPON_FRONT_MATTER_CONTAINS_TOKENS,
-                publication_keywords=PNAS_FRONT_MATTER_PUBLICATION_KEYWORDS,
-            ),
-            dom_hooks=DomHooks(
-                before_block_normalization=_pnas.pnas_before_block_normalization,
-            ),
-            markdown_hooks=MarkdownHooks(
-                suppress_missing_abstract=_pnas.pnas_suppress_missing_abstract,
-            ),
-        ),
-        "elsevier": ProviderHtmlRules(
-            name="elsevier",
-            availability=AvailabilityPolicy(
-                name="elsevier",
-                overrides=ELSEVIER_AVAILABILITY_OVERRIDES,
-            ),
-        ),
-        "springer_nature": ProviderHtmlRules(
-            name="springer_nature",
-            aliases=("springer", "nature"),
-            noise_profile="springer_nature",
-            cleanup=ProviderCleanupRules(
-                markdown_promo_tokens=SPRINGER_NATURE_MARKDOWN_PROMO_TOKENS,
-                chrome_section_headings=SPRINGER_NATURE_CHROME_SECTION_HEADINGS,
-                chrome_attr_tokens=SPRINGER_NATURE_CHROME_ATTR_TOKENS,
-                license_link_hosts=SPRINGER_NATURE_LICENSE_LINK_HOSTS,
-                license_link_path_prefixes=SPRINGER_NATURE_LICENSE_LINK_PATH_PREFIXES,
-                license_word_limit=SPRINGER_NATURE_LICENSE_WORD_LIMIT,
-            ),
-            formula=ProviderFormulaRules(
-                container_tokens=SPRINGER_NATURE_FORMULA_CONTAINER_TOKENS,
-                display_selectors=SPRINGER_NATURE_DISPLAY_FORMULA_SELECTORS,
-            ),
-            assets=ProviderAssetRules(
-                supplementary_text_tokens=SPRINGER_NATURE_SUPPLEMENTARY_TEXT_TOKENS,
-            ),
-            heading=ProviderHeadingRules(normalizations={"online methods": "Methods"}),
-            availability=AvailabilityPolicy(
-                name="springer_nature",
-                overrides=SPRINGER_AVAILABILITY_OVERRIDES,
-            ),
-        ),
-        "wiley": ProviderHtmlRules(
-            name="wiley",
-            cleanup=ProviderCleanupRules(
-                extraction_drop_keywords=("citation-tools", "publicationhistory"),
-            ),
-            formula=ProviderFormulaRules(
-                container_tokens=WILEY_FORMULA_CONTAINER_TOKENS,
-            ),
-            availability=AvailabilityPolicy(
-                name="wiley",
-                site_rule_overrides=WILEY_SITE_RULE_OVERRIDES,
-                datalayer_signal_set=WILEY_SIGNAL_SET,
-            ),
-            front_matter=ProviderFrontMatterRules(
-                exact_texts=WILEY_FRONT_MATTER_EXACT_TEXTS,
-                contains_tokens=ATYPON_FRONT_MATTER_CONTAINS_TOKENS,
-            ),
-            dom_hooks=DomHooks(
-                before_block_normalization=_wiley.wiley_before_block_normalization,
-                after_block_normalization=_wiley.wiley_after_block_normalization,
-                body_container=_wiley.wiley_body_container,
-                asset_body_container=_wiley.wiley_asset_body_container,
-            ),
-        ),
-        "ams": ProviderHtmlRules(
-            name="ams",
-            cleanup=ProviderCleanupRules(
-                markdown_promo_tokens=AMS_MARKDOWN_PROMO_TOKENS,
-                dom_postprocess_cleanup_selectors=AMS_DOM_POSTPROCESS_CLEANUP_SELECTORS,
-                post_content_break_tokens=AMS_POST_CONTENT_BREAK_TOKENS,
-            ),
-            availability=AvailabilityPolicy(
-                name="ams",
-                site_rule_overrides=AMS_SITE_RULE_OVERRIDES,
-                text_marker_signal_set=AMS_TEXT_MARKER_SIGNAL_SET,
-            ),
-            front_matter=ProviderFrontMatterRules(
-                exact_texts=AMS_FRONT_MATTER_EXACT_TEXTS,
-                contains_tokens=ATYPON_FRONT_MATTER_CONTAINS_TOKENS,
-                publication_keywords=AMS_FRONT_MATTER_PUBLICATION_KEYWORDS,
-            ),
-            dom_hooks=DomHooks(
-                before_block_normalization=_ams.ams_before_block_normalization,
-                after_block_normalization=_ams.ams_after_block_normalization,
-                body_container=_ams.ams_body_container,
-                asset_body_container=_ams.ams_asset_body_container,
-                asset_figure_extraction=_ams.ams_asset_figure_extraction,
-            ),
-            markdown_hooks=MarkdownHooks(
-                normalize_markdown=_ams.ams_normalize_markdown,
-                classify_heading=_ams.ams_classify_heading,
-                keep_unknown_abstract_block=_ams.ams_keep_unknown_abstract_block,
-            ),
-        ),
-        "ieee": ProviderHtmlRules(
-            name="ieee",
-            noise_profile="ieee",
-            cleanup=ProviderCleanupRules(
-                markdown_promo_tokens=IEEE_MARKDOWN_PROMO_TOKENS,
-                extraction_cleanup_selectors=IEEE_EXTRACTION_CLEANUP_SELECTORS,
-                extraction_drop_keywords=IEEE_AVAILABILITY_DROP_KEYWORDS,
-                access_block_text_tokens=IEEE_ACCESS_BLOCK_TEXT_TOKENS,
-            ),
-            availability=AvailabilityPolicy(
-                name="ieee",
-                site_rule_overrides=IEEE_SITE_RULE_OVERRIDES,
-                text_marker_signal_set=IEEE_TEXT_MARKER_SIGNAL_SET,
-                overrides=IEEE_AVAILABILITY_OVERRIDES,
-            ),
-        ),
-    }
-)
+        {
+            bundle.html_rules.name: bundle.html_rules
+            for bundle in _registered_provider_bundles()
+            if bundle.html_rules is not None
+        }
+    )
+
+
+def _provider_entry_imports_complete() -> bool:
+    import paper_fetch.providers as providers
+
+    return bool(getattr(providers, "_PROVIDER_ENTRY_IMPORTS_COMPLETE", False))
 
 
 def _provider_html_rules_map() -> Mapping[str, ProviderHtmlRules]:
@@ -577,7 +417,8 @@ def _provider_html_rules_map() -> Mapping[str, ProviderHtmlRules]:
     rules = _PROVIDER_HTML_RULES_CACHE
     if rules is None:
         rules = _build_provider_html_rules()
-        _PROVIDER_HTML_RULES_CACHE = rules
+        if _provider_entry_imports_complete():
+            _PROVIDER_HTML_RULES_CACHE = rules
     return rules
 
 
@@ -617,7 +458,8 @@ def _rule_lookup() -> Mapping[str, ProviderHtmlRules]:
     lookup = _RULE_LOOKUP_CACHE
     if lookup is None:
         lookup = MappingProxyType(_build_rule_lookup())
-        _RULE_LOOKUP_CACHE = lookup
+        if _provider_entry_imports_complete():
+            _RULE_LOOKUP_CACHE = lookup
     return lookup
 
 
