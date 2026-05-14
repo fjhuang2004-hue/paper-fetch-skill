@@ -83,7 +83,7 @@ Date: 2026-05-12
 - MCP payload/tool 入口通过 `paper_fetch.mcp._deps.MCPDeps` 显式注入 runtime env、service、provider registry 与 cache index 依赖；生产默认依赖由 `default_mcp_deps()` 装配，测试和 integration harness 通过构造定制 deps 注入，不再通过 `mcp.tools` 模块 monkeypatch 同步。
 - `fetch_paper` 和批量工具会把阻塞抓取工作放到有界 `ThreadPoolExecutor`，并在 MCP 事件循环里继续处理 progress、structured log 和 cancellation；批量工具保持输入顺序、rate limit 后停止提交新任务、已提交任务完成后返回已有结果。
 - async `fetch_paper` 用 `RuntimeContext(cancel_check=...)` 创建 cancel-aware `HttpTransport`，service/workflow 只消费 transport，不直接依赖 MCP cancellation 机制。
-- `server_compat.py` 集中封装 FastMCP private SDK surface（resource registry、initialization options、stdio run），让 SDK 私有字段变化时失败点可读且集中。
+- FastMCP 版本在 `pyproject.toml` 窄范围固定；MCP server 直接访问 1.27 系列的 resource registry、initialization options 与 stdio run surface，不再保留 SDK 漂移兼容层。
 
 不负责：
 
