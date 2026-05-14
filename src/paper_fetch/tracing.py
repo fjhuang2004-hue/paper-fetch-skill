@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .reason_codes import NOT_CONFIGURED, OK, PARTIAL, RATE_LIMITED
+from .quality.reason_codes import ABSTRACT_ONLY
 from .utils import normalize_text
 
 _OUTCOMELESS_MARKER_OUTCOMES = {"", "info", "selected", "done"}
 _KNOWN_OUTCOMES = {
-    "ok",
+    OK,
     "fail",
     "attempt",
     "positive",
@@ -16,12 +18,12 @@ _KNOWN_OUTCOMES = {
     "unknown",
     "saved",
     "skipped",
-    "partial",
+    PARTIAL,
     "disabled",
     "unavailable",
-    "not_configured",
-    "rate_limited",
-    "abstract_only",
+    NOT_CONFIGURED,
+    RATE_LIMITED,
+    ABSTRACT_ONLY,
     "not_usable",
     "article_ok",
     "article_fail",

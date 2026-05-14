@@ -14,6 +14,7 @@ from paper_fetch.publisher_identity import normalize_doi
 from paper_fetch.providers import (
     _pnas_html,
     _science_html,
+    _ams_html,
     _atypon_browser_workflow_profiles as atypon_browser_workflow_profiles,
     _wiley_html,
     copernicus as copernicus_provider,
@@ -21,6 +22,7 @@ from paper_fetch.providers import (
     ieee as ieee_provider,
     pnas as pnas_provider,
     science as science_provider,
+    ams as ams_provider,
     springer as springer_provider,
     _springer_html as springer_html,
     wiley as wiley_provider,
@@ -34,6 +36,7 @@ from tests.golden_criteria import golden_criteria_asset, golden_criteria_sample_
 
 
 REPRESENTATIVE_GOLDEN_CORPUS_DOIS = (
+    "10.1175/jcli-d-23-0738.1",
     "10.1016/j.rse.2025.114648",
     "10.1038/s43247-024-01295-w",
     "10.1126/science.adp0212",
@@ -200,13 +203,59 @@ def _build_springer_article(fixture: GoldenCorpusFixture):
 
 def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
     metadata = _base_metadata(fixture)
-    html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
     client_map = {
+        "ams": ams_provider.AmsClient,
         "science": science_provider.ScienceClient,
         "pnas": pnas_provider.PnasClient,
         "wiley": wiley_provider.WileyClient,
     }
     client = client_map[fixture.provider](HttpTransport(), {})
+    if fixture.route_kind == "pdf_fallback":
+        body = fixture.raw_path.read_bytes()
+        landing_path = golden_criteria_asset(fixture.doi, "landing.html")
+        if landing_path.exists():
+            landing_metadata = parse_html_metadata(
+                landing_path.read_text(encoding="utf-8", errors="ignore"),
+                fixture.landing_url,
+            )
+            metadata = merge_html_metadata(metadata, landing_metadata)
+        if not metadata.get("doi"):
+            metadata["doi"] = fixture.doi
+        pdf_result = pdf_fetch_result_from_bytes(
+            artifact_dir=None,
+            source_url=fixture.source_url,
+            final_url=fixture.source_url,
+            pdf_bytes=body,
+        )
+        raw_payload = RawFulltextPayload(
+            provider=fixture.provider,
+            source_url=fixture.source_url,
+            content_type=fixture.content_type or "application/pdf",
+            body=body,
+            content=ProviderContent(
+                route_kind="pdf_fallback",
+                source_url=fixture.source_url,
+                content_type=fixture.content_type or "application/pdf",
+                body=body,
+                markdown_text=pdf_result.markdown_text,
+                merged_metadata=metadata,
+                diagnostics={"pdf_fallback": {"fixture": "golden_corpus"}},
+                reason=f"Loaded {fixture.provider} PDF fallback golden fixture.",
+            ),
+            trace=trace_from_markers(
+                [
+                    f"fulltext:{fixture.provider}_html_fail",
+                    f"fulltext:{fixture.provider}_pdf_fallback_ok",
+                ]
+            ),
+            merged_metadata=metadata,
+            warnings=[
+                f"Full text was extracted from {fixture.provider} PDF fallback after the HTML path was not usable.",
+            ],
+        )
+        return client.to_article_model(metadata, raw_payload)
+
+    html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
     markdown_text, extraction = client.extract_markdown(
         html_text,
         fixture.source_url,
@@ -411,7 +460,7 @@ def build_article_from_fixture(fixture: GoldenCorpusFixture):
         return _build_elsevier_article(fixture)
     if fixture.provider == "springer":
         return _build_springer_article(fixture)
-    if fixture.provider in {"science", "pnas", "wiley"}:
+    if fixture.provider in {"ams", "science", "pnas", "wiley"}:
         return _build_browser_workflow_article(fixture)
     if fixture.provider == "ieee":
         return _build_ieee_article(fixture)
@@ -459,10 +508,30 @@ def lightweight_positive_summary_from_fixture(fixture: GoldenCorpusFixture) -> d
             "source_candidate_hit": True,
         }
 
-    if fixture.provider in {"science", "pnas", "wiley"}:
+    if fixture.provider in {"ams", "science", "pnas", "wiley"}:
+        if fixture.route_kind == "pdf_fallback":
+            article = _build_browser_workflow_article(fixture)
+            abstract_sections = [section for section in article.sections if section.kind == "abstract"]
+            body_sections = [section for section in article.sections if section.kind == "body"]
+            return {
+                "doi": normalize_doi(str(article.doi or fixture.doi)),
+                "has": {
+                    "title": bool(normalize_text(article.metadata.title)),
+                    "authors": bool(article.metadata.authors),
+                    "abstract": bool(normalize_text(article.metadata.abstract)) or bool(abstract_sections),
+                    "body": bool(body_sections),
+                },
+                "validated_fields": ("title", "authors", "abstract", "body"),
+                "blocking_fallback_signals": (),
+                "source_candidate_hit": True,
+            }
         html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
         metadata = parse_html_metadata(html_text, fixture.source_url)
         browser_helpers = {
+            "ams": (
+                _ams_html.extract_authors,
+                _ams_html.blocking_fallback_signals,
+            ),
             "science": (
                 _science_html.extract_authors,
                 _science_html.blocking_fallback_signals,

@@ -16,8 +16,10 @@ from paper_fetch.providers._atypon_browser_workflow_profiles import (
     site_rule_for_publisher,
     publisher_profile,
 )
+from paper_fetch.providers._pdf_candidates import extract_pdf_candidate_urls_from_html
 from paper_fetch.provider_catalog import PROVIDER_CATALOG
 from paper_fetch.providers.base import RawFulltextPayload
+from paper_fetch.providers.ams import AmsClient
 from paper_fetch.providers.pnas import PnasClient
 from paper_fetch.providers.science import ScienceClient
 from paper_fetch.providers.wiley import WileyClient
@@ -32,7 +34,7 @@ PNAS_SAMPLE = provider_benchmark_sample("pnas")
 class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
     def test_atypon_profile_scope_is_catalog_aligned(self) -> None:
         self.assertEqual(
-            ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES, ("science", "pnas", "wiley")
+            ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES, ("science", "pnas", "wiley", "ams")
         )
         self.assertTrue(
             set(ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES) <= set(PROVIDER_CATALOG)
@@ -86,6 +88,12 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
                 "drop_keywords": {"access-widget", "rightslink"},
                 "drop_text": {"Recommended articles", "Check for updates"},
             },
+            "ams": {
+                "candidate_selectors": {".NLM_body", "[itemprop='articleBody']"},
+                "remove_selectors": {".article-tools", ".cookie-banner"},
+                "drop_keywords": {"download", "rightslink"},
+                "drop_text": {"Check for updates"},
+            },
         }
 
         for publisher, expectations in cases.items():
@@ -136,6 +144,13 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
                 f"https://onlinelibrary.wiley.com/wol1/doi/{WILEY_SAMPLE.doi}/fullpdf",
             ],
         )
+        ams_doi = "10.1175/jcli-d-23-0738.1"
+        ams_landing = "https://journals.ametsoc.org/view/journals/clim/37/24/JCLI-D-23-0738.1.xml"
+        self.assertEqual(
+            build_html_candidates("ams", ams_doi, ams_landing),
+            [ams_landing],
+        )
+        self.assertEqual(build_pdf_candidates("ams", ams_doi, None), [])
 
     def test_provider_profiles_match_candidate_builder_priority(self) -> None:
         crossref_pdf_url = (
@@ -145,6 +160,12 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
             ("science", ScienceClient(None, {}), SCIENCE_SAMPLE.doi, None),
             ("pnas", PnasClient(None, {}), PNAS_SAMPLE.doi, None),
             ("wiley", WileyClient(None, {}), WILEY_SAMPLE.doi, crossref_pdf_url),
+            (
+                "ams",
+                AmsClient(None, {}),
+                "10.1175/jcli-d-23-0738.1",
+                "https://journals.ametsoc.org/downloadpdf/journals/clim/37/24/JCLI-D-23-0738.1.xml",
+            ),
         )
 
         for provider, client, doi, pdf_url in cases:
@@ -194,8 +215,41 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
             ],
         )
 
+    def test_extract_pdf_url_from_crossref_recognizes_ams_downloadpdf_links(self) -> None:
+        pdf_url = "https://journals.ametsoc.org/downloadpdf/journals/clim/37/24/JCLI-D-23-0738.1.xml"
+
+        self.assertEqual(
+            extract_pdf_url_from_crossref(
+                {"fulltext_links": [{"url": pdf_url, "content_type": "text/html"}]}
+            ),
+            pdf_url,
+        )
+
+    def test_extract_pdf_candidates_recognizes_pdfjs_default_url(self) -> None:
+        html = """
+        <html><head><script>
+        PDFViewerApplicationOptions.set('defaultUrl',
+          "/downloadpdf/view/journals/bams/aop/BAMS-D-24-0270.1/BAMS-D-24-0270.1.pdf?pdfJsInlineViewToken=1&amp;inlineView=true");
+        </script></head></html>
+        """
+
+        self.assertEqual(
+            extract_pdf_candidate_urls_from_html(
+                html,
+                "https://journals.ametsoc.org/pdfviewer/full/journals/bams/aop/BAMS-D-24-0270.1/BAMS-D-24-0270.1.xml",
+            ),
+            [
+                "https://journals.ametsoc.org/downloadpdf/view/journals/bams/aop/BAMS-D-24-0270.1/BAMS-D-24-0270.1.pdf?pdfJsInlineViewToken=1&inlineView=true"
+            ],
+        )
+
     def test_provider_clients_use_canonical_browser_workflow_runtime(self) -> None:
-        clients = (ScienceClient(None, {}), PnasClient(None, {}), WileyClient(None, {}))
+        clients = (
+            ScienceClient(None, {}),
+            PnasClient(None, {}),
+            WileyClient(None, {}),
+            AmsClient(None, {}),
+        )
 
         for client in clients:
             with self.subTest(provider=client.name):
@@ -215,6 +269,7 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
             (ScienceClient(None, {}), None, "Science", "science"),
             (PnasClient(None, {}), None, "PNAS", "pnas"),
             (WileyClient(None, {}), "wiley_browser", "Wiley", "wiley"),
+            (AmsClient(None, {}), None, "AMS", "ams"),
         )
 
         for client, article_source_name, label, markdown_publisher in cases:
@@ -261,9 +316,11 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
         ).profile.fallback_author_extractor
         pnas_extract_authors = PnasClient(None, {}).profile.fallback_author_extractor
         wiley_extract_authors = WileyClient(None, {}).profile.fallback_author_extractor
+        ams_extract_authors = AmsClient(None, {}).profile.fallback_author_extractor
         assert science_extract_authors is not None
         assert pnas_extract_authors is not None
         assert wiley_extract_authors is not None
+        assert ams_extract_authors is not None
 
         self.assertEqual(
             science_extract_authors(science_html), ["Ada Lovelace", "Grace Hopper"]
@@ -274,6 +331,7 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
             ["Edward Example", "Dana Creator"],
         )
         self.assertEqual(wiley_extract_authors(wiley_html), ["Meta Author"])
+        self.assertEqual(ams_extract_authors(wiley_html), ["Meta Author"])
 
         wiley_dom_only_html = """
         <html><body>

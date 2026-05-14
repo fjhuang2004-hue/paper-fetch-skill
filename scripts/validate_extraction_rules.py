@@ -22,7 +22,15 @@ CANONICAL_FIXTURE_PREFIXES = (
     "tests/fixtures/golden_criteria/",
     "tests/fixtures/block/",
 )
-PROVIDER_SECTIONS = ("Springer", "Elsevier", "Wiley", "Science", "PNAS", "IEEE", "Copernicus")
+PROVIDER_SECTIONS = (
+    "Springer",
+    "Elsevier",
+    "Wiley",
+    "Science",
+    "PNAS",
+    "IEEE",
+    "Copernicus",
+)
 SHARED_RULE_SECTIONS = ("Generic", "Models", "Service", "CLI")
 UNLINKED_FIXTURES_START = "<!-- extraction-rules-unlinked-fixtures:start -->"
 UNLINKED_FIXTURES_END = "<!-- extraction-rules-unlinked-fixtures:end -->"
@@ -36,6 +44,11 @@ PROVIDER_RULE_REQUIREMENTS = {
         "markdown_promo_tokens",
     },
     "springer_nature": {
+        "chrome_attr_tokens",
+        "chrome_section_headings",
+        "license_link_hosts",
+        "license_link_path_prefixes",
+        "license_word_limit",
         "markdown_promo_tokens",
     },
     "wiley": {
@@ -46,6 +59,9 @@ PROVIDER_RULE_REQUIREMENTS = {
         "availability_site_rule_overrides",
         "extraction_cleanup_selectors",
         "markdown_promo_tokens",
+    },
+    "ams": {
+        "dom_postprocess_cleanup_selectors",
     },
 }
 
@@ -59,18 +75,37 @@ BACKTICK_RE = re.compile(r"`([^`]+)`")
 CONTROLLED_STAGE_RE = re.compile(r"^- `([^`]+)`：", flags=re.MULTILINE)
 PHASE_FIELD_RE = re.compile(r"^- 它对应的阶段是：(.+)$", flags=re.MULTILINE)
 OWNER_FIELD_RE = re.compile(r"^- Owner：(.+)$", flags=re.MULTILINE)
-RULE_MARKER_RE = re.compile(r"^\s*rule:\s*(rule-[A-Za-z0-9_-]+)\s*$", flags=re.MULTILINE)
+RULE_MARKER_RE = re.compile(
+    r"^\s*rule:\s*(rule-[A-Za-z0-9_-]+)\s*$", flags=re.MULTILINE
+)
+SITE_UI_COPY_MARKER = "SITE_UI_COPY_REGRESSION_MARKER"
+SITE_UI_COPY_STRUCTURAL_HOOK_MARKER = "STRUCTURAL_UI_COPY_HOOK"
+SITE_UI_COPY_CONSTANT_RE = re.compile(
+    r"^(?P<name>[A-Z][A-Z0-9_]*(?:PROMO_TOKENS|POST_CONTENT_BREAK_TOKENS|CHROME_[A-Z0-9_]+|FATAL_ERROR_TEXTS|ERROR_TEXTS))\s*=",
+    flags=re.MULTILINE,
+)
+SITE_UI_COPY_EXEMPT_PREFIXES = ("COMMON_", "MARKDOWN_")
+SITE_UI_COPY_POLICY_OWNED_FILES = {
+    Path("src/paper_fetch/extraction/html/cleanup_policy.py"),
+    Path("src/paper_fetch/extraction/html/provider_rules.py"),
+}
 
 PROVIDER_INFERENCE_PATTERNS = {
     # Nature HTML is intentionally maintained through the Springer/Springer Nature
     # provider path, so nature-named tests are checked against Springer shared rules.
-    "Springer": re.compile(r"(?<![A-Za-z])(?:springer|nature)(?![A-Za-z])", flags=re.IGNORECASE),
+    "Springer": re.compile(
+        r"(?<![A-Za-z])(?:springer|nature)(?![A-Za-z])", flags=re.IGNORECASE
+    ),
     "Elsevier": re.compile(r"(?<![A-Za-z])elsevier(?![A-Za-z])", flags=re.IGNORECASE),
     "Wiley": re.compile(r"(?<![A-Za-z])wiley(?![A-Za-z])", flags=re.IGNORECASE),
-    "Science": re.compile(r"(?<![A-Za-z])(?:science|sciadv)(?![A-Za-z])", flags=re.IGNORECASE),
+    "Science": re.compile(
+        r"(?<![A-Za-z])(?:science|sciadv)(?![A-Za-z])", flags=re.IGNORECASE
+    ),
     "PNAS": re.compile(r"(?<![A-Za-z])pnas(?![A-Za-z])", flags=re.IGNORECASE),
     "IEEE": re.compile(r"(?<![A-Za-z])ieee(?![A-Za-z])", flags=re.IGNORECASE),
-    "Copernicus": re.compile(r"(?<![A-Za-z])copernicus(?![A-Za-z])", flags=re.IGNORECASE),
+    "Copernicus": re.compile(
+        r"(?<![A-Za-z])copernicus(?![A-Za-z])", flags=re.IGNORECASE
+    ),
 }
 
 
@@ -133,10 +168,14 @@ def _iter_rule_blocks(markdown: str) -> list[tuple[str, str, str, int]]:
 
 
 def _subsection_body(markdown: str, name: str) -> str | None:
-    start_match = re.search(rf"^### {re.escape(name)}\s*$", markdown, flags=re.MULTILINE)
+    start_match = re.search(
+        rf"^### {re.escape(name)}\s*$", markdown, flags=re.MULTILINE
+    )
     if start_match is None:
         return None
-    next_match = re.search(r"^###\s+", markdown[start_match.end() :], flags=re.MULTILINE)
+    next_match = re.search(
+        r"^###\s+", markdown[start_match.end() :], flags=re.MULTILINE
+    )
     if next_match is None:
         return markdown[start_match.end() :]
     return markdown[start_match.end() : start_match.end() + next_match.start()]
@@ -177,7 +216,9 @@ def validate_anchors(markdown: str) -> list[str]:
         anchor = match.group(1)
         line = _line_number(markdown, match.start(1))
         if anchor in seen:
-            errors.append(f"duplicate anchor #{anchor} at line {line}; first seen at line {seen[anchor]}")
+            errors.append(
+                f"duplicate anchor #{anchor} at line {line}; first seen at line {seen[anchor]}"
+            )
         else:
             seen[anchor] = line
 
@@ -197,7 +238,9 @@ def validate_rule_owners(markdown: str) -> list[str]:
             continue
         match = OWNER_FIELD_RE.search(block)
         if match is None:
-            errors.append(f"rule #{anchor} at line {line} is missing required Owner： field")
+            errors.append(
+                f"rule #{anchor} at line {line} is missing required Owner： field"
+            )
             continue
         owner_paths = _owner_path_tokens(match.group(1))
         if not owner_paths:
@@ -206,7 +249,9 @@ def validate_rule_owners(markdown: str) -> list[str]:
         for owner_path in owner_paths:
             error = _validate_owner_path(owner_path)
             if error:
-                errors.append(f"rule #{anchor} at line {line} has invalid Owner `{owner_path}`: {error}")
+                errors.append(
+                    f"rule #{anchor} at line {line} has invalid Owner `{owner_path}`: {error}"
+                )
     return errors
 
 
@@ -228,7 +273,9 @@ def _find_spec(module_name: str) -> bool:
 
 
 def _validate_owner_path(owner_path: str) -> str | None:
-    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$", owner_path):
+    if not re.match(
+        r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+$", owner_path
+    ):
         return "not a dotted import path"
     if _find_spec(owner_path):
         return None
@@ -258,16 +305,22 @@ def validate_rule_phases(markdown: str) -> list[str]:
             continue
         match = PHASE_FIELD_RE.search(block)
         if match is None:
-            errors.append(f"rule #{anchor} at line {line} is missing required phase field")
+            errors.append(
+                f"rule #{anchor} at line {line} is missing required phase field"
+            )
             continue
         field = match.group(1)
         stages = BACKTICK_RE.findall(field)
         if not stages:
-            errors.append(f"rule #{anchor} at line {line} must use backticked controlled stage tokens")
+            errors.append(
+                f"rule #{anchor} at line {line} must use backticked controlled stage tokens"
+            )
             continue
         for stage in stages:
             if stage not in controlled_stages:
-                errors.append(f"rule #{anchor} at line {line} uses unknown stage token `{stage}`")
+                errors.append(
+                    f"rule #{anchor} at line {line} uses unknown stage token `{stage}`"
+                )
         unbackticked = BACKTICK_RE.sub("", field)
         unbackticked = re.sub(r"[、,，。\s]+", "", unbackticked)
         if unbackticked:
@@ -283,7 +336,9 @@ def validate_single_test_rule_risk_markers(markdown: str) -> list[str]:
         if _is_redirect_rule(title, block):
             continue
         test_names = set(TEST_NAME_RE.findall(block))
-        if len(test_names) == 1 and not any(marker in block for marker in LOW_COVERAGE_MARKERS):
+        if len(test_names) == 1 and not any(
+            marker in block for marker in LOW_COVERAGE_MARKERS
+        ):
             errors.append(
                 f"single-test rule #{anchor} at line {line} must mark low coverage risk"
             )
@@ -356,16 +411,22 @@ def validate_manifest_fixture_reverse_index(markdown: str) -> list[str]:
 
     unknown = documented_unlinked - sample_ids
     for sample_id in sorted(unknown):
-        errors.append(f"unlinked fixture list references unknown manifest sample: {sample_id}")
+        errors.append(
+            f"unlinked fixture list references unknown manifest sample: {sample_id}"
+        )
 
     stale = documented_unlinked & covered
     for sample_id in sorted(stale):
-        errors.append(f"manifest sample is both reverse-indexed and listed as unlinked: {sample_id}")
+        errors.append(
+            f"manifest sample is both reverse-indexed and listed as unlinked: {sample_id}"
+        )
 
     sample_ids_with_assets = {
         sample_id
         for sample_id, sample in samples.items()
-        if isinstance(sample, dict) and isinstance(sample.get("assets"), dict) and sample["assets"]
+        if isinstance(sample, dict)
+        and isinstance(sample.get("assets"), dict)
+        and sample["assets"]
     }
     undocumented = sample_ids_with_assets - covered - documented_unlinked
     for sample_id in sorted(undocumented):
@@ -383,7 +444,11 @@ def validate_canonical_fixture_manifest() -> list[str]:
             continue
         for asset_path in sample["assets"].values():
             parts = Path(str(asset_path)).parts
-            if len(parts) >= 4 and parts[:3] == ("tests", "fixtures", "golden_criteria"):
+            if len(parts) >= 4 and parts[:3] == (
+                "tests",
+                "fixtures",
+                "golden_criteria",
+            ):
                 manifest_dirs["golden"].add(parts[3])
             elif len(parts) >= 4 and parts[:3] == ("tests", "fixtures", "block"):
                 manifest_dirs["block"].add(parts[3])
@@ -396,12 +461,16 @@ def validate_canonical_fixture_manifest() -> list[str]:
         if path.name == "_scenarios":
             continue
         if path.name not in manifest_dirs["golden"]:
-            errors.append(f"golden fixture directory is missing from manifest assets: {path.name}")
+            errors.append(
+                f"golden fixture directory is missing from manifest assets: {path.name}"
+            )
 
     block_root = REPO_ROOT / "tests" / "fixtures" / "block"
     for path in sorted(item for item in block_root.iterdir() if item.is_dir()):
         if path.name not in manifest_dirs["block"]:
-            errors.append(f"block fixture directory is missing from manifest assets: {path.name}")
+            errors.append(
+                f"block fixture directory is missing from manifest assets: {path.name}"
+            )
     return errors
 
 
@@ -444,23 +513,34 @@ def validate_manifest_anchors(anchors: set[str]) -> list[str]:
         test_id = entry.get("test", "<unknown>")
         for anchor in entry.get("anchors", []):
             if anchor not in anchors:
-                errors.append(f"manifest test {test_id} references missing anchor #{anchor}")
+                errors.append(
+                    f"manifest test {test_id} references missing anchor #{anchor}"
+                )
     return errors
 
 
 def validate_provider_rule_registry() -> list[str]:
-    from paper_fetch.extraction.html.provider_rules import PROVIDER_HTML_RULES, provider_html_rules
+    from paper_fetch.extraction.html.provider_rules import (
+        PROVIDER_HTML_RULES,
+        provider_html_rules,
+    )
 
     errors: list[str] = []
     for provider, required_fields in PROVIDER_RULE_REQUIREMENTS.items():
         rules = PROVIDER_HTML_RULES.get(provider)
         if rules is None:
-            errors.append(f"provider HTML rules registry is missing provider: {provider}")
+            errors.append(
+                f"provider HTML rules registry is missing provider: {provider}"
+            )
             continue
         if provider_html_rules(provider).name != provider:
-            errors.append(f"provider HTML rules registry does not resolve canonical provider: {provider}")
+            errors.append(
+                f"provider HTML rules registry does not resolve canonical provider: {provider}"
+            )
         if not rules.noise_profile:
-            errors.append(f"provider HTML rules registry has empty noise profile for provider: {provider}")
+            errors.append(
+                f"provider HTML rules registry has empty noise profile for provider: {provider}"
+            )
         for alias in rules.aliases:
             if provider_html_rules(alias).name != provider:
                 errors.append(
@@ -473,6 +553,57 @@ def validate_provider_rule_registry() -> list[str]:
                     f"provider HTML rules registry provider `{provider}` is missing required `{field_name}`"
                 )
     return errors
+
+
+def validate_site_ui_copy_markers() -> list[str]:
+    errors: list[str] = []
+    for path in sorted((SRC_ROOT / "paper_fetch").rglob("*.py")):
+        relative_path = path.relative_to(REPO_ROOT)
+        if not _site_ui_copy_marker_scope(relative_path):
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in SITE_UI_COPY_CONSTANT_RE.finditer(text):
+            name = match.group("name")
+            if name.startswith(SITE_UI_COPY_EXEMPT_PREFIXES):
+                continue
+            preceding_lines = text[: match.start()].splitlines()[-5:]
+            if SITE_UI_COPY_MARKER not in "\n".join(preceding_lines):
+                errors.append(
+                    f"{path.relative_to(REPO_ROOT)}:{_line_number(text, match.start())} "
+                    f"`{name}` is missing {SITE_UI_COPY_MARKER}"
+                )
+                continue
+            if not _site_ui_copy_has_cleanup_owner(path, text, match):
+                errors.append(
+                    f"{path.relative_to(REPO_ROOT)}:{_line_number(text, match.start())} "
+                    f"`{name}` is missing CleanupPolicy or {SITE_UI_COPY_STRUCTURAL_HOOK_MARKER} ownership"
+                )
+    return errors
+
+
+def _site_ui_copy_marker_scope(relative_path: Path) -> bool:
+    if relative_path in SITE_UI_COPY_POLICY_OWNED_FILES:
+        return True
+    return relative_path.parts[:3] == ("src", "paper_fetch", "providers")
+
+
+def _site_ui_copy_has_cleanup_owner(
+    path: Path, text: str, match: re.Match[str]
+) -> bool:
+    relative_path = path.relative_to(REPO_ROOT)
+    if relative_path in SITE_UI_COPY_POLICY_OWNED_FILES:
+        return True
+    context = "\n".join(text[: match.start()].splitlines()[-8:])
+    if SITE_UI_COPY_STRUCTURAL_HOOK_MARKER in context:
+        return True
+    if "CleanupPolicy" in context or "cleanup policy" in context.lower():
+        return True
+    if (
+        match.group("name").endswith(("ERROR_TEXTS", "FATAL_ERROR_TEXTS"))
+        and "structural" in context.lower()
+    ):
+        return True
+    return False
 
 
 def _section_body(markdown: str, name: str) -> str | None:
@@ -502,14 +633,18 @@ def validate_provider_shared_lists(markdown: str, anchors: set[str]) -> list[str
             shared,
             maxsplit=1,
         )[0]
-        bullet_lines = [line for line in shared.splitlines() if line.strip().startswith("- ")]
+        bullet_lines = [
+            line for line in shared.splitlines() if line.strip().startswith("- ")
+        ]
         if not bullet_lines:
             errors.append(f"provider section {provider} has an empty shared-rule list")
             continue
         for line in bullet_lines:
             links = RULE_LINK_RE.findall(line)
             if not links:
-                errors.append(f"provider section {provider} shared item lacks rule link: {line.strip()}")
+                errors.append(
+                    f"provider section {provider} shared item lacks rule link: {line.strip()}"
+                )
                 continue
             for anchor in links:
                 if anchor not in anchors:
@@ -540,14 +675,20 @@ def validate_provider_shared_applicability(markdown: str) -> list[str]:
         shared_by_provider[provider] = set(RULE_LINK_RE.findall(shared))
 
     for anchor, title, block, line in _iter_rule_blocks(markdown):
-        if _is_redirect_rule(title, block) or rule_sections.get(anchor) not in SHARED_RULE_SECTIONS:
+        if (
+            _is_redirect_rule(title, block)
+            or rule_sections.get(anchor) not in SHARED_RULE_SECTIONS
+        ):
             continue
         owner_match = OWNER_FIELD_RE.search(block)
         inferred = _infer_providers(owner_match.group(1) if owner_match else "")
         for test_name in TEST_NAME_RE.findall(block):
             name_providers = _infer_providers(test_name)
             for definition in test_defs.get(test_name, []):
-                inferred.update(name_providers or _infer_providers(str(definition.path.relative_to(REPO_ROOT))))
+                inferred.update(
+                    name_providers
+                    or _infer_providers(str(definition.path.relative_to(REPO_ROOT)))
+                )
         for provider in sorted(inferred):
             if anchor not in shared_by_provider.get(provider, set()):
                 errors.append(
@@ -581,6 +722,7 @@ def main() -> int:
     errors.extend(validate_test_docstring_markers(markdown))
     errors.extend(validate_manifest_anchors(anchors))
     errors.extend(validate_provider_rule_registry())
+    errors.extend(validate_site_ui_copy_markers())
     errors.extend(validate_provider_shared_lists(markdown, anchors))
     errors.extend(validate_provider_shared_applicability(markdown))
 

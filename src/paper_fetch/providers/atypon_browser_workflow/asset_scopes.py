@@ -1,4 +1,4 @@
-"""Atypon asset scope selection for Science, PNAS, and Wiley browser workflows."""
+"""Atypon asset scope selection for Science, PNAS, Wiley, and AMS browser workflows."""
 
 from __future__ import annotations
 
@@ -7,7 +7,11 @@ from typing import Any, Mapping
 
 from ...extraction.html import assets as _html_asset_impl
 from ...extraction.html.parsing import choose_parser
-from ...extraction.html.semantics import node_identity_text, normalize_heading
+from ...extraction.html.semantics import (
+    SUPPLEMENTARY_BACK_MATTER_HEADINGS,
+    node_identity_text,
+    normalize_heading,
+)
 from ...extraction.html.shared import short_text as _short_text
 from ...extraction.html.signals import HtmlExtractionFailure
 from ...quality.html_availability import (
@@ -47,12 +51,9 @@ ATYPON_BROWSER_WORKFLOW_SUPPLEMENTARY_SECTION_SELECTORS = (
 )
 
 
-ATYPON_BROWSER_WORKFLOW_SUPPLEMENTARY_HEADING_KEYS = {
-    "supplementary material",
-    "supplementary materials",
-    "supplementary information",
-    "supporting information",
-}
+ATYPON_BROWSER_WORKFLOW_SUPPLEMENTARY_HEADING_KEYS = (
+    SUPPLEMENTARY_BACK_MATTER_HEADINGS - {"electronic supplementary material"}
+)
 
 
 def _atypon_browser_workflow_supplementary_heading_key(node: Tag) -> str:

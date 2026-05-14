@@ -17,6 +17,7 @@ from ...extraction.html.signals import HtmlExtractionFailure
 from ...metadata.types import ProviderMetadata
 from ...models import AssetProfile
 from ...publisher_identity import normalize_doi
+from ...quality.reason_codes import FULLTEXT
 from ...runtime import RuntimeContext
 from ...tracing import download_marker, fulltext_marker, trace_from_markers
 from ...utils import empty_asset_results, normalize_text, provider_display_name
@@ -36,6 +37,7 @@ from .._flaresolverr import (
 )
 from .._pdf_fallback import PdfFallbackFailure
 from .._waterfall import ProviderWaterfallStep, run_provider_waterfall
+from ...reason_codes import ABSTRACT_ONLY, NO_RESULT, NOT_SUPPORTED, PDF_FALLBACK
 from .html_extraction import (
     _cached_browser_workflow_markdown,
 )
@@ -98,7 +100,7 @@ class BrowserWorkflowClient(ProviderClient):
 
     def fetch_metadata(self, query: Mapping[str, str | None]) -> ProviderMetadata:
         raise ProviderFailure(
-            "not_supported",
+            NOT_SUPPORTED,
             f"{self.name} official metadata retrieval is not implemented; routing relies on Crossref metadata.",
         )
 
@@ -110,11 +112,15 @@ class BrowserWorkflowClient(ProviderClient):
             return profile.article_source_name
         return self.name
 
+    def article_source_for_payload(self, raw_payload: RawFulltextPayload) -> str:
+        del raw_payload
+        return self.article_source()
+
     def require_profile(self) -> ProviderBrowserProfile:
         profile = self.profile
         if profile is None:
             raise ProviderFailure(
-                "not_supported",
+                NOT_SUPPORTED,
                 f"{self.name} must declare a browser workflow profile.",
             )
         return profile
@@ -144,16 +150,16 @@ class BrowserWorkflowClient(ProviderClient):
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
             raise ProviderFailure(
-                "not_supported", f"{self.name} PDF fallback requires a DOI."
+                NOT_SUPPORTED, f"{self.name} PDF fallback requires a DOI."
             )
         content = raw_payload.content
         if content is None or normalize_text(content.route_kind).lower() != "html":
             raise ProviderFailure(
-                "not_supported",
+                NOT_SUPPORTED,
                 f"{self.name} PDF fallback recovery requires provider-owned HTML content.",
             )
 
-        html_failure_reason = "abstract_only"
+        html_failure_reason = ABSTRACT_ONLY
         html_failure_message = f"{self.name} HTML route only exposed abstract-level content after markdown extraction."
         recovery_warning = f"{self.name} HTML route only exposed abstract-level content after markdown extraction; attempting PDF fallback."
         runtime = _facade_attr("load_runtime_config", _load_runtime_config)(
@@ -180,8 +186,8 @@ class BrowserWorkflowClient(ProviderClient):
             warnings=[*raw_payload.warnings, recovery_warning],
             success_source_trail=[
                 fulltext_marker(self.name, "ok", route="html"),
-                fulltext_marker(self.name, "abstract_only"),
-                fulltext_marker(self.name, "ok", route="pdf_fallback"),
+                fulltext_marker(self.name, ABSTRACT_ONLY),
+                fulltext_marker(self.name, "ok", route=PDF_FALLBACK),
             ],
             context=context,
         )
@@ -255,7 +261,7 @@ class BrowserWorkflowClient(ProviderClient):
         ):
             reason = bootstrap.html_failure_message or f"{self.name} HTML route failed."
             raise ProviderFailure(
-                "no_result",
+                NO_RESULT,
                 (
                     f"{self.name} HTML route was not usable ({bootstrap.html_failure_reason or 'html_failed'}); "
                     f"PDF fallback is disabled. {reason}"
@@ -295,7 +301,7 @@ class BrowserWorkflowClient(ProviderClient):
                     bootstrap.html_failure_message or f"{self.name} HTML route failed."
                 )
                 raise ProviderFailure(
-                    "no_result",
+                    NO_RESULT,
                     (
                         f"{self.name} full text could not be retrieved via HTML or PDF fallback. "
                         f"HTML failure: {reason} PDF failure: {exc.message}"
@@ -308,7 +314,7 @@ class BrowserWorkflowClient(ProviderClient):
                     label="pdf",
                     run=run_pdf_fallback,
                     success_markers=(
-                        fulltext_marker(self.name, "ok", route="pdf_fallback"),
+                        fulltext_marker(self.name, "ok", route=PDF_FALLBACK),
                     ),
                 )
             ],
@@ -353,11 +359,11 @@ class BrowserWorkflowClient(ProviderClient):
             metadata, raw_payload, context=context
         )
         prepared.provisional_article = provisional_article
-        if provisional_article.quality.content_kind != "abstract_only":
+        if provisional_article.quality.content_kind != ABSTRACT_ONLY:
             return prepared
 
         if not self.allow_pdf_fallback_after_html_failure(
-            html_failure_reason="abstract_only",
+            html_failure_reason=ABSTRACT_ONLY,
             html_failure_message=f"{self.name} HTML route only exposed abstract-level content after markdown extraction.",
         ):
             return prepared
@@ -389,7 +395,7 @@ class BrowserWorkflowClient(ProviderClient):
     ) -> bool:
         return (
             provisional_article is None
-            or provisional_article.quality.content_kind == "fulltext"
+            or provisional_article.quality.content_kind == FULLTEXT
         )
 
     def finalize_fetch_result_article(
@@ -400,7 +406,7 @@ class BrowserWorkflowClient(ProviderClient):
         provisional_article=None,
         finalize_warnings: list[str] | None = None,
     ):
-        if article.quality.content_kind != "abstract_only":
+        if article.quality.content_kind != ABSTRACT_ONLY:
             return article
         return _finalize_abstract_only_provider_article(
             self.name,
@@ -885,7 +891,7 @@ class BrowserWorkflowClient(ProviderClient):
         content = raw_payload.content
         if (
             normalize_text(content.route_kind if content is not None else "").lower()
-            != "pdf_fallback"
+            != PDF_FALLBACK
         ):
             return artifacts
         provider_label = self.provider_label()

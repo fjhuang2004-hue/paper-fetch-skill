@@ -1,8 +1,8 @@
-# Wiley / Science / PNAS FlareSolverr 工作流
+# Wiley / Science / PNAS / AMS FlareSolverr 工作流
 
 这份文档解决：
 
-- `wiley` / `science` / `pnas` 的 repo-local 运行边界
+- `wiley` / `science` / `pnas` / `ams` 的 repo-local 运行边界
 - 必填变量与 preset 选择
 - 一次性准备、启动、检查、停止
 - smoke 命令与常见失败排障
@@ -17,19 +17,20 @@
 
 ## 范围与边界
 
-`wiley` / `science` / `pnas` 当前遵循这些边界：
+`wiley` / `science` / `pnas` / `ams` 当前遵循这些边界：
 
 - 它们是公开 provider 名字，可能出现在 `provider_hint`、`preferred_providers` 中
 - metadata 仍由 `crossref` 提供
-- 正文链路顺序以 [`providers.md` 的 Wiley / Science / PNAS 小节](providers.md#wiley-science-pnas-browser-workflow) 为准
+- 正文链路顺序以 [`providers.md` 的 Wiley / Science / PNAS / AMS 小节](providers.md#wiley-science-pnas-browser-workflow) 为准
 - `pnas` 会先做 direct Playwright HTML preflight；成功时跳过 FlareSolverr，失败时继续走 provider-owned browser workflow
 - `wiley` 的 `WILEY_TDM_CLIENT_TOKEN` 只启用官方 TDM API PDF lane；这条 lane 会在 browser PDF/ePDF fallback 失败或本地 browser runtime 不可用时继续尝试，但不会下载 HTML 资产
-- `wiley` 的 HTML / browser PDF/ePDF 路径与 `science` / `pnas` 共用同一套 provider-owned 浏览器 bootstrap 与 browser-PDF executor，不再保留单独的 Science path harness
-- `source` 公开可能是 `wiley_browser`、`science` 或 `pnas`
+- `wiley` 的 HTML / browser PDF/ePDF 路径与 `science` / `pnas` / `ams` 共用同一套 provider-owned 浏览器 bootstrap 与 browser-PDF executor，不再保留单独的 Science path harness
+- `ams` 的 AMS XML/JATS 路径被显式禁用：即使页面声明 `citation_xml_url`，也不会请求 `/doc/...xml`
+- `source` 公开可能是 `wiley_browser`、`science`、`pnas`、`ams_html` 或 `ams_pdf`
 - `FlareSolverr HTML` 成功路径支持 `asset_profile=body|all` 的正文资产下载；PDF/ePDF fallback 仍是 text-only
 - 正文 `FlareSolverr HTML` 首次请求使用快速路径：`waitInSeconds=0` 并传 `disableMedia=true`，如果遇到 challenge、访问拦截、摘要重定向、HTML 抽取失败或正文不足，会立刻用原保守参数重试一次
 - FlareSolverr HTML 请求默认不要求 screenshot，减少 response payload；failure artifact 仍会保留 HTML 与 response JSON，图片恢复仍只接受 `solution.imagePayload`
-- `wiley` / `science` / `pnas` 的正文 figure / table / formula 图片资产下载以 shared Playwright browser context 为主链路；同一个 `RuntimeContext` 会 lazy 复用 Chromium browser，每次 download attempt 仍创建隔离 context/page，多图复用同一个 seeded browser context
+- `wiley` / `science` / `pnas` / `ams` 的正文 figure / table / formula 图片资产下载以 shared Playwright browser context 为主链路；同一个 `RuntimeContext` 会 lazy 复用 Chromium browser，每次 download attempt 仍创建隔离 context/page，多图复用同一个 seeded browser context
 - 资产下载 worker 上限由 `PAPER_FETCH_ASSET_DOWNLOAD_CONCURRENCY` 控制，默认 `4`、最小 `1`
 - 图片候选仍优先 full-size/original，全部失败后才尝试 preview；preview 也通过同一个 browser context 下载，目标 provider 不再使用 `playwright_canvas_fallback` tier
 - 正文图片下载在单次 attempt 内会对 figure page 和图片候选 URL 做缓存，并按 `PAPER_FETCH_ASSET_DOWNLOAD_CONCURRENCY` 控制的 worker 上限拉取 payload，默认 `4`；只要使用 Playwright image document fetcher，单个正文图片也会通过 worker 线程执行 resolver；文件写入仍按资产原顺序完成
@@ -58,7 +59,7 @@ export PAPER_FETCH_FLARESOLVERR_KEEP_SESSION=1
 
 说明：
 
-- `science` / `pnas` 必须走这组 browser 配置
+- `science` / `pnas` / `ams` 必须走这组 browser 配置
 - `wiley` 的 HTML 与 seeded-browser PDF/ePDF 路径也必须走这组配置；只配置 `WILEY_TDM_CLIENT_TOKEN` 时只能尝试官方 TDM API PDF lane
 - `FLARESOLVERR_ENV_FILE` 不会自动猜 preset
 - 默认每次 `FlareSolverr HTML` 抓取结束后都会调用 `sessions.destroy` 销毁本次 browser session；这只关闭 FlareSolverr 管理的浏览器 session，不会停止本地 FlareSolverr 服务进程
@@ -88,10 +89,10 @@ export PAPER_FETCH_FLARESOLVERR_KEEP_SESSION=1
 它会顺手准备：
 
 - `vendor/flaresolverr/` 源码工作流
-- `wiley` / `science` / `pnas` 所需的 Playwright Chromium
+- `wiley` / `science` / `pnas` / `ams` 所需的 Playwright Chromium
 - `headless` preset 所需的 `Xvfb` 检查
 
-如果你只想手动准备 Wiley / Science / PNAS 依赖：
+如果你只想手动准备 Wiley / Science / PNAS / AMS 依赖：
 
 ```bash
 bash ./vendor/flaresolverr/setup_flaresolverr_source.sh
@@ -99,7 +100,7 @@ bash ./vendor/flaresolverr/setup_flaresolverr_source.sh
 
 在线源码工作流会在本地 checkout 上应用 `vendor/flaresolverr/patches/return-image-payload.patch`。这个 patch 文件必须保持有效的 unified diff hunk 计数，unit suite 会先校验 patch 结构，避免离线包构建阶段才暴露格式错误。setup 如果发现现有 checkout 已经带有 `returnImagePayload` / `imagePayload` 扩展，会直接复用当前源码并保留本地 tracked 改动，不再强制切回 upstream tag；如果扩展缺失且 checkout 已有 tracked 改动，则会拒绝重置并要求先 commit / stash。离线包不会在目标机执行这一步；CI 会先生成已 patch 的 `vendor/flaresolverr/.work/FlareSolverr/` 源码快照和 `vendor/flaresolverr/wheelhouse/`，目标机只创建 venv 并从 wheelhouse 安装依赖。
 
-如果你还要启用 `wiley` / `science` / `pnas` 的 seeded-browser PDF/ePDF fallback，再补：
+如果你还要启用 `wiley` / `science` / `pnas` / `ams` 的 seeded-browser PDF/ePDF fallback，再补：
 
 ```bash
 python3 -m playwright install chromium
@@ -189,7 +190,7 @@ PYTHONPATH=src pytest -n 0 \
 ### HTML 失败但 provider 最终成功
 
 - 这通常表示 provider-owned browser workflow 已继续进入后续 fallback。
-- Wiley / Science / PNAS 的完整 fallback 顺序见 [`providers.md`](providers.md#wiley-science-pnas-browser-workflow)。
+- Wiley / Science / PNAS / AMS 的完整 fallback 顺序见 [`providers.md`](providers.md#wiley-science-pnas-browser-workflow)。
 - 最终成功与否以结果为准；细节看 `source_trail`。
 
 ### `asset_profile=body|all` 仍没有图或只有 preview
@@ -197,7 +198,7 @@ PYTHONPATH=src pytest -n 0 \
 - 先看 `source_trail` 和 `warnings`，区分 `download:*_asset_failures`、`download:*_assets_preview_fallback`、`download:*_assets_preview_accepted` 等轨迹
 - `download_tier=preview` 本身只是诊断标签；当 source trail 带 `download:*_assets_preview_accepted` 且资产尺寸达标时，不应直接当作下载失败
 - formula-only preview fallback 不自动算 live review 的 `asset_download_failure`；figure/table preview fallback 仍需要 accepted 轨迹或其它证据才能降噪
-- `wiley` / `science` / `pnas` 不再先走普通 HTTP 直连；full-size 与 preview 候选都会通过 seeded Playwright browser context 获取。若刷新 FlareSolverr seed 后仍失败，才按资产下载问题处理
+- `wiley` / `science` / `pnas` / `ams` 不再先走普通 HTTP 直连；full-size 与 preview 候选都会通过 seeded Playwright browser context 获取。若刷新 FlareSolverr seed 后仍失败，才按资产下载问题处理
 - seeded Playwright 图片获取里的页面内 `fetch()` 带有短超时；如果候选图实际落到 Cloudflare `Just a moment...` 等非图片页面，会快速失败并进入下一候选或刷新 seed 重试，而不是长期卡住整个 live review
 - 如果最终仍失败，失败详情会保留在 `article.quality.asset_failures` 和顶层 `quality.asset_failures`：包括 `status`、`content_type`、`title_snippet`、`body_snippet`、以及 asset-level FlareSolverr recovery 的 `recovery_attempts`。正文图片保存前会用 magic bytes 或顶层 SVG 文本检测确认 payload，避免把 Cloudflare / 登录页 HTML 以图片后缀落盘
 - PDF/ePDF fallback 仍是 text-only；只有 HTML 成功路径承诺尝试正文资产下载

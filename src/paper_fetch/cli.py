@@ -11,6 +11,7 @@ from .artifacts import ArtifactStore
 from .config import build_runtime_env, resolve_cli_download_dir
 from .models import FetchEnvelope, RenderOptions
 from .providers.base import ProviderFailure
+from .reason_codes import ERROR, NO_ACCESS, RATE_LIMITED
 from .service import FetchStrategy, PaperFetchFailure, fetch_paper
 from .utils import sanitize_filename
 from .workflow.pipeline import FetchPipeline, MarkdownSaveSpec
@@ -129,13 +130,13 @@ def exit_code_for_error(error: Exception) -> int:
     elif isinstance(error, ProviderFailure):
         status = error.code
     else:
-        status = "error"
+        status = ERROR
 
     if status == "ambiguous":
         return 2
-    if status == "no_access":
+    if status == NO_ACCESS:
         return 3
-    if status == "rate_limited":
+    if status == RATE_LIMITED:
         return 4
     return 1
 

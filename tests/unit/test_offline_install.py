@@ -162,7 +162,7 @@ class OfflineInstallTests(unittest.TestCase):
             f'{{"target": {{"platform": "linux", "arch": "x86_64", "python_tag": "{manifest_python_tag}"}}}}\n',
         )
         _write_file(bundle / ".env.example", 'ELSEVIER_API_KEY=""\n')
-        _write_file(bundle / "dist" / "paper_fetch_skill-1.0.0-py3-none-any.whl")
+        _write_file(bundle / "dist" / "paper_fetch_skill-1.4-py3-none-any.whl")
         _write_file(bundle / "wheelhouse" / "dependency-1.0.0-py3-none-any.whl")
         _write_file(bundle / "skills" / "paper-fetch-skill" / "SKILL.md", "# Paper fetch skill\n")
         _write_file(

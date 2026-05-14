@@ -1,4 +1,4 @@
-"""Shared browser-workflow runtime helpers for Wiley/Science/PNAS."""
+"""Shared browser-workflow runtime helpers for Wiley/Science/PNAS/AMS."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "FlareSolverrFailure": ("paper_fetch.providers._flaresolverr", "FlareSolverrFailure"),
     "PdfFallbackFailure": ("paper_fetch.providers._pdf_fallback", "PdfFallbackFailure"),
     "ProviderBrowserProfile": (".profile", "ProviderBrowserProfile"),
+    "make_atypon_browser_profile": (".profile", "make_atypon_browser_profile"),
     "HtmlExtractionFailure": ("paper_fetch.extraction.html.signals", "HtmlExtractionFailure"),
     "_IMAGE_DOCUMENT_FETCH_TIMEOUT_MS": (".fetchers", "_IMAGE_DOCUMENT_FETCH_TIMEOUT_MS"),
     "_BasePlaywrightDocumentFetcher": (".fetchers", "_BasePlaywrightDocumentFetcher"),

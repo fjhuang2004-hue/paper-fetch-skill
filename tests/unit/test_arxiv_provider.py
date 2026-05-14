@@ -186,7 +186,9 @@ def _html_then_pdf_transport(
                     html_content_type,
                 )
             ),
-            ("GET", pdf_url): _response(pdf_url, _fixture_pdf(arxiv_id), "application/pdf"),
+            ("GET", pdf_url): _response(
+                pdf_url, _fixture_pdf(arxiv_id), "application/pdf"
+            ),
         }
     )
 
@@ -203,7 +205,9 @@ def _html_404_then_pdf_transport(arxiv_id: str) -> RecordingTransport:
     )
 
 
-def _downloaded_html_assets(raw_payload, *, limit: int | None = None) -> list[dict[str, str]]:
+def _downloaded_html_assets(
+    raw_payload, *, limit: int | None = None
+) -> list[dict[str, str]]:
     downloaded_assets: list[dict[str, str]] = []
     source_assets = list(raw_payload.content.extracted_assets)
     if limit is not None:
@@ -234,7 +238,9 @@ def _multiline_plain_prose_blocks(markdown_text: str) -> list[str]:
 
 class ArxivProviderTests(unittest.TestCase):
     def test_fetch_metadata_uses_replayed_arxiv_api_result(self) -> None:
-        api_client = ReplayArxivApiClient({"2605.06663v1": _api_payload("2605.06663v1")})
+        api_client = ReplayArxivApiClient(
+            {"2605.06663v1": _api_payload("2605.06663v1")}
+        )
         client = ArxivClient(RecordingTransport({}), {}, api_client=api_client)
 
         metadata = client.fetch_metadata({"doi": _doi("2605.06663v1")})
@@ -243,13 +249,18 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertEqual(metadata["official_provider"], True)
         self.assertEqual(metadata["doi"], _doi("2605.06663v1"))
         self.assertEqual(metadata["arxiv_id"], "2605.06663v1")
-        self.assertEqual(metadata["landing_page_url"], "https://arxiv.org/abs/2605.06663v1")
+        self.assertEqual(
+            metadata["landing_page_url"], "https://arxiv.org/abs/2605.06663v1"
+        )
         self.assertEqual(metadata["html_url"], "https://arxiv.org/html/2605.06663v1")
         self.assertEqual(metadata["pdf_url"], "https://arxiv.org/pdf/2605.06663v1")
         self.assertNotIn("source_url", metadata)
         self.assertEqual(
             [link["url"] for link in metadata["fulltext_links"]],
-            ["https://arxiv.org/html/2605.06663v1", "https://arxiv.org/pdf/2605.06663v1"],
+            [
+                "https://arxiv.org/html/2605.06663v1",
+                "https://arxiv.org/pdf/2605.06663v1",
+            ],
         )
         self.assertEqual(api_client.queries, [["2605.06663v1"]])
 
@@ -283,7 +294,9 @@ class ArxivProviderTests(unittest.TestCase):
             transport.calls[0]["query"],
             {"id_list": arxiv_id, "max_results": "1"},
         )
-        self.assertEqual(transport.calls[0]["headers"]["Accept"], arxiv_provider.ARXIV_API_ACCEPT)
+        self.assertEqual(
+            transport.calls[0]["headers"]["Accept"], arxiv_provider.ARXIV_API_ACCEPT
+        )
         self.assertIn("User-Agent", transport.calls[0]["headers"])
 
     def test_fetch_metadata_reports_no_result_for_empty_atom_feed(self) -> None:
@@ -305,7 +318,9 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "no_result")
         self.assertIn(arxiv_id, caught.exception.message)
 
-    def test_resolve_query_recognizes_arxiv_urls_ids_and_dois_without_network(self) -> None:
+    def test_resolve_query_recognizes_arxiv_urls_ids_and_dois_without_network(
+        self,
+    ) -> None:
         cases = {
             "https://arxiv.org/abs/2605.06663v1": ("url", "2605.06663v1"),
             "https://arxiv.org/html/2605.06663v1": ("url", "2605.06663v1"),
@@ -320,7 +335,9 @@ class ArxivProviderTests(unittest.TestCase):
                 resolved = resolve_query(query, env={})
                 self.assertEqual(resolved.query_kind, kind)
                 self.assertEqual(resolved.doi, _doi(arxiv_id))
-                self.assertEqual(resolved.landing_url, f"https://arxiv.org/abs/{arxiv_id}")
+                self.assertEqual(
+                    resolved.landing_url, f"https://arxiv.org/abs/{arxiv_id}"
+                )
                 self.assertEqual(resolved.provider_hint, "arxiv")
                 self.assertEqual(resolved.confidence, 1.0)
 
@@ -337,7 +354,9 @@ class ArxivProviderTests(unittest.TestCase):
                 self.assertTrue((_fixture_dir(arxiv_id) / "original.pdf").is_file())
                 self.assertFalse((_fixture_dir(arxiv_id) / "original.html").exists())
 
-        manifest = json.loads((GOLDEN_ROOT / "manifest.json").read_text(encoding="utf-8"))["samples"]
+        manifest = json.loads(
+            (GOLDEN_ROOT / "manifest.json").read_text(encoding="utf-8")
+        )["samples"]
         for arxiv_id in HTML_ROUTE_IDS:
             with self.subTest(arxiv_id=arxiv_id):
                 sample = manifest[_doi(arxiv_id).replace("/", "_")]
@@ -349,12 +368,26 @@ class ArxivProviderTests(unittest.TestCase):
                 self.assertEqual(sample["route_kind"], "pdf_fallback")
                 self.assertEqual(set(sample["assets"]), {"api.json", "original.pdf"})
 
-    def test_author_boundary_splits_affiliations_without_rejecting_country_name_authors(self) -> None:
+    def test_arxiv_ar5iv_chrome_selectors_share_base_script_style_rules(self) -> None:
+        self.assertEqual(
+            arxiv_provider._ARXIV_BASE_CHROME_SELECTORS, ("script", "style")
+        )
+        for key in ("frontmatter_noise", "reference_noise", "article_chrome"):
+            with self.subTest(key=key):
+                selectors = arxiv_provider._ARXIV_AR5IV_SELECTORS[key]
+                self.assertEqual(
+                    selectors[:2], arxiv_provider._ARXIV_BASE_CHROME_SELECTORS
+                )
+
+    def test_author_boundary_splits_affiliations_without_rejecting_country_name_authors(
+        self,
+    ) -> None:
         soup = arxiv_provider.BeautifulSoup(
             """
             <article>
               <span class="ltx_personname">Anatole France</span>
               <span class="ltx_personname">Ada Lovelace<br><span>Department of Computing, Example University, Russia</span></span>
+              <span class="ltx_personname">Grace Hopper<br><span>Centro de Matematica, Lisbon, Portugal</span></span>
             </article>
             """,
             "html.parser",
@@ -362,11 +395,49 @@ class ArxivProviderTests(unittest.TestCase):
         names = soup.select(".ltx_personname")
 
         self.assertTrue(arxiv_provider._looks_like_arxiv_author_name("Anatole France"))
-        candidate = arxiv_provider._candidate_arxiv_author_text_from_person_node(names[1])
+        candidate = arxiv_provider._candidate_arxiv_author_text_from_person_node(
+            names[1]
+        )
         self.assertNotIn("Department", candidate)
-        self.assertEqual(arxiv_provider._split_arxiv_author_text(candidate), ["Ada Lovelace"])
+        self.assertEqual(
+            arxiv_provider._split_arxiv_author_text(candidate), ["Ada Lovelace"]
+        )
+        data_file_candidate = (
+            arxiv_provider._candidate_arxiv_author_text_from_person_node(names[2])
+        )
+        self.assertNotIn("Portugal", data_file_candidate)
+        self.assertEqual(
+            arxiv_provider._split_arxiv_author_text(data_file_candidate),
+            ["Grace Hopper"],
+        )
+        self.assertEqual(
+            arxiv_provider._trim_arxiv_author_text_at_boundary(
+                "Katherine Johnson, 10115 Berlin"
+            ),
+            "Katherine Johnson",
+        )
 
-    def test_generic_html_frontmatter_and_references_fallback_without_ltx_selectors(self) -> None:
+    def test_author_boundary_resource_loading_fails_closed(self) -> None:
+        self.assertIn(
+            "Portugal",
+            arxiv_provider._load_arxiv_author_boundary_tokens(
+                "country_boundary_patterns"
+            ),
+        )
+        self.assertEqual(
+            arxiv_provider._load_arxiv_author_boundary_tokens(
+                "country_boundary_patterns", resource_name="missing.json"
+            ),
+            (),
+        )
+        empty_country_pattern = (
+            arxiv_provider._compile_arxiv_author_country_boundary_pattern(())
+        )
+        self.assertIsNone(empty_country_pattern.search("Ada Lovelace, Portugal"))
+
+    def test_generic_html_frontmatter_and_references_fallback_without_ltx_selectors(
+        self,
+    ) -> None:
         soup = arxiv_provider.BeautifulSoup(
             """
             <html><body><article>
@@ -410,7 +481,10 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertIn("fulltext:arxiv_html_ok", article.quality.source_trail)
         self.assertNotIn("source_url", raw_payload.content.merged_metadata)
         self.assertEqual(raw_payload.warnings, [])
-        self.assertEqual([call["url"] for call in transport.calls], [canonical_arxiv_html_url(arxiv_id)])
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [canonical_arxiv_html_url(arxiv_id)],
+        )
 
     def test_html_404_directly_requests_pdf_fallback(self) -> None:
         for arxiv_id in PDF_FALLBACK_IDS:
@@ -426,12 +500,21 @@ class ArxivProviderTests(unittest.TestCase):
                 self.assertEqual(article.source, "arxiv_pdf")
                 self.assertEqual(article.quality.content_kind, "fulltext")
                 self.assertIn("fulltext:arxiv_html_fail", article.quality.source_trail)
-                self.assertIn("fulltext:arxiv_pdf_fallback_ok", article.quality.source_trail)
-                self.assertFalse(any("latex" in item.lower() for item in raw_payload.warnings))
-                self.assertEqual([call["url"] for call in transport.calls], [metadata["html_url"], metadata["pdf_url"]])
+                self.assertIn(
+                    "fulltext:arxiv_pdf_fallback_ok", article.quality.source_trail
+                )
+                self.assertFalse(
+                    any("latex" in item.lower() for item in raw_payload.warnings)
+                )
+                self.assertEqual(
+                    [call["url"] for call in transport.calls],
+                    [metadata["html_url"], metadata["pdf_url"]],
+                )
                 self.assertIn("html:", raw_payload.content.html_failure_message)
 
-                result = client.fetch_result(metadata["doi"], metadata, None, asset_profile="body")
+                result = client.fetch_result(
+                    metadata["doi"], metadata, None, asset_profile="body"
+                )
                 self.assertTrue(result.artifacts.text_only)
                 self.assertFalse(result.artifacts.allow_related_assets)
                 self.assertIn(
@@ -456,7 +539,10 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertEqual(article.source, "arxiv_pdf")
         self.assertIn("fulltext:arxiv_html_fail", article.quality.source_trail)
         self.assertIn("fulltext:arxiv_pdf_fallback_ok", article.quality.source_trail)
-        self.assertEqual([call["url"] for call in transport.calls], [metadata["html_url"], metadata["pdf_url"]])
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [metadata["html_url"], metadata["pdf_url"]],
+        )
 
     def test_insufficient_html_body_directly_requests_pdf_fallback(self) -> None:
         arxiv_id = "2006.11239v2"
@@ -473,16 +559,25 @@ class ArxivProviderTests(unittest.TestCase):
 
         self.assertEqual(raw_payload.content.route_kind, "pdf_fallback")
         self.assertEqual(article.source, "arxiv_pdf")
-        self.assertTrue(any("did not expose enough body text" in item for item in raw_payload.warnings))
+        self.assertTrue(
+            any(
+                "did not expose enough body text" in item
+                for item in raw_payload.warnings
+            )
+        )
         self.assertIn("fulltext:arxiv_html_fail", article.quality.source_trail)
         self.assertIn("fulltext:arxiv_pdf_fallback_ok", article.quality.source_trail)
-        self.assertEqual([call["url"] for call in transport.calls], [metadata["html_url"], metadata["pdf_url"]])
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [metadata["html_url"], metadata["pdf_url"]],
+        )
 
     def test_polluted_html_body_directly_requests_pdf_fallback(self) -> None:
         arxiv_id = "2006.11239v2"
         metadata = _metadata(arxiv_id)
         repeated_body = " ".join(
-            ["This synthetic body has enough words for the full text quality gate."] * 100
+            ["This synthetic body has enough words for the full text quality gate."]
+            * 100
         )
         polluted_html = f"""
         <html><body><article class="ltx_document">
@@ -499,8 +594,16 @@ class ArxivProviderTests(unittest.TestCase):
 
         self.assertEqual(raw_payload.content.route_kind, "pdf_fallback")
         self.assertEqual(article.source, "arxiv_pdf")
-        self.assertTrue(any("not classified as usable full text" in item for item in raw_payload.warnings))
-        self.assertEqual([call["url"] for call in transport.calls], [metadata["html_url"], metadata["pdf_url"]])
+        self.assertTrue(
+            any(
+                "not classified as usable full text" in item
+                for item in raw_payload.warnings
+            )
+        )
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [metadata["html_url"], metadata["pdf_url"]],
+        )
 
     def test_api_transient_failure_with_arxiv_doi_uses_derived_html_url(self) -> None:
         arxiv_id = "2605.06663v1"
@@ -513,13 +616,26 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertEqual(raw_payload.content.route_kind, "html")
         self.assertEqual(raw_payload.content.merged_metadata["arxiv_id"], arxiv_id)
         self.assertEqual(raw_payload.content.merged_metadata["provider"], "arxiv")
-        self.assertEqual(raw_payload.content.merged_metadata["html_url"], canonical_arxiv_html_url(arxiv_id))
+        self.assertEqual(
+            raw_payload.content.merged_metadata["html_url"],
+            canonical_arxiv_html_url(arxiv_id),
+        )
         self.assertNotIn("source_url", raw_payload.content.merged_metadata)
-        self.assertTrue(any("arXiv API metadata retrieval failed" in warning for warning in raw_payload.warnings))
+        self.assertTrue(
+            any(
+                "arXiv API metadata retrieval failed" in warning
+                for warning in raw_payload.warnings
+            )
+        )
         self.assertEqual(api_client.queries, [[arxiv_id]])
-        self.assertEqual([call["url"] for call in transport.calls], [canonical_arxiv_html_url(arxiv_id)])
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [canonical_arxiv_html_url(arxiv_id)],
+        )
 
-    def test_api_failure_uses_html_frontmatter_metadata_without_untitled_article(self) -> None:
+    def test_api_failure_uses_html_frontmatter_metadata_without_untitled_article(
+        self,
+    ) -> None:
         arxiv_id = "2605.06663v1"
         api_client = FailingArxivApiClient("HTTP 429: Too Many Requests")
         transport = _html_transport(arxiv_id)
@@ -531,14 +647,29 @@ class ArxivProviderTests(unittest.TestCase):
 
         self.assertEqual(raw_payload.content.route_kind, "html")
         self.assertEqual(article.source, "arxiv_html")
-        self.assertEqual(article.metadata.title, "Emo: Pretraining Mixture of Experts for Emergent Modularity")
-        self.assertEqual(article.metadata.authors[:3], ["Ryan Wang", "Akshita Bhagia", "Sewon Min"])
+        self.assertEqual(
+            article.metadata.title,
+            "Emo: Pretraining Mixture of Experts for Emergent Modularity",
+        )
+        self.assertEqual(
+            article.metadata.authors[:3], ["Ryan Wang", "Akshita Bhagia", "Sewon Min"]
+        )
         self.assertNotIn("# Untitled Article", markdown)
-        self.assertTrue(any("arXiv API metadata retrieval failed" in warning for warning in raw_payload.warnings))
+        self.assertTrue(
+            any(
+                "arXiv API metadata retrieval failed" in warning
+                for warning in raw_payload.warnings
+            )
+        )
         self.assertEqual(api_client.queries, [[arxiv_id]])
-        self.assertEqual([call["url"] for call in transport.calls], [canonical_arxiv_html_url(arxiv_id)])
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [canonical_arxiv_html_url(arxiv_id)],
+        )
 
-    def test_api_metadata_success_takes_priority_over_html_frontmatter_metadata(self) -> None:
+    def test_api_metadata_success_takes_priority_over_html_frontmatter_metadata(
+        self,
+    ) -> None:
         arxiv_id = "2605.06663v1"
         payload = json.loads(json.dumps(_api_payload(arxiv_id)))
         payload["raw_result"]["title"] = "API Preferred Title"
@@ -552,14 +683,18 @@ class ArxivProviderTests(unittest.TestCase):
 
         self.assertEqual(raw_payload.content.route_kind, "html")
         self.assertEqual(article.metadata.title, "API Preferred Title")
-        self.assertEqual(article.metadata.authors[:2], ["API Author", "HTML Merge Author"])
+        self.assertEqual(
+            article.metadata.authors[:2], ["API Author", "HTML Merge Author"]
+        )
         self.assertNotEqual(
             raw_payload.content.merged_metadata["title"],
             "Emo: Pretraining Mixture of Experts for Emergent Modularity",
         )
         self.assertEqual(api_client.queries, [[arxiv_id]])
 
-    def test_api_transient_failure_continues_to_pdf_fallback_when_html_is_unavailable(self) -> None:
+    def test_api_transient_failure_continues_to_pdf_fallback_when_html_is_unavailable(
+        self,
+    ) -> None:
         arxiv_id = "2006.11239v2"
         api_client = FailingArxivApiClient("temporary export API timeout")
         transport = _html_404_then_pdf_transport(arxiv_id)
@@ -569,7 +704,12 @@ class ArxivProviderTests(unittest.TestCase):
 
         self.assertEqual(raw_payload.content.route_kind, "pdf_fallback")
         self.assertEqual(raw_payload.content.merged_metadata["arxiv_id"], arxiv_id)
-        self.assertTrue(any("arXiv API metadata retrieval failed" in warning for warning in raw_payload.warnings))
+        self.assertTrue(
+            any(
+                "arXiv API metadata retrieval failed" in warning
+                for warning in raw_payload.warnings
+            )
+        )
         self.assertEqual(api_client.queries, [[arxiv_id]])
         self.assertEqual(
             [call["url"] for call in transport.calls],
@@ -588,20 +728,29 @@ class ArxivProviderTests(unittest.TestCase):
                 )
             },
         )
-        api_client = arxiv_provider.InternalArxivApiClient(transport, "paper-fetch-test")
+        api_client = arxiv_provider.InternalArxivApiClient(
+            transport, "paper-fetch-test"
+        )
         client = ArxivClient(transport, {}, api_client=api_client)
 
         raw_payload = client.fetch_raw_fulltext(_doi(arxiv_id), {})
 
         self.assertEqual(raw_payload.content.route_kind, "html")
         self.assertEqual(raw_payload.content.merged_metadata["arxiv_id"], arxiv_id)
-        self.assertTrue(any("arXiv API metadata retrieval failed" in warning for warning in raw_payload.warnings))
+        self.assertTrue(
+            any(
+                "arXiv API metadata retrieval failed" in warning
+                for warning in raw_payload.warnings
+            )
+        )
         self.assertEqual(
             [call["url"] for call in transport.calls],
             [canonical_arxiv_html_url(arxiv_id), arxiv_provider.ARXIV_API_URL],
         )
 
-    def test_html_route_extracts_sections_abstract_formulas_and_citations_from_fixture(self) -> None:
+    def test_html_route_extracts_sections_abstract_formulas_and_citations_from_fixture(
+        self,
+    ) -> None:
         arxiv_id = "2605.06663v1"
         metadata = _metadata(arxiv_id)
         transport = _html_transport(arxiv_id)
@@ -624,16 +773,29 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertGreaterEqual(len(article.sections), 5)
         self.assertGreater(len(article.references), 0)
         self.assertGreater(len(raw_payload.content.extracted_assets), 0)
-        self.assertEqual(raw_payload.content.merged_metadata["references"][0]["year"], "2020")
-        self.assertIn("PIQA", raw_payload.content.merged_metadata["references"][0]["raw"])
-        self.assertTrue(raw_payload.content.extracted_assets[0]["url"].startswith("https://arxiv.org/html/"))
-        self.assertEqual([call["url"] for call in transport.calls], [canonical_arxiv_html_url(arxiv_id)])
+        self.assertEqual(
+            raw_payload.content.merged_metadata["references"][0]["year"], "2020"
+        )
+        self.assertIn(
+            "PIQA", raw_payload.content.merged_metadata["references"][0]["raw"]
+        )
+        self.assertTrue(
+            raw_payload.content.extracted_assets[0]["url"].startswith(
+                "https://arxiv.org/html/"
+            )
+        )
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [canonical_arxiv_html_url(arxiv_id)],
+        )
         diagnostics = raw_payload.content.diagnostics["extraction"]
         self.assertEqual(diagnostics["parser"], "latexml_html")
         self.assertGreaterEqual(diagnostics["word_count"], 500)
         self.assertGreaterEqual(diagnostics["formula_block_count"], 1)
         self.assertEqual(diagnostics["reference_count"], len(article.references))
-        self.assertEqual(diagnostics["asset_count"], len(raw_payload.content.extracted_assets))
+        self.assertEqual(
+            diagnostics["asset_count"], len(raw_payload.content.extracted_assets)
+        )
         self.assertGreaterEqual(diagnostics["table_block_rendered_count"], 1)
         self.assertEqual(diagnostics["semantic_block_loss_count"], 0)
 
@@ -668,8 +830,12 @@ class ArxivProviderTests(unittest.TestCase):
             metadata=_metadata("2605.06653v1"),
         )
         self.assertNotIn(r"\addsec", error_extraction.markdown_text)
-        self.assertGreaterEqual(error_extraction.diagnostics["extraction"]["latexml_error_nodes_removed"], 1)
-        self.assertEqual(error_extraction.diagnostics["extraction"]["reference_count"], 0)
+        self.assertGreaterEqual(
+            error_extraction.diagnostics["extraction"]["latexml_error_nodes_removed"], 1
+        )
+        self.assertEqual(
+            error_extraction.diagnostics["extraction"]["reference_count"], 0
+        )
 
     def test_html_route_normalizes_math_without_duplicate_fallback_text(self) -> None:
         for arxiv_id in HTML_ROUTE_IDS:
@@ -680,20 +846,26 @@ class ArxivProviderTests(unittest.TestCase):
                     metadata=_metadata(arxiv_id),
                 )
                 self.assertNotIn(r"\hspace{0pt}", extraction.markdown_text)
-                self.assertGreater(extraction.diagnostics["extraction"]["math_nodes_normalized"], 0)
+                self.assertGreater(
+                    extraction.diagnostics["extraction"]["math_nodes_normalized"], 0
+                )
 
         extraction = arxiv_provider._extract_arxiv_html_markdown(
             _fixture_html("2605.06667v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06667v1"),
             metadata=_metadata("2605.06667v1"),
         )
-        all_asset_captions = "\n".join(str(asset.get("caption") or "") for asset in extraction.extracted_assets)
+        all_asset_captions = "\n".join(
+            str(asset.get("caption") or "") for asset in extraction.extracted_assets
+        )
         self.assertIn("$N_{D}$", extraction.markdown_text)
         self.assertIn("$N_{D}$", all_asset_captions)
         self.assertNotIn("N D N_{D}", extraction.markdown_text)
         self.assertNotIn("N D N_{D}", all_asset_captions)
 
-    def test_html_route_sanitizes_nested_tex_dollars_in_latexml_annotations(self) -> None:
+    def test_html_route_sanitizes_nested_tex_dollars_in_latexml_annotations(
+        self,
+    ) -> None:
         soup = arxiv_provider.BeautifulSoup(
             r"""
 <math class="ltx_Math" alttext="P(A(1,x,y)\text{ is a quota violation for $x&gt;x_{\tau}$})">
@@ -722,7 +894,9 @@ class ArxivProviderTests(unittest.TestCase):
         )
 
         self.assertIn("1. Assign each state zero seats", extraction.markdown_text)
-        self.assertIn("2. Calculate each state’s priority value", extraction.markdown_text)
+        self.assertIn(
+            "2. Calculate each state’s priority value", extraction.markdown_text
+        )
         self.assertNotIn("- 1.\nAssign each state", extraction.markdown_text)
         self.assertNotIn("- 1. Assign each state", extraction.markdown_text)
 
@@ -743,14 +917,18 @@ class ArxivProviderTests(unittest.TestCase):
         )
         self.assertIn("- Zero-shot joint control.", extraction.markdown_text)
 
-    def test_html_route_inlines_single_official_html_figure_without_trailing_figures(self) -> None:
+    def test_html_route_inlines_single_official_html_figure_without_trailing_figures(
+        self,
+    ) -> None:
         arxiv_id = "2605.06556v1"
         metadata = _metadata(arxiv_id)
         client = ArxivClient(_html_transport(arxiv_id), {})
         raw_payload = client.fetch_raw_fulltext(metadata["doi"], metadata)
         downloaded_assets = _downloaded_html_assets(raw_payload)
 
-        article = client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+        article = client.to_article_model(
+            metadata, raw_payload, downloaded_assets=downloaded_assets
+        )
         markdown = article.to_ai_markdown(asset_profile="body", max_tokens="full_text")
         diagnostics = raw_payload.content.diagnostics["extraction"]
 
@@ -761,7 +939,10 @@ class ArxivProviderTests(unittest.TestCase):
         )
         self.assertNotIn("\n## Figures\n", markdown)
         self.assertNotIn("https://arxiv.org/html/", markdown)
-        self.assertEqual(diagnostics["inline_figure_image_count"], len(raw_payload.content.extracted_assets))
+        self.assertEqual(
+            diagnostics["inline_figure_image_count"],
+            len(raw_payload.content.extracted_assets),
+        )
         self.assertEqual(diagnostics["inline_figure_asset_miss_count"], 0)
 
     def test_html_route_uses_dom_id_labels_for_captionless_panel_figures(self) -> None:
@@ -772,9 +953,14 @@ class ArxivProviderTests(unittest.TestCase):
         raw_payload = client.fetch_raw_fulltext(metadata["doi"], metadata)
         downloaded_assets = _downloaded_html_assets(raw_payload)
 
-        article = client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+        article = client.to_article_model(
+            metadata, raw_payload, downloaded_assets=downloaded_assets
+        )
         markdown = article.to_ai_markdown(asset_profile="body", max_tokens="full_text")
-        asset_captions = "\n".join(str(asset.get("caption") or "") for asset in raw_payload.content.extracted_assets)
+        asset_captions = "\n".join(
+            str(asset.get("caption") or "")
+            for asset in raw_payload.content.extracted_assets
+        )
         diagnostics = raw_payload.content.diagnostics["extraction"]
 
         self.assertNotIn("\n## Figures\n", markdown)
@@ -783,10 +969,16 @@ class ArxivProviderTests(unittest.TestCase):
             markdown.index("![Figure 2.2](body_assets/gc0oo4.png)"),
             markdown.index("**Figure 2.** Phase portraits projected"),
         )
-        self.assertIn("Figure 2.2", [asset.get("heading") for asset in raw_payload.content.extracted_assets])
+        self.assertIn(
+            "Figure 2.2",
+            [asset.get("heading") for asset in raw_payload.content.extracted_assets],
+        )
         self.assertNotIn("Refer to caption", markdown)
         self.assertNotIn("Refer to caption", asset_captions)
-        self.assertEqual(diagnostics["inline_figure_asset_match_count"], len(raw_payload.content.extracted_assets))
+        self.assertEqual(
+            diagnostics["inline_figure_asset_match_count"],
+            len(raw_payload.content.extracted_assets),
+        )
         self.assertEqual(diagnostics["inline_figure_asset_miss_count"], 0)
 
     def test_html_route_extracts_multi_image_multi_caption_figures(self) -> None:
@@ -804,12 +996,21 @@ class ArxivProviderTests(unittest.TestCase):
 
         self.assertEqual(assets_by_basename["x8.png"]["heading"], "Figure 9")
         self.assertEqual(assets_by_basename["x9.png"]["heading"], "Figure 10")
-        self.assertEqual(assets_by_basename["diff_scenes_1.jpg"]["heading"], "Figure 11")
-        self.assertEqual(assets_by_basename["diff_scenes_2.jpg"]["heading"], "Figure 12")
+        self.assertEqual(
+            assets_by_basename["diff_scenes_1.jpg"]["heading"], "Figure 11"
+        )
+        self.assertEqual(
+            assets_by_basename["diff_scenes_2.jpg"]["heading"], "Figure 12"
+        )
         self.assertEqual(assets_by_basename["x10.png"]["heading"], "Figure 13")
         self.assertIn("**Figure 10.** Different cameras.", extraction.markdown_text)
-        self.assertIn("**Figure 12.** Different scenes and different cameras.", extraction.markdown_text)
-        self.assertIn("**Figure 13.** Multi-character results.", extraction.markdown_text)
+        self.assertIn(
+            "**Figure 12.** Different scenes and different cameras.",
+            extraction.markdown_text,
+        )
+        self.assertIn(
+            "**Figure 13.** Multi-character results.", extraction.markdown_text
+        )
 
     def test_html_route_keeps_all_images_from_shared_caption_figures(self) -> None:
         arxiv_id = "2605.06665v1"
@@ -818,7 +1019,10 @@ class ArxivProviderTests(unittest.TestCase):
             canonical_arxiv_html_url(arxiv_id),
             metadata=_metadata(arxiv_id),
         )
-        basenames = {str(asset.get("url") or "").rsplit("/", 1)[-1] for asset in extraction.extracted_assets}
+        basenames = {
+            str(asset.get("url") or "").rsplit("/", 1)[-1]
+            for asset in extraction.extracted_assets
+        }
 
         self.assertIn("x2.png", basenames)
         self.assertIn("x3.png", basenames)
@@ -831,14 +1035,18 @@ class ArxivProviderTests(unittest.TestCase):
             ["Figure 2", "Figure 2"],
         )
 
-    def test_html_route_inlines_all_images_from_shared_caption_figures_once(self) -> None:
+    def test_html_route_inlines_all_images_from_shared_caption_figures_once(
+        self,
+    ) -> None:
         arxiv_id = "2605.06665v1"
         metadata = _metadata(arxiv_id)
         client = ArxivClient(_html_transport(arxiv_id), {})
         raw_payload = client.fetch_raw_fulltext(metadata["doi"], metadata)
         downloaded_assets = _downloaded_html_assets(raw_payload)
 
-        article = client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+        article = client.to_article_model(
+            metadata, raw_payload, downloaded_assets=downloaded_assets
+        )
         markdown = article.to_ai_markdown(asset_profile="body", max_tokens="full_text")
         caption = "**Figure 2.** Efficiency and granularity sweeps for UniPool."
         diagnostics = raw_payload.content.diagnostics["extraction"]
@@ -846,14 +1054,23 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertIn("![Figure 2](body_assets/x2.png)", markdown)
         self.assertIn("![Figure 2](body_assets/x3.png)", markdown)
         self.assertEqual(markdown.count(caption), 1)
-        self.assertLess(markdown.index("![Figure 2](body_assets/x2.png)"), markdown.index(caption))
-        self.assertLess(markdown.index("![Figure 2](body_assets/x3.png)"), markdown.index(caption))
+        self.assertLess(
+            markdown.index("![Figure 2](body_assets/x2.png)"), markdown.index(caption)
+        )
+        self.assertLess(
+            markdown.index("![Figure 2](body_assets/x3.png)"), markdown.index(caption)
+        )
         self.assertNotRegex(markdown, r"!\[[^\]]*Efficiency and granularity")
         self.assertNotIn("\n## Figures\n", markdown)
-        self.assertEqual(diagnostics["inline_figure_asset_match_count"], len(raw_payload.content.extracted_assets))
+        self.assertEqual(
+            diagnostics["inline_figure_asset_match_count"],
+            len(raw_payload.content.extracted_assets),
+        )
         self.assertEqual(diagnostics["inline_figure_asset_miss_count"], 0)
 
-    def test_html_route_unmatched_figure_asset_stays_caption_only_and_can_append_fallback(self) -> None:
+    def test_html_route_unmatched_figure_asset_stays_caption_only_and_can_append_fallback(
+        self,
+    ) -> None:
         soup = arxiv_provider.BeautifulSoup(
             """
             <article class="ltx_document">
@@ -884,7 +1101,9 @@ class ArxivProviderTests(unittest.TestCase):
             canonical_arxiv_html_url("2605.06663v1"),
         )
         lines: list[str] = []
-        arxiv_provider.render_container_markdown(article_node, lines, level=2, section_content_selectors=())
+        arxiv_provider.render_container_markdown(
+            article_node, lines, level=2, section_content_selectors=()
+        )
         markdown = "\n".join(lines)
         rendered = arxiv_provider.article_from_markdown(
             source="arxiv_html",
@@ -910,17 +1129,30 @@ class ArxivProviderTests(unittest.TestCase):
         raw_payload = client.fetch_raw_fulltext(metadata["doi"], metadata)
         downloaded_assets = _downloaded_html_assets(raw_payload)
 
-        article = client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+        article = client.to_article_model(
+            metadata, raw_payload, downloaded_assets=downloaded_assets
+        )
         markdown = article.to_ai_markdown(asset_profile="body", max_tokens="full_text")
-        image_alts = [match.group(1) for match in re.finditer(r"!\[([^\]]*)\]\(([^)]+)\)", markdown)]
+        image_alts = [
+            match.group(1)
+            for match in re.finditer(r"!\[([^\]]*)\]\(([^)]+)\)", markdown)
+        ]
 
         self.assertNotIn("****", raw_payload.content.markdown_text)
         self.assertNotIn("Column 1", raw_payload.content.markdown_text)
         self.assertNotIn("Column 2", raw_payload.content.markdown_text)
         self.assertNotIn("<sup>1</sup><sup>1</sup>1", raw_payload.content.markdown_text)
-        self.assertIn("<sup>1</sup> Appendix Table 6 reports", raw_payload.content.markdown_text)
-        self.assertIn("Main scales (default 8E / top-1 MoE) |       |", raw_payload.content.markdown_text)
-        self.assertNotIn("Main scales (default 8E / top-1 MoE) | Main scales", raw_payload.content.markdown_text)
+        self.assertIn(
+            "<sup>1</sup> Appendix Table 6 reports", raw_payload.content.markdown_text
+        )
+        self.assertIn(
+            "Main scales (default 8E / top-1 MoE) |       |",
+            raw_payload.content.markdown_text,
+        )
+        self.assertNotIn(
+            "Main scales (default 8E / top-1 MoE) | Main scales",
+            raw_payload.content.markdown_text,
+        )
         self.assertTrue(image_alts)
         self.assertTrue(all("$" not in alt for alt in image_alts))
         self.assertTrue(all(alt != "Figure" for alt in image_alts))
@@ -938,9 +1170,13 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertNotIn("**Table**", extraction.markdown_text)
         self.assertNotIn("****", extraction.markdown_text)
         self.assertIn("| Method", extraction.markdown_text)
-        self.assertIn("**Table 1.** Approximate probabilities", extraction.markdown_text)
+        self.assertIn(
+            "**Table 1.** Approximate probabilities", extraction.markdown_text
+        )
 
-    def test_html_route_lifts_cross_column_table_titles_and_keeps_pipe_tables_valid(self) -> None:
+    def test_html_route_lifts_cross_column_table_titles_and_keeps_pipe_tables_valid(
+        self,
+    ) -> None:
         extraction = arxiv_provider._extract_arxiv_html_markdown(
             _fixture_html("2605.06556v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06556v1"),
@@ -952,14 +1188,21 @@ class ArxivProviderTests(unittest.TestCase):
             r"Probability of Quota Violations Caused by Nonzero Allocation with $(1,x,y)$ uniform on $\{1<x<y\}$",
             markdown,
         )
-        self.assertNotIn("| Probability of Quota Violations Caused by Nonzero Allocation\nwith", markdown)
+        self.assertNotIn(
+            "| Probability of Quota Violations Caused by Nonzero Allocation\nwith",
+            markdown,
+        )
         for block in re.split(r"\n\s*\n", markdown):
             pipe_lines = [line for line in block.splitlines() if line.startswith("|")]
             if len(pipe_lines) < 2:
                 continue
-            self.assertEqual({line.count("|") for line in pipe_lines}, {pipe_lines[0].count("|")})
+            self.assertEqual(
+                {line.count("|") for line in pipe_lines}, {pipe_lines[0].count("|")}
+            )
 
-    def test_html_route_collapses_plain_prose_hard_linebreaks_in_real_arxiv_fixtures(self) -> None:
+    def test_html_route_collapses_plain_prose_hard_linebreaks_in_real_arxiv_fixtures(
+        self,
+    ) -> None:
         for arxiv_id in ("2605.06598v1", "2605.06653v1", "2605.06659v1"):
             with self.subTest(arxiv_id=arxiv_id):
                 extraction = arxiv_provider._extract_arxiv_html_markdown(
@@ -968,24 +1211,38 @@ class ArxivProviderTests(unittest.TestCase):
                     metadata=_metadata(arxiv_id),
                 )
 
-                self.assertEqual(_multiline_plain_prose_blocks(extraction.markdown_text), [])
+                self.assertEqual(
+                    _multiline_plain_prose_blocks(extraction.markdown_text), []
+                )
 
-    def test_html_route_keeps_images_but_suppresses_repeated_appendix_captions(self) -> None:
+    def test_html_route_keeps_images_but_suppresses_repeated_appendix_captions(
+        self,
+    ) -> None:
         arxiv_id = "2605.06667v1"
         metadata = _metadata(arxiv_id)
         client = ArxivClient(_html_transport(arxiv_id), {})
         raw_payload = client.fetch_raw_fulltext(metadata["doi"], metadata)
         downloaded_assets = _downloaded_html_assets(raw_payload, limit=5)
 
-        article = client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+        article = client.to_article_model(
+            metadata, raw_payload, downloaded_assets=downloaded_assets
+        )
         markdown = article.to_ai_markdown(asset_profile="body", max_tokens="full_text")
 
         self.assertNotIn("\n## Figures\n", markdown)
         self.assertIn("![Figure 4](body_assets/x4.png)", markdown)
         self.assertIn("![Figure 5](body_assets/x5.png)", markdown)
-        self.assertLess(markdown.index("![Figure 4](body_assets/x4.png)"), markdown.index("**Figure 4.**"))
-        self.assertLess(markdown.index("![Figure 5](body_assets/x5.png)"), markdown.index("**Figure 5.**"))
-        self.assertEqual(markdown.count("Overview. ActCam enables zero-shot joint control"), 1)
+        self.assertLess(
+            markdown.index("![Figure 4](body_assets/x4.png)"),
+            markdown.index("**Figure 4.**"),
+        )
+        self.assertLess(
+            markdown.index("![Figure 5](body_assets/x5.png)"),
+            markdown.index("**Figure 5.**"),
+        )
+        self.assertEqual(
+            markdown.count("Overview. ActCam enables zero-shot joint control"), 1
+        )
         self.assertEqual(markdown.count("Effect of $N_{D}$ on VBench score"), 1)
         self.assertNotIn("N D N_{D}", markdown)
 
@@ -998,7 +1255,10 @@ class ArxivProviderTests(unittest.TestCase):
         )
         markdown = extraction.markdown_text
 
-        self.assertIn("**Algorithm 1.** Monte Carlo estimation of NormRouter scale constant", markdown)
+        self.assertIn(
+            "**Algorithm 1.** Monte Carlo estimation of NormRouter scale constant",
+            markdown,
+        )
         self.assertIn("```text", markdown)
         self.assertIn("Input: Number of experts", markdown)
         self.assertIn("return", markdown)
@@ -1018,8 +1278,12 @@ class ArxivProviderTests(unittest.TestCase):
         markdown = article.to_ai_markdown(asset_profile="none")
         section_hints = raw_payload.content.diagnostics["extraction"]["section_hints"]
 
-        metrics_sections = [section for section in article.sections if section.heading == "Metrics."]
-        metrics_hints = [hint for hint in section_hints if hint["heading"] == "Metrics."]
+        metrics_sections = [
+            section for section in article.sections if section.heading == "Metrics."
+        ]
+        metrics_hints = [
+            hint for hint in section_hints if hint["heading"] == "Metrics."
+        ]
         self.assertTrue(metrics_sections)
         self.assertTrue(all(section.kind == "body" for section in metrics_sections))
         self.assertTrue(metrics_hints)
@@ -1088,14 +1352,18 @@ class ArxivProviderTests(unittest.TestCase):
         section_hints = extraction.diagnostics["extraction"]["section_hints"]
         metric_hints = [hint for hint in section_hints if hint["heading"] == "Metrics."]
         self.assertEqual([hint["kind"] for hint in metric_hints], ["body"])
-        self.assertEqual([hint for hint in section_hints if hint["heading"] == "Metrics"], [])
+        self.assertEqual(
+            [hint for hint in section_hints if hint["heading"] == "Metrics"], []
+        )
         self.assertIn("#### Metrics.", extraction.markdown_text)
         self.assertIn("**Table 1.** Synthetic metric scores.", extraction.markdown_text)
         self.assertIn("| ActCam", extraction.markdown_text)
         self.assertIn("0.74", extraction.markdown_text)
         self.assertNotIn("Article views", extraction.markdown_text)
 
-    def test_arxiv_complex_table_falls_back_to_key_value_without_semantic_loss(self) -> None:
+    def test_arxiv_complex_table_falls_back_to_key_value_without_semantic_loss(
+        self,
+    ) -> None:
         soup = arxiv_provider.BeautifulSoup(
             """
             <figure class="ltx_table" id="S1.T9">
@@ -1109,7 +1377,9 @@ class ArxivProviderTests(unittest.TestCase):
             """,
             "html.parser",
         )
-        markdown, rendered, key_value_fallback = arxiv_provider._render_arxiv_table_block(soup.figure)
+        markdown, rendered, key_value_fallback = (
+            arxiv_provider._render_arxiv_table_block(soup.figure)
+        )
 
         self.assertTrue(rendered)
         self.assertTrue(key_value_fallback)
@@ -1117,11 +1387,17 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertIn("- Group: A; Metric: Loss; Score: 0.1", markdown)
         self.assertIn("- Group: B; Metric: Accuracy", markdown)
 
-    def test_preview_dimensions_accept_wide_real_figures_but_reject_small_icons(self) -> None:
+    def test_preview_dimensions_accept_wide_real_figures_but_reject_small_icons(
+        self,
+    ) -> None:
         self.assertTrue(preview_dimensions_are_acceptable(997, 187))
         self.assertFalse(preview_dimensions_are_acceptable(40, 30))
-        self.assertTrue(paper_fetch_artifacts._preview_asset_accepted({"width": 997, "height": 187}))
-        self.assertFalse(paper_fetch_artifacts._preview_asset_accepted({"width": 40, "height": 30}))
+        self.assertTrue(
+            paper_fetch_artifacts._preview_asset_accepted({"width": 997, "height": 187})
+        )
+        self.assertFalse(
+            paper_fetch_artifacts._preview_asset_accepted({"width": 40, "height": 30})
+        )
 
     def test_html_route_downloads_body_figure_assets_for_body_profile(self) -> None:
         arxiv_id = "2605.06663v1"
@@ -1134,36 +1410,65 @@ class ArxivProviderTests(unittest.TestCase):
             for field in ("url", "full_size_url", "preview_url"):
                 url = str(asset.get(field) or "")
                 if url:
-                    transport.responses[("GET", url)] = _response(url, PNG_1X1, "image/png")
+                    transport.responses[("GET", url)] = _response(
+                        url, PNG_1X1, "image/png"
+                    )
 
-        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
-            arxiv_provider.html_assets,
-            "_build_cookie_seeded_opener",
-            return_value=None,
-        ) as cookie_opener:
-            result = client.fetch_result(metadata["doi"], metadata, Path(tmpdir), asset_profile="body")
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            mock.patch.object(
+                arxiv_provider.html_assets,
+                "_build_cookie_seeded_opener",
+                return_value=None,
+            ) as cookie_opener,
+        ):
+            result = client.fetch_result(
+                metadata["doi"], metadata, Path(tmpdir), asset_profile="body"
+            )
             self.assertEqual(result.content.route_kind, "html")
             self.assertGreater(len(result.article.assets), 0)
-            self.assertTrue(all(asset.path and Path(asset.path).is_file() for asset in result.article.assets))
+            self.assertTrue(
+                all(
+                    asset.path and Path(asset.path).is_file()
+                    for asset in result.article.assets
+                )
+            )
             markdown = result.article.to_ai_markdown(asset_profile="body")
             self.assertGreater(markdown.count("!["), 0)
             cookie_opener.assert_not_called()
-            asset_calls = [call for call in transport.calls if call["url"] != canonical_arxiv_html_url(arxiv_id)]
+            asset_calls = [
+                call
+                for call in transport.calls
+                if call["url"] != canonical_arxiv_html_url(arxiv_id)
+            ]
             self.assertGreater(len(asset_calls), 0)
             self.assertTrue(
-                all(call["headers"]["Accept"] == arxiv_provider.ARXIV_IMAGE_ACCEPT for call in asset_calls)
+                all(
+                    call["headers"]["Accept"] == arxiv_provider.ARXIV_IMAGE_ACCEPT
+                    for call in asset_calls
+                )
             )
-            self.assertTrue(all("text/html" not in call["headers"]["Accept"] for call in asset_calls))
+            self.assertTrue(
+                all(
+                    "text/html" not in call["headers"]["Accept"] for call in asset_calls
+                )
+            )
 
-    def test_html_route_asset_download_limits_concurrency_and_retries_network_failures(self) -> None:
+    def test_html_route_asset_download_limits_concurrency_and_retries_network_failures(
+        self,
+    ) -> None:
         arxiv_id = "2605.06663v1"
         metadata = _metadata(arxiv_id)
         transport = _html_transport(arxiv_id)
         client = ArxivClient(transport, {})
         raw_payload = client.fetch_raw_fulltext(metadata["doi"], metadata)
-        extracted_assets = [dict(item) for item in raw_payload.content.extracted_assets[:3]]
+        extracted_assets = [
+            dict(item) for item in raw_payload.content.extracted_assets[:3]
+        ]
         self.assertGreaterEqual(len(extracted_assets), 3)
-        raw_payload.content = replace(raw_payload.content, extracted_assets=extracted_assets)
+        raw_payload.content = replace(
+            raw_payload.content, extracted_assets=extracted_assets
+        )
         first_asset, retried_asset, non_image_asset = extracted_assets
         retryable_failure = {
             "kind": "figure",
@@ -1206,19 +1511,28 @@ class ArxivProviderTests(unittest.TestCase):
             "download_url": retried_asset.get("url", ""),
         }
 
-        context = paper_fetch.RuntimeContext(env={"PAPER_FETCH_ASSET_DOWNLOAD_CONCURRENCY": "8"})
+        context = paper_fetch.RuntimeContext(
+            env={"PAPER_FETCH_ASSET_DOWNLOAD_CONCURRENCY": "8"}
+        )
         try:
-            with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
-                arxiv_provider.html_assets,
-                "download_figure_assets",
-                side_effect=[
-                    {
-                        "assets": [initial_download],
-                        "asset_failures": [retryable_failure, non_retryable_failure, non_image_failure],
-                    },
-                    {"assets": [retry_download], "asset_failures": []},
-                ],
-            ) as downloader:
+            with (
+                tempfile.TemporaryDirectory() as tmpdir,
+                mock.patch.object(
+                    arxiv_provider.html_assets,
+                    "download_figure_assets",
+                    side_effect=[
+                        {
+                            "assets": [initial_download],
+                            "asset_failures": [
+                                retryable_failure,
+                                non_retryable_failure,
+                                non_image_failure,
+                            ],
+                        },
+                        {"assets": [retry_download], "asset_failures": []},
+                    ],
+                ) as downloader,
+            ):
                 result = client.download_related_assets(
                     metadata["doi"],
                     metadata,
@@ -1231,16 +1545,26 @@ class ArxivProviderTests(unittest.TestCase):
             context.close()
 
         self.assertEqual(result["assets"], [initial_download, retry_download])
-        self.assertEqual(result["asset_failures"], [non_retryable_failure, non_image_failure])
-        self.assertEqual(downloader.call_args_list[0].kwargs["asset_download_concurrency"], 2)
-        self.assertEqual(downloader.call_args_list[1].kwargs["asset_download_concurrency"], 1)
+        self.assertEqual(
+            result["asset_failures"], [non_retryable_failure, non_image_failure]
+        )
+        self.assertEqual(
+            downloader.call_args_list[0].kwargs["asset_download_concurrency"], 2
+        )
+        self.assertEqual(
+            downloader.call_args_list[1].kwargs["asset_download_concurrency"], 1
+        )
         self.assertEqual(downloader.call_args_list[1].kwargs["assets"], [retried_asset])
         for call in downloader.call_args_list:
             self.assertNotIn("seed_urls", call.kwargs)
-            self.assertEqual(call.kwargs["headers"]["Accept"], arxiv_provider.ARXIV_IMAGE_ACCEPT)
+            self.assertEqual(
+                call.kwargs["headers"]["Accept"], arxiv_provider.ARXIV_IMAGE_ACCEPT
+            )
             self.assertNotIn("text/html", call.kwargs["headers"]["Accept"])
 
-    def test_html_route_asset_partial_failure_surfaces_quality_diagnostics(self) -> None:
+    def test_html_route_asset_partial_failure_surfaces_quality_diagnostics(
+        self,
+    ) -> None:
         arxiv_id = "2605.06663v1"
         metadata = _metadata(arxiv_id)
         client = ArxivClient(_html_transport(arxiv_id), {})
@@ -1253,10 +1577,15 @@ class ArxivProviderTests(unittest.TestCase):
             "section": "body",
         }
 
-        article = client.to_article_model(metadata, raw_payload, asset_failures=[failure])
+        article = client.to_article_model(
+            metadata, raw_payload, asset_failures=[failure]
+        )
 
         self.assertTrue(
-            any("arXiv related assets were only partially downloaded" in warning for warning in article.quality.warnings)
+            any(
+                "arXiv related assets were only partially downloaded" in warning
+                for warning in article.quality.warnings
+            )
         )
         self.assertEqual(article.quality.asset_failures, [failure])
 
@@ -1267,13 +1596,18 @@ class ArxivProviderTests(unittest.TestCase):
         client = ArxivClient(transport, {})
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = client.fetch_result(metadata["doi"], metadata, Path(tmpdir), asset_profile="none")
+            result = client.fetch_result(
+                metadata["doi"], metadata, Path(tmpdir), asset_profile="none"
+            )
 
         self.assertEqual(result.content.route_kind, "html")
         self.assertGreater(len(result.content.extracted_assets), 0)
         self.assertEqual(result.article.assets, [])
         self.assertEqual(result.artifacts.assets, [])
-        self.assertEqual([call["url"] for call in transport.calls], [canonical_arxiv_html_url(arxiv_id)])
+        self.assertEqual(
+            [call["url"] for call in transport.calls],
+            [canonical_arxiv_html_url(arxiv_id)],
+        )
 
     def test_fetch_paper_uses_arxiv_provider_for_resolved_arxiv_id(self) -> None:
         arxiv_id = "2605.06663v1"
@@ -1283,7 +1617,9 @@ class ArxivProviderTests(unittest.TestCase):
             env={},
             clients={
                 "arxiv": arxiv_client,
-                "crossref": StubProvider(metadata=ProviderFailure("no_result", "Crossref not used.")),
+                "crossref": StubProvider(
+                    metadata=ProviderFailure("no_result", "Crossref not used.")
+                ),
             },
         )
 
@@ -1297,9 +1633,13 @@ class ArxivProviderTests(unittest.TestCase):
         assert envelope.article is not None
         self.assertEqual(envelope.article.source, "arxiv_html")
         self.assertEqual(envelope.article.quality.content_kind, "fulltext")
-        self.assertIn("route:provider_selected_arxiv", envelope.article.quality.source_trail)
+        self.assertIn(
+            "route:provider_selected_arxiv", envelope.article.quality.source_trail
+        )
         self.assertIn("metadata:arxiv_ok", envelope.article.quality.source_trail)
-        self.assertIn("fulltext:arxiv_article_ok", envelope.article.quality.source_trail)
+        self.assertIn(
+            "fulltext:arxiv_article_ok", envelope.article.quality.source_trail
+        )
         self.assertTrue(envelope.markdown)
         self.assertEqual(api_client.queries, [[arxiv_id]])
 
@@ -1331,7 +1671,9 @@ class ArxivProviderTests(unittest.TestCase):
         assert envelope.article is not None
         self.assertEqual(envelope.article.source, "crossref_meta")
         self.assertEqual(envelope.article.quality.content_kind, "abstract_only")
-        self.assertNotIn("fulltext:arxiv_attempt", envelope.article.quality.source_trail)
+        self.assertNotIn(
+            "fulltext:arxiv_attempt", envelope.article.quality.source_trail
+        )
         self.assertEqual(arxiv_client.transport.calls, [])
 
     def test_no_download_returns_markdown_without_payload_artifacts(self) -> None:
@@ -1346,7 +1688,9 @@ class ArxivProviderTests(unittest.TestCase):
                         {},
                         api_client=api_client,
                     ),
-                    "crossref": StubProvider(metadata=ProviderFailure("no_result", "Crossref not used.")),
+                    "crossref": StubProvider(
+                        metadata=ProviderFailure("no_result", "Crossref not used.")
+                    ),
                 },
                 download_dir=None,
             )
@@ -1373,21 +1717,29 @@ class ArxivProviderTests(unittest.TestCase):
                         {},
                         api_client=api_client,
                     ),
-                    "crossref": StubProvider(metadata=ProviderFailure("no_result", "Crossref not used.")),
+                    "crossref": StubProvider(
+                        metadata=ProviderFailure("no_result", "Crossref not used.")
+                    ),
                 },
                 download_dir=output_dir,
             )
             envelope = paper_fetch.fetch_paper(
                 arxiv_id,
                 modes={"article"},
-                strategy=paper_fetch.FetchStrategy(preferred_providers=["arxiv"], asset_profile="none"),
+                strategy=paper_fetch.FetchStrategy(
+                    preferred_providers=["arxiv"], asset_profile="none"
+                ),
                 context=context,
             )
 
             self.assertEqual(envelope.source, "arxiv_html")
             saved_files = list(output_dir.iterdir())
-            self.assertTrue(any(path.name.endswith("_original.html") for path in saved_files))
-            self.assertFalse(any(path.suffix in {".gz", ".tar"} for path in saved_files))
+            self.assertTrue(
+                any(path.name.endswith("_original.html") for path in saved_files)
+            )
+            self.assertFalse(
+                any(path.suffix in {".gz", ".tar"} for path in saved_files)
+            )
 
 
 if __name__ == "__main__":

@@ -36,6 +36,15 @@ from paper_fetch.provider_catalog import (
     provider_status_order,
     sources_by_provider,
 )
+from paper_fetch.extraction.html.provider_rules import (
+    COMMON_ACCESS_BLOCK_TOKENS,
+    IEEE_ACCESS_BLOCK_TEXT_TOKENS,
+    IEEE_AVAILABILITY_DROP_KEYWORDS,
+    IEEE_EXTRACTION_CLEANUP_SELECTORS,
+    SPRINGER_NATURE_DISPLAY_FORMULA_SELECTORS,
+    SPRINGER_NATURE_FORMULA_CONTAINER_TOKENS,
+)
+from paper_fetch.quality.html_profiles import site_rule_for_publisher
 from paper_fetch.quality.issues import EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER
 from paper_fetch.models.schema import SourceKind
 from paper_fetch.providers import _pdf_candidates, html_springer_nature
@@ -83,6 +92,32 @@ class ProviderCatalogTests(unittest.TestCase):
                 spec.probe_capability == "metadata_api",
             )
 
+    def test_provider_rule_constants_keep_shared_and_incremental_layers(self) -> None:
+        self.assertTrue(
+            set(COMMON_ACCESS_BLOCK_TOKENS) < set(IEEE_ACCESS_BLOCK_TEXT_TOKENS)
+        )
+        self.assertIn("institutional sign in", IEEE_ACCESS_BLOCK_TEXT_TOKENS)
+        self.assertIn("purchase access", IEEE_ACCESS_BLOCK_TEXT_TOKENS)
+
+        for selector in ("script", "style", "noscript", "iframe", "button", "input"):
+            self.assertNotIn(selector, IEEE_EXTRACTION_CLEANUP_SELECTORS)
+        self.assertIn("accesstype", IEEE_EXTRACTION_CLEANUP_SELECTORS)
+        self.assertNotIn("accessType", IEEE_EXTRACTION_CLEANUP_SELECTORS)
+        self.assertIn("select", IEEE_EXTRACTION_CLEANUP_SELECTORS)
+        self.assertIn("textarea", IEEE_EXTRACTION_CLEANUP_SELECTORS)
+        self.assertIn(".zoom-container", IEEE_EXTRACTION_CLEANUP_SELECTORS)
+        self.assertIn("button[data-docId]", IEEE_EXTRACTION_CLEANUP_SELECTORS)
+
+        for keyword in ("download", "metrics", "recommend", "rightslink"):
+            self.assertNotIn(keyword, IEEE_AVAILABILITY_DROP_KEYWORDS)
+            self.assertIn(keyword, site_rule_for_publisher("ieee")["drop_keywords"])
+        self.assertIn("references-modal", IEEE_AVAILABILITY_DROP_KEYWORDS)
+
+        self.assertEqual(
+            SPRINGER_NATURE_DISPLAY_FORMULA_SELECTORS,
+            tuple(f".{token}" for token in SPRINGER_NATURE_FORMULA_CONTAINER_TOKENS),
+        )
+
     def test_official_and_provider_managed_sets_are_catalog_derived(self) -> None:
         self.assertEqual(
             set(official_provider_names()),
@@ -111,6 +146,7 @@ class ProviderCatalogTests(unittest.TestCase):
             self.assertEqual(utils.provider_display_name(name), display_name)
 
         self.assertEqual(utils.provider_display_name("pnas"), "PNAS")
+        self.assertEqual(utils.provider_display_name("ams"), "AMS")
         self.assertEqual(
             utils.provider_display_name("unknown-provider"), "Unknown Provider"
         )
@@ -222,8 +258,13 @@ class ProviderCatalogTests(unittest.TestCase):
         )
         self.assertEqual(
             provider_pdf_path_templates("pnas"),
-            ("/doi/epdf/{doi}", "/doi/pdf/{doi}?download=true", "/doi/pdf/{doi}"),
+            (
+                "/doi/epdf/{doi}",
+                "/doi/pdf/{doi}?download=true",
+                "/doi/pdf/{doi}",
+            ),
         )
+        self.assertEqual(provider_pdf_path_templates("ams"), ())
         self.assertEqual(provider_crossref_pdf_position("wiley"), 1)
 
     def test_springer_pdf_templates_are_catalog_derived(self) -> None:
@@ -282,9 +323,7 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(result.state, "positive")
         self.assertEqual(result.metadata["provider"], "arxiv")
         self.assertEqual(result.metadata["arxiv_id"], "2605.06663")
-        self.assertEqual(
-            result.metadata["pdf_url"], "https://arxiv.org/pdf/2605.06663"
-        )
+        self.assertEqual(result.metadata["pdf_url"], "https://arxiv.org/pdf/2605.06663")
         self.assertIsNone(provider_metadata_probe_short_circuit("elsevier"))
 
     def test_provider_html_persistence_is_catalog_derived(self) -> None:
@@ -324,6 +363,9 @@ class ProviderCatalogTests(unittest.TestCase):
         self.assertEqual(provider_body_text_thresholds("copernicus").min_chars, 500)
         self.assertEqual(
             provider_body_text_thresholds("springer"), DEFAULT_BODY_TEXT_THRESHOLDS
+        )
+        self.assertEqual(
+            provider_body_text_thresholds("ams"), DEFAULT_BODY_TEXT_THRESHOLDS
         )
 
     def test_fulltext_provider_attempt_skips_non_official_catalog_provider(
@@ -371,6 +413,10 @@ class ProviderCatalogTests(unittest.TestCase):
             "copernicus",
         )
         self.assertEqual(
+            publisher_identity.infer_provider_from_doi("10.1175/jcli-d-23-0738.1"),
+            "ams",
+        )
+        self.assertEqual(
             publisher_identity.infer_provider_from_doi("10.48550/arXiv.2605.06663"),
             "arxiv",
         )
@@ -384,6 +430,12 @@ class ProviderCatalogTests(unittest.TestCase):
         )
         self.assertEqual(
             publisher_identity.infer_provider_from_publisher("arXiv"), "arxiv"
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_publisher(
+                "American Meteorological Society"
+            ),
+            "ams",
         )
         self.assertEqual(
             publisher_identity.infer_provider_from_publisher(
@@ -437,6 +489,12 @@ class ProviderCatalogTests(unittest.TestCase):
                 "https://arxiv.org/abs/2605.06663v1"
             ),
             "arxiv",
+        )
+        self.assertEqual(
+            publisher_identity.infer_provider_from_url(
+                "https://journals.ametsoc.org/view/journals/clim/37/24/JCLI-D-23-0738.1.xml"
+            ),
+            "ams",
         )
         self.assertEqual(
             publisher_identity.ordered_provider_candidates(

@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from .extraction.html.signals import ACCESS_DENIED_TOKEN, CLOUDFLARE_CHALLENGE_TITLE_TOKENS, LOGIN_GATE_TOKENS
 from .utils import normalize_text
 
 HTML_LOOKUP_TITLE_DENYLIST = (
     "redirecting",
-    "sign in",
-    "just a moment",
+    LOGIN_GATE_TOKENS[0],
+    CLOUDFLARE_CHALLENGE_TITLE_TOKENS[0],
     "cookie",
     "subscribe",
-    "access denied",
+    ACCESS_DENIED_TOKEN,
 )
 
 

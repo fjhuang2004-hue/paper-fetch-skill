@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from paper_fetch.http import HttpTransport, RequestFailure, build_text_preview
 from paper_fetch.providers.base import ProviderFailure, map_request_failure
+from paper_fetch.reason_codes import NO_ACCESS, NO_RESULT
 from paper_fetch.utils import build_output_path, empty_asset_results, save_payload
 
 
@@ -19,7 +20,7 @@ def download_from_fulltext_links(
 ) -> dict[str, Any]:
     links = metadata.get("fulltext_links") or []
     if not isinstance(links, list) or not links:
-        raise ProviderFailure("no_result", "No full-text links are available in the metadata payload.")
+        raise ProviderFailure(NO_RESULT, "No full-text links are available in the metadata payload.")
 
     preferred_order = {
         "application/pdf": 0,
@@ -65,4 +66,4 @@ def download_from_fulltext_links(
             **empty_asset_results(),
         }
 
-    raise ProviderFailure("no_access", "No downloadable full-text link succeeded.")
+    raise ProviderFailure(NO_ACCESS, "No downloadable full-text link succeeded.")

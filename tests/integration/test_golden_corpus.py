@@ -28,6 +28,12 @@ class ProviderGoldenContract:
 
 
 PROVIDER_GOLDEN_CONTRACTS = {
+    "ams": ProviderGoldenContract(
+        route_kind="html",
+        content_prefix="text/html",
+        source="ams_html",
+        primary_marker="fulltext:ams_html_ok",
+    ),
     "elsevier": ProviderGoldenContract(
         route_kind="official",
         content_prefix="text/xml",
@@ -74,6 +80,13 @@ PROVIDER_GOLDEN_CONTRACTS = {
 
 
 def _golden_contract_for_fixture(fixture: GoldenCorpusFixture) -> ProviderGoldenContract:
+    if fixture.provider == "ams" and fixture.route_kind == "pdf_fallback":
+        return ProviderGoldenContract(
+            route_kind="pdf_fallback",
+            content_prefix="application/pdf",
+            source="ams_pdf",
+            primary_marker="fulltext:ams_pdf_fallback_ok",
+        )
     if fixture.provider == "copernicus" and fixture.route_kind == "pdf_fallback":
         return ProviderGoldenContract(
             route_kind="pdf_fallback",
@@ -93,9 +106,18 @@ def _fixture_id(fixture: GoldenCorpusFixture) -> str:
 
 
 def test_golden_corpus_is_balanced_across_publishers() -> None:
-    assert len(GOLDEN_CORPUS_FIXTURES) == 71
+    assert len(GOLDEN_CORPUS_FIXTURES) == 82
     assert Counter(fixture.provider for fixture in GOLDEN_CORPUS_FIXTURES) == Counter(
-        {"copernicus": 12, "elsevier": 10, "ieee": 7, "pnas": 10, "science": 11, "springer": 11, "wiley": 10}
+        {
+            "ams": 11,
+            "copernicus": 12,
+            "elsevier": 10,
+            "ieee": 7,
+            "pnas": 10,
+            "science": 11,
+            "springer": 11,
+            "wiley": 10,
+        }
     )
 
 
@@ -114,7 +136,7 @@ def test_golden_corpus_lightweight_contracts_hold_across_full_corpus(fixture: Go
         if expected["has"][field_name]:
             assert actual["has"][field_name], f"Expected {field_name} for {fixture.doi}"
 
-    if fixture.provider in {"science", "pnas", "wiley"}:
+    if fixture.provider in {"ams", "science", "pnas", "wiley"} and fixture.route_kind == "html":
         assert list(actual["blocking_fallback_signals"]) == [], (
             f"Positive fixture leaked paywall signals for {fixture.doi}"
         )
@@ -124,9 +146,18 @@ def test_golden_corpus_lightweight_contracts_hold_across_full_corpus(fixture: Go
 
 
 def test_golden_corpus_representative_fixtures_cover_primary_fulltext_paths_by_provider() -> None:
-    assert len(REPRESENTATIVE_GOLDEN_CORPUS_FIXTURES) == 7
+    assert len(REPRESENTATIVE_GOLDEN_CORPUS_FIXTURES) == 8
     assert Counter(fixture.provider for fixture in REPRESENTATIVE_GOLDEN_CORPUS_FIXTURES) == Counter(
-        {"copernicus": 1, "elsevier": 1, "ieee": 1, "pnas": 1, "science": 1, "springer": 1, "wiley": 1}
+        {
+            "ams": 1,
+            "copernicus": 1,
+            "elsevier": 1,
+            "ieee": 1,
+            "pnas": 1,
+            "science": 1,
+            "springer": 1,
+            "wiley": 1,
+        }
     )
 
 
@@ -154,7 +185,7 @@ def test_golden_corpus_representative_fixture_matches_primary_fulltext_path(fixt
 
 @pytest.mark.skipif(
     os.environ.get(FULL_GOLDEN_ENV) != "1",
-    reason=f"Set {FULL_GOLDEN_ENV}=1 to run full 71-fixture golden corpus regression.",
+    reason=f"Set {FULL_GOLDEN_ENV}=1 to run full 82-fixture golden corpus regression.",
 )
 @pytest.mark.parametrize("fixture", GOLDEN_CORPUS_FIXTURES, ids=_fixture_id)
 def test_golden_corpus_expected_summary_matches_current_extractor(fixture: GoldenCorpusFixture) -> None:

@@ -28,13 +28,15 @@ from ..config import (
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..quality.html_availability import choose_parser, extract_page_title
 from ..quality.html_signals import looks_like_abstract_redirect
-from ..utils import normalize_text, sanitize_filename
+from ..quality.reason_codes import CLOUDFLARE_CHALLENGE, REDIRECTED_TO_ABSTRACT
+from ..utils import normalize_text, provider_display_name, sanitize_filename
 from .base import (
     ProviderFailure,
     ProviderStatusResult,
     build_provider_status_check,
     provider_status_check_from_failure,
 )
+from ..reason_codes import ERROR, NOT_CONFIGURED, OK, READY
 
 try:
     from bs4 import BeautifulSoup
@@ -58,10 +60,10 @@ FLARESOLVERR_STATUS_PROBE_ID = "probe://flaresolverr/status"
 
 logger = logging.getLogger("paper_fetch.providers.flaresolverr")
 
+_BROWSER_WORKFLOW_PROVIDERS = ("wiley", "science", "pnas", "ams")
 _BROWSER_WORKFLOW_LABELS = {
-    "wiley": "Wiley browser workflow",
-    "science": "Science browser workflow",
-    "pnas": "PNAS browser workflow",
+    provider: f"{provider_display_name(provider)} browser workflow"
+    for provider in _BROWSER_WORKFLOW_PROVIDERS
 }
 
 _POSIX_FLARESOLVERR_WORKFLOW_FILES = (
@@ -152,7 +154,7 @@ def load_runtime_config(env: Mapping[str, str], *, provider: str, doi: str) -> F
     workflow_label = _browser_workflow_label(provider)
     if env_file is None:
         raise ProviderFailure(
-            "not_configured",
+            NOT_CONFIGURED,
             (
                 f"{workflow_label} requires FLARESOLVERR_ENV_FILE pointing at a repo-local vendor/flaresolverr preset. "
                 "Start the service with ./scripts/flaresolverr-up <preset> first."
@@ -161,7 +163,7 @@ def load_runtime_config(env: Mapping[str, str], *, provider: str, doi: str) -> F
         )
     if not env_file.exists():
         raise ProviderFailure(
-            "not_configured",
+            NOT_CONFIGURED,
             f"Configured FLARESOLVERR_ENV_FILE does not exist: {env_file}",
             missing_env=["FLARESOLVERR_ENV_FILE"],
         )
@@ -188,7 +190,7 @@ def ensure_runtime_ready(config: FlareSolverrRuntimeConfig) -> None:
     except ProviderFailure as exc:
         workflow_label = _browser_workflow_label(config.provider)
         raise ProviderFailure(
-            "not_configured",
+            NOT_CONFIGURED,
             (
                 f"{workflow_label} requires a running local FlareSolverr service. "
                 f"{exc.message} Start it with ./scripts/flaresolverr-up <preset>."
@@ -200,7 +202,7 @@ def check_local_workflow(config: FlareSolverrRuntimeConfig) -> None:
     workflow_label = _browser_workflow_label(config.provider)
     if not config.source_dir.exists():
         raise ProviderFailure(
-            "not_configured",
+            NOT_CONFIGURED,
             (
                 f"{workflow_label} is repo-local only. Missing vendor/flaresolverr under the current checkout: "
                 f"{config.source_dir}"
@@ -209,7 +211,7 @@ def check_local_workflow(config: FlareSolverrRuntimeConfig) -> None:
     missing_files = [name for name in config.required_files if not (config.source_dir / name).exists()]
     if missing_files:
         raise ProviderFailure(
-            "not_configured",
+            NOT_CONFIGURED,
             (
                 f"{workflow_label} requires the repo-local vendor/flaresolverr workflow. "
                 f"Missing files: {', '.join(missing_files)}"
@@ -221,10 +223,10 @@ def health_check(url: str) -> None:
     try:
         payload = post_to_flaresolverr(url, {"cmd": "sessions.list"}, timeout_seconds=10.0)
     except FlareSolverrFailure as exc:
-        raise ProviderFailure("not_configured", f"Health check failed for {url}: {exc.message}.") from exc
+        raise ProviderFailure(NOT_CONFIGURED, f"Health check failed for {url}: {exc.message}.") from exc
     if normalize_text(str(payload.get("status") or "")).lower() not in {"", "ok"}:
         raise ProviderFailure(
-            "not_configured",
+            NOT_CONFIGURED,
             f"Health check returned status={payload.get('status')!r} message={payload.get('message')!r}.",
         )
 
@@ -247,7 +249,7 @@ def _runtime_probe_details(env: Mapping[str, str]) -> dict[str, Any]:
 def _skipped_status_check(name: str, message: str, *, details: Mapping[str, Any]) -> Any:
     return build_provider_status_check(
         name,
-        "not_configured",
+        NOT_CONFIGURED,
         message,
         details=details,
     )
@@ -274,7 +276,7 @@ def probe_runtime_status(
         checks.append(
             build_provider_status_check(
                 "runtime_env",
-                "ok",
+                OK,
                 f"{provider} runtime environment is configured.",
                 details=runtime_details,
             )
@@ -282,7 +284,7 @@ def probe_runtime_status(
     except ProviderFailure as exc:
         checks.append(provider_status_check_from_failure("runtime_env", exc, details=runtime_details))
     except Exception as exc:
-        checks.append(build_provider_status_check("runtime_env", "error", str(exc), details=runtime_details))
+        checks.append(build_provider_status_check("runtime_env", ERROR, str(exc), details=runtime_details))
 
     repo_details = {
         "source_dir": runtime_details.get("source_dir"),
@@ -311,7 +313,7 @@ def probe_runtime_status(
             checks.append(
                 build_provider_status_check(
                     "repo_local_workflow",
-                    "ok",
+                    OK,
                     "Repo-local FlareSolverr workflow files are available.",
                     details={
                         "source_dir": str(config.source_dir),
@@ -334,7 +336,7 @@ def probe_runtime_status(
             checks.append(
                 build_provider_status_check(
                     "repo_local_workflow",
-                    "error",
+                    ERROR,
                     str(exc),
                     details={
                         "source_dir": str(config.source_dir),
@@ -357,7 +359,7 @@ def probe_runtime_status(
                 checks.append(
                     build_provider_status_check(
                         "flaresolverr_health",
-                        "ok",
+                        OK,
                         "Local FlareSolverr health check passed.",
                         details={"url": config.url},
                     )
@@ -365,7 +367,7 @@ def probe_runtime_status(
             except ProviderFailure as exc:
                 checks.append(provider_status_check_from_failure("flaresolverr_health", exc, details={"url": config.url}))
             except Exception as exc:
-                checks.append(build_provider_status_check("flaresolverr_health", "error", str(exc), details={"url": config.url}))
+                checks.append(build_provider_status_check("flaresolverr_health", ERROR, str(exc), details={"url": config.url}))
 
     missing_env: list[str] = []
     for check in checks:
@@ -373,17 +375,17 @@ def probe_runtime_status(
             if name not in missing_env:
                 missing_env.append(name)
 
-    if any(check.status == "error" for check in checks):
-        status = "error"
-    elif all(check.status == "ok" for check in checks):
-        status = "ready"
+    if any(check.status == ERROR for check in checks):
+        status = ERROR
+    elif all(check.status == OK for check in checks):
+        status = READY
     else:
-        status = "not_configured"
+        status = NOT_CONFIGURED
 
     return ProviderStatusResult(
         provider=provider,
         status=status,
-        available=status == "ready",
+        available=status == READY,
         official_provider=True,
         missing_env=missing_env,
         notes=[],
@@ -954,7 +956,7 @@ def fetch_html_with_flaresolverr(
 
                     if looks_like_abstract_redirect(url, final_url):
                         last_failure = FlareSolverrFailure(
-                            "redirected_to_abstract",
+                            REDIRECTED_TO_ABSTRACT,
                             "Publisher redirected the full-text URL to an abstract page.",
                             browser_context_seed=browser_context_seed,
                         )
@@ -968,7 +970,7 @@ def fetch_html_with_flaresolverr(
 
                     detected = detect_html_block(title or "", summary, response_status)
                     if detected is not None:
-                        if detected.reason == "cloudflare_challenge" and wait_mode == "warm" and not challenge_retried:
+                        if detected.reason == CLOUDFLARE_CHALLENGE and wait_mode == "warm" and not challenge_retried:
                             challenge_retried = True
                             force_cold_retry = True
                             logger.debug(

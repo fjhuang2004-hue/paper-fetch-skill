@@ -13,11 +13,14 @@ from ..models import (
     strip_markdown_images,
 )
 from ..provider_catalog import provider_for_source, sources_by_provider
+from ..publisher_identity import ASCII_DOI_CORE_PATTERN
+from ..section_vocab import PRIMARY_ABSTRACT_HEADINGS
 from ..utils import normalize_text
 from .html_signals import authorless_heading_signatures_for_provider
+from .reason_codes import FULLTEXT
 
 EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER = sources_by_provider()
-ASCII_DOI_PATTERN = re.compile(r"^10\.\d{4,9}/[!-~]+$")
+ASCII_DOI_PATTERN = re.compile(rf"^{ASCII_DOI_CORE_PATTERN}$")
 ABSTRACT_INFLATED_TOKEN_THRESHOLD = 900
 ABSTRACT_INFLATED_CHAR_THRESHOLD = 3500
 ABSTRACT_INFLATED_WITH_OVERLAP_TOKEN_THRESHOLD = 600
@@ -25,7 +28,6 @@ ABSTRACT_INFLATED_WITH_OVERLAP_CHAR_THRESHOLD = 2600
 OVERLAP_SINGLE_CHUNK_MIN_CHARS = 240
 OVERLAP_MULTI_CHUNK_MIN_CHARS = 160
 OVERLAP_MULTI_CHUNK_MATCHES = 2
-PRIMARY_ABSTRACT_HEADINGS = frozenset({"abstract", "structured abstract", "summary"})
 
 
 def normalize_issue_heading(value: Any) -> str:
@@ -91,7 +93,7 @@ def collect_issue_flags(provider: str, envelope: FetchEnvelope, *, status: str) 
     body_sections = filtered_body_sections(getattr(article, "sections", []) or []) if article is not None else []
     body_text = "\n\n".join(normalize_text(section.text) for section in body_sections if normalize_text(section.text))
 
-    if abstract_text and status == "fulltext":
+    if abstract_text and status == FULLTEXT:
         abstract_tokens = estimate_tokens(abstract_text)
         overlap_detected = bool(body_text) and has_abstract_body_overlap(abstract_text, body_text)
         if has_inflated_abstract(
@@ -106,7 +108,7 @@ def collect_issue_flags(provider: str, envelope: FetchEnvelope, *, status: str) 
 
     if article is not None and any(reference_doi_requires_normalization(item.doi) for item in article.references):
         issue_flags.append("refs_doi_not_normalized")
-    if status == "fulltext" and envelope.source not in EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER.get(provider, frozenset()):
+    if status == FULLTEXT and envelope.source not in EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER.get(provider, frozenset()):
         issue_flags.append("unexpected_source_path")
     if article is not None and not getattr(metadata, "authors", []) and not is_authorless_briefing_like(
         article,

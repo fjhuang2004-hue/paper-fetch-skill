@@ -7,6 +7,7 @@ from typing import Any, Mapping
 
 from ..markdown.citations import normalize_inline_citation_markdown
 from ..publisher_identity import normalize_doi
+from ..quality.reason_codes import FULLTEXT
 from ..tracing import TraceEvent, source_trail_from_trace, trace_from_markers
 from ..utils import normalize_text, safe_text
 from .markdown import (
@@ -293,7 +294,7 @@ def article_from_structure(
         references=normalized_references,
         assets=assets,
         quality=Quality(
-            has_fulltext=content_kind == "fulltext",
+            has_fulltext=content_kind == FULLTEXT,
             token_estimate=token_estimate,
             content_kind=content_kind,
             has_abstract=bool(article_metadata.abstract),
@@ -402,7 +403,7 @@ def article_from_markdown(
         references=references,
         assets=normalized_assets,
         quality=Quality(
-            has_fulltext=content_kind == "fulltext",
+            has_fulltext=content_kind == FULLTEXT,
             token_estimate=token_estimate,
             content_kind=content_kind,
             has_abstract=bool(article_metadata.abstract),

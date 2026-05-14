@@ -10,6 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
+from ..extraction.html.semantics import FRONT_MATTER_HEADINGS
+from ..reason_codes import METADATA_ONLY
+
 
 @dataclass(frozen=True)
 class ElsevierElementRule:
@@ -133,27 +136,23 @@ ELSEVIER_ELEMENT_RULES: dict[str, ElsevierElementRule] = {
     ),
     "link": ElsevierElementRule(
         category="linkage",
-        handler="metadata_only",
+        handler=METADATA_ONLY,
         markdown_behavior="used to resolve assets; not rendered inline",
     ),
     "alt-text": ElsevierElementRule(
         category="metadata",
-        handler="metadata_only",
+        handler=METADATA_ONLY,
         markdown_behavior="descriptive metadata only",
     ),
 }
 
 
 ELSEVIER_XML_RULES = ElsevierXmlRules(
-    ignored_section_titles=frozenset(
-        {
-            "graphical abstract",
-            "supplementary data",
-        }
-    )
+    # Elsevier XML renders graphical abstracts as section-like metadata blocks.
+    # Derive the shared front-matter heading while keeping supplementary data
+    # provider-specific because it is an Elsevier XML section title.
+    ignored_section_titles=(FRONT_MATTER_HEADINGS & {"graphical abstract"}) | {"supplementary data"}
 )
-
-ELSEVIER_IGNORED_SECTION_TITLES = ELSEVIER_XML_RULES.ignored_section_titles
 
 ELSEVIER_IMAGE_ASSET_TYPES = frozenset(
     {
@@ -163,12 +162,41 @@ ELSEVIER_IMAGE_ASSET_TYPES = frozenset(
     }
 )
 
-_ASSET_GROUP_PATTERN = re.compile(r"(gr\d+|ga\d+|mmc\d+|tbl\d+|fx\d+|sup\d+|si\d+|am\d+)", flags=re.IGNORECASE)
-_BODY_IMAGE_PATTERN = re.compile(r"gr\d+\Z", flags=re.IGNORECASE)
-_APPENDIX_IMAGE_PATTERN = re.compile(r"fx\d+\Z", flags=re.IGNORECASE)
-_GRAPHICAL_ABSTRACT_PATTERN = re.compile(r"ga\d+\Z", flags=re.IGNORECASE)
-_TABLE_ASSET_PATTERN = re.compile(r"tbl\d+\Z", flags=re.IGNORECASE)
-_SUPPLEMENTARY_ASSET_PATTERN = re.compile(r"(mmc\d+|si\d+|sup\d+|am\d+)\Z", flags=re.IGNORECASE)
+ELSEVIER_ASSET_PREFIX_BY_KIND = {
+    "body_image": ("gr",),
+    "appendix_image": ("fx",),
+    "graphical_abstract": ("ga",),
+    "table_asset": ("tbl",),
+    "supplementary": ("mmc", "si", "sup", "am"),
+}
+
+
+def _elsevier_asset_prefix_pattern(prefixes: tuple[str, ...], *, fullmatch: bool) -> re.Pattern[str]:
+    body = "|".join(f"{re.escape(prefix)}\\d+" for prefix in prefixes)
+    suffix = r"\Z" if fullmatch else ""
+    return re.compile(rf"({body}){suffix}", flags=re.IGNORECASE)
+
+
+_ALL_ELSEVIER_ASSET_PREFIXES = tuple(
+    prefix
+    for prefixes in ELSEVIER_ASSET_PREFIX_BY_KIND.values()
+    for prefix in prefixes
+)
+_ASSET_GROUP_PATTERN = _elsevier_asset_prefix_pattern(_ALL_ELSEVIER_ASSET_PREFIXES, fullmatch=False)
+_BODY_IMAGE_PATTERN = _elsevier_asset_prefix_pattern(ELSEVIER_ASSET_PREFIX_BY_KIND["body_image"], fullmatch=True)
+_APPENDIX_IMAGE_PATTERN = _elsevier_asset_prefix_pattern(
+    ELSEVIER_ASSET_PREFIX_BY_KIND["appendix_image"],
+    fullmatch=True,
+)
+_GRAPHICAL_ABSTRACT_PATTERN = _elsevier_asset_prefix_pattern(
+    ELSEVIER_ASSET_PREFIX_BY_KIND["graphical_abstract"],
+    fullmatch=True,
+)
+_TABLE_ASSET_PATTERN = _elsevier_asset_prefix_pattern(ELSEVIER_ASSET_PREFIX_BY_KIND["table_asset"], fullmatch=True)
+_SUPPLEMENTARY_ASSET_PATTERN = _elsevier_asset_prefix_pattern(
+    ELSEVIER_ASSET_PREFIX_BY_KIND["supplementary"],
+    fullmatch=True,
+)
 
 
 def get_elsevier_element_rule(local_name: str) -> ElsevierElementRule:

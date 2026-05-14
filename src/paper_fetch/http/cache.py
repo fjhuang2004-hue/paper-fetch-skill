@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..provider_catalog import provider_sensitive_header_names
+
 DEFAULT_CACHE_TTL_SECONDS = 30
 DEFAULT_METADATA_CACHE_TTL_SECONDS = 86400
 DEFAULT_CACHE_CAPACITY = 128
@@ -35,11 +37,8 @@ CACHE_STAT_KEYS = (
 )
 SENSITIVE_CACHE_HEADER_NAMES = {
     "authorization",
-    "wiley-tdm-client-token",
-    "x-els-apikey",
-    "x-els-insttoken",
-    "cr-clickthrough-client-token",
     "proxy-authorization",
+    *provider_sensitive_header_names(),
 }
 CACHE_KEY_HEADER_NAMES = {
     "accept",

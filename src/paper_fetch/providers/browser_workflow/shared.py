@@ -13,6 +13,7 @@ HTML_STRUCTURE_MARKERS = _html_profiles.HTML_STRUCTURE_MARKERS
 dedupe_signals = _html_profiles.dedupe_signals
 default_positive_signals = _html_profiles.default_positive_signals
 looks_like_abstract_redirect = _html_profiles.looks_like_abstract_redirect
+BROWSER_HTML_BLOCKED_RESOURCE_TYPES = {"image", "font", "stylesheet", "media"}
 
 
 def preferred_html_candidate_from_landing_page(
@@ -31,7 +32,12 @@ def preferred_html_candidate_from_landing_page(
         for token in hosts
     ):
         return None
-    if normalize_text(urllib.parse.unquote(candidate)).lower().find(doi.lower()) == -1:
+    unquoted_candidate = normalize_text(urllib.parse.unquote(candidate)).lower()
+    normalized_doi = normalize_text(doi).lower()
+    doi_suffix = normalized_doi.split("/", 1)[1] if "/" in normalized_doi else ""
+    if normalized_doi not in unquoted_candidate and (
+        not doi_suffix or doi_suffix not in unquoted_candidate
+    ):
         return None
     return candidate
 

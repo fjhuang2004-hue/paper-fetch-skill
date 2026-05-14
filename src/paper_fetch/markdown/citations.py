@@ -20,14 +20,18 @@ NUMERIC_CITATION_ITEM_PATTERN = re.compile(r"(?P<start>\d{1,3})(?:\s*[–-]\s*(?
 REFERENCE_PREFIX_SENTINEL_PATTERN = re.compile(
     rf"(?i)\brefs?\.\s*(?P<sentinel>{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@)"
 )
+# The 160-character cap is a conservative guardrail to avoid swallowing
+# unrelated parentheticals across long prose spans.
 PARENTHETICAL_CITATION_PATTERN = re.compile(r"\((?P<inner>[^()\n]{1,160})\)")
 ADJACENT_SENTINEL_RUN_PATTERN = re.compile(
     rf"{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@(?:\s*[,–-]\s*{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}[^@\n]+@@)+"
 )
 COMMON_LABEL_PATTERN = re.compile(
-    r"(?<!Extended Data )\b((?:Fig|Figs|Tab|Tabs|Eq|Eqs|Ref|Refs))\.?\s+(\d+[A-Za-z]?)\b",
+    r"\b((?:Fig|Figs|Tab|Tabs|Eq|Eqs|Ref|Refs))\.?\s+(\d+[A-Za-z]?)\b",
     flags=re.IGNORECASE,
 )
+# Tuple wrappers are intentional extension points for provider-specific
+# additions such as Springer/Nature Extended Data labels and source-data lines.
 COMMON_LABEL_PATTERNS = (COMMON_LABEL_PATTERN,)
 COMMON_FIGURE_LINE_PATTERN = re.compile(r"(?im)^fig\.\s*[a-z0-9.-]+:.*$")
 COMMON_FIGURE_LINE_PATTERNS = (COMMON_FIGURE_LINE_PATTERN,)

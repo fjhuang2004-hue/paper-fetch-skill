@@ -2018,6 +2018,184 @@
       "landing_url": "https://bg.copernicus.org/articles/21/1/2024/",
       "route_kind": "xml",
       "content_type": "application/xml"
+    },
+    "10.1175_jcli-d-23-0738.1": {
+      "doi": "10.1175/jcli-d-23-0738.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/clim/37/24/JCLI-D-23-0738.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_jcli-d-23-0738.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_jcli-d-23-0738.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "A Slower North Equatorial Countercurrent but Faster Equatorial Undercurrent in a Warming Climate",
+      "landing_url": "https://journals.ametsoc.org/view/journals/clim/37/24/JCLI-D-23-0738.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_bams-d-24-0223.1": {
+      "doi": "10.1175/bams-d-24-0223.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/bams/107/5/BAMS-D-24-0223.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_bams-d-24-0223.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_bams-d-24-0223.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "What Makes a Successful Community Model for Research and Operations? Lessons Learned from WAVEWATCH III®",
+      "landing_url": "https://journals.ametsoc.org/view/journals/bams/107/5/BAMS-D-24-0223.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_waf-d-24-0019.1": {
+      "doi": "10.1175/waf-d-24-0019.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/wefo/39/12/WAF-D-24-0019.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_waf-d-24-0019.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_waf-d-24-0019.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "A Bayesian Framework for the Probabilistic Interpretation of Radar Observations and Severe Hailstorm Reports",
+      "landing_url": "https://journals.ametsoc.org/view/journals/wefo/39/12/WAF-D-24-0019.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_jtech-d-24-0028.1": {
+      "doi": "10.1175/jtech-d-24-0028.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/atot/41/12/JTECH-D-24-0028.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_jtech-d-24-0028.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_jtech-d-24-0028.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Assessing Air–Sea Surface Turbulent Heat Fluxes from Reanalyses Using Concurrent Shipboard Measurements",
+      "landing_url": "https://journals.ametsoc.org/view/journals/atot/41/12/JTECH-D-24-0028.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_jamc-d-24-0048.1": {
+      "doi": "10.1175/jamc-d-24-0048.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/apme/63/12/JAMC-D-24-0048.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_jamc-d-24-0048.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_jamc-d-24-0048.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Retrieval of Boundary Layer Precipitable Water from GOES ABI Using Machine Learning Techniques",
+      "landing_url": "https://journals.ametsoc.org/view/journals/apme/63/12/JAMC-D-24-0048.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_jhm-d-23-0228.1": {
+      "doi": "10.1175/jhm-d-23-0228.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/hydr/25/12/JHM-D-23-0228.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_jhm-d-23-0228.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_jhm-d-23-0228.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Locally Defined Seasonal Rainfall Characteristics within the Horn of Africa Drylands from Rain Gauge Observations",
+      "landing_url": "https://journals.ametsoc.org/view/journals/hydr/25/12/JHM-D-23-0228.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_mwr-d-24-0060.1": {
+      "doi": "10.1175/mwr-d-24-0060.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/mwre/152/12/MWR-D-24-0060.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_mwr-d-24-0060.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_mwr-d-24-0060.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Lightning and Radar Measures of Mixed-Phase Updraft Variability in Tracked Storms during the TRACER Field Campaign in Houston, Texas",
+      "landing_url": "https://journals.ametsoc.org/view/journals/mwre/152/12/MWR-D-24-0060.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_jpo-d-23-0234.1": {
+      "doi": "10.1175/jpo-d-23-0234.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/phoc/54/12/JPO-D-23-0234.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_jpo-d-23-0234.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_jpo-d-23-0234.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Optimal Transition Paths for AMOC Collapse and Recovery in a Stochastic Box Model",
+      "landing_url": "https://journals.ametsoc.org/view/journals/phoc/54/12/JPO-D-23-0234.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_aies-d-23-0093.1": {
+      "doi": "10.1175/aies-d-23-0093.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/view/journals/aies/3/4/AIES-D-23-0093.1.xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_aies-d-23-0093.1/expected.json",
+        "original.html": "tests/fixtures/golden_criteria/10.1175_aies-d-23-0093.1/original.html"
+      },
+      "fixture_family": "golden",
+      "title": "Evidential Deep Learning: Enhancing Predictive Uncertainty Estimation for Earth System Science Applications",
+      "landing_url": "https://journals.ametsoc.org/view/journals/aies/3/4/AIES-D-23-0093.1.xml",
+      "route_kind": "html",
+      "content_type": "text/html"
+    },
+    "10.1175_bams-d-24-0270.1": {
+      "doi": "10.1175/bams-d-24-0270.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/downloadpdf/view/journals/bams/aop/BAMS-D-24-0270.1/BAMS-D-24-0270.1.pdf",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_bams-d-24-0270.1/expected.json",
+        "landing.html": "tests/fixtures/golden_criteria/10.1175_bams-d-24-0270.1/landing.html",
+        "original.pdf": "tests/fixtures/golden_criteria/10.1175_bams-d-24-0270.1/original.pdf"
+      },
+      "fixture_family": "golden",
+      "title": "Integrating High-Resolution Modeling with Diverse Field Campaign Observations through an Open Science Summer School",
+      "landing_url": "https://journals.ametsoc.org/view/journals/bams/aop/BAMS-D-24-0270.1/BAMS-D-24-0270.1.xml",
+      "route_kind": "pdf_fallback",
+      "content_type": "application/pdf"
+    },
+    "10.1175_jcli-d-25-0547.1": {
+      "doi": "10.1175/jcli-d-25-0547.1",
+      "publisher": "ams",
+      "source_url": "https://journals.ametsoc.org/downloadpdf/view/journals/clim/39/10/JCLI-D-25-0547.1.pdf",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "expected.json": "tests/fixtures/golden_criteria/10.1175_jcli-d-25-0547.1/expected.json",
+        "landing.html": "tests/fixtures/golden_criteria/10.1175_jcli-d-25-0547.1/landing.html",
+        "original.pdf": "tests/fixtures/golden_criteria/10.1175_jcli-d-25-0547.1/original.pdf"
+      },
+      "fixture_family": "golden",
+      "title": "Corrigendum",
+      "landing_url": "https://journals.ametsoc.org/view/journals/clim/39/10/JCLI-D-25-0547.1.xml",
+      "route_kind": "pdf_fallback",
+      "content_type": "application/pdf"
     }
   },
   "tests": [

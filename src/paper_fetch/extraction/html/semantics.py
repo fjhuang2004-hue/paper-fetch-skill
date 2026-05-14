@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from ...common_patterns import HEADING_LEVEL_PATTERN, REFERENCE_TOKEN_VOCABULARY
+from ...section_vocab import MARKDOWN_ABSTRACT_HEADINGS, SIGNIFICANCE_ABSTRACT_HEADINGS
 from ...utils import normalize_text
 from ..citation_anchors import looks_like_reference_href
 from ..section_hints import (
@@ -13,11 +15,47 @@ from ..section_hints import (
     match_next_section_hint,
 )
 from .signals import contains_access_gate_text
+from .ui_tokens import (
+    CITATION_TOOL_CHROME_TOKENS,
+    COMMON_NOISE_TOKENS,
+    RELATED_CONTENT_CHROME_TOKENS,
+)
 
 try:
     from bs4 import Tag
 except ImportError:  # pragma: no cover - dependency is declared in pyproject
     Tag = None
+
+HTML_BLOCK_TAGS = frozenset(
+    {
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "dd",
+        "div",
+        "dl",
+        "dt",
+        "figcaption",
+        "footer",
+        "form",
+        "header",
+        "li",
+        "main",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "tr",
+        "ul",
+    }
+)
 
 
 def coerce_html_section_hints(section_hints: Any) -> list[dict[str, Any]]:
@@ -84,14 +122,14 @@ BACK_MATTER_HEADINGS = frozenset(
         "references",
         "references and notes",
         "bibliography",
-        "acknowledgements",
-        "acknowledgments",
         "electronic supplementary material",
         "supplementary material",
         "supplementary materials",
         "supplementary information",
         "supporting information",
         "notes",
+        "acknowledgements",
+        "acknowledgments",
         "author contributions",
         "funding",
         "research funding",
@@ -103,11 +141,23 @@ BACK_MATTER_HEADINGS = frozenset(
         "disclosures",
     }
 )
+SUPPLEMENTARY_BACK_MATTER_HEADINGS = frozenset(
+    {
+        "electronic supplementary material",
+        "supplementary material",
+        "supplementary materials",
+        "supplementary information",
+        "supporting information",
+    }
+) & BACK_MATTER_HEADINGS
+# HTML ancillary headings classify DOM headings before rendering. Some labels
+# overlap with markdown cleanup, but this set decides whether a source heading
+# should be treated as article body while section hints are still available.
 ANCILLARY_HEADINGS = frozenset(
     {
         "recommended",
         "related content",
-        "related articles",
+        *RELATED_CONTENT_CHROME_TOKENS,
         "metrics",
         "metrics & citations",
         "view options",
@@ -120,7 +170,7 @@ ANCILLARY_HEADINGS = frozenset(
         "submission history",
         "license information",
         "cite as",
-        "export citation",
+        *CITATION_TOOL_CHROME_TOKENS,
         "cited by",
         "citing literature",
         "figures",
@@ -139,18 +189,9 @@ ANCILLARY_HEADINGS = frozenset(
         "open access",
     }
 )
-MARKDOWN_ABSTRACT_HEADINGS = frozenset(
-    {
-        "abstract",
-        "structured abstract",
-        "summary",
-        "resumo",
-        "resumen",
-        "resume",
-        "résumé",
-        "zusammenfassung",
-    }
-)
+# Markdown auxiliary headings run after HTML/XML has already been rendered to
+# text. Keep this separate from ANCILLARY_HEADINGS so renderer cleanup can drop
+# chrome without changing DOM section classification.
 MARKDOWN_AUXILIARY_HEADINGS = frozenset(
     {
         "abbreviations",
@@ -175,30 +216,7 @@ MARKDOWN_FRONT_MATTER_HEADINGS = frozenset(
         "graphical abstract",
     }
 )
-MARKDOWN_BACK_MATTER_HEADINGS = frozenset(
-    {
-        "references",
-        "references and notes",
-        "bibliography",
-        "acknowledgements",
-        "acknowledgments",
-        "electronic supplementary material",
-        "supplementary materials",
-        "supplementary material",
-        "supplementary information",
-        "supporting information",
-        "notes",
-        "author contributions",
-        "funding",
-        "research funding",
-        "ethics",
-        "conflict of interest",
-        "conflicts of interest",
-        "competing interests",
-        "statement of competing interests",
-        "disclosures",
-    }
-)
+MARKDOWN_BACK_MATTER_HEADINGS = BACK_MATTER_HEADINGS
 BODY_CONTAINER_TOKENS = (
     "articlebody",
     "article-body",
@@ -241,11 +259,11 @@ CODE_AVAILABILITY_TOKENS = (
 BACK_MATTER_TOKENS = (
     "reference",
     "bibliograph",
-    "acknowledg",
     "supplement",
     "supplementary",
     "supporting-information",
     "supporting_information",
+    "acknowledg",
     "funding",
     "author-contribution",
     "conflict",
@@ -253,25 +271,14 @@ BACK_MATTER_TOKENS = (
     "ethics",
 )
 ANCILLARY_TOKENS = (
-    "related",
-    "recommend",
-    "metric",
-    "metrics",
-    "share",
-    "social",
-    "toolbar",
-    "breadcrumb",
+    *COMMON_NOISE_TOKENS,
     "access",
-    "cookie",
-    "banner",
-    "promo",
     "viewer",
     "citation",
     "permissions",
     "eletter",
     "signup",
     "comment",
-    "rightslink",
     "author-information",
     "additional-information",
     "profiles",
@@ -290,9 +297,15 @@ IDENTITY_ATTR_KEYS = (
     "aria-label",
     "aria-labelledby",
 )
-SECTION_HEADING_PATTERN = re.compile(r"^h([1-6])$")
+SECTION_HEADING_PATTERN = HEADING_LEVEL_PATTERN
 SECTION_TITLE_NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
-REFERENCE_MARKER_VALUE_PATTERN = re.compile(r"(?:ref|bib|bibr|cite|citation|cr|r)\d+[a-z]?", flags=re.IGNORECASE)
+_REFERENCE_MARKER_TOKENS = tuple(
+    token for token in (*REFERENCE_TOKEN_VOCABULARY, "r") if token not in {"refs", "reference", "bibliography"}
+)
+REFERENCE_MARKER_VALUE_PATTERN = re.compile(
+    rf"(?:{'|'.join(re.escape(token) for token in _REFERENCE_MARKER_TOKENS)})\d+[a-z]?",
+    flags=re.IGNORECASE,
+)
 REFERENCE_ANCHOR_CLASS_TOKENS = frozenset({"biblink", "to-citation"})
 
 

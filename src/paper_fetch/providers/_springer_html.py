@@ -6,6 +6,7 @@ import re
 import urllib.parse
 from typing import Any, Mapping
 
+from ..common_patterns import EXTENDED_DATA_LABEL, FIGURE_LABEL_CORE_PATTERN
 from ..extraction.html import decode_html as _decode_html
 from ..extraction.html.assets import (
     FULL_SIZE_IMAGE_ATTRS,
@@ -20,20 +21,43 @@ from ..extraction.html.assets import (
     split_body_and_supplementary_assets,
     looks_like_full_size_asset_url,
 )
-from ..extraction.html._metadata import merge_html_metadata as merge_generic_html_metadata
-from ..extraction.html._metadata import parse_html_metadata as parse_generic_html_metadata
+from ..extraction.html._metadata import (
+    merge_html_metadata as merge_generic_html_metadata,
+)
+from ..extraction.html._metadata import (
+    parse_html_metadata as parse_generic_html_metadata,
+)
 from ..extraction.html._runtime import (
     clean_markdown,
     prune_html_tree,
 )
 from ..extraction.html.renderer import render_html_markdown
-from ..extraction.html.language import collect_html_abstract_blocks, html_node_language_hint
+from ..extraction.html.language import (
+    collect_html_abstract_blocks,
+    html_node_language_hint,
+)
 from ..extraction.html.parsing import choose_parser
-from ..extraction.html.semantics import collect_html_section_hints, heading_category, normalize_section_title
+from ..extraction.html.semantics import (
+    BACK_MATTER_HEADINGS,
+    SUPPLEMENTARY_BACK_MATTER_HEADINGS,
+    collect_html_section_hints,
+    heading_category,
+    normalize_section_title,
+)
+from ..extraction.html.ui_tokens import (
+    SPRINGER_FULL_SIZE_IMAGE_LABEL,
+    SPRINGER_NATURE_SOURCE_DATA_LABEL,
+    SPRINGER_POWERPOINT_SLIDE_LABEL,
+    SPRINGER_PREVIEW_PHRASE,
+)
 from ..utils import dedupe_authors, normalize_text
-from ._html_asset_engine import HtmlAssetExtractionPolicy, extract_scoped_assets_with_policy
+from ._html_asset_engine import (
+    HtmlAssetExtractionPolicy,
+    extract_scoped_assets_with_policy,
+)
 from ._html_authors import (
     AuthorExtractionPipeline,
+    GENERIC_AUTHOR_NOISE_TEXT,
     extract_jsonld_authors as extract_common_jsonld_authors,
     extract_meta_authors as extract_common_meta_authors,
     extract_selector_authors as extract_common_selector_authors,
@@ -49,7 +73,10 @@ from .html_springer_nature import (
     select_nature_abstract_section,
     select_springer_nature_article_root,
 )
-from ._html_section_markdown import render_clean_text_from_html
+from ._html_section_markdown import (
+    FIGURE_ACTION_TRAILING_LINK_PATTERN as SPRINGER_FIGURE_TRAILING_LINK_PATTERN,
+    render_clean_text_from_html,
+)
 
 try:
     from bs4 import BeautifulSoup, Tag
@@ -60,23 +87,28 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
 SPRINGER_MEDIA_SIZE_SEGMENT_PATTERN = re.compile(r"^(?:lw|w|m|h)\d+(?:h\d+)?$")
 SPRINGER_INLINE_FIGURE_SELECTORS = (".c-article-section__figure-item",)
 SPRINGER_FIGURE_DESCRIPTION_SELECTORS = (".c-article-section__figure-description",)
-SPRINGER_FIGURE_LABEL_PATTERN = re.compile(r"\bfigure\s+(\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
-SPRINGER_FIGURE_PAGE_NUMBER_PATTERN = re.compile(r"/figures/(\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
-SPRINGER_INLINE_EQUATION_URL_PATTERN = re.compile(r"(?:ieq|math)[-_]?\d+", flags=re.IGNORECASE)
+# Springer figure headings are extracted from captions, alt text, and page URLs;
+# keep the caption regex provider-scoped while deriving its core label syntax.
+SPRINGER_FIGURE_LABEL_PATTERN = re.compile(
+    rf"\b{FIGURE_LABEL_CORE_PATTERN}\b",
+    flags=re.IGNORECASE,
+)
+SPRINGER_FIGURE_PAGE_NUMBER_PATTERN = re.compile(
+    r"/figures/(\d+[A-Za-z]?)\b", flags=re.IGNORECASE
+)
+SPRINGER_INLINE_EQUATION_URL_PATTERN = re.compile(
+    r"(?:ieq|math)[-_]?\d+", flags=re.IGNORECASE
+)
 SPRINGER_SUPPLEMENTARY_HOST_TOKENS = (
     "static-content.springer.com/esm/",
     "/mediaobjects/",
 )
 SPRINGER_PREVIEW_SENTENCE_PATTERN = re.compile(
-    r"\bthis is a preview of subscription content\b[,.!;:]*",
+    rf"\b{re.escape(SPRINGER_PREVIEW_PHRASE)}\b[,.!;:]*",
     flags=re.IGNORECASE,
 )
 SPRINGER_PREVIEW_MARKDOWN_LINE_PATTERN = re.compile(
-    r"(?im)^[ \t>*-]*this is a preview of subscription content[,.!;:]*\s*$\n?",
-)
-SPRINGER_FIGURE_TRAILING_LINK_PATTERN = re.compile(
-    r"\b(?:PowerPoint slide|Full size image)\b.*$",
-    flags=re.IGNORECASE,
+    rf"(?im)^[ \t>*-]*{re.escape(SPRINGER_PREVIEW_PHRASE)}[,.!;:]*\s*$\n?",
 )
 SPRINGER_AI_ALT_DISCLAIMER_ID_TOKEN = "ai-alt-disclaimer"
 SPRINGER_ARTICLE_JSONLD_TYPES = frozenset(
@@ -89,25 +121,22 @@ SPRINGER_ARTICLE_JSONLD_TYPES = frozenset(
     }
 )
 SPRINGER_IGNORED_AUTHOR_TEXT = {
-    "authors",
-    "author information",
+    *GENERIC_AUTHOR_NOISE_TEXT,
     "authors and affiliations",
     "view author information",
 }
+SPRINGER_NON_SUPPLEMENTARY_BACK_MATTER_HEADINGS = BACK_MATTER_HEADINGS - SUPPLEMENTARY_BACK_MATTER_HEADINGS
+# BACK_MATTER_HEADINGS also includes references, acknowledgements, disclosures,
+# and similar prose sections; those are not downloadable supplementary scopes.
 SPRINGER_SUPPLEMENTARY_SECTION_TITLES = frozenset(
-    {
-        "electronic supplementary material",
-        "supplementary material",
-        "supplementary materials",
-        "supplementary information",
-        "supporting information",
-        "extended data",
-        "extended data figures and tables",
-    }
+    (BACK_MATTER_HEADINGS | {EXTENDED_DATA_LABEL, f"{EXTENDED_DATA_LABEL} figures and tables"})
+    - SPRINGER_NON_SUPPLEMENTARY_BACK_MATTER_HEADINGS
 )
-SPRINGER_EXTENDED_DATA_SECTION_TITLES = frozenset({"extended data", "extended data figures and tables"})
-SPRINGER_SOURCE_DATA_SECTION_TITLES = frozenset({"source data"})
-SPRINGER_SOURCE_DATA_TITLE_PREFIX = "source data"
+SPRINGER_EXTENDED_DATA_SECTION_TITLES = frozenset(
+    {EXTENDED_DATA_LABEL, f"{EXTENDED_DATA_LABEL} figures and tables"}
+)
+SPRINGER_SOURCE_DATA_SECTION_TITLES = frozenset({SPRINGER_NATURE_SOURCE_DATA_LABEL})
+SPRINGER_SOURCE_DATA_TITLE_PREFIX = SPRINGER_NATURE_SOURCE_DATA_LABEL
 SPRINGER_PEER_REVIEW_TOKENS = (
     "peer review",
     "peer reviewer report",
@@ -133,13 +162,21 @@ def _normalize_display_author_name(name: str) -> str:
         return normalized
     if not (looks_like_author_name(left) and looks_like_author_name(right)):
         return normalized
-    if _looks_like_collective_author_text(left) or _looks_like_collective_author_text(right):
+    if _looks_like_collective_author_text(left) or _looks_like_collective_author_text(
+        right
+    ):
         return normalized
     return normalize_text(f"{right} {left}")
 
 
 def _normalize_display_authors(authors: list[str]) -> list[str]:
-    return dedupe_authors([_normalize_display_author_name(author) for author in authors if normalize_text(author)])
+    return dedupe_authors(
+        [
+            _normalize_display_author_name(author)
+            for author in authors
+            if normalize_text(author)
+        ]
+    )
 
 
 def normalize_display_authors(authors: list[str]) -> list[str]:
@@ -147,7 +184,9 @@ def normalize_display_authors(authors: list[str]) -> list[str]:
 
 
 def _extract_meta_authors(html_text: str) -> list[str]:
-    return _normalize_display_authors(extract_common_meta_authors(html_text, keys={"citation_author"}))
+    return _normalize_display_authors(
+        extract_common_meta_authors(html_text, keys={"citation_author"})
+    )
 
 
 def _extract_jsonld_authors(html_text: str) -> list[str]:
@@ -161,7 +200,11 @@ def _extract_jsonld_authors(html_text: str) -> list[str]:
 
 
 def _node_author_text(node: Any) -> str:
-    return normalize_text(node.get_text(" ", strip=True)) if Tag is not None and isinstance(node, Tag) else ""
+    return (
+        normalize_text(node.get_text(" ", strip=True))
+        if Tag is not None and isinstance(node, Tag)
+        else ""
+    )
 
 
 def _extract_dom_authors(html_text: str) -> list[str]:
@@ -199,7 +242,11 @@ def parse_html_metadata(html_text: str, source_url: str):
     if abstract and is_springer_nature_url(source_url):
         metadata["abstract"] = clean_springer_nature_text_fragment(abstract)
     metadata["authors"] = _normalize_display_authors(
-        [normalize_text(str(item)) for item in (metadata.get("authors") or []) if normalize_text(str(item))]
+        [
+            normalize_text(str(item))
+            for item in (metadata.get("authors") or [])
+            if normalize_text(str(item))
+        ]
     )
     return metadata
 
@@ -226,12 +273,16 @@ def _clean_springer_preview_markdown(markdown_text: str) -> str:
     return clean_markdown(cleaned)
 
 
-def _clean_springer_abstract_sections(sections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _clean_springer_abstract_sections(
+    sections: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     cleaned_sections: list[dict[str, Any]] = []
     for section in sections:
         cleaned_section = dict(section)
         if cleaned_section.get("text") is not None:
-            cleaned_section["text"] = _clean_springer_preview_fragment(str(cleaned_section.get("text") or ""))
+            cleaned_section["text"] = _clean_springer_preview_fragment(
+                str(cleaned_section.get("text") or "")
+            )
         cleaned_sections.append(cleaned_section)
     return cleaned_sections
 
@@ -255,16 +306,26 @@ def _springer_is_figure_or_illustration_context(node: Any) -> bool:
     current = node
     while Tag is not None and isinstance(current, Tag):
         context_text = _springer_node_context_text(current)
-        if current.name == "figure" or "figure" in context_text or "illustration" in context_text:
+        if (
+            current.name == "figure"
+            or "figure" in context_text
+            or "illustration" in context_text
+        ):
             return True
-        current = current.parent if isinstance(getattr(current, "parent", None), Tag) else None
+        current = (
+            current.parent
+            if isinstance(getattr(current, "parent", None), Tag)
+            else None
+        )
     return False
 
 
 def _strip_ai_alt_disclaimer_references(root: Any) -> None:
     if Tag is None or not isinstance(root, Tag):
         return
-    for node in root.select(f"[aria-describedby*='{SPRINGER_AI_ALT_DISCLAIMER_ID_TOKEN}']"):
+    for node in root.select(
+        f"[aria-describedby*='{SPRINGER_AI_ALT_DISCLAIMER_ID_TOKEN}']"
+    ):
         if not isinstance(node, Tag):
             continue
         described_by = normalize_text(str(node.get("aria-describedby") or ""))
@@ -302,7 +363,11 @@ def _normalized_root_html(html_text: str) -> tuple[str, Any]:
     if BeautifulSoup is None:
         return html_text, None
     soup = BeautifulSoup(html_text, choose_parser())
-    root = select_springer_nature_article_root(soup) or soup.select_one("article") or soup.select_one("main")
+    root = (
+        select_springer_nature_article_root(soup)
+        or soup.select_one("article")
+        or soup.select_one("main")
+    )
     if root is None:
         root = soup.body or soup
     candidate_soup = BeautifulSoup(str(root), choose_parser())
@@ -327,17 +392,26 @@ def extract_html_extraction_sidecars(
         }
     if is_nature_url(source_url):
         article_root = select_springer_nature_article_root(active_root) or active_root
-        body_root = article_root.select_one("div.c-article-body") if isinstance(article_root, Tag) else None
+        body_root = (
+            article_root.select_one("div.c-article-body")
+            if isinstance(article_root, Tag)
+            else None
+        )
         abstract_node = select_nature_abstract_section(body_root or article_root)
         if isinstance(abstract_node, Tag):
-            content_root = abstract_node.select_one("div.c-article-section__content") or abstract_node
+            content_root = (
+                abstract_node.select_one("div.c-article-section__content")
+                or abstract_node
+            )
             abstract_text = render_clean_text_from_html(content_root)
             abstract_sections = (
                 [
                     {
                         "heading": "Abstract",
                         "text": abstract_text,
-                        "language": html_node_language_hint(abstract_node, allow_soft_hints=True),
+                        "language": html_node_language_hint(
+                            abstract_node, allow_soft_hints=True
+                        ),
                         "kind": "abstract",
                         "order": 0,
                         "source_selector": "section",
@@ -347,16 +421,22 @@ def extract_html_extraction_sidecars(
                 else []
             )
         else:
-            abstract_sections = _clean_springer_abstract_sections(collect_html_abstract_blocks(active_root))
+            abstract_sections = _clean_springer_abstract_sections(
+                collect_html_abstract_blocks(active_root)
+            )
     else:
-        abstract_sections = _clean_springer_abstract_sections(collect_html_abstract_blocks(active_root))
+        abstract_sections = _clean_springer_abstract_sections(
+            collect_html_abstract_blocks(active_root)
+        )
     return {
         "cleaned_html": cleaned_html,
         "abstract_sections": abstract_sections,
         "section_hints": collect_html_section_hints(
             active_root,
             title=title,
-            language_hint_resolver=lambda node: html_node_language_hint(node, allow_soft_hints=True),
+            language_hint_resolver=lambda node: html_node_language_hint(
+                node, allow_soft_hints=True
+            ),
         ),
     }
 
@@ -382,7 +462,9 @@ def extract_html_payload(
     *,
     title: str | None = None,
 ) -> dict[str, Any]:
-    extraction_sidecars = extract_html_extraction_sidecars(html_text, source_url, title=title)
+    extraction_sidecars = extract_html_extraction_sidecars(
+        html_text, source_url, title=title
+    )
     markdown_text = _clean_springer_preview_markdown(
         extract_article_markdown(extraction_sidecars["cleaned_html"], source_url)
     )
@@ -406,11 +488,15 @@ def extract_asset_html_scopes(
 ) -> tuple[str, str]:
     cleaned_html, active_root = _normalized_root_html(html_text)
     if active_root is None:
-        extraction_sidecars = extract_html_extraction_sidecars(html_text, source_url, title=title)
+        extraction_sidecars = extract_html_extraction_sidecars(
+            html_text, source_url, title=title
+        )
         cleaned_html = str(extraction_sidecars["cleaned_html"] or "")
         return cleaned_html, ""
 
-    body_html, supplementary_html, _ = _extract_asset_html_scope_fragments(cleaned_html, active_root)
+    body_html, supplementary_html, _ = _extract_asset_html_scope_fragments(
+        cleaned_html, active_root
+    )
     return body_html, supplementary_html
 
 
@@ -422,10 +508,14 @@ def extract_source_data_html_scope(
 ) -> str:
     cleaned_html, active_root = _normalized_root_html(html_text)
     if active_root is None:
-        extraction_sidecars = extract_html_extraction_sidecars(html_text, source_url, title=title)
+        extraction_sidecars = extract_html_extraction_sidecars(
+            html_text, source_url, title=title
+        )
         return str(extraction_sidecars["cleaned_html"] or "")
 
-    _, _, source_data_html = _extract_asset_html_scope_fragments(cleaned_html, active_root)
+    _, _, source_data_html = _extract_asset_html_scope_fragments(
+        cleaned_html, active_root
+    )
     return source_data_html
 
 
@@ -448,7 +538,11 @@ def _springer_is_descendant_of(node: Any, ancestor: Any) -> bool:
     while isinstance(current, Tag):
         if current is ancestor:
             return True
-        current = current.parent if isinstance(getattr(current, "parent", None), Tag) else None
+        current = (
+            current.parent
+            if isinstance(getattr(current, "parent", None), Tag)
+            else None
+        )
     return False
 
 
@@ -491,11 +585,17 @@ def _springer_collect_asset_sections(article_root: Any) -> tuple[list[Any], list
 
 
 def _springer_merge_scope_fragments(nodes: list[Any]) -> str:
-    fragments = [str(node) for node in nodes if isinstance(node, Tag) and normalize_text(str(node))]
+    fragments = [
+        str(node)
+        for node in nodes
+        if isinstance(node, Tag) and normalize_text(str(node))
+    ]
     return "\n".join(fragments)
 
 
-def _extract_asset_html_scope_fragments(cleaned_html: str, active_root: Any) -> tuple[str, str, str]:
+def _extract_asset_html_scope_fragments(
+    cleaned_html: str, active_root: Any
+) -> tuple[str, str, str]:
     article_root = select_springer_nature_article_root(active_root) or active_root
     if isinstance(article_root, Tag):
         body_root = (
@@ -512,7 +612,9 @@ def _extract_asset_html_scope_fragments(cleaned_html: str, active_root: Any) -> 
     )
     body_html = str(body_root) if isinstance(body_root, Tag) else cleaned_html
     supplementary_html = _springer_merge_scope_fragments(supplementary_sections)
-    source_data_html = _springer_merge_scope_fragments([*supplementary_sections, *source_data_sections])
+    source_data_html = _springer_merge_scope_fragments(
+        [*supplementary_sections, *source_data_sections]
+    )
     return body_html, supplementary_html, source_data_html
 
 
@@ -530,7 +632,9 @@ def _springer_figure_caption(node: Any, soup: Any) -> str:
         if described_by:
             described_node = soup.find(id=described_by)
             if isinstance(described_node, Tag):
-                caption = _clean_springer_asset_caption(described_node.get_text(" ", strip=True))
+                caption = _clean_springer_asset_caption(
+                    described_node.get_text(" ", strip=True)
+                )
                 if caption:
                     return caption
     for context in (node, node.parent if isinstance(node.parent, Tag) else None):
@@ -539,7 +643,9 @@ def _springer_figure_caption(node: Any, soup: Any) -> str:
         for selector in SPRINGER_FIGURE_DESCRIPTION_SELECTORS:
             description = context.select_one(selector)
             if isinstance(description, Tag):
-                caption = _clean_springer_asset_caption(description.get_text(" ", strip=True))
+                caption = _clean_springer_asset_caption(
+                    description.get_text(" ", strip=True)
+                )
                 if caption:
                     return caption
     return ""
@@ -563,7 +669,7 @@ def _springer_figure_page_url(node: Any, source_url: str) -> str:
                     normalize_text(str(anchor.get("title") or "")).lower(),
                 ]
             )
-            if "full size image" in hint_blob or "/figures/" in href:
+            if SPRINGER_FULL_SIZE_IMAGE_LABEL in hint_blob or "/figures/" in href:
                 return urllib.parse.urljoin(source_url, href)
     return ""
 
@@ -575,12 +681,18 @@ def _springer_figure_heading(
     alt_text: str,
 ) -> str:
     for candidate in (caption, alt_text):
+        match = SPRINGER_FIGURE_LABEL_PATTERN.match(normalize_text(candidate))
+        if match:
+            return f"Figure {match.group(1)}"
+    page_match = SPRINGER_FIGURE_PAGE_NUMBER_PATTERN.search(
+        normalize_text(figure_page_url)
+    )
+    if page_match:
+        return f"Figure {page_match.group(1)}"
+    for candidate in (caption, alt_text):
         match = SPRINGER_FIGURE_LABEL_PATTERN.search(normalize_text(candidate))
         if match:
             return f"Figure {match.group(1)}"
-    page_match = SPRINGER_FIGURE_PAGE_NUMBER_PATTERN.search(normalize_text(figure_page_url))
-    if page_match:
-        return f"Figure {page_match.group(1)}"
     return caption[:80] or alt_text or "Figure"
 
 
@@ -629,7 +741,15 @@ def promote_springer_media_url_to_full_size(url: str | None) -> str | None:
         return None
     size_segment, remainder = segments
     if size_segment == "full":
-        return urllib.parse.urlunsplit((parsed.scheme or "https", parsed.netloc, path, parsed.query, parsed.fragment))
+        return urllib.parse.urlunsplit(
+            (
+                parsed.scheme or "https",
+                parsed.netloc,
+                path,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
     if not SPRINGER_MEDIA_SIZE_SEGMENT_PATTERN.match(size_segment):
         return None
     if "/springer-static/" not in f"/{remainder}":
@@ -651,7 +771,9 @@ def extract_full_size_figure_image_url(html_text: str, source_url: str) -> str |
     if isinstance(raw_meta, Mapping):
         for key in ("twitter:image", "twitter:image:src", "og:image"):
             for value in raw_meta.get(key, []):
-                candidate = urllib.parse.urljoin(source_url, normalize_text(str(value or "")))
+                candidate = urllib.parse.urljoin(
+                    source_url, normalize_text(str(value or ""))
+                )
                 if candidate:
                     return candidate
     if BeautifulSoup is None:
@@ -679,7 +801,9 @@ def extract_full_size_figure_image_url(html_text: str, source_url: str) -> str |
         if looks_like_full_size_asset_url(absolute_candidate.lower()):
             return absolute_candidate
         if promoted_candidate is None:
-            promoted_candidate = promote_springer_media_url_to_full_size(absolute_candidate)
+            promoted_candidate = promote_springer_media_url_to_full_size(
+                absolute_candidate
+            )
         if fallback_candidate is None:
             fallback_candidate = absolute_candidate
     return promoted_candidate or fallback_candidate
@@ -718,22 +842,39 @@ def extract_figure_assets(html_text: str, source_url: str) -> list[dict[str, str
         source = node.find("source")
         preview_url = _soup_attr_url(image, *PREVIEW_IMAGE_ATTRS) if image else ""
         if not preview_url:
-            preview_url = _soup_attr_url(source, "srcset", "data-srcset") if source else ""
+            preview_url = (
+                _soup_attr_url(source, "srcset", "data-srcset") if source else ""
+            )
         full_size_url = _soup_attr_url(image, *FULL_SIZE_IMAGE_ATTRS) if image else ""
         if not full_size_url:
-            full_size_url = _soup_attr_url(source, *FULL_SIZE_IMAGE_ATTRS) if source else ""
-        absolute_preview = urllib.parse.urljoin(source_url, preview_url) if preview_url else ""
-        absolute_full = urllib.parse.urljoin(source_url, full_size_url) if full_size_url else ""
+            full_size_url = (
+                _soup_attr_url(source, *FULL_SIZE_IMAGE_ATTRS) if source else ""
+            )
+        absolute_preview = (
+            urllib.parse.urljoin(source_url, preview_url) if preview_url else ""
+        )
+        absolute_full = (
+            urllib.parse.urljoin(source_url, full_size_url) if full_size_url else ""
+        )
         promoted_preview = promote_springer_media_url_to_full_size(absolute_preview)
         figure_page_url = _springer_figure_page_url(node, source_url)
         caption = _springer_figure_caption(node, soup)
-        alt_text = normalize_text(str(image.get("alt") or "")) if isinstance(image, Tag) else ""
+        alt_text = (
+            normalize_text(str(image.get("alt") or ""))
+            if isinstance(image, Tag)
+            else ""
+        )
         heading = _springer_figure_heading(
             figure_page_url,
             caption=caption,
             alt_text=alt_text,
         )
-        if not absolute_preview and not absolute_full and not figure_page_url and not caption:
+        if (
+            not absolute_preview
+            and not absolute_full
+            and not figure_page_url
+            and not caption
+        ):
             continue
         asset = {
             "kind": "figure",
@@ -758,15 +899,21 @@ def extract_figure_assets(html_text: str, source_url: str) -> list[dict[str, str
         if existing is None:
             assets_by_key[key] = asset
         else:
-            if _springer_figure_asset_score(asset) > _springer_figure_asset_score(existing):
+            if _springer_figure_asset_score(asset) > _springer_figure_asset_score(
+                existing
+            ):
                 preserved_path = existing.get("path")
                 existing.clear()
                 existing.update(asset)
                 if preserved_path and not existing.get("path"):
                     existing["path"] = preserved_path
-            if len(normalize_text(asset.get("caption") or "")) > len(normalize_text(existing.get("caption") or "")):
+            if len(normalize_text(asset.get("caption") or "")) > len(
+                normalize_text(existing.get("caption") or "")
+            ):
                 existing["caption"] = asset["caption"]
-            if len(normalize_text(asset.get("heading") or "")) > len(normalize_text(existing.get("heading") or "")):
+            if len(normalize_text(asset.get("heading") or "")) > len(
+                normalize_text(existing.get("heading") or "")
+            ):
                 existing["heading"] = asset["heading"]
             if asset.get("full_size_url") and not existing.get("full_size_url"):
                 existing["full_size_url"] = asset["full_size_url"]
@@ -776,13 +923,21 @@ def extract_figure_assets(html_text: str, source_url: str) -> list[dict[str, str
     return deduped_assets or extract_generic_figure_assets(html_text, source_url)
 
 
-def extract_supplementary_assets(html_text: str, source_url: str) -> list[dict[str, str]]:
+def extract_supplementary_assets(
+    html_text: str, source_url: str
+) -> list[dict[str, str]]:
     if BeautifulSoup is None:
-        return extract_generic_supplementary_assets(html_text, source_url, noise_profile="springer_nature")
+        return extract_generic_supplementary_assets(
+            html_text, source_url, noise_profile="springer_nature"
+        )
     assets: list[dict[str, str]] = []
-    for asset in extract_generic_supplementary_assets(html_text, source_url, noise_profile="springer_nature"):
+    for asset in extract_generic_supplementary_assets(
+        html_text, source_url, noise_profile="springer_nature"
+    ):
         heading = normalize_text(str(asset.get("heading") or ""))
-        if _springer_asset_is_source_data(heading) or _springer_asset_is_peer_review(heading):
+        if _springer_asset_is_source_data(heading) or _springer_asset_is_peer_review(
+            heading
+        ):
             continue
         assets.append(dict(asset))
     return _dedupe_springer_supplementary_assets(assets)
@@ -827,7 +982,10 @@ def _anchor_text_candidates(anchor: Any) -> list[str]:
 
 
 def _anchor_mentions_source_data(anchor: Any) -> bool:
-    return any(_springer_asset_is_source_data(candidate) for candidate in _anchor_text_candidates(anchor))
+    return any(
+        _springer_asset_is_source_data(candidate)
+        for candidate in _anchor_text_candidates(anchor)
+    )
 
 
 def _anchor_target_id(anchor: Any) -> str:
@@ -846,19 +1004,26 @@ def extract_source_data_assets(html_text: str, source_url: str) -> list[dict[str
 
     soup = BeautifulSoup(html_text, choose_parser())
     root = soup.body or soup
-    supplementary_sections, source_data_sections = _springer_collect_asset_sections(root)
+    supplementary_sections, source_data_sections = _springer_collect_asset_sections(
+        root
+    )
     assets: list[dict[str, str]] = []
 
     for section in source_data_sections:
         assets.extend(
             _mark_source_data_assets(
-                extract_generic_supplementary_assets(str(section), source_url, noise_profile="springer_nature")
+                extract_generic_supplementary_assets(
+                    str(section), source_url, noise_profile="springer_nature"
+                )
             )
         )
 
     for section in supplementary_sections:
         title_key = _springer_section_title_key(section)
-        if normalize_section_title(title_key) not in SPRINGER_EXTENDED_DATA_SECTION_TITLES:
+        if (
+            normalize_section_title(title_key)
+            not in SPRINGER_EXTENDED_DATA_SECTION_TITLES
+        ):
             continue
         for anchor in section.find_all("a", href=True):
             if not isinstance(anchor, Tag) or not _anchor_mentions_source_data(anchor):
@@ -879,7 +1044,9 @@ def extract_source_data_assets(html_text: str, source_url: str) -> list[dict[str
                 continue
             assets.extend(
                 _mark_source_data_assets(
-                    extract_generic_supplementary_assets(str(anchor), source_url, noise_profile="springer_nature")
+                    extract_generic_supplementary_assets(
+                        str(anchor), source_url, noise_profile="springer_nature"
+                    )
                 )
             )
 
@@ -887,7 +1054,14 @@ def extract_source_data_assets(html_text: str, source_url: str) -> list[dict[str
 
 
 def _springer_asset_identity(asset: Mapping[str, Any]) -> str:
-    for field in ("figure_page_url", "full_size_url", "preview_url", "download_url", "url", "source_url"):
+    for field in (
+        "figure_page_url",
+        "full_size_url",
+        "preview_url",
+        "download_url",
+        "url",
+        "source_url",
+    ):
         candidate = normalize_text(str(asset.get(field) or ""))
         if candidate:
             return candidate
@@ -1004,7 +1178,10 @@ def figure_download_candidates(
                 response = transport.request(
                     "GET",
                     figure_page_url,
-                    headers={"User-Agent": user_agent, "Accept": "text/html,application/xhtml+xml"},
+                    headers={
+                        "User-Agent": user_agent,
+                        "Accept": "text/html,application/xhtml+xml",
+                    },
                     timeout=20,
                     retry_on_rate_limit=True,
                     retry_on_transient=True,

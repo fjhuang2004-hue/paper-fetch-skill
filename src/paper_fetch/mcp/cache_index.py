@@ -11,6 +11,7 @@ from typing import Any
 from filelock import FileLock
 
 from ..artifacts import ArtifactStore
+from ..http.content_types import STRUCTURED_TEXT_MIME_TYPES, content_type_base
 from ..utils import sanitize_filename
 
 INDEX_FILENAME = ".paper-fetch-mcp-cache.json"
@@ -25,9 +26,7 @@ SCOPED_CACHED_RESOURCE_URI_PREFIX = "resource://paper-fetch/cached-dir/"
 SCOPED_CACHED_RESOURCE_TEMPLATE = "resource://paper-fetch/cached-dir/{scope_id}/{entry_id}"
 
 _TEXT_MIME_TYPES = {
-    "application/json",
-    "application/xml",
-    "application/jats+xml",
+    *STRUCTURED_TEXT_MIME_TYPES,
     "image/svg+xml",
 }
 
@@ -76,7 +75,7 @@ def scoped_cached_resource_uri_prefix(scope_id: str) -> str:
 
 
 def is_text_mime_type(mime_type: str | None) -> bool:
-    normalized = (mime_type or "").split(";", 1)[0].strip().lower()
+    normalized = content_type_base(mime_type)
     return normalized.startswith("text/") or normalized in _TEXT_MIME_TYPES
 
 

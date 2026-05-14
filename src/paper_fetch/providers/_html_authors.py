@@ -28,6 +28,17 @@ COMMON_COLLECTIVE_AUTHOR_TOKENS = frozenset(
         "team",
     }
 )
+ATYPON_VIEW_ALL_ARTICLES_LABEL = "view all articles by this author"
+GENERIC_AUTHOR_NOISE_TEXT = frozenset({"authors", "author information"})
+ATYPON_AUTHOR_NOISE_TEXT = frozenset(
+    {
+        "authors info & affiliations",
+        "orcid",
+        ATYPON_VIEW_ALL_ARTICLES_LABEL,
+    }
+)
+ATYPON_AUTHOR_COLLAPSE_UI_TEXT = frozenset({"expand all", "collapse all", "fewer"})
+ATYPON_AUTHOR_COUNT_PATTERN = re.compile(r"^\+\s*\d+\s+authors?$", flags=re.IGNORECASE)
 
 
 class AuthorExtractionPipeline:

@@ -22,7 +22,9 @@ PUBLISHER_PROVIDER_MAP = {
     for alias in spec.publisher_aliases
 }
 DOI_PREFIX_PROVIDER_MAP = doi_prefix_provider_map()
-DOI_PATTERN = re.compile(r"10\.\d{4,9}/[^\s\"'<>]+", flags=re.IGNORECASE)
+DOI_CORE_PATTERN = r"10\.\d{4,9}/[^\s\"'<>]+"
+ASCII_DOI_CORE_PATTERN = r"10\.\d{4,9}/[!-~]+"
+DOI_PATTERN = re.compile(DOI_CORE_PATTERN, flags=re.IGNORECASE)
 DOI_DASH_TRANSLATION = str.maketrans(
     {
         "‐": "-",

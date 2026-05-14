@@ -5,6 +5,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Mapping, cast
 
+from ..http import PDF_MIME_TYPE
 from ..metadata.types import ProviderMetadata
 from ..providers.base import ProviderFailure
 from ..providers.protocols import MetadataProvider
@@ -108,7 +109,7 @@ def metadata_from_resolution(resolved) -> ProviderMetadata:
 def _citation_pdf_link(url: str) -> dict[str, Any]:
     return {
         "url": url,
-        "content_type": "application/pdf",
+        "content_type": PDF_MIME_TYPE,
         "content_version": None,
         "intended_application": "full_text",
     }

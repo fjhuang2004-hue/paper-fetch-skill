@@ -14,6 +14,7 @@ from ..models import ArticleModel, AssetProfile
 from ..runtime import RuntimeContext
 from ..tracing import TraceEvent, download_marker, source_trail_from_trace, trace_from_markers
 from ..utils import empty_asset_results, normalize_text, provider_display_name
+from ..reason_codes import ERROR, NO_ACCESS, NO_RESULT, NOT_CONFIGURED, NOT_SUPPORTED, OK, PARTIAL, RATE_LIMITED, READY
 
 
 class ProviderFailure(Exception):
@@ -255,7 +256,7 @@ def provider_status_check_from_failure(
     *,
     details: Mapping[str, Any] | None = None,
 ) -> ProviderStatusCheck:
-    status = failure.code if failure.code in {"not_configured", "rate_limited"} else "error"
+    status = failure.code if failure.code in {NOT_CONFIGURED, RATE_LIMITED} else ERROR
     merged_details = dict(details or {})
     if failure.retry_after_seconds is not None:
         merged_details["retry_after_seconds"] = failure.retry_after_seconds
@@ -281,11 +282,11 @@ def summarize_capability_status(
     has_error = False
     has_rate_limit = False
     for check in checks:
-        if check.status == "ok":
+        if check.status == OK:
             ok_checks += 1
-        elif check.status == "error":
+        elif check.status == ERROR:
             has_error = True
-        elif check.status == "rate_limited":
+        elif check.status == RATE_LIMITED:
             has_rate_limit = True
         for name in check.missing_env:
             if name not in missing_env:
@@ -293,15 +294,15 @@ def summarize_capability_status(
 
     available = ok_checks > 0
     if has_error:
-        status = "error"
+        status = ERROR
     elif has_rate_limit and ok_checks == 0:
-        status = "rate_limited"
-    elif checks and all(check.status == "ok" for check in checks):
-        status = "ready"
+        status = RATE_LIMITED
+    elif checks and all(check.status == OK for check in checks):
+        status = READY
     elif available:
-        status = "partial"
+        status = PARTIAL
     else:
-        status = "not_configured"
+        status = NOT_CONFIGURED
 
     return ProviderStatusResult(
         provider=provider,
@@ -322,30 +323,30 @@ def map_request_failure(
 ) -> ProviderFailure:
     if exc.status_code in (no_result_status_codes or set()):
         message = normalize_text(str((no_result_messages or {}).get(exc.status_code) or "")) or str(exc)
-        return ProviderFailure("no_result", message)
+        return ProviderFailure(NO_RESULT, message)
     if exc.status_code in {401, 403}:
-        return ProviderFailure("no_access", str(exc))
+        return ProviderFailure(NO_ACCESS, str(exc))
     if exc.status_code == 404:
-        return ProviderFailure("no_result", str(exc))
+        return ProviderFailure(NO_RESULT, str(exc))
     if exc.status_code == 429:
-        return ProviderFailure("rate_limited", str(exc), retry_after_seconds=exc.retry_after_seconds)
+        return ProviderFailure(RATE_LIMITED, str(exc), retry_after_seconds=exc.retry_after_seconds)
     if exc.status_code in {400, 406, 422}:
-        return ProviderFailure("error", str(exc))
+        return ProviderFailure(ERROR, str(exc))
     if exc.status_code is None:
-        return ProviderFailure("error", str(exc))
+        return ProviderFailure(ERROR, str(exc))
     if exc.status_code >= 500:
-        return ProviderFailure("error", str(exc))
-    return ProviderFailure("error", str(exc))
+        return ProviderFailure(ERROR, str(exc))
+    return ProviderFailure(ERROR, str(exc))
 
 
 def combine_provider_failures(failures: list[tuple[str, ProviderFailure]]) -> ProviderFailure:
     priority = {
-        "no_access": 0,
-        "no_result": 1,
-        "rate_limited": 2,
-        "error": 3,
-        "not_configured": 4,
-        "not_supported": 5,
+        NO_ACCESS: 0,
+        NO_RESULT: 1,
+        RATE_LIMITED: 2,
+        ERROR: 3,
+        NOT_CONFIGURED: 4,
+        NOT_SUPPORTED: 5,
     }
     selected_label, selected_failure = min(
         failures,
@@ -386,7 +387,7 @@ class ProviderClient:
     official_provider = True
 
     def fetch_metadata(self, query: Mapping[str, str | None]) -> dict[str, Any]:
-        raise ProviderFailure("not_supported", f"{self.name} metadata retrieval is not available.")
+        raise ProviderFailure(NOT_SUPPORTED, f"{self.name} metadata retrieval is not available.")
 
     def fetch_result(
         self,
@@ -640,7 +641,7 @@ class ProviderClient:
         context: RuntimeContext | None = None,
     ) -> RawFulltextPayload:
         del context
-        raise ProviderFailure("not_supported", f"{self.name} raw full-text retrieval is not available.")
+        raise ProviderFailure(NOT_SUPPORTED, f"{self.name} raw full-text retrieval is not available.")
 
     def to_article_model(
         self,
@@ -652,7 +653,7 @@ class ProviderClient:
         context: RuntimeContext | None = None,
     ):
         del context
-        raise ProviderFailure("not_supported", f"{self.name} article conversion is not available.")
+        raise ProviderFailure(NOT_SUPPORTED, f"{self.name} article conversion is not available.")
 
     def download_related_assets(
         self,
@@ -670,14 +671,14 @@ class ProviderClient:
     def probe_status(self) -> ProviderStatusResult:
         return ProviderStatusResult(
             provider=self.name,
-            status="error",
+            status=ERROR,
             available=False,
             official_provider=self.official_provider,
             notes=["Provider diagnostics are not implemented for this client."],
             checks=[
                 build_provider_status_check(
                     "diagnostics",
-                    "error",
+                    ERROR,
                     f"{self.name} provider diagnostics are not implemented.",
                 )
             ],

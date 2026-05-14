@@ -7,6 +7,8 @@ from typing import Any, Callable, Mapping
 from ....config import build_user_agent
 from ....runtime import RuntimeContext
 from ....utils import normalize_text
+from ..._pdf_candidates import BROWSER_WORKFLOW_PDF_URL_TOKENS
+from ....reason_codes import ERROR
 from .diagnostics import _compact_failure_diagnostic
 
 
@@ -14,10 +16,7 @@ def _looks_like_pdf_navigation_url(url: str | None) -> bool:
     normalized = normalize_text(url).lower()
     if not normalized:
         return False
-    return any(
-        token in normalized
-        for token in ("/doi/pdf", "/doi/pdfdirect", "/doi/epdf", "/fullpdf", ".pdf")
-    )
+    return any(token in normalized for token in BROWSER_WORKFLOW_PDF_URL_TOKENS)
 
 
 def _choose_playwright_seed_url(*candidates: str | None) -> str | None:
@@ -260,7 +259,7 @@ class _BasePlaywrightDocumentFetcher:
             recovery = self._challenge_recovery(normalized_url, asset, failure)
         except Exception as exc:
             recovery = {
-                "status": "error",
+                "status": ERROR,
                 "reason": normalize_text(str(exc)) or exc.__class__.__name__,
             }
         if not isinstance(recovery, Mapping):

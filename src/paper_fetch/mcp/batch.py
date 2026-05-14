@@ -12,6 +12,7 @@ from mcp.server.fastmcp import Context
 from mcp.types import CallToolResult
 
 from ..config import build_runtime_env as _build_runtime_env
+from ..reason_codes import RATE_LIMITED
 from ..runtime import RuntimeContext
 from .log_bridge import PaperFetchLogBridge
 from .results import _tool_result, error_payload_from_exception
@@ -144,7 +145,7 @@ def _run_batch_sync(
                 payload = error_payload_from_exception(error)
                 payload["query"] = query
                 results[index] = payload
-                if payload["status"] == "rate_limited":
+                if payload["status"] == RATE_LIMITED:
                     abort_reason = dict(payload)
                     break
         return [result for result in results if result is not None], abort_reason
@@ -171,7 +172,7 @@ def _run_batch_sync(
                     payload = error_payload_from_exception(error)
                     payload["query"] = query
                     results[index] = payload
-                    if payload["status"] == "rate_limited" and abort_reason is None:
+                    if payload["status"] == RATE_LIMITED and abort_reason is None:
                         abort_reason = dict(payload)
             while abort_reason is None and next_index < len(queries) and len(pending) < max_workers:
                 submit(next_index)
@@ -218,7 +219,7 @@ async def _run_batch_async(
                     payload = error_payload_from_exception(error)
                     payload["query"] = query
                     results[index] = payload
-                    if payload["status"] == "rate_limited" and abort_reason is None:
+                    if payload["status"] == RATE_LIMITED and abort_reason is None:
                         abort_reason = dict(payload)
                 completed += 1
                 await report_progress(

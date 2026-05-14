@@ -200,9 +200,11 @@ def dedupe_authors(authors: list[str]) -> list[str]:
 def extension_from_content_type(
     content_type: str | None, source_url: str | None = None
 ) -> str:
+    from .http.content_types import PDF_MIME_TYPE
+
     normalized = (content_type or "").split(";", 1)[0].strip().lower()
     known = {
-        "application/pdf": ".pdf",
+        PDF_MIME_TYPE: ".pdf",
         "text/plain": ".txt",
         "text/xml": ".xml",
         "application/xml": ".xml",

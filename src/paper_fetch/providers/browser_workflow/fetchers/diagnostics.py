@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from ....extraction.html.signals import (
+    CLOUDFLARE_CHALLENGE_TITLE_TOKENS as _CLOUDFLARE_CHALLENGE_TITLE_TOKENS,
+)
+from ....quality.reason_codes import CLOUDFLARE_CHALLENGE
 from ....utils import normalize_text
 from ..._flaresolverr import FetchedPublisherHtml
-
-_CLOUDFLARE_CHALLENGE_TITLE_TOKENS = (
-    "just a moment",
-    "attention required",
-    "checking your browser",
-)
 
 
 def _looks_like_cloudflare_challenge_title(title: str | None) -> bool:
@@ -31,7 +29,7 @@ def _looks_like_cloudflare_challenge_failure(failure: Mapping[str, Any] | None) 
     ).lower()
     body = normalize_text(str(failure.get("body_snippet") or "")).lower()
     return (
-        reason in {"cloudflare_challenge", "login_or_access_html"}
+        reason in {CLOUDFLARE_CHALLENGE, "login_or_access_html"}
         or _looks_like_cloudflare_challenge_title(title)
         or any(token in body for token in _CLOUDFLARE_CHALLENGE_TITLE_TOKENS)
     )

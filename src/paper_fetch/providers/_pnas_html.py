@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from functools import partial
 from typing import Any, Callable, Mapping
 
@@ -17,12 +16,12 @@ from ..extraction.html.provider_rules import (
     PNAS_SITE_RULE_OVERRIDES,
     provider_html_rules,
 )
-from ..quality.html_profiles import (
-    pnas_blocking_fallback_signals,
-    pnas_positive_signals,
-)
+from ..quality.html_profiles import pnas_blocking_fallback_signals
 from ..utils import normalize_text
 from ._html_authors import (
+    ATYPON_AUTHOR_COUNT_PATTERN,
+    ATYPON_AUTHOR_COLLAPSE_UI_TEXT,
+    ATYPON_AUTHOR_NOISE_TEXT,
     AuthorExtractionPipeline,
     extract_meta_authors,
     extract_property_authors,
@@ -36,18 +35,14 @@ PDF_PATH_TEMPLATES: tuple[str, ...] = provider_pdf_path_templates("pnas")
 CROSSREF_PDF_POSITION = provider_crossref_pdf_position("pnas")
 NOISE_PROFILE = provider_html_rules("pnas").noise_profile
 SITE_RULE_OVERRIDES: dict[str, Any] = PNAS_SITE_RULE_OVERRIDES
-PNAS_AUTHOR_COUNT_PATTERN = re.compile(r"^\+\s*\d+\s+authors?$", flags=re.IGNORECASE)
+PNAS_AUTHOR_COUNT_PATTERN = ATYPON_AUTHOR_COUNT_PATTERN
 PNAS_IGNORED_AUTHOR_TEXT = {
-    "authors info & affiliations",
-    "view all articles by this author",
-    "expand all",
-    "collapse all",
-    "orcid",
+    *ATYPON_AUTHOR_NOISE_TEXT,
+    *ATYPON_AUTHOR_COLLAPSE_UI_TEXT,
 }
 
 
-def blocking_fallback_signals(html_text: str) -> list[str]:
-    return pnas_blocking_fallback_signals(html_text)
+blocking_fallback_signals = pnas_blocking_fallback_signals
 
 
 def _extract_dom_authors(html_text: str) -> list[str]:
@@ -68,10 +63,6 @@ _AUTHOR_EXTRACTION_PIPELINE = AuthorExtractionPipeline(
 
 def extract_authors(html_text: str) -> list[str]:
     return _AUTHOR_EXTRACTION_PIPELINE(html_text)
-
-
-def positive_signals(html_text: str) -> tuple[list[str], list[str], list[str]]:
-    return pnas_positive_signals(html_text)
 
 
 def dom_postprocess(container: Any, *, stage: str | None = None) -> None:

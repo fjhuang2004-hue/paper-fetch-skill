@@ -5,7 +5,19 @@ from __future__ import annotations
 import re
 
 from ...utils import normalize_text
+from ...quality.reason_codes import (
+    ABSTRACT_ONLY,
+    CLOUDFLARE_CHALLENGE,
+    INSUFFICIENT_BODY,
+    PUBLISHER_ACCESS_DENIED,
+    PUBLISHER_NOT_FOUND,
+    PUBLISHER_PAYWALL,
+    REDIRECTED_TO_ABSTRACT,
+    STRUCTURED_ARTICLE_NOT_FULLTEXT,
+    STRUCTURED_MISSING_BODY_SECTIONS,
+)
 from .parsing import choose_parser
+from .ui_tokens import SPRINGER_PREVIEW_PHRASE
 
 try:
     from bs4 import BeautifulSoup
@@ -20,8 +32,69 @@ CHALLENGE_PATTERNS = (
     "attention required",
     "cloudflare",
 )
+CLOUDFLARE_CHALLENGE_TITLE_TOKENS = tuple(
+    token
+    for token in CHALLENGE_PATTERNS
+    if token in {"just a moment", "attention required", "checking your browser"}
+)
+ACCESS_DENIED_TOKEN = "access denied"
+LOGIN_GATE_TOKENS = ("sign in", "sign-in", "log in", "login")
+ACCESS_GATE_CHECK_ACCESS_LABEL = "check access"
+ACCESS_GATE_ACCESS_PROVIDED_BY_LABEL = "access provided by"
+ACCESS_GATE_BUY_NOW_LABEL = "buy now"
+ACCESS_GATE_VIEW_OPTIONS_LABEL = "view access options"
+ACCESS_GATE_INSTITUTIONAL_LOGIN_LABEL = "institutional login"
+ACCESS_GATE_LABELS = (
+    ACCESS_GATE_CHECK_ACCESS_LABEL,
+    ACCESS_GATE_ACCESS_PROVIDED_BY_LABEL,
+    ACCESS_GATE_BUY_NOW_LABEL,
+    ACCESS_GATE_VIEW_OPTIONS_LABEL,
+    ACCESS_GATE_INSTITUTIONAL_LOGIN_LABEL,
+)
+MARKDOWN_ACCESS_NOISE_LABELS = (
+    ACCESS_GATE_ACCESS_PROVIDED_BY_LABEL,
+    "buy article",
+    ACCESS_GATE_VIEW_OPTIONS_LABEL,
+    "you have full access to this",
+)
+MARKDOWN_SHORT_ACCESS_GATE_TOKENS = (
+    *LOGIN_GATE_TOKENS,
+    ACCESS_GATE_VIEW_OPTIONS_LABEL,
+    ACCESS_GATE_CHECK_ACCESS_LABEL,
+    ACCESS_GATE_BUY_NOW_LABEL,
+)
+COMMON_ACCESS_BLOCK_TOKENS = (
+    "unable to complete your request",
+    "your request has been blocked",
+    "verify you are human",
+    "captcha",
+    ACCESS_DENIED_TOKEN,
+)
+SUPPLEMENTARY_BLOCKING_TITLE_TOKENS = (
+    *CLOUDFLARE_CHALLENGE_TITLE_TOKENS,
+    *LOGIN_GATE_TOKENS,
+    ACCESS_DENIED_TOKEN,
+)
+SUPPLEMENTARY_BLOCKING_BODY_TOKENS = (
+    *(token for token in CHALLENGE_PATTERNS if token in {"checking your browser", "cloudflare"}),
+    "enable javascript and cookies",
+    "please sign in",
+    ACCESS_GATE_INSTITUTIONAL_LOGIN_LABEL,
+    ACCESS_DENIED_TOKEN,
+)
+ASSET_ACCESS_BLOCK_LABELS = (
+    "unauthorized",
+    "forbidden",
+    "authentication",
+    "authorization",
+    "permission",
+    ACCESS_DENIED_TOKEN,
+    "access gate",
+    "license",
+)
+ASSET_BLOCKING_REASON_TOKENS = ASSET_ACCESS_BLOCK_LABELS
 ACCESS_GATE_PATTERNS = (
-    "check access",
+    ACCESS_GATE_CHECK_ACCESS_LABEL,
     "purchase access",
     "purchase digital access to this article",
     "institutional access",
@@ -29,7 +102,7 @@ ACCESS_GATE_PATTERNS = (
     "login to your account",
     "subscribe to continue",
     "access through your institution",
-    "access provided by",
+    ACCESS_GATE_ACCESS_PROVIDED_BY_LABEL,
     "rent or buy",
     "purchase this article",
     "purchase article",
@@ -38,14 +111,13 @@ ACCESS_GATE_PATTERNS = (
     "get access",
     "access this article",
     "buy article pdf",
-    "buy now",
+    ACCESS_GATE_BUY_NOW_LABEL,
     "sign in to access",
-    "view access options",
+    ACCESS_GATE_VIEW_OPTIONS_LABEL,
     "view all access options to continue reading this article",
-    "institutional login",
+    ACCESS_GATE_INSTITUTIONAL_LOGIN_LABEL,
+    SPRINGER_PREVIEW_PHRASE,
 )
-ACCESS_GATE_PATTERN_MAP = ACCESS_GATE_PATTERNS
-PAYWALL_PATTERNS = ACCESS_GATE_PATTERNS
 NOT_FOUND_PATTERNS = (
     "doi not found",
     "page not found",
@@ -53,15 +125,15 @@ NOT_FOUND_PATTERNS = (
     "content not found",
 )
 FAILURE_MESSAGES = {
-    "cloudflare_challenge": "Encountered a challenge or CAPTCHA page while loading publisher HTML.",
-    "publisher_not_found": "Publisher page was not found for this DOI.",
-    "publisher_access_denied": "Publisher denied access to the full-text page.",
-    "publisher_paywall": "Publisher paywall or access gate detected on the page.",
-    "redirected_to_abstract": "Publisher redirected the full-text URL to an abstract page.",
-    "abstract_only": "Publisher HTML only exposed abstract-level content without article body text.",
-    "insufficient_body": "HTML extraction did not produce enough article body text.",
-    "structured_article_not_fulltext": "Structured full text did not indicate complete article availability.",
-    "structured_missing_body_sections": "Structured full text did not include article body sections beyond the abstract and references.",
+    CLOUDFLARE_CHALLENGE: "Encountered a challenge or CAPTCHA page while loading publisher HTML.",
+    PUBLISHER_NOT_FOUND: "Publisher page was not found for this DOI.",
+    PUBLISHER_ACCESS_DENIED: "Publisher denied access to the full-text page.",
+    PUBLISHER_PAYWALL: "Publisher paywall or access gate detected on the page.",
+    REDIRECTED_TO_ABSTRACT: "Publisher redirected the full-text URL to an abstract page.",
+    ABSTRACT_ONLY: "Publisher HTML only exposed abstract-level content without article body text.",
+    INSUFFICIENT_BODY: "HTML extraction did not produce enough article body text.",
+    STRUCTURED_ARTICLE_NOT_FULLTEXT: "Structured full text did not indicate complete article availability.",
+    STRUCTURED_MISSING_BODY_SECTIONS: "Structured full text did not include article body sections beyond the abstract and references.",
 }
 
 
@@ -105,19 +177,19 @@ def detect_html_access_signals(
 ) -> list[str]:
     signals: list[str] = []
     if redirected_to_abstract:
-        signals.append("redirected_to_abstract")
+        signals.append(REDIRECTED_TO_ABSTRACT)
 
     combined = normalize_text(" ".join([title, text])).lower()
     if any(pattern in combined for pattern in CHALLENGE_PATTERNS):
-        signals.append("cloudflare_challenge")
+        signals.append(CLOUDFLARE_CHALLENGE)
     if response_status == 404 or any(pattern in combined for pattern in NOT_FOUND_PATTERNS):
-        signals.append("publisher_not_found")
-    if response_status in {401, 402, 403} and "cloudflare_challenge" not in signals:
-        signals.append("publisher_access_denied")
+        signals.append(PUBLISHER_NOT_FOUND)
+    if response_status in {401, 402, 403} and CLOUDFLARE_CHALLENGE not in signals:
+        signals.append(PUBLISHER_ACCESS_DENIED)
     if explicit_no_access:
-        signals.append("publisher_access_denied")
+        signals.append(PUBLISHER_ACCESS_DENIED)
     if include_paywall_text and contains_access_gate_text(combined):
-        signals.append("publisher_paywall")
+        signals.append(PUBLISHER_PAYWALL)
     return list(dict.fromkeys(signals))
 
 

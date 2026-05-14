@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..reason_codes import ERROR, NO_ACCESS, RATE_LIMITED
+
 DEFAULT_FETCH_VALUES: tuple[tuple[str, str], ...] = (
     ("modes", '["article", "markdown"]'),
     ("strategy.asset_profile", "null (provider default)"),
@@ -24,8 +26,8 @@ SKILL_ENVIRONMENT_VARIABLES: tuple[tuple[str, str], ...] = (
     ("ELSEVIER_API_KEY", "Required for official Elsevier full-text access."),
     ("ELSEVIER_INSTTOKEN", "Optional institution token for Elsevier entitlement."),
     ("WILEY_TDM_CLIENT_TOKEN", "Optional Wiley Text and Data Mining client token for the official Wiley PDF lane; browser PDF/ePDF fallback can still run without it when the local runtime is ready."),
-    ("FLARESOLVERR_URL", "Optional override for the local Wiley/Science/PNAS FlareSolverr endpoint; defaults to http://127.0.0.1:8191/v1."),
-    ("FLARESOLVERR_ENV_FILE", "Required for Science/PNAS and for Wiley HTML/browser PDF routes; points at a repo-local vendor/flaresolverr preset file."),
+    ("FLARESOLVERR_URL", "Optional override for the local Wiley/Science/PNAS/AMS FlareSolverr endpoint; defaults to http://127.0.0.1:8191/v1."),
+    ("FLARESOLVERR_ENV_FILE", "Required for Science/PNAS/AMS and for Wiley HTML/browser PDF routes; points at a repo-local vendor/flaresolverr preset file."),
     ("FLARESOLVERR_SOURCE_DIR", "Optional override for the repo-local vendor/flaresolverr directory."),
     ("PAPER_FETCH_DOWNLOAD_DIR", "Overrides the default CLI/MCP download directory."),
     ("PAPER_FETCH_RUN_LIVE", "Test-only flag for live publisher integration checks."),
@@ -33,9 +35,9 @@ SKILL_ENVIRONMENT_VARIABLES: tuple[tuple[str, str], ...] = (
 
 ERROR_CONTRACT: tuple[tuple[str, str], ...] = (
     ("ambiguous", "Contains `candidates`; prompt the user to choose and retry."),
-    ("no_access", "Credentials or entitlements are missing; inspect `missing_env` when present, then retry."),
-    ("rate_limited", "Back off and retry later."),
-    ("error", "Any other failure; inspect `reason`."),
+    (NO_ACCESS, "Credentials or entitlements are missing; inspect `missing_env` when present, then retry."),
+    (RATE_LIMITED, "Back off and retry later."),
+    (ERROR, "Any other failure; inspect `reason`."),
 )
 
 
@@ -80,16 +82,16 @@ def server_instructions() -> str:
         "behaves like 'all'. When asset_profile is body/all, optional "
         "strategy.inline_image_budget can tune the default inline ImageContent caps of "
         "3 figures, 2 MiB each, and 8 MiB total. `provider_hint` and "
-        "`preferred_providers` may include `elsevier`, `springer`, `wiley`, `science`, `pnas`, `ieee`, `arxiv`, `copernicus`, or `crossref`. "
+        "`preferred_providers` may include `elsevier`, `springer`, `wiley`, `science`, `pnas`, `ams`, `ieee`, `arxiv`, `copernicus`, or `crossref`. "
         "`elsevier` keeps an official XML route first and may then fall back to the "
         "official Elsevier API PDF lane before degrading to metadata-only, publishing "
         "`elsevier_xml` on XML success and `elsevier_pdf` on PDF fallback success. `springer` keeps a provider-managed direct HTML route "
         "with direct HTTP PDF fallback, publishing `springer_html` on HTML success and `springer_pdf` on PDF fallback success. `wiley` keeps "
         "the repo-local FlareSolverr HTML route, then seeded-browser publisher PDF/ePDF "
         "fallback, and may still continue into the official Wiley TDM API PDF lane "
-        "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing `wiley_browser`. `science` "
-        "and `pnas` require repo-local FlareSolverr/browser runtime but no legacy local "
-        "rate-limit env vars, and keep their existing public source names. `ieee` uses "
+        "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing `wiley_browser`. `science`, "
+        "`pnas`, and `ams` require repo-local FlareSolverr/browser runtime but no legacy local "
+        "rate-limit env vars; AMS publishes `ams_html` or `ams_pdf` and ignores `citation_xml_url`. `ieee` uses "
         "landing metadata, the Xplore dynamic HTML endpoint, and direct HTTP PDF fallback, "
         "publishing `ieee_html` or `ieee_pdf` when those routes return usable full text. `arxiv` uses "
         "arXiv ID-derived HTML first, optional API/HTML metadata merge, and text-only PDF fallback while publishing "
@@ -100,7 +102,7 @@ def server_instructions() -> str:
         "`asset_profile` is `body` or `all`. On successful HTML/XML routes, "
         "`asset_profile='body'` means provider-cleaned body figure/table/formula assets only, "
         "while `asset_profile='all'` additionally downloads supplementary files. "
-        "Inline ImageContent still only comes from body figures. Wiley/Science/PNAS support "
+        "Inline ImageContent still only comes from body figures. Wiley/Science/PNAS/AMS support "
         "`asset_profile=body|all` on successful FlareSolverr HTML routes and "
         "prefer full-size/original figures before falling back to previews, while "
         "their PDF/ePDF fallback routes remain text-only. Springer, IEEE, arXiv, and Copernicus PDF fallback "
@@ -139,9 +141,9 @@ def fetch_tool_description() -> str:
         "repo-local FlareSolverr HTML first, then seeded-browser publisher PDF/ePDF "
         "fallback, and may still continue into the official Wiley TDM API PDF lane "
         "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing source "
-        "`wiley_browser` on success. `science` and `pnas` routes use "
+        "`wiley_browser` on success. `science`, `pnas`, and `ams` routes use "
         "provider-managed FlareSolverr HTML plus seeded-browser publisher PDF/ePDF repo-local "
-        "workflows and keep their existing public source names. `ieee` uses landing metadata, "
+        "workflows; AMS publishes `ams_html` or `ams_pdf` and does not request `citation_xml_url` / `/doc/...xml`. `ieee` uses landing metadata, "
         "the Xplore dynamic HTML endpoint, and direct HTTP PDF fallback while publishing "
         "`ieee_html` or `ieee_pdf`. `arxiv` uses ID-derived official HTML first, optional API/HTML metadata merge, and text-only PDF "
         "fallback while publishing `arxiv_html` or `arxiv_pdf`. `copernicus` uses direct HTTP landing discovery, public NLM/JATS XML, "
@@ -150,7 +152,7 @@ def fetch_tool_description() -> str:
         "`asset_profile='body'` means provider-cleaned body figure/table/formula assets only, "
         "while `asset_profile='all'` additionally downloads supplementary files; "
         "supplementary files are saved as assets but are not emitted as ImageContent. "
-        "Wiley/Science/PNAS support body/all assets on successful FlareSolverr HTML routes while keeping "
+        "Wiley/Science/PNAS/AMS support body/all assets on successful FlareSolverr HTML routes while keeping "
         "PDF/ePDF fallback text-only, and Springer/IEEE/arXiv/Copernicus PDF fallback is also text-only "
         "in this version. Set "
         "download_dir to isolate task-local downloads; the MCP server can also surface "

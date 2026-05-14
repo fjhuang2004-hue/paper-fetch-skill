@@ -6,8 +6,16 @@ import re
 import urllib.parse
 from typing import Any, Mapping
 
+from ..asset_fields import FULL_SIZE_IMAGE_ATTRS, PREVIEW_IMAGE_ATTRS
+from ..ui_tokens import SPRINGER_FULL_SIZE_IMAGE_LABEL
 from ....models import normalize_text
+from ....quality.reason_codes import CLOUDFLARE_CHALLENGE
 from ...image_payloads import image_dimensions_from_bytes
+from ..signals import (
+    CLOUDFLARE_CHALLENGE_TITLE_TOKENS,
+    SUPPLEMENTARY_BLOCKING_BODY_TOKENS,
+    SUPPLEMENTARY_BLOCKING_TITLE_TOKENS,
+)
 from ..shared import (
     html_text_snippet as _html_text_snippet,
     html_title_snippet as _html_title_snippet,
@@ -17,24 +25,6 @@ try:
     from bs4 import Tag
 except ImportError:  # pragma: no cover - dependency is declared in pyproject
     Tag = None
-
-FULL_SIZE_IMAGE_ATTRS = (
-    "data-original",
-    "data-full-size",
-    "data-fullsize",
-    "data-zoom-src",
-    "data-zoom-image",
-    "data-lg-src",
-    "data-hi-res-src",
-    "data-hires",
-    "data-large-src",
-    "data-image-full",
-    "data-download-url",
-)
-
-
-PREVIEW_IMAGE_ATTRS = ("data-src", "src", "data-lazy-src")
-
 
 FULL_SIZE_URL_TOKENS = (
     "/full/",
@@ -69,7 +59,7 @@ ACCEPTABLE_WIDE_PREVIEW_MIN_HEIGHT = 120
 
 
 FIGURE_PAGE_HINTS = (
-    "full size image",
+    SPRINGER_FULL_SIZE_IMAGE_LABEL,
     "view figure",
     "open in viewer",
     "view larger",
@@ -79,33 +69,7 @@ FIGURE_PAGE_HINTS = (
 )
 
 
-_CLOUDFLARE_CHALLENGE_TOKENS = (
-    "just a moment",
-    "attention required",
-    "checking your browser",
-)
-
-
-SUPPLEMENTARY_BLOCKING_TITLE_TOKENS = (
-    "just a moment",
-    "attention required",
-    "checking your browser",
-    "sign in",
-    "sign-in",
-    "login",
-    "log in",
-    "access denied",
-)
-
-
-SUPPLEMENTARY_BLOCKING_BODY_TOKENS = (
-    "checking your browser",
-    "enable javascript and cookies",
-    "cloudflare",
-    "please sign in",
-    "institutional login",
-    "access denied",
-)
+_CLOUDFLARE_CHALLENGE_TOKENS = CLOUDFLARE_CHALLENGE_TITLE_TOKENS
 
 
 def _response_header(response: Mapping[str, Any], name: str) -> str:
@@ -145,7 +109,7 @@ def supplementary_response_block_reason(content_type: str | None, body: bytes | 
     title = _html_title_snippet(body).lower()
     snippet = _html_text_snippet(body).lower()
     if any(token in title or token in snippet for token in _CLOUDFLARE_CHALLENGE_TOKENS):
-        return "cloudflare_challenge"
+        return CLOUDFLARE_CHALLENGE
     if any(token in title for token in SUPPLEMENTARY_BLOCKING_TITLE_TOKENS):
         return "login_or_access_html"
     if any(token in snippet for token in SUPPLEMENTARY_BLOCKING_BODY_TOKENS):

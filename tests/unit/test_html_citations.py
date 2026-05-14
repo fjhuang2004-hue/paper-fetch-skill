@@ -48,7 +48,7 @@ class HtmlCitationsTests(unittest.TestCase):
 
         self.assertEqual(cleaned, "See details and Fig1 for context.")
 
-    def test_clean_citation_markers_keeps_provider_specific_labels_out_of_generic_defaults(self) -> None:
+    def test_clean_citation_markers_keeps_extended_data_prefix_provider_specific(self) -> None:
         generic = clean_citation_markers(
             "Extended Data Fig 2 and Fig 1 are cited.",
             unwrap_inline_links=True,
@@ -62,7 +62,7 @@ class HtmlCitationsTests(unittest.TestCase):
             label_patterns=SPRINGER_NATURE_CITATION_LABEL_PATTERNS,
         )
 
-        self.assertEqual(generic, "Extended Data Fig 2 and Fig1 are cited.")
+        self.assertEqual(generic, "Extended Data Fig2 and Fig1 are cited.")
         self.assertEqual(springer_nature, "See details, Extended Data Fig2 and Fig1.")
 
     def test_clean_citation_markers_drops_springer_figure_lines_when_requested(self) -> None:

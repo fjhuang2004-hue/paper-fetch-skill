@@ -14,6 +14,7 @@ from ..extraction.section_hints import (
     normalize_section_hint_heading,
 )
 from ..markdown.citations import normalize_inline_citation_markdown
+from ..section_vocab import SIGNIFICANCE_ABSTRACT_HEADINGS
 from ..utils import normalize_text
 from .markdown import (
     INLINE_MARKDOWN_ABSTRACT_PREFIX_PATTERN,
@@ -31,41 +32,6 @@ BODY_SECTION_EXCLUDED_KINDS = frozenset(
 
 
 RETAINED_NON_BODY_SECTION_KINDS = frozenset({"data_availability", "code_availability"})
-
-
-ABSTRACT_SECTION_HEADINGS = frozenset(
-    {
-        "abstract",
-        "structured abstract",
-        "summary",
-        "resumo",
-        "resumen",
-        "resume",
-        "résumé",
-        "zusammenfassung",
-    }
-)
-
-
-DATA_AVAILABILITY_SECTION_HEADINGS = frozenset(
-    {
-        "data availability",
-        "data availability statement",
-        "data, materials, and software availability",
-        "data, code, and materials availability",
-        "availability of data and materials",
-    }
-)
-
-
-CODE_AVAILABILITY_SECTION_HEADINGS = frozenset(
-    {
-        "code availability",
-        "code availability statement",
-        "software availability",
-        "software availability statement",
-    }
-)
 
 
 PRESERVE_EMPTY_PARENT_SECTION_HEADINGS = frozenset(
@@ -105,7 +71,7 @@ SECTION_PRIORITY = {
 }
 
 
-LEADING_ABSTRACT_CONTEXT_HEADINGS = frozenset({"significance", "significance statement"})
+LEADING_ABSTRACT_CONTEXT_HEADINGS = SIGNIFICANCE_ABSTRACT_HEADINGS
 
 
 ABSTRACT_NEAR_DUPLICATE_SIMILARITY_THRESHOLD = 0.995
@@ -587,6 +553,9 @@ def _has_old_nature_methods_summary_structure(
     parsed_sections: Sequence[Section],
     section_hints: Sequence[SectionHint | Mapping[str, Any]] | None,
 ) -> bool:
+    # Historical Nature/Springer pages used a body "Methods Summary" followed
+    # by "Online Methods". This model-layer compatibility check only protects
+    # that rendered markdown shape after provider section hints have been lost.
     parsed_headings = {normalize_text(section.heading).lower() for section in parsed_sections if normalize_text(section.heading)}
     if "methods summary" not in parsed_headings:
         return False
@@ -663,9 +632,6 @@ def split_leading_inline_abstract(sections: Sequence[Section]) -> tuple[str | No
 __all__ = [
     "BODY_SECTION_EXCLUDED_KINDS",
     "RETAINED_NON_BODY_SECTION_KINDS",
-    "ABSTRACT_SECTION_HEADINGS",
-    "DATA_AVAILABILITY_SECTION_HEADINGS",
-    "CODE_AVAILABILITY_SECTION_HEADINGS",
     "PRESERVE_EMPTY_PARENT_SECTION_HEADINGS",
     "SECTION_PRIORITY",
     "LEADING_ABSTRACT_CONTEXT_HEADINGS",

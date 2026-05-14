@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import html
+import re
 import urllib.parse
 from typing import Any, Mapping
 
 from ..extraction.html.parsing import choose_parser
+from ..extraction.html.ui_tokens import DOWNLOAD_PDF_LABEL
+from ..http import is_pdf_content_type
 from ..provider_catalog import (
     host_matches_domain,
     provider_base_domains,
@@ -20,13 +24,14 @@ try:
 except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
 
-PDF_LINK_TEXT_TOKENS = ("pdf", "download pdf", "full text pdf", "view pdf")
+PDF_LINK_TEXT_TOKENS = ("pdf", DOWNLOAD_PDF_LABEL, "full text pdf", "view pdf")
 PDF_URL_COMMON_TOKENS = (".pdf", "download=true")
 HTML_DISCOVERY_PDF_URL_TOKENS = ("/pdf", "/epdf", "/pdfdirect", "/pdfft")
 BROWSER_WORKFLOW_PDF_URL_PREFIX_TOKENS = (
     "/doi/pdf/",
     "/doi/pdfdirect/",
     "/doi/epdf/",
+    "/downloadpdf/",
     "/fullpdf",
 )
 # HTML discovery accepts broad href shapes because labels/content types can
@@ -35,6 +40,10 @@ PDF_HREF_TOKENS = (*PDF_URL_COMMON_TOKENS, *HTML_DISCOVERY_PDF_URL_TOKENS)
 BROWSER_WORKFLOW_PDF_URL_TOKENS = (
     *PDF_URL_COMMON_TOKENS,
     *BROWSER_WORKFLOW_PDF_URL_PREFIX_TOKENS,
+)
+PDF_JS_DEFAULT_URL_RE = re.compile(
+    r"PDFViewerApplicationOptions\.set\(\s*['\"]defaultUrl['\"]\s*,\s*['\"]([^'\"]+)['\"]",
+    flags=re.IGNORECASE,
 )
 
 
@@ -79,7 +88,7 @@ def extract_pdf_url_from_metadata_links(metadata: Mapping[str, Any]) -> str | No
         if not url:
             continue
         content_type = normalize_text(str(item.get("content_type") or "")).lower()
-        if any(token in url.lower() for token in PDF_HREF_TOKENS) or content_type == "application/pdf":
+        if any(token in url.lower() for token in PDF_HREF_TOKENS) or is_pdf_content_type(content_type):
             return url
     return None
 
@@ -97,7 +106,7 @@ def extract_pdf_url_from_crossref(metadata: Mapping[str, Any]) -> str | None:
         if not url:
             continue
         content_type = normalize_text(str(item.get("content_type") or "")).lower()
-        if looks_like_browser_workflow_pdf_url(url) or content_type == "application/pdf":
+        if looks_like_browser_workflow_pdf_url(url) or is_pdf_content_type(content_type):
             return url
     return None
 
@@ -132,6 +141,15 @@ def extract_pdf_candidate_urls_from_html(html_text: str, source_url: str) -> lis
         ):
             _append_candidate(candidates, target, source_url=source_url)
             _append_query_param_pdf_candidates(candidates, target, source_url=source_url)
+
+    for script in soup.find_all("script"):
+        script_text = script.string if script.string is not None else script.get_text(" ", strip=False)
+        for match in PDF_JS_DEFAULT_URL_RE.finditer(str(script_text or "")):
+            target = html.unescape(match.group(1))
+            lowered_target = normalize_text(target).lower()
+            if any(token in lowered_target for token in PDF_HREF_TOKENS):
+                _append_candidate(candidates, target, source_url=source_url)
+                _append_query_param_pdf_candidates(candidates, target, source_url=source_url)
 
     return candidates
 

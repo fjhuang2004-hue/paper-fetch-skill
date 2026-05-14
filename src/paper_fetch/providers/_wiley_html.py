@@ -7,6 +7,7 @@ import urllib.parse
 from functools import partial
 from typing import Any, Mapping
 
+from ..common_patterns import HEADING_TAG_PATTERN
 from ..provider_catalog import (
     provider_base_domains,
     provider_crossref_pdf_position,
@@ -33,12 +34,10 @@ from ..extraction.html.shared import (
 from ..extraction.html.assets import (
     extract_formula_assets as extract_generic_formula_assets,
 )
-from ..quality.html_profiles import (
-    wiley_blocking_fallback_signals,
-    wiley_positive_signals,
-)
+from ..quality.html_profiles import wiley_blocking_fallback_signals
 from ..utils import normalize_text
 from ._html_authors import (
+    ATYPON_AUTHOR_NOISE_TEXT,
     AuthorExtractionPipeline,
     extract_jsonld_authors,
     extract_meta_authors,
@@ -64,8 +63,8 @@ CROSSREF_PDF_POSITION = provider_crossref_pdf_position("wiley")
 NOISE_PROFILE = provider_html_rules("wiley").noise_profile
 SITE_RULE_OVERRIDES: dict[str, Any] = WILEY_SITE_RULE_OVERRIDES
 NUMBERED_SECTION_HEADING_PATTERN = re.compile(r"^\d+(?:\.\d+)*\s+\S")
-HEADING_TAG_PATTERN = re.compile(r"^h[1-6]$")
 WILEY_AUTHOR_NOISE_TEXT = {
+    *ATYPON_AUTHOR_NOISE_TEXT,
     "orcid",
     "search for more papers by this author",
 }
@@ -90,8 +89,7 @@ WILEY_SUPPLEMENTARY_DOWNLOAD_PATH_SEGMENT = "downloadsupplement"
 WILEY_SUPPLEMENTARY_FILENAME_QUERY_KEYS = ("file", "filename", "attachment", "download")
 
 
-def blocking_fallback_signals(html_text: str) -> list[str]:
-    return wiley_blocking_fallback_signals(html_text)
+blocking_fallback_signals = wiley_blocking_fallback_signals
 
 
 def find_supporting_information_sections(container: Any) -> list[Any]:
@@ -219,10 +217,6 @@ _AUTHOR_EXTRACTION_PIPELINE = AuthorExtractionPipeline(
 
 def extract_authors(html_text: str) -> list[str]:
     return _AUTHOR_EXTRACTION_PIPELINE(html_text)
-
-
-def positive_signals(html_text: str) -> tuple[list[str], list[str], list[str]]:
-    return wiley_positive_signals(html_text)
 
 
 def _heading_nodes(container: Tag) -> list[Tag]:

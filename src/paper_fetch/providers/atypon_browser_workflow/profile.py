@@ -1,9 +1,11 @@
-"""Container/profile helpers for Science/PNAS browser-workflow extraction."""
+"""Container/profile helpers for Atypon browser-workflow extraction."""
 
 from __future__ import annotations
 
 import re
 
+from ...common_patterns import HEADING_TAG_PATTERN
+from ...extraction.html.container_selectors import ARTICLE_BODY_SELECTORS
 from ...extraction.html.language import html_node_language_hint
 from ...extraction.html.semantics import (
     ANCILLARY_TOKENS,
@@ -14,13 +16,21 @@ from ...extraction.html.semantics import (
     heading_category,
     parse_markdown_heading,
 )
+from ...extraction.html.cleanup_policy import (
+    classify_markdown_cleanup_block,
+    extend_cleanup_policy,
+)
 from ...extraction.html.provider_rules import (
+    cleanup_policy_for_profile,
     front_matter_contains_tokens_for_profile,
     front_matter_exact_texts_for_profile,
     front_matter_publication_keywords_for_profile,
-    markdown_promo_tokens_for_profile,
 )
-from ...extraction.html._runtime import FRONT_MATTER_PUBLICATION_KEYWORDS
+from ...extraction.html._runtime import (
+    FRONT_MATTER_PUBLICATION_KEYWORDS,
+    _publication_watermark_label_tokens,
+)
+from ...extraction.html.front_matter import COMMON_FRONT_MATTER_LINE_PATTERNS
 from ...extraction.html.signals import contains_access_gate_text
 from ...extraction.html.shared import (
     class_tokens as _class_tokens,
@@ -33,6 +43,7 @@ from ...quality.html_availability import (
     HTML_CONTAINER_SCORE_BROWSER_WORKFLOW,
     HtmlContainerSelectionPolicy,
 )
+from .._html_authors import ATYPON_VIEW_ALL_ARTICLES_LABEL
 from ...utils import normalize_text
 from .._atypon_browser_workflow_profiles import (
     noise_profile_for_publisher as _profile_noise_profile_for_publisher,
@@ -61,16 +72,11 @@ has_sufficient_article_body = _html_noise.has_sufficient_article_body
 BODY_PARAGRAPH_MIN_CHARS = 80
 
 
-HEADING_TAG_PATTERN = re.compile(r"^h[1-6]$")
-
-
 SENTENCE_PATTERN = re.compile(r"[.!?。！？]+")
 
 
 FRONT_MATTER_LINE_PATTERNS = (
-    re.compile(r"^doi:\s*", flags=re.IGNORECASE),
-    re.compile(r"^(vol\.?|volume)\b", flags=re.IGNORECASE),
-    re.compile(r"^issue\b", flags=re.IGNORECASE),
+    *COMMON_FRONT_MATTER_LINE_PATTERNS,
     re.compile(r"^[A-Z][a-z]{2,9}\s+\d{4}$"),
     re.compile(r"^[0-3]?\d\s+[A-Z][a-z]{2,9}\s+\d{4}$"),
 )
@@ -88,8 +94,11 @@ POST_CONTENT_BREAK_TEXTS = {
 }
 
 
+# SITE_UI_COPY_REGRESSION_MARKER: site-owned Atypon export/account chrome;
+# rerun browser-workflow extraction tests when these labels change. These
+# labels are registered through CleanupPolicy post-content classification.
 POST_CONTENT_BREAK_TOKENS = (
-    "view all articles by this author",
+    ATYPON_VIEW_ALL_ARTICLES_LABEL,
     "select the format you want to export the citation of this publication",
     "loading institution options",
     "account help",
@@ -106,18 +115,7 @@ CONTENT_ABSTRACT_SELECTORS = (
 )
 
 
-CONTENT_BODY_SELECTORS = (
-    "#bodymatter",
-    "[data-extent='bodymatter']",
-    "[property='articleBody']",
-    "[itemprop='articleBody']",
-    ".article__body",
-    ".article-body",
-    ".article__content",
-    ".article-section__content",
-    ".article__fulltext",
-    ".epub-section",
-)
+CONTENT_BODY_SELECTORS = ARTICLE_BODY_SELECTORS
 
 
 CONTENT_AVAILABILITY_SELECTORS = (
@@ -144,7 +142,11 @@ def _noise_profile_for_publisher(publisher: str | None) -> str:
 
 
 def _promo_block_tokens(publisher: str | None) -> tuple[str, ...]:
-    return markdown_promo_tokens_for_profile(
+    return _cleanup_policy_for_publisher(publisher).markdown_contains_tokens
+
+
+def _cleanup_policy_for_publisher(publisher: str | None):
+    return cleanup_policy_for_profile(
         publisher or _noise_profile_for_publisher(publisher)
     )
 
@@ -174,6 +176,15 @@ def _post_content_break_tokens(publisher: str | None) -> tuple[str, ...]:
     return (
         *POST_CONTENT_BREAK_TOKENS,
         *_publisher_profile(publisher).post_content_break_tokens,
+    )
+
+
+def _post_content_cleanup_policy(publisher: str | None):
+    return extend_cleanup_policy(
+        _cleanup_policy_for_publisher(publisher),
+        post_content_exact_texts=tuple(POST_CONTENT_BREAK_TEXTS),
+        post_content_prefixes=POST_CONTENT_BREAK_PREFIXES,
+        post_content_cutoff_tokens=_post_content_break_tokens(publisher),
     )
 
 
@@ -362,25 +373,11 @@ def _looks_like_publication_watermark(
     publisher: str | None = None,
 ) -> bool:
     normalized = normalize_text(text)
-    lowered = normalized.lower()
-    if not normalized or len(normalized) > 64:
+    tokens = _publication_watermark_label_tokens(normalized)
+    if not tokens:
         return False
-    if any(character in normalized for character in ".:;!?。！？"):
-        return False
-    tokens = lowered.split()
-    if not tokens or len(tokens) > 5:
-        return False
-    if normalized.upper() == normalized and len(normalized) <= 8:
-        return True
     publication_keywords = _front_matter_publication_keywords(publisher)
-    if not any(
-        token.strip("&") in publication_keywords for token in tokens
-    ):
-        return False
-    return all(
-        token[:1].isupper() or token.lower() in {"and", "of", "the", "&"}
-        for token in normalized.split()
-    )
+    return any(token.lower().strip("&") in publication_keywords for token in tokens)
 
 
 def _looks_like_access_gate_text(text: str) -> bool:
@@ -394,16 +391,13 @@ def _markdown_heading_info(block: str) -> tuple[int, str] | None:
 def _looks_like_post_content_noise_block(
     text: str, *, publisher: str | None = None
 ) -> bool:
-    lowered = normalize_text(text).lower()
-    if not lowered:
-        return False
-    if any(token in lowered for token in _promo_block_tokens(publisher)):
-        return True
-    if lowered in POST_CONTENT_BREAK_TEXTS:
-        return True
-    if any(lowered.startswith(prefix) for prefix in POST_CONTENT_BREAK_PREFIXES):
-        return True
-    return any(token in lowered for token in _post_content_break_tokens(publisher))
+    return (
+        classify_markdown_cleanup_block(
+            text,
+            policy=_post_content_cleanup_policy(publisher),
+        ).action
+        != "keep"
+    )
 
 
 def _looks_like_markdown_auxiliary_block(text: str) -> bool:

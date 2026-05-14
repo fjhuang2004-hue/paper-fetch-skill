@@ -13,13 +13,16 @@ from ....extraction.html.shared import (
     html_title_snippet as _html_title_snippet,
     image_magic_type as _image_magic_type,
 )
+from ....extraction.html.signals import (
+    CLOUDFLARE_CHALLENGE_TITLE_TOKENS as _CLOUDFLARE_CHALLENGE_TITLE_TOKENS,
+)
 from ....logging_utils import emit_structured_log
+from ....quality.reason_codes import CLOUDFLARE_CHALLENGE
 from ....runtime import RuntimeContext
 from ....utils import normalize_text
 from ..._flaresolverr import FetchedPublisherHtml
 from .context import _BasePlaywrightDocumentFetcher, _normalized_response_headers
 from .diagnostics import (
-    _CLOUDFLARE_CHALLENGE_TITLE_TOKENS,
     _compact_failure_diagnostic,
     _copy_failure_diagnostic,
     _image_fetch_failure_reason,
@@ -219,7 +222,7 @@ class _SharedPlaywrightImageDocumentFetcher(_BasePlaywrightDocumentFetcher):
         title_snippet = normalize_text(title)[:160] or _html_title_snippet(body)
         body_snippet = _html_text_snippet(body)
         failure_reason = (
-            "cloudflare_challenge"
+            CLOUDFLARE_CHALLENGE
             if _looks_like_cloudflare_challenge_title(title_snippet)
             or any(
                 token in body_snippet.lower()
@@ -425,7 +428,7 @@ class _SharedPlaywrightImageDocumentFetcher(_BasePlaywrightDocumentFetcher):
                     title_snippet=normalize_text(str(image_info.get("title") or ""))[
                         :160
                     ],
-                    reason="cloudflare_challenge",
+                    reason=CLOUDFLARE_CHALLENGE,
                 )
                 return None
             try:

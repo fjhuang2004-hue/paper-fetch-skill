@@ -17,6 +17,7 @@ from ..provider_catalog import (
     provider_supports_metadata_api_probe,
 )
 from ..providers.base import ProviderFailure
+from ..reason_codes import ERROR, NO_ACCESS, NO_RESULT, NOT_CONFIGURED, NOT_SUPPORTED, RATE_LIMITED
 from ..providers.protocols import MetadataProvider
 from ..runtime import RUNTIME_UNSET, RuntimeContext, resolve_runtime_context
 from ..tracing import route_marker
@@ -98,13 +99,13 @@ def build_official_provider_candidates(
 
 
 def classify_probe_state(failure: ProviderFailure) -> str:
-    if failure.code == "no_result":
+    if failure.code == NO_RESULT:
         return "negative"
     return "unknown"
 
 
 def _is_unknown_has_fulltext_probe_failure(error: ProviderFailure) -> bool:
-    return error.code in {"no_access", "rate_limited", "not_configured", "not_supported", "error"}
+    return error.code in {NO_ACCESS, RATE_LIMITED, NOT_CONFIGURED, NOT_SUPPORTED, ERROR}
 
 
 def _probe_warning(prefix: str, message: str) -> str:

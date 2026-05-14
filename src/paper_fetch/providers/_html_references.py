@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from ..extraction.html.parsing import choose_parser
+from ..publisher_identity import DOI_CORE_PATTERN
 from ..utils import normalize_text
 
 try:
@@ -14,8 +15,23 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
     Tag = None
 
-DOI_URL_PATTERN = re.compile(r"https?://(?:dx\.)?doi\.org/(?P<doi>10\.\S+)", flags=re.IGNORECASE)
+DOI_URL_PATTERN = re.compile(
+    rf"https?://(?:dx\.)?doi\.org/(?P<doi>{DOI_CORE_PATTERN})",
+    flags=re.IGNORECASE,
+)
 YEAR_PATTERN = re.compile(r"\((?P<year>(?:18|19|20)\d{2})\)")
+REFERENCE_LINKOUT_LABELS = (
+    "Article",
+    "ADS",
+    "Crossref",
+    "PubMed",
+    "Web of Science",
+    "Google Scholar",
+    "CAS",
+)
+REFERENCE_LINKOUT_LABEL_PATTERN = re.compile(
+    rf"\b(?:{'|'.join(re.escape(label) for label in REFERENCE_LINKOUT_LABELS)})\b(?:\s*\|?\s*)*$"
+)
 NUMBERED_BIBLIOGRAPHY_SELECTORS = (
     "section[role='doc-bibliography'] [role='listitem'][data-has='label']",
     "#bibliography [role='listitem'][data-has='label']",
@@ -94,7 +110,7 @@ def _reference_text(node: Any) -> str:
                     match.decompose()
             active_node = clone
     text = normalize_text(active_node.get_text(" ", strip=True))
-    text = re.sub(r"\b(?:Article|ADS|Crossref|PubMed|Web of Science|Google Scholar|CAS)\b(?:\s*\|?\s*)*$", "", text)
+    text = REFERENCE_LINKOUT_LABEL_PATTERN.sub("", text)
     return normalize_text(text)
 
 

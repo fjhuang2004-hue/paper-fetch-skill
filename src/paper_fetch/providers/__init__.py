@@ -6,6 +6,7 @@ from importlib import import_module
 from typing import Any
 
 _EXPORTS: dict[str, tuple[str, str]] = {
+    "AmsClient": (".ams", "AmsClient"),
     "ArxivClient": (".arxiv", "ArxivClient"),
     "CrossrefClient": (".crossref", "CrossrefClient"),
     "CopernicusClient": (".copernicus", "CopernicusClient"),

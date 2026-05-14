@@ -13,6 +13,15 @@ SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+from paper_fetch.quality.reason_codes import FULLTEXT  # noqa: E402
+from paper_fetch.reason_codes import (  # noqa: E402
+    ERROR,
+    METADATA_ONLY,
+    NO_RESULT,
+    NOT_CONFIGURED,
+    RATE_LIMITED,
+)
+
 
 def _load_geography_live_exports():
     from paper_fetch_devtools.geography.live import (
@@ -93,12 +102,12 @@ def main() -> int:
         counts = summary.status_counts
         sys.stdout.write(
             f"{summary.provider}: attempted={summary.attempted} "
-            f"fulltext={counts.get('fulltext', 0)} "
-            f"metadata_only={counts.get('metadata_only', 0)} "
-            f"not_configured={counts.get('not_configured', 0)} "
-            f"rate_limited={counts.get('rate_limited', 0)} "
-            f"no_result={counts.get('no_result', 0)} "
-            f"error={counts.get('error', 0)}\n"
+            f"fulltext={counts.get(FULLTEXT, 0)} "
+            f"metadata_only={counts.get(METADATA_ONLY, 0)} "
+            f"not_configured={counts.get(NOT_CONFIGURED, 0)} "
+            f"rate_limited={counts.get(RATE_LIMITED, 0)} "
+            f"no_result={counts.get(NO_RESULT, 0)} "
+            f"error={counts.get(ERROR, 0)}\n"
         )
     return 0
 

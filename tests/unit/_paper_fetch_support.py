@@ -103,9 +103,13 @@ class StubProvider:
                 "figure and supplementary asset downloads are not implemented for PDF fallback."
             )
             skip_trace = trace_from_markers(["download:ieee_assets_skipped_text_only"])
-        elif provider_name in {"wiley", "science", "pnas"} and route == "pdf_fallback":
+        elif provider_name in {"wiley", "science", "pnas", "ams"} and route == "pdf_fallback":
             allow_related_assets = False
-            provider_label = "PNAS" if provider_name == "pnas" else provider_name.title()
+            provider_label = (
+                provider_name.upper()
+                if provider_name in {"ams", "pnas"}
+                else provider_name.title()
+            )
             skip_warning = (
                 f"{provider_label} PDF fallback currently returns text-only full text; "
                 "figure and supplementary asset downloads are not implemented yet."

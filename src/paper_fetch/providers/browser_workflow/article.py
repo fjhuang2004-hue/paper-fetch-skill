@@ -16,6 +16,7 @@ from ...publisher_identity import normalize_doi
 from ...runtime import RuntimeContext
 from ...tracing import fulltext_marker, merge_trace, source_trail_from_trace, trace_from_markers
 from ...utils import dedupe_authors, extend_unique, normalize_text
+from ...reason_codes import ABSTRACT_ONLY
 from .html_extraction import (
     _cached_browser_workflow_markdown,
     rewrite_inline_figure_links,
@@ -116,7 +117,7 @@ def browser_workflow_article_from_payload(
     warnings = list(raw_payload.warnings)
     trace = list(raw_payload.trace)
     doi = normalize_doi(metadata.get("doi"))
-    source = client.article_source()
+    source = client.article_source_for_payload(raw_payload)
     assets = list(downloaded_assets or [])
     content_type = str(raw_payload.content_type or "").lower()
 
@@ -236,7 +237,7 @@ def _finalize_abstract_only_provider_article(
     *,
     warnings: list[str] | None = None,
 ):
-    marker = fulltext_marker(provider_name, "abstract_only")
+    marker = fulltext_marker(provider_name, ABSTRACT_ONLY)
     article.quality.trace = merge_trace(
         article.quality.trace, trace_from_markers([marker])
     )

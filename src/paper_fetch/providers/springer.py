@@ -8,12 +8,17 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..common_patterns import (
+    EXTENDED_DATA_TABLE_PREFIX_PATTERN,
+    TABLE_LABEL_PREFIX_PATTERN,
+    table_label_prefix_for_match,
+)
 from ..config import build_user_agent, resolve_asset_download_concurrency
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
 from ..extraction.html.parsing import choose_parser
 from ..extraction.html.figure_links import rewrite_inline_figure_links
 from ..extraction.html.tables import inject_inline_table_blocks, render_table_markdown, table_placeholder
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
+from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYPE, RequestFailure
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..publisher_identity import normalize_doi
@@ -31,7 +36,14 @@ from ..extraction.html.assets import html_asset_identity_key
 from ._pdf_candidates import build_springer_pdf_candidates
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
 from ._payloads import build_provider_payload
-from ._waterfall import ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
+from ._waterfall import (
+    DEFAULT_WATERFALL_CONTINUE_CODES,
+    ProviderWaterfallStep,
+    ProviderWaterfallState,
+    run_provider_waterfall,
+)
+from ..reason_codes import ABSTRACT_ONLY, ERROR, NO_RESULT, NOT_SUPPORTED, OK, PDF_FALLBACK
+from ..quality.reason_codes import FULLTEXT
 from ..quality.html_availability import HtmlQualityAssessor, availability_failure_message
 from .base import (
     PreparedFetchResultPayload,
@@ -56,8 +68,11 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
 MAX_SPRINGER_HTML_REDIRECTS = 5
 MARKDOWN_TEXT_KEY = "markdown_text"
 SPRINGER_FETCH_RESULT_WARNINGS_KEY = "springer_fetch_result_warnings"
+# Springer table pages include normal and Extended Data labels. The regex stays
+# provider-owned because it uses named captures consumed by table-page fallback.
 SPRINGER_TABLE_LABEL_PATTERN = re.compile(
-    r"\b(?P<prefix>extended\s+data\s+table|table)\.?\s*(?P<number>\d+[A-Za-z]?)\b",
+    rf"\b(?P<prefix>{EXTENDED_DATA_TABLE_PREFIX_PATTERN}|{TABLE_LABEL_PREFIX_PATTERN})"
+    r"\.?\s*(?P<number>\d+[A-Za-z]?)\b",
     flags=re.IGNORECASE,
 )
 SPRINGER_IMAGE_URL_PATTERN = re.compile(r"\.(?:avif|gif|jpe?g|png|tiff?|webp)(?:[?#]|$)", flags=re.IGNORECASE)
@@ -75,16 +90,6 @@ SPRINGER_TABLE_CAPTION_SELECTORS = (
     ".c-article-satellite-title",
     "figcaption",
 )
-SPRINGER_FETCH_RESULT_HTML_CONTINUE_CODES = (
-    "no_result",
-    "no_access",
-    "rate_limited",
-    "error",
-    "not_configured",
-    "not_supported",
-)
-
-
 @dataclass
 class SpringerHtmlAttempt:
     normalized_doi: str
@@ -302,7 +307,7 @@ def _springer_fallback_attempt(
 
 
 def _finalize_springer_abstract_only_article(article, *, warnings: list[str] | None = None):
-    article.quality.trace = merge_trace(article.quality.trace, trace_from_markers([fulltext_marker("springer", "abstract_only")]))
+    article.quality.trace = merge_trace(article.quality.trace, trace_from_markers([fulltext_marker("springer", ABSTRACT_ONLY)]))
     article.quality.source_trail = source_trail_from_trace(article.quality.trace)
     extend_unique(article.quality.warnings, list(warnings or []))
     return article
@@ -329,17 +334,14 @@ def _springer_table_label(node: Tag | BeautifulSoup, *, fallback: str = "Table")
             text = _springer_short_text(candidate)
             match = SPRINGER_TABLE_LABEL_PATTERN.search(text)
             if match:
-                prefix = "Extended Data Table" if "extended" in match.group("prefix").lower() else "Table"
-                return f"{prefix} {match.group('number')}."
+                return f"{table_label_prefix_for_match(match.group('prefix'))} {match.group('number')}."
     if isinstance(node, BeautifulSoup) and isinstance(node.title, Tag):
         match = SPRINGER_TABLE_LABEL_PATTERN.search(_springer_short_text(node.title))
         if match:
-            prefix = "Extended Data Table" if "extended" in match.group("prefix").lower() else "Table"
-            return f"{prefix} {match.group('number')}."
+            return f"{table_label_prefix_for_match(match.group('prefix'))} {match.group('number')}."
     match = SPRINGER_TABLE_LABEL_PATTERN.search(_springer_short_text(node))
     if match:
-        prefix = "Extended Data Table" if "extended" in match.group("prefix").lower() else "Table"
-        return f"{prefix} {match.group('number')}."
+        return f"{table_label_prefix_for_match(match.group('prefix'))} {match.group('number')}."
     return fallback
 
 
@@ -363,7 +365,7 @@ def _springer_table_label_heading(label: str) -> str:
 
 def _springer_extended_data_table_number(label: str) -> str:
     normalized_label = normalize_text(label).lower().rstrip(".")
-    match = re.match(r"^extended\s+data\s+table\s+(\d+[a-z]?)\b", normalized_label)
+    match = re.match(rf"^{EXTENDED_DATA_TABLE_PREFIX_PATTERN}\s+(\d+[a-z]?)\b", normalized_label)
     return match.group(1) if match else ""
 
 
@@ -465,7 +467,7 @@ class SpringerClient(ProviderClient):
             checks=[
                 build_provider_status_check(
                     "html_route",
-                    "ok",
+                    OK,
                     "Springer direct HTML route is available.",
                     details={"mode": "direct_html"},
                 ),
@@ -492,7 +494,7 @@ class SpringerClient(ProviderClient):
             )
         except LandingRedirectLimitExceeded as exc:
             raise ProviderFailure(
-                "error",
+                ERROR,
                 f"Springer direct HTML retrieval exceeded {MAX_SPRINGER_HTML_REDIRECTS} redirects.",
             ) from exc
         except RequestFailure as exc:
@@ -628,7 +630,7 @@ class SpringerClient(ProviderClient):
 
     def fetch_metadata(self, query: Mapping[str, str | None]) -> ProviderMetadata:
         raise ProviderFailure(
-            "not_supported",
+            NOT_SUPPORTED,
             "Springer publisher metadata is taken from Crossref; the runtime does not use Springer publisher endpoints.",
         )
 
@@ -641,7 +643,7 @@ class SpringerClient(ProviderClient):
     ) -> SpringerHtmlAttempt:
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
-            raise ProviderFailure("not_supported", "Springer direct HTML retrieval requires a DOI.")
+            raise ProviderFailure(NOT_SUPPORTED, "Springer direct HTML retrieval requires a DOI.")
 
         landing_url = choose_public_landing_page_url(
             metadata.get("landing_page_url"),
@@ -745,9 +747,9 @@ class SpringerClient(ProviderClient):
         ).fetch(pdf_candidates)
         return build_provider_payload(
             provider="springer",
-            route_kind="pdf_fallback",
+            route_kind=PDF_FALLBACK,
             source_url=pdf_result.final_url,
-            content_type="application/pdf",
+            content_type=PDF_MIME_TYPE,
             body=pdf_result.pdf_bytes,
             markdown_text=pdf_result.markdown_text,
             merged_metadata=attempt.merged_metadata,
@@ -761,7 +763,7 @@ class SpringerClient(ProviderClient):
             ],
             trace_markers=[
                 fulltext_marker("springer", "fail", route="html"),
-                fulltext_marker("springer", "ok", route="pdf_fallback"),
+                fulltext_marker("springer", "ok", route=PDF_FALLBACK),
             ],
             needs_local_copy=True,
         )
@@ -780,7 +782,7 @@ class SpringerClient(ProviderClient):
         if output_dir is None or asset_profile == "none":
             return empty_asset_results()
         content = raw_payload.content
-        if normalize_text(content.route_kind if content is not None else "").lower() == "pdf_fallback":
+        if normalize_text(content.route_kind if content is not None else "").lower() == PDF_FALLBACK:
             return empty_asset_results()
         article_assets = _filter_springer_assets_for_profile(
             list(content.extracted_assets if content is not None else []),
@@ -840,7 +842,7 @@ class SpringerClient(ProviderClient):
         runtime_context = self._runtime_context(context)
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
-            raise ProviderFailure("not_supported", "Springer direct HTML retrieval requires a DOI.")
+            raise ProviderFailure(NOT_SUPPORTED, "Springer direct HTML retrieval requires a DOI.")
 
         landing_url = choose_public_landing_page_url(
             metadata.get("landing_page_url"),
@@ -879,13 +881,13 @@ class SpringerClient(ProviderClient):
                     extracted_assets=extracted_assets,
                 )
             raise ProviderFailure(
-                "no_result",
+                NO_RESULT,
                 availability_failure_message(attempt.diagnostics),
                 warnings=attempt.warnings,
             )
 
         def run_pdf(state: ProviderWaterfallState) -> RawFulltextPayload:
-            html_failure = state.last_failure() or ProviderFailure("no_result", "Springer HTML route failed.")
+            html_failure = state.last_failure() or ProviderFailure(NO_RESULT, "Springer HTML route failed.")
             attempt = _springer_fallback_attempt(
                 normalized_doi=normalized_doi,
                 landing_url=landing_url,
@@ -902,7 +904,7 @@ class SpringerClient(ProviderClient):
                 )
             except PdfFetchFailure as exc:
                 raise ProviderFailure(
-                    "no_result",
+                    NO_RESULT,
                     _springer_fulltext_failure_message(
                         html_message=html_failure.message,
                         pdf_message=exc.message,
@@ -920,7 +922,7 @@ class SpringerClient(ProviderClient):
                 ProviderWaterfallStep(
                     label="pdf",
                     run=run_pdf,
-                    success_markers=(fulltext_marker("springer", "ok", route="pdf_fallback"),),
+                    success_markers=(fulltext_marker("springer", "ok", route=PDF_FALLBACK),),
                 ),
             ],
         )
@@ -952,7 +954,7 @@ class SpringerClient(ProviderClient):
         context = self._runtime_context(context)
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
-            raise ProviderFailure("not_supported", "Springer direct HTML retrieval requires a DOI.")
+            raise ProviderFailure(NOT_SUPPORTED, "Springer direct HTML retrieval requires a DOI.")
 
         landing_url = choose_public_landing_page_url(
             metadata.get("landing_page_url"),
@@ -1007,7 +1009,7 @@ class SpringerClient(ProviderClient):
                 context=context,
             )
             raise ProviderFailure(
-                "no_result",
+                NO_RESULT,
                 availability_failure_message(attempt.diagnostics),
                 warnings=attempt.warnings,
             )
@@ -1016,7 +1018,7 @@ class SpringerClient(ProviderClient):
             return (
                 state.failure("html")
                 or state.last_failure()
-                or ProviderFailure("no_result", "Springer HTML route failed.")
+                or ProviderFailure(NO_RESULT, "Springer HTML route failed.")
             )
 
         try:
@@ -1027,7 +1029,7 @@ class SpringerClient(ProviderClient):
                         run=run_html,
                         failure_marker=fulltext_marker("springer", "fail", route="html"),
                         success_markers=(fulltext_marker("springer", "ok", route="html"),),
-                        continue_codes=SPRINGER_FETCH_RESULT_HTML_CONTINUE_CODES,
+                        continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     ),
                 ],
                 final_failure_factory=final_html_failure,
@@ -1102,7 +1104,7 @@ class SpringerClient(ProviderClient):
                 )
             except PdfFetchFailure as exc:
                 raise ProviderFailure(
-                    "no_result",
+                    NO_RESULT,
                     _springer_fulltext_failure_message(
                         html_message=html_failure.message,
                         pdf_message=exc.message,
@@ -1112,7 +1114,7 @@ class SpringerClient(ProviderClient):
         def final_pdf_failure(state: ProviderWaterfallState) -> ProviderFailure:
             failure = state.failure("pdf") or state.last_failure()
             if failure is None:
-                return ProviderFailure("no_result", "Springer PDF fallback did not run.", warnings=state.warnings)
+                return ProviderFailure(NO_RESULT, "Springer PDF fallback did not run.", warnings=state.warnings)
             return ProviderFailure(
                 failure.code,
                 failure.message,
@@ -1132,7 +1134,7 @@ class SpringerClient(ProviderClient):
                     ProviderWaterfallStep(
                         label="pdf",
                         run=run_pdf,
-                        success_markers=(fulltext_marker("springer", "ok", route="pdf_fallback"),),
+                        success_markers=(fulltext_marker("springer", "ok", route=PDF_FALLBACK),),
                     ),
                 ],
                 initial_warnings=warnings,
@@ -1144,7 +1146,7 @@ class SpringerClient(ProviderClient):
             extend_unique(warnings, [exc.message])
             if prepared.provisional_article is not None:
                 provisional_article = prepared.provisional_article
-                if provisional_article.quality.content_kind == "abstract_only":
+                if provisional_article.quality.content_kind == ABSTRACT_ONLY:
                     provisional_article = _finalize_springer_abstract_only_article(
                         provisional_article,
                         warnings=[
@@ -1173,7 +1175,7 @@ class SpringerClient(ProviderClient):
         *,
         provisional_article=None,
     ) -> bool:
-        return provisional_article is None or provisional_article.quality.content_kind == "fulltext"
+        return provisional_article is None or provisional_article.quality.content_kind == FULLTEXT
 
     def asset_download_failure_warning(self, exc: ProviderFailure | RequestFailure | OSError) -> str:
         message = exc.message if isinstance(exc, ProviderFailure) else str(exc)
@@ -1252,11 +1254,11 @@ class SpringerClient(ProviderClient):
         if not markdown_text:
             warnings.append(
                 "Springer PDF fallback did not produce usable Markdown."
-                if route == "pdf_fallback"
+                if route == PDF_FALLBACK
                 else "Springer HTML retrieval did not produce usable Markdown."
             )
             return metadata_only_article(
-                source="springer_pdf" if route == "pdf_fallback" else "springer_html",
+                source="springer_pdf" if route == PDF_FALLBACK else "springer_html",
                 metadata=article_metadata,
                 doi=doi or None,
                 warnings=warnings,
@@ -1264,7 +1266,7 @@ class SpringerClient(ProviderClient):
             )
         if asset_failures:
             warnings.append(f"Springer related assets were only partially downloaded ({len(asset_failures)} failed).")
-        if route != "pdf_fallback" and markdown_text:
+        if route != PDF_FALLBACK and markdown_text:
             inline_figure_assets = [
                 dict(item)
                 for item in (downloaded_assets or [])
@@ -1285,7 +1287,7 @@ class SpringerClient(ProviderClient):
             else None
         )
         return article_from_markdown(
-            source="springer_pdf" if route == "pdf_fallback" else "springer_html",
+            source="springer_pdf" if route == PDF_FALLBACK else "springer_html",
             metadata=article_metadata,
             doi=doi or None,
             markdown_text=markdown_text,
@@ -1311,7 +1313,7 @@ class SpringerClient(ProviderClient):
             asset_failures=asset_failures,
         )
         content = raw_payload.content
-        if normalize_text(content.route_kind if content is not None else "").lower() != "pdf_fallback":
+        if normalize_text(content.route_kind if content is not None else "").lower() != PDF_FALLBACK:
             return artifacts
         return ProviderArtifacts(
             assets=list(artifacts.assets),

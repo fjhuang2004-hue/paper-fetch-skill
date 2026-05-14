@@ -51,6 +51,7 @@ include = ["paper_fetch*"]
 exclude = ["paper_fetch_devtools*"]
 
 [tool.setuptools.package-data]
+"paper_fetch.resources.arxiv" = ["*.json"]
 "paper_fetch.resources.formula" = ["*.json", "*.mjs"]
 
 [tool.ruff]

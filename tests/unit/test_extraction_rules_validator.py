@@ -58,11 +58,17 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
             errors = validator.validate_test_docstring_markers(markdown)
 
         self.assertTrue(
-            any("documented test `test_demo` for #rule-demo" in error for error in errors),
+            any(
+                "documented test `test_demo` for #rule-demo" in error
+                for error in errors
+            ),
             errors,
         )
         self.assertTrue(
-            any("has no documented test with matching docstring marker" in error for error in errors),
+            any(
+                "has no documented test with matching docstring marker" in error
+                for error in errors
+            ),
             errors,
         )
 
@@ -102,7 +108,9 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
             ],
         )
 
-    def test_manifest_samples_with_assets_must_be_reverse_indexed_or_allowlisted(self) -> None:
+    def test_manifest_samples_with_assets_must_be_reverse_indexed_or_allowlisted(
+        self,
+    ) -> None:
         markdown = """
 ## 未直接挂规则 fixture 清单
 
@@ -130,7 +138,9 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
             ],
         )
 
-    def test_rules_declaring_no_stable_doi_sample_must_be_in_summary_table(self) -> None:
+    def test_rules_declaring_no_stable_doi_sample_must_be_in_summary_table(
+        self,
+    ) -> None:
         markdown = """
 ### 无稳定 DOI 样本规则汇总表
 
@@ -157,7 +167,9 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
             ],
         )
 
-    def test_rules_declaring_no_stable_doi_sample_pass_when_summary_lists_anchor(self) -> None:
+    def test_rules_declaring_no_stable_doi_sample_pass_when_summary_lists_anchor(
+        self,
+    ) -> None:
         markdown = """
 ### 无稳定 DOI 样本规则汇总表
 
@@ -197,8 +209,12 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
             ],
         )
 
-    def test_nature_names_are_explicitly_inferred_as_springer_shared_rules(self) -> None:
-        self.assertEqual(validator._infer_providers("test_old_nature_fixture"), {"Springer"})
+    def test_nature_names_are_explicitly_inferred_as_springer_shared_rules(
+        self,
+    ) -> None:
+        self.assertEqual(
+            validator._infer_providers("test_old_nature_fixture"), {"Springer"}
+        )
 
         markdown = """
 ## Generic
@@ -247,6 +263,125 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
                 "`markdown_promo_tokens`"
             ],
         )
+
+    def test_site_ui_copy_constants_require_regression_marker(self) -> None:
+        files = {
+            validator.SRC_ROOT / "paper_fetch/providers/demo.py": (
+                "DEMO_MARKDOWN_PROMO_TOKENS = ('subscribe now',)\n"
+            )
+        }
+
+        def fake_read_text(path, encoding="utf-8"):
+            del encoding
+            return files[path]
+
+        with (
+            mock.patch.object(Path, "rglob", return_value=list(files)),
+            mock.patch.object(Path, "read_text", fake_read_text),
+        ):
+            errors = validator.validate_site_ui_copy_markers()
+
+        self.assertEqual(
+            errors,
+            [
+                "src/paper_fetch/providers/demo.py:1 "
+                "`DEMO_MARKDOWN_PROMO_TOKENS` is missing SITE_UI_COPY_REGRESSION_MARKER"
+            ],
+        )
+
+    def test_site_ui_copy_marker_allows_provider_copy_constant(self) -> None:
+        files = {
+            validator.SRC_ROOT / "paper_fetch/providers/demo.py": (
+                "# SITE_UI_COPY_REGRESSION_MARKER: provider UI copy.\n"
+                "# STRUCTURAL_UI_COPY_HOOK: provider structure-only cleanup.\n"
+                "DEMO_CHROME_TEXTS = ('save article',)\n"
+                "COMMON_MARKDOWN_PROMO_TOKENS = ('learn more',)\n"
+            )
+        }
+
+        def fake_read_text(path, encoding="utf-8"):
+            del encoding
+            return files[path]
+
+        with (
+            mock.patch.object(Path, "rglob", return_value=list(files)),
+            mock.patch.object(Path, "read_text", fake_read_text),
+        ):
+            self.assertEqual(validator.validate_site_ui_copy_markers(), [])
+
+    def test_site_ui_copy_marker_requires_policy_or_structural_owner(self) -> None:
+        files = {
+            validator.SRC_ROOT / "paper_fetch/providers/demo.py": (
+                "# SITE_UI_COPY_REGRESSION_MARKER: provider UI copy.\n"
+                "DEMO_CHROME_TEXTS = ('save article',)\n"
+            )
+        }
+
+        def fake_read_text(path, encoding="utf-8"):
+            del encoding
+            return files[path]
+
+        with (
+            mock.patch.object(Path, "rglob", return_value=list(files)),
+            mock.patch.object(Path, "read_text", fake_read_text),
+        ):
+            errors = validator.validate_site_ui_copy_markers()
+
+        self.assertEqual(
+            errors,
+            [
+                "src/paper_fetch/providers/demo.py:2 "
+                "`DEMO_CHROME_TEXTS` is missing CleanupPolicy or "
+                "STRUCTURAL_UI_COPY_HOOK ownership"
+            ],
+        )
+
+    def test_site_ui_copy_marker_requires_owner_for_chrome_selector_constants(
+        self,
+    ) -> None:
+        files = {
+            validator.SRC_ROOT / "paper_fetch/providers/demo.py": (
+                "# SITE_UI_COPY_REGRESSION_MARKER: provider chrome selectors.\n"
+                "DEMO_CHROME_SELECTORS = ('.toolbar',)\n"
+            )
+        }
+
+        def fake_read_text(path, encoding="utf-8"):
+            del encoding
+            return files[path]
+
+        with (
+            mock.patch.object(Path, "rglob", return_value=list(files)),
+            mock.patch.object(Path, "read_text", fake_read_text),
+        ):
+            errors = validator.validate_site_ui_copy_markers()
+
+        self.assertEqual(
+            errors,
+            [
+                "src/paper_fetch/providers/demo.py:2 "
+                "`DEMO_CHROME_SELECTORS` is missing CleanupPolicy or "
+                "STRUCTURAL_UI_COPY_HOOK ownership"
+            ],
+        )
+
+    def test_site_ui_copy_marker_allows_provider_rules_policy_owner(self) -> None:
+        files = {
+            validator.SRC_ROOT / "paper_fetch/extraction/html/provider_rules.py": (
+                "# SITE_UI_COPY_REGRESSION_MARKER: provider UI copy.\n"
+                "DEMO_MARKDOWN_PROMO_TOKENS = ('subscribe now',)\n"
+            )
+        }
+
+        def fake_read_text(path, encoding="utf-8"):
+            del encoding
+            return files[path]
+
+        with (
+            mock.patch.object(Path, "rglob", return_value=list(files)),
+            mock.patch.object(Path, "read_text", fake_read_text),
+        ):
+            self.assertEqual(validator.validate_site_ui_copy_markers(), [])
 
 
 if __name__ == "__main__":

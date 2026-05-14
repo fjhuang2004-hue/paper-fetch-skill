@@ -8,6 +8,12 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
+from paper_fetch.common_patterns import (
+    FIGURE_LABEL_PATTERN,
+    TABLE_LABEL_PATTERN,
+    is_extended_data_prefix,
+    table_label_prefix_for_match,
+)
 from paper_fetch.extraction.html import assets as html_assets
 from paper_fetch.extraction.html import _metadata as html_metadata
 from paper_fetch.extraction.html import _runtime as html_runtime
@@ -20,7 +26,17 @@ from paper_fetch.extraction.html.formula_rules import (
     is_display_formula_node,
     looks_like_formula_image,
 )
-from paper_fetch.extraction.html.provider_rules import provider_html_rules
+from paper_fetch.extraction.html.provider_rules import (
+    availability_rules_for_provider,
+    cleanup_policy_for_profile,
+    extraction_cleanup_selectors_for_profile,
+    extraction_drop_keywords_for_profile,
+    front_matter_contains_tokens_for_profile,
+    front_matter_exact_texts_for_profile,
+    front_matter_publication_keywords_for_profile,
+    markdown_promo_tokens_for_profile,
+    provider_html_rules,
+)
 from paper_fetch.extraction.html.inline import normalize_html_inline_text
 from paper_fetch.extraction.html.tables import render_table_markdown
 from paper_fetch.http import HttpTransport
@@ -31,8 +47,12 @@ from paper_fetch.providers._html_section_markdown import (
 )
 from paper_fetch.providers import _springer_html as springer_html
 import paper_fetch.providers._wiley_html as wiley_html
-from paper_fetch.providers.atypon_browser_workflow import asset_scopes as atypon_browser_workflow_asset_scopes
-from paper_fetch.providers.atypon_browser_workflow import profile as atypon_browser_workflow_profile
+from paper_fetch.providers.atypon_browser_workflow import (
+    asset_scopes as atypon_browser_workflow_asset_scopes,
+)
+from paper_fetch.providers.atypon_browser_workflow import (
+    profile as atypon_browser_workflow_profile,
+)
 from tests.block_fixtures import block_asset
 from tests.golden_criteria import golden_criteria_asset, golden_criteria_scenario_asset
 
@@ -63,6 +83,15 @@ class _DelayedAssetTransport(HttpTransport):
 
 
 class SharedHtmlHelperTests(unittest.TestCase):
+    def test_common_label_patterns_and_extended_data_prefix_helpers(self) -> None:
+        self.assertIsNotNone(FIGURE_LABEL_PATTERN.search("see Fig. 2a."))
+        self.assertIsNotNone(TABLE_LABEL_PATTERN.search("Table 3 reports values"))
+        self.assertTrue(is_extended_data_prefix("Extended Data Table"))
+        self.assertEqual(
+            table_label_prefix_for_match("extended data table"), "Extended Data Table"
+        )
+        self.assertEqual(table_label_prefix_for_match("table"), "Table")
+
     def test_shared_dom_helpers_normalize_common_tag_operations(self) -> None:
         soup = BeautifulSoup(
             """
@@ -1061,6 +1090,127 @@ Important body text.
         self.assertIn("Sign up for PNAS alerts.", generic_cleaned)
         self.assertNotIn("Sign up for PNAS alerts.", pnas_cleaned)
 
+    def test_html_cleanup_rules_merge_generic_and_provider_tokens(self) -> None:
+        generic_rules = html_runtime.html_cleanup_rules()
+        pnas_rules = html_runtime.html_cleanup_rules("pnas")
+
+        self.assertIn("toolbar", generic_rules.attr_tokens)
+        self.assertIn("toolbar", pnas_rules.attr_tokens)
+        self.assertNotIn("signup-alert-ad", generic_rules.attr_tokens)
+        self.assertIn("signup-alert-ad", pnas_rules.attr_tokens)
+        self.assertNotIn(
+            "sign up for pnas alerts",
+            generic_rules.markdown_promo_tokens,
+        )
+        self.assertIn(
+            "sign up for pnas alerts",
+            pnas_rules.markdown_promo_tokens,
+        )
+
+    def test_cleanup_policy_preserves_generic_runtime_tokens(self) -> None:
+        policy = cleanup_policy_for_profile(None)
+
+        self.assertEqual(policy.dom_drop_selectors, html_runtime.HTML_DROP_SELECTORS)
+        self.assertEqual(policy.dom_exact_texts, html_runtime.HTML_EXACT_NOISE_TEXTS)
+        self.assertEqual(policy.dom_prefix_texts, html_runtime.HTML_PREFIX_NOISE_TEXTS)
+        self.assertEqual(
+            policy.markdown_exact_texts, html_runtime.MARKDOWN_EXACT_NOISE_TEXTS
+        )
+        self.assertEqual(
+            policy.markdown_prefix_texts, html_runtime.MARKDOWN_PREFIX_NOISE_TEXTS
+        )
+        self.assertEqual(
+            policy.markdown_short_tokens, html_runtime.MARKDOWN_SHORT_NOISE_TOKENS
+        )
+
+    def test_cleanup_policy_preserves_provider_markdown_promo_tokens(self) -> None:
+        pnas_policy = cleanup_policy_for_profile("pnas")
+
+        self.assertEqual(
+            markdown_promo_tokens_for_profile("pnas"),
+            pnas_policy.markdown_contains_tokens,
+        )
+        self.assertIn("learn more", pnas_policy.markdown_contains_tokens)
+        self.assertIn("sign up for pnas alerts", pnas_policy.markdown_contains_tokens)
+        self.assertEqual(
+            provider_html_rules("pnas").markdown_promo_tokens,
+            pnas_policy.provider_markdown_promo_tokens,
+        )
+
+    def test_cleanup_policy_preserves_provider_front_matter_tokens(self) -> None:
+        science_policy = cleanup_policy_for_profile("science")
+
+        self.assertEqual(
+            front_matter_exact_texts_for_profile("science"),
+            science_policy.front_matter_exact_texts,
+        )
+        self.assertEqual(
+            front_matter_contains_tokens_for_profile("science"),
+            science_policy.front_matter_contains_tokens,
+        )
+        self.assertEqual(
+            front_matter_publication_keywords_for_profile("science"),
+            science_policy.front_matter_publication_keywords,
+        )
+
+    def test_cleanup_policy_preserves_ieee_extraction_cleanup_selectors(self) -> None:
+        ieee_policy = cleanup_policy_for_profile("ieee")
+
+        self.assertEqual(
+            extraction_cleanup_selectors_for_profile("ieee"),
+            ieee_policy.extraction_cleanup_selectors,
+        )
+        self.assertEqual(
+            extraction_drop_keywords_for_profile("ieee"),
+            ieee_policy.extraction_drop_keywords,
+        )
+        self.assertIn(".document-actions", ieee_policy.extraction_cleanup_selectors)
+        self.assertIn("document-actions", ieee_policy.availability_drop_keywords)
+
+    def test_cleanup_policy_exposes_springer_nature_chrome_policy(self) -> None:
+        policy = cleanup_policy_for_profile("springer_nature")
+
+        self.assertIn("open access", policy.chrome_section_headings)
+        self.assertIn("rights and permissions", policy.chrome_section_headings)
+        self.assertIn("article-actions", policy.chrome_attr_tokens)
+        self.assertEqual(policy.license_link_hosts, ("creativecommons.org",))
+        self.assertEqual(policy.license_link_path_prefixes, ("/licenses/",))
+        self.assertEqual(policy.license_word_limit, 180)
+
+    def test_cleanup_policy_exposes_ams_dom_postprocess_selectors(self) -> None:
+        policy = cleanup_policy_for_profile("ams")
+
+        self.assertIn(".gallery-link", policy.dom_postprocess_cleanup_selectors)
+        self.assertIn(
+            ".component-image-gallery", policy.dom_postprocess_cleanup_selectors
+        )
+        self.assertNotIn(".gallery-link", policy.extraction_cleanup_selectors)
+        self.assertNotIn(
+            ".gallery-link",
+            extraction_cleanup_selectors_for_profile("ams"),
+        )
+
+    def test_provider_html_rules_exposes_compatible_child_rule_objects(self) -> None:
+        rules = provider_html_rules("springer_nature")
+
+        self.assertEqual(rules.cleanup.policy.name, rules.noise_profile)
+        self.assertEqual(
+            rules.availability.availability_overrides,
+            rules.availability_overrides,
+        )
+        self.assertEqual(
+            rules.formula.display_formula_selectors,
+            rules.display_formula_selectors,
+        )
+        self.assertEqual(
+            rules.assets.supplementary_text_tokens,
+            rules.supplementary_text_tokens,
+        )
+        self.assertEqual(
+            availability_rules_for_provider("springer_nature").availability_overrides,
+            rules.availability_overrides,
+        )
+
     def test_front_matter_publication_keywords_keep_atypon_browser_workflow_provider_scoped(
         self,
     ) -> None:
@@ -1080,6 +1230,45 @@ Important body text.
                 publisher="pnas",
             )
         )
+        self.assertTrue(
+            html_runtime._looks_like_publication_watermark(
+                "BAMS",
+                noise_profile="ams",
+            )
+        )
+
+    def test_front_matter_publication_watermarks_require_short_label_shape(
+        self,
+    ) -> None:
+        examples = (
+            (
+                "science",
+                "Science and PNAS are mentioned here as part of a normal sentence.",
+            ),
+            (
+                "pnas",
+                "This PNAS Nexus article is discussed in the results, not the masthead.",
+            ),
+            (
+                "ams",
+                "BAMS appears in the body when comparing forecast verification datasets.",
+            ),
+        )
+
+        for profile, text in examples:
+            with self.subTest(profile=profile):
+                self.assertFalse(
+                    html_runtime._looks_like_publication_watermark(
+                        text,
+                        noise_profile=profile,
+                    )
+                )
+                self.assertFalse(
+                    atypon_browser_workflow_profile._looks_like_publication_watermark(
+                        text,
+                        publisher=profile,
+                    )
+                )
 
     def test_real_nature_fixture_keeps_source_data_without_chrome_sections(
         self,

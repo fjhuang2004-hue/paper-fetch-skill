@@ -286,6 +286,25 @@ SERVER_SCRIPT = textwrap.dedent(
                     ],
                 )
             ),
+            "ams": FakeProviderClient(
+                ProviderStatusResult(
+                    provider="ams",
+                    status="not_configured",
+                    available=False,
+                    official_provider=True,
+                    missing_env=["FLARESOLVERR_ENV_FILE"],
+                    checks=[
+                        build_provider_status_check(
+                            "runtime_env",
+                            "not_configured",
+                            "FLARESOLVERR_ENV_FILE is required.",
+                            missing_env=["FLARESOLVERR_ENV_FILE"],
+                        ),
+                        build_provider_status_check("repo_local_workflow", "not_configured", "Skipped because runtime_env is not configured."),
+                        build_provider_status_check("flaresolverr_health", "not_configured", "Skipped because runtime_env is not configured."),
+                    ],
+                )
+            ),
         }
 
     tools.service_resolve_paper = fake_resolve
@@ -389,11 +408,12 @@ class McpStdioIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         self.assertFalse(provider_status.isError)
                         self.assertEqual(
                             [item["provider"] for item in provider_status.structuredContent["providers"]],
-                            ["crossref", "elsevier", "springer", "wiley", "science", "pnas", "ieee", "arxiv", "copernicus"],
+                            ["crossref", "elsevier", "springer", "wiley", "science", "pnas", "ieee", "arxiv", "copernicus", "ams"],
                         )
                         self.assertEqual(provider_status.structuredContent["providers"][0]["status"], "ready")
                         self.assertEqual(provider_status.structuredContent["providers"][1]["missing_env"], ["ELSEVIER_API_KEY"])
-                        self.assertEqual(provider_status.structuredContent["providers"][-1]["status"], "ready")
+                        self.assertEqual(provider_status.structuredContent["providers"][-2]["status"], "ready")
+                        self.assertEqual(provider_status.structuredContent["providers"][-1]["provider"], "ams")
 
                         custom_fetch = await session.call_tool(
                             "fetch_paper",

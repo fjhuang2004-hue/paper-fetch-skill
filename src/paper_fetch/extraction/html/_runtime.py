@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Any, Mapping
 
@@ -10,27 +11,48 @@ from ...extraction.html.language import (
     collect_html_abstract_blocks,
     html_node_language_hint,
 )
+from ...extraction.html.front_matter import (
+    ARTICLE_TYPE_FRONT_MATTER_PREFIXES,
+    COMMON_FRONT_MATTER_LINE_PATTERNS,
+)
+from ...extraction.html.cleanup_policy import (
+    HTML_DROP_SELECTORS,
+    HTML_EXACT_NOISE_TEXTS,
+    HTML_NOISE_ATTR_TOKENS,
+    HTML_PREFIX_NOISE_TEXTS,
+    MARKDOWN_CHROME_SECTION_HEADINGS,
+    MARKDOWN_EXACT_NOISE_TEXTS,
+    MARKDOWN_PREFIX_NOISE_TEXTS,
+    MARKDOWN_SHORT_NOISE_TOKENS,
+    CleanupPolicy,
+    classify_dom_cleanup_node,
+    classify_markdown_cleanup_line,
+    count_words,
+)
+from ...extraction.html.html_tags import HTML_DROP_TAGS
 from ...extraction.html.parsing import choose_parser
 from ...extraction.html.semantics import (
+    HTML_BLOCK_TAGS,
     collect_html_section_hints,
     coerce_html_section_hints,
-    looks_like_reference_anchor,
     markdown_heading_category,
     match_next_html_section_hint,
     parse_markdown_heading,
 )
-from ...extraction.html.signals import contains_access_gate_text
+from ...extraction.html.signals import (
+    contains_access_gate_text,
+)
 from ...models import normalize_markdown_text, normalize_text
 from ...provider_catalog import provider_body_text_thresholds
 from ...publisher_identity import normalize_doi
 from ...publisher_identity import extract_doi as extract_doi_from_text
 from .provider_rules import (
+    cleanup_policy_for_profile,
     extraction_cleanup_selectors_for_profile,
     extraction_drop_keywords_for_profile,
     front_matter_exact_texts_for_profile,
     front_matter_footer_prefixes,
     front_matter_publication_keywords_for_profile,
-    markdown_promo_tokens_for_profile,
     normalize_noise_profile,
 )
 
@@ -46,7 +68,8 @@ except ImportError:  # pragma: no cover - exercised implicitly when dependency i
     Tag = None
 
 HTML_ROOT_SELECTORS = ("article", "main", '[role="main"]')
-HTML_DROP_TAGS = ("script", "style", "svg", "noscript", "template")
+# Publication-watermark heuristic only: these English masthead nouns are used
+# after short/title-like guards and are not a general language or NER list.
 FRONT_MATTER_PUBLICATION_KEYWORDS = {
     "advances",
     "bulletin",
@@ -61,118 +84,51 @@ FRONT_MATTER_PUBLICATION_KEYWORDS = {
     "sciences",
     "transactions",
 }
-HTML_BLOCK_TAGS = {
-    "address",
-    "article",
-    "aside",
-    "blockquote",
-    "dd",
-    "div",
-    "dl",
-    "dt",
-    "figcaption",
-    "footer",
-    "form",
-    "header",
-    "li",
-    "main",
-    "ol",
-    "p",
-    "pre",
-    "section",
-    "table",
-    "tbody",
-    "td",
-    "tfoot",
-    "th",
-    "thead",
-    "tr",
-    "ul",
-}
-HTML_DROP_SELECTORS = (
-    "nav",
-    "aside",
-    "form",
-    "button",
-    "input",
-    "select",
-    "textarea",
-    "dialog",
-    '[aria-hidden="true"]',
-    "[hidden]",
-)
-HTML_EXACT_NOISE_TEXTS = {
-    "advertisement",
-    "aims and scope",
-    "download pdf",
-    "rights and permissions",
-    "save article",
-    "submit manuscript",
-    "view all journals",
-    "view author publications",
-    "view saved research",
-    "search author on:",
-    "search author on: pubmed google scholar",
-    "get shareable link",
-    "copy shareable link to clipboard",
-}
-HTML_PREFIX_NOISE_TEXTS = ("skip to main content",)
-HTML_NOISE_ATTR_TOKENS = (
-    "advert",
-    "cookie",
-    "newsletter",
-    "share",
-    "toolbar",
-    "related",
-    "recommend",
-    "metrics",
-    "banner",
-    "promo",
-)
-MARKDOWN_EXACT_NOISE_TEXTS = HTML_EXACT_NOISE_TEXTS | {
-    "menu",
-    "home",
-    "similar content being viewed by others",
-}
-MARKDOWN_PREFIX_NOISE_TEXTS = HTML_PREFIX_NOISE_TEXTS + (
-    "subscribe",
-    "access provided by",
-    "buy article",
-    "view access options",
-    "you have full access to this",
-)
-MARKDOWN_SHORT_NOISE_TOKENS = (
-    "sign in",
-    "sign-in",
-    "log in",
-    "login",
-    "view access options",
-    "check access",
-    "buy now",
-)
-MARKDOWN_CHROME_SECTION_HEADINGS = frozenset(
-    {
-        "open access",
-        "permissions",
-        "rights and permissions",
-        "reprints and permissions",
-    }
-)
-ARTICLE_TYPE_FRONT_MATTER_PREFIXES = (
-    "regular paper",
-    "research article",
-    "original article",
-    "review article",
-    "short communication",
-    "brief communication",
-    "case report",
-    "letter to the editor",
+PUBLICATION_WATERMARK_PUNCTUATION = ".:;!?。！？"
+PUBLICATION_WATERMARK_CONNECTORS = {"and", "of", "the", "&"}
+PUBLICATION_WATERMARK_MAX_LENGTH = 64
+PUBLICATION_WATERMARK_MAX_TOKENS = 5
+TEXT_EXTRACTION_BLOCK_TAGS = frozenset(
+    tag
+    for tag in ("p", "div", "section", "article", "li", "ul", "ol", "table", "tr")
+    if tag in HTML_BLOCK_TAGS
 )
 _USE_MODULE_TRAFILATURA = object()
 
 
+@dataclass(frozen=True)
+class HtmlCleanupRules:
+    policy: CleanupPolicy
+    drop_selectors: tuple[str, ...]
+    exact_texts: frozenset[str]
+    prefix_texts: tuple[str, ...]
+    attr_tokens: tuple[str, ...]
+    extraction_cleanup_selectors: tuple[str, ...]
+    markdown_exact_texts: frozenset[str]
+    markdown_prefix_texts: tuple[str, ...]
+    markdown_short_tokens: tuple[str, ...]
+    markdown_promo_tokens: tuple[str, ...]
+
+
+def html_cleanup_rules(noise_profile: str | None = None) -> HtmlCleanupRules:
+    active_noise_profile = _normalize_noise_profile(noise_profile)
+    policy = cleanup_policy_for_profile(active_noise_profile)
+    return HtmlCleanupRules(
+        policy=policy,
+        drop_selectors=policy.dom_drop_selectors,
+        exact_texts=policy.dom_exact_texts,
+        prefix_texts=policy.dom_prefix_texts,
+        attr_tokens=policy.dom_attr_tokens,
+        extraction_cleanup_selectors=policy.extraction_cleanup_selectors,
+        markdown_exact_texts=policy.markdown_exact_texts,
+        markdown_prefix_texts=policy.markdown_prefix_texts,
+        markdown_short_tokens=policy.markdown_short_tokens,
+        markdown_promo_tokens=policy.markdown_contains_tokens,
+    )
+
+
 class _FallbackMarkdownParser(HTMLParser):
-    BLOCK_TAGS = {"p", "div", "section", "article", "li", "ul", "ol", "table", "tr"}
+    BLOCK_TAGS = TEXT_EXTRACTION_BLOCK_TAGS
     HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 
     def __init__(self) -> None:
@@ -252,17 +208,13 @@ def decode_html(body: bytes) -> str:
     return body.decode("utf-8", errors="replace")
 
 
-def count_words(text: str) -> int:
-    return len(re.findall(r"\b\w+\b", text, flags=re.UNICODE))
-
-
 def _normalize_noise_profile(noise_profile: str | None) -> str:
     return normalize_noise_profile(noise_profile)
 
 
 def _markdown_promo_tokens(noise_profile: str | None) -> tuple[str, ...]:
     active_noise_profile = _normalize_noise_profile(noise_profile)
-    return markdown_promo_tokens_for_profile(active_noise_profile)
+    return cleanup_policy_for_profile(active_noise_profile).markdown_contains_tokens
 
 
 def select_html_content_root(root: Any):
@@ -284,63 +236,39 @@ def prune_html_tree(root: Any, *, noise_profile: str | None = None) -> None:
     if BeautifulSoup is None:
         return
 
+    rules = html_cleanup_rules(noise_profile)
     for tag in root(HTML_DROP_TAGS):
         tag.decompose()
-    for selector in HTML_DROP_SELECTORS:
+    for selector in rules.drop_selectors:
         for element in root.select(selector):
             element.decompose()
-    for selector in extraction_cleanup_selectors_for_profile(noise_profile):
+    for selector in rules.extraction_cleanup_selectors:
         for element in root.select(selector):
             element.decompose()
     for element in list(root.find_all(href=re.compile(r"orcid\.org", re.IGNORECASE))):
         element.decompose()
     for element in list(root.find_all(True)):
-        if should_drop_html_element(element, noise_profile=noise_profile):
+        if should_drop_html_element(element, noise_profile=noise_profile, rules=rules):
             element.decompose()
 
 
-def should_drop_html_element(element: Any, *, noise_profile: str | None = None) -> bool:
+def should_drop_html_element(
+    element: Any,
+    *,
+    noise_profile: str | None = None,
+    rules: HtmlCleanupRules | None = None,
+) -> bool:
     if BeautifulSoup is None:
         return False
-    if element.name and re.compile(r"^h[1-6]$").match(element.name):
-        return False
-    if looks_like_reference_anchor(element):
-        return False
-
-    text = normalize_text(element.get_text(separator=" ", strip=True))
-    if not text:
-        return False
-
-    has_heading_descendant = bool(element.find(re.compile(r"^h[1-6]$")))
-    lowered = text.lower()
-    if lowered in HTML_EXACT_NOISE_TEXTS:
-        return True
-    if any(lowered.startswith(prefix) for prefix in HTML_PREFIX_NOISE_TEXTS):
-        if has_heading_descendant:
-            return False
-        return count_words(text) <= 40
-
-    attr_tokens: list[str] = []
-    element_name = normalize_text(getattr(element, "name", "")).lower()
-    for key, value in element.attrs.items():
-        key_name = str(key).lower()
-        if key_name in {"href", "src", "srcset"} or (
-            key_name == "title" and element_name == "a"
-        ):
-            continue
-        if isinstance(value, str):
-            attr_tokens.append(value.lower())
-        elif isinstance(value, list):
-            attr_tokens.extend(str(item).lower() for item in value)
-    if attr_tokens:
-        joined = " ".join(attr_tokens)
-        profile_drop_keywords = extraction_drop_keywords_for_profile(noise_profile)
-        if any(
-            token in joined
-            for token in (*HTML_NOISE_ATTR_TOKENS, *profile_drop_keywords)
-        ):
-            return count_words(text) <= 80
-    return False
+    cleanup_rules = rules or html_cleanup_rules(noise_profile)
+    return (
+        classify_dom_cleanup_node(
+            element,
+            policy=cleanup_rules.policy,
+            stage="extraction",
+        ).action
+        == "drop"
+    )
 
 
 def prepare_html_extraction_tree(
@@ -500,23 +428,13 @@ def _strip_markdown_chrome_sections(markdown_text: str) -> str:
 
 
 def clean_markdown(markdown_text: str, *, noise_profile: str | None = None) -> str:
-    active_noise_profile = _normalize_noise_profile(noise_profile)
-    markdown_promo_tokens = _markdown_promo_tokens(active_noise_profile)
+    cleanup_rules = html_cleanup_rules(noise_profile)
     markdown_text = _strip_markdown_chrome_sections(markdown_text)
     cleaned_lines: list[str] = []
     for raw_line in markdown_text.splitlines():
         line = re.sub(r"\(\s*refs?\.\s*\)", "", raw_line, flags=re.IGNORECASE).rstrip()
-        normalized = normalize_text(re.sub(r"^#+\s*", "", line)).lower()
-        if normalized in MARKDOWN_EXACT_NOISE_TEXTS:
-            continue
-        if any(normalized.startswith(prefix) for prefix in MARKDOWN_PREFIX_NOISE_TEXTS):
-            continue
-        if any(token in normalized for token in markdown_promo_tokens):
-            continue
-        if (
-            any(token in normalized for token in MARKDOWN_SHORT_NOISE_TOKENS)
-            and count_words(normalized) <= 16
-        ):
+        decision = classify_markdown_cleanup_line(line, policy=cleanup_rules.policy)
+        if decision.action == "drop":
             continue
         cleaned_lines.append(line)
     cleaned = "\n".join(cleaned_lines)
@@ -557,22 +475,33 @@ def _strip_title_heading(markdown_text: str, title: str) -> str:
     )
 
 
-def _looks_like_access_block(text: str) -> bool:
+def _looks_like_access_block(
+    text: str,
+    *,
+    rules: HtmlCleanupRules | None = None,
+) -> bool:
     lowered = normalize_text(text).lower()
     if not lowered:
         return False
+    cleanup_rules = rules or html_cleanup_rules()
     if contains_access_gate_text(lowered):
         return True
-    if any(prefix in lowered for prefix in MARKDOWN_PREFIX_NOISE_TEXTS):
+    if any(prefix in lowered for prefix in cleanup_rules.markdown_prefix_texts):
         return True
-    return any(token in lowered for token in MARKDOWN_SHORT_NOISE_TOKENS)
+    return any(token in lowered for token in cleanup_rules.markdown_short_tokens)
 
 
-def _looks_like_promo_block(text: str, *, noise_profile: str | None = None) -> bool:
+def _looks_like_promo_block(
+    text: str,
+    *,
+    rules: HtmlCleanupRules | None = None,
+    noise_profile: str | None = None,
+) -> bool:
     lowered = normalize_text(text).lower()
     if not lowered:
         return False
-    return any(token in lowered for token in _markdown_promo_tokens(noise_profile))
+    cleanup_rules = rules or html_cleanup_rules(noise_profile)
+    return any(token in lowered for token in cleanup_rules.markdown_promo_tokens)
 
 
 def _looks_like_caption_block(text: str) -> bool:
@@ -595,29 +524,38 @@ def _front_matter_publication_keywords(noise_profile: str | None) -> set[str]:
     }
 
 
+def _publication_watermark_label_tokens(text: str) -> tuple[str, ...]:
+    """Return tokens only for short publication masthead labels, not prose."""
+    normalized = normalize_text(text)
+    if not normalized or len(normalized) > PUBLICATION_WATERMARK_MAX_LENGTH:
+        return ()
+    if any(character in normalized for character in PUBLICATION_WATERMARK_PUNCTUATION):
+        return ()
+    tokens = tuple(normalized.split())
+    if not tokens or len(tokens) > PUBLICATION_WATERMARK_MAX_TOKENS:
+        return ()
+    if normalized.upper() == normalized:
+        return tokens
+    if all(
+        token[:1].isupper() or token.lower() in PUBLICATION_WATERMARK_CONNECTORS
+        for token in tokens
+    ):
+        return tokens
+    return ()
+
+
 def _looks_like_publication_watermark(
     text: str,
     *,
     noise_profile: str | None = None,
 ) -> bool:
     normalized = normalize_text(text)
-    if not normalized or len(normalized) > 64:
+    tokens = _publication_watermark_label_tokens(normalized)
+    if not tokens:
         return False
-    if any(character in normalized for character in ".:;!?。！？"):
-        return False
-    tokens = normalized.split()
     lowered_tokens = [token.lower().strip("&") for token in tokens]
-    if not tokens or len(tokens) > 5:
-        return False
-    if normalized.upper() == normalized and len(normalized) <= 8:
-        return True
     publication_keywords = _front_matter_publication_keywords(noise_profile)
-    if not any(token in publication_keywords for token in lowered_tokens):
-        return False
-    return all(
-        token[:1].isupper() or token.lower() in {"and", "of", "the", "&"}
-        for token in tokens
-    )
+    return any(token in publication_keywords for token in lowered_tokens)
 
 
 def _looks_like_front_matter_block(
@@ -643,14 +581,7 @@ def _looks_like_front_matter_block(
         return True
     if lowered.startswith("by "):
         return True
-    if any(
-        pattern.match(normalized)
-        for pattern in (
-            re.compile(r"^doi:\s*", flags=re.IGNORECASE),
-            re.compile(r"^(vol\.?|volume)\b", flags=re.IGNORECASE),
-            re.compile(r"^issue\b", flags=re.IGNORECASE),
-        )
-    ):
+    if any(pattern.match(normalized) for pattern in COMMON_FRONT_MATTER_LINE_PATTERNS):
         return True
     return lowered in front_matter_exact_texts_for_profile(
         noise_profile
@@ -675,6 +606,7 @@ def _filtered_body_blocks(
     abstract_canonical = _canonical_text(abstract)
     blocks = _split_markdown_blocks(candidate)
     coerced_section_hints = coerce_html_section_hints(section_hints)
+    cleanup_rules = html_cleanup_rules(noise_profile)
     filtered_blocks: list[str] = []
     abstract_blocks: list[str] = []
     body_heading_count = 0
@@ -769,8 +701,8 @@ def _filtered_body_blocks(
         ):
             continue
         if (
-            _looks_like_access_block(normalized_block)
-            or _looks_like_promo_block(normalized_block, noise_profile=noise_profile)
+            _looks_like_access_block(normalized_block, rules=cleanup_rules)
+            or _looks_like_promo_block(normalized_block, rules=cleanup_rules)
             or _looks_like_markdown_image_block(normalized_block)
             or _looks_like_caption_block(normalized_block)
             or _looks_like_equation_label_block(normalized_block)

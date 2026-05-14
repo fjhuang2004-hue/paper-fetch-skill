@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any, Mapping
 
+from ..common_patterns import EXTENDED_DATA_FIGURE_LABEL
 from ..utils import normalize_text, safe_text
 from .markdown import (
     NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN,
@@ -44,8 +45,10 @@ from .sections import (
 from .tokens import estimate_normalized_tokens, estimate_tokens, normalize_token_budget, truncate_text_to_tokens
 
 MARKDOWN_DECORATION_PATTERN = re.compile(r"[*_`$]+")
+# Rendering strips only already-rendered caption prefixes; this is narrower
+# than provider extraction because it must not reinterpret arbitrary body text.
 FIGURE_CAPTION_LABEL_PREFIX_PATTERN = re.compile(
-    r"^\s*(?:figure|fig\.?|extended data fig\.?)\s+\d+[A-Za-z]?\s*[:.]?\s*",
+    rf"^\s*(?:figure|fig\.?|{re.escape(EXTENDED_DATA_FIGURE_LABEL)}\.?)\s+\d+[A-Za-z]?\s*[:.]?\s*",
     flags=re.IGNORECASE,
 )
 
@@ -152,6 +155,13 @@ def _build_markdown_render_plan(
         for section in article.sections
         if strip_markdown_images(section.text) and normalize_text(section.kind).lower() in RETAINED_NON_BODY_SECTION_KINDS
     )
+    remaining_ids = {id(section) for section in remaining_body_sections}
+    retained_ids = {id(section) for section in retained_sections}
+    source_ordered_main_sections = tuple(
+        section
+        for section in article.sections
+        if id(section) in remaining_ids or id(section) in retained_ids
+    )
     figure_assets = selected_figure_assets(article.assets, asset_profile=asset_profile)
     figure_assets = filter_inline_body_figure_assets(
         figure_assets,
@@ -161,6 +171,10 @@ def _build_markdown_render_plan(
         figure_assets,
         sections=(*rendered_abstract_sections, *body_sections, *retained_sections),
     )
+    table_assets = filter_inline_body_table_assets(
+        selected_table_assets(article.assets, asset_profile=asset_profile),
+        sections=(*lead_sections, *rendered_abstract_sections, *remaining_body_sections, *retained_sections),
+    )
     return _MarkdownRenderPlan(
         token_budget=token_budget,
         abstract_text=first_abstract_text(abstract_text=article.metadata.abstract, sections=article.sections),
@@ -169,10 +183,10 @@ def _build_markdown_render_plan(
         include_figures=effective_include_figures,
         reference_count=resolve_reference_limit(effective_include_refs, len(article.references)),
         lead_sections=lead_sections,
-        body_sections=remaining_body_sections,
-        retained_sections=retained_sections,
+        body_sections=source_ordered_main_sections,
+        retained_sections=(),
         figure_assets=tuple(figure_assets),
-        table_assets=tuple(selected_table_assets(article.assets, asset_profile=asset_profile)),
+        table_assets=tuple(table_assets),
         supplementary_assets=tuple(
             selected_supplementary_assets(
                 article.assets,
@@ -377,6 +391,32 @@ def rewrite_markdown_asset_links(markdown_text: str, assets: Sequence[Asset | Ma
 
 
 def filter_inline_body_figure_assets(
+    assets: Sequence[Asset],
+    *,
+    sections: Sequence["Section"],
+) -> list[Asset]:
+    inline_urls = _inline_markdown_image_urls(sections)
+    if not inline_urls:
+        return list(assets)
+    inline_candidates = [_image_reference_candidates(url) for url in inline_urls]
+
+    remaining: list[Asset] = []
+    for asset in assets:
+        if not asset_in_body(asset):
+            remaining.append(asset)
+            continue
+        asset_candidates = _asset_markdown_reference_candidates(asset)
+        if asset_candidates and any(
+            _image_references_match(asset_candidates, inline_candidate)
+            for inline_candidate in inline_candidates
+            if inline_candidate
+        ):
+            continue
+        remaining.append(asset)
+    return remaining
+
+
+def filter_inline_body_table_assets(
     assets: Sequence[Asset],
     *,
     sections: Sequence["Section"],
@@ -724,6 +764,7 @@ __all__ = [
     "selected_figure_assets",
     "rewrite_markdown_asset_links",
     "filter_inline_body_figure_assets",
+    "filter_inline_body_table_assets",
     "suppress_repeated_body_figure_captions",
     "selected_table_assets",
     "selected_supplementary_assets",

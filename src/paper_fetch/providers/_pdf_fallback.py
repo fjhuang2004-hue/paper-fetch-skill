@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
+from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_HEADER, RequestFailure
 from ..extraction.html.shared import html_text_snippet, html_title_snippet
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..runtime import RuntimeContext
@@ -186,13 +186,21 @@ def _response_to_pdf_result(
         return None
     response_headers = response.headers if response is not None else {}
     content_type = normalize_text(str(response_headers.get("content-type") or "")).lower()
-    if not looks_like_pdf_payload(content_type, response.body(), final_url):
+    try:
+        response_body = response.body()
+    except Exception as exc:
+        raise PdfFallbackFailure(
+            "pdf_download_failed",
+            f"Failed to read PDF fallback response body: {exc}",
+            details={"source_url": source_url, "final_url": final_url},
+        ) from exc
+    if not looks_like_pdf_payload(content_type, response_body, final_url):
         return None
     return pdf_fetch_result_from_bytes(
         artifact_dir=artifact_dir,
         source_url=source_url,
         final_url=final_url,
-        pdf_bytes=response.body(),
+        pdf_bytes=response_body,
         suggested_filename=filename_from_headers(response_headers),
     )
 
@@ -480,7 +488,7 @@ def fetch_pdf_over_http(
     if not candidate_urls:
         raise PdfFetchFailure("empty_pdf_attempts", "No PDF fallback candidates were attempted.")
 
-    request_headers = {"Accept": "application/pdf,*/*;q=0.8", **dict(headers or {})}
+    request_headers = {"Accept": PDF_ACCEPT_HEADER, **dict(headers or {})}
     last_failure: PdfFetchFailure | None = None
     opener = _build_cookie_seeded_opener(
         seed_urls,

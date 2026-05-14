@@ -22,6 +22,10 @@ class BodyTextThresholds:
 
 
 DEFAULT_BODY_TEXT_THRESHOLDS = BodyTextThresholds()
+ATYPON_DEFAULT_PDF_PATH_TEMPLATES = (
+    "/doi/epdf/{doi}",
+    "/doi/pdf/{doi}",
+)
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,7 @@ class ProviderSpec:
     crossref_pdf_position: int = 0
     api_hosts: tuple[str, ...] = ()
     api_url_templates: tuple[tuple[str, str], ...] = ()
+    sensitive_headers: tuple[str, ...] = ()
     metadata_probe_short_circuit: MetadataProbeShortCircuit | str | None = None
     persist_provider_html: bool = False
     xml_root_tags: tuple[str, ...] = ()
@@ -76,6 +81,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         provider_managed_abstract_only=False,
         client_factory_path="paper_fetch.providers.crossref:CrossrefClient",
         status_order=0,
+        sensitive_headers=("cr-clickthrough-client-token",),
     ),
     "elsevier": ProviderSpec(
         name="elsevier",
@@ -90,6 +96,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         client_factory_path="paper_fetch.providers.elsevier:ElsevierClient",
         status_order=1,
         api_hosts=("scopus.com", "www.scopus.com"),
+        sensitive_headers=("x-els-apikey", "x-els-insttoken"),
         xml_root_tags=("full-text-retrieval-response",),
         xml_file_tokens=("elsevier", "10.1016"),
     ),
@@ -137,8 +144,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         base_domains=("onlinelibrary.wiley.com",),
         html_path_templates=("/doi/full/{doi}", "/doi/{doi}"),
         pdf_path_templates=(
-            "/doi/epdf/{doi}",
-            "/doi/pdf/{doi}",
+            *ATYPON_DEFAULT_PDF_PATH_TEMPLATES,
             "/doi/pdfdirect/{doi}",
             "/wol1/doi/{doi}/fullpdf",
         ),
@@ -146,6 +152,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         api_url_templates=(
             ("tdm_pdf", "https://api.wiley.com/onlinelibrary/tdm/v1/articles/{doi}"),
         ),
+        sensitive_headers=("wiley-tdm-client-token",),
     ),
     "science": ProviderSpec(
         name="science",
@@ -162,8 +169,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         base_domains=("www.science.org", "science.org"),
         html_path_templates=("/doi/full/{doi}", "/doi/{doi}"),
         pdf_path_templates=(
-            "/doi/epdf/{doi}",
-            "/doi/pdf/{doi}",
+            *ATYPON_DEFAULT_PDF_PATH_TEMPLATES,
             "/doi/pdf/{doi}?download=true",
         ),
     ),
@@ -243,6 +249,27 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         xml_file_tokens=("copernicus", "10.5194"),
         body_text_thresholds=BodyTextThresholds(min_chars=500),
     ),
+    "ams": ProviderSpec(
+        name="ams",
+        display_name="AMS",
+        official=True,
+        domains=("journals.ametsoc.org", "ametsoc.org"),
+        doi_prefixes=("10.1175/",),
+        publisher_aliases=(
+            "american meteorological society",
+            "ams",
+            "american meteorological society (ams)",
+        ),
+        asset_default="body",
+        probe_capability="routing_signal",
+        provider_managed_abstract_only=True,
+        client_factory_path="paper_fetch.providers.ams:AmsClient",
+        status_order=9,
+        base_domains=("journals.ametsoc.org",),
+        # AMS is Atypon-hosted, but does not use the shared /doi/pdf routes.
+        # Its PDF fallback is built from Crossref/source URL candidates instead.
+        crossref_pdf_position=0,
+    ),
 }
 
 SOURCE_PROVIDER_MAP: dict[str, str] = {
@@ -260,6 +287,8 @@ SOURCE_PROVIDER_MAP: dict[str, str] = {
     "arxiv_pdf": "arxiv",
     "copernicus_xml": "copernicus",
     "copernicus_pdf": "copernicus",
+    "ams_html": "ams",
+    "ams_pdf": "ams",
 }
 
 
@@ -363,6 +392,15 @@ def provider_api_url_template(provider_name: str | None, template_name: str) -> 
         if name == template_name:
             return template
     return None
+
+
+def provider_sensitive_header_names() -> frozenset[str]:
+    return frozenset(
+        _normalize_catalog_token(header)
+        for spec in PROVIDER_CATALOG.values()
+        for header in spec.sensitive_headers
+        if _normalize_catalog_token(header)
+    )
 
 
 def _load_callable(callback_path: str) -> MetadataProbeShortCircuit:

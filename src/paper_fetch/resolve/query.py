@@ -27,6 +27,7 @@ from ..http import HttpTransport, RequestFailure
 from ..metadata.crossref import CrossrefLookupClient
 from ..metadata.types import CrossrefMetadata
 from ..publisher_identity import extract_doi, infer_provider_from_signals, normalize_doi
+from ..reason_codes import ERROR, NO_RESULT, NOT_SUPPORTED
 CONFIDENT_SCORE_MIN = 0.90
 CONFIDENT_MARGIN_MIN = 0.05
 MIN_HTML_TITLE_LOOKUP_CHARS = 24
@@ -114,7 +115,7 @@ def resolve_query(
 ) -> ResolvedQuery:
     normalized_query = query.strip()
     if not normalized_query:
-        raise ProviderFailure("not_supported", "Query must not be empty.")
+        raise ProviderFailure(NOT_SUPPORTED, "Query must not be empty.")
 
     direct_arxiv_id = arxiv_id_from_query(normalized_query)
     if direct_arxiv_id and (arxiv_id_from_url(normalized_query) or normalized_query.lower().startswith("arxiv:")):
@@ -170,7 +171,7 @@ def resolve_query(
                     provider_hint=provider_hint,
                     confidence=1.0,
                 )
-            raise ProviderFailure("error", f"Failed to fetch landing page: {exc}") from exc
+            raise ProviderFailure(ERROR, f"Failed to fetch landing page: {exc}") from exc
         response_url = landing_fetch.final_url
         html_metadata = landing_fetch.metadata
         landing_url = urllib.parse.urljoin(
@@ -246,7 +247,7 @@ def resolve_query(
 
     candidates = crossref.search_bibliographic_candidates(normalized_query, rows=5)
     if not candidates:
-        raise ProviderFailure("no_result", "Crossref returned no metadata results for the title query.")
+        raise ProviderFailure(NO_RESULT, "Crossref returned no metadata results for the title query.")
     scored = score_candidates(normalized_query, candidates)
     top_one = scored[0]
     if is_confident_top_candidate(scored):

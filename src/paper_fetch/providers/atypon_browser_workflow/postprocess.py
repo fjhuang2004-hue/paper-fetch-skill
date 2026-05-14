@@ -1,4 +1,4 @@
-"""Markdown postprocess helpers for Science/PNAS browser workflows."""
+"""Markdown postprocess helpers for Atypon browser workflows."""
 
 from __future__ import annotations
 
@@ -356,6 +356,21 @@ def _postprocess_browser_workflow_markdown(
                 continue
 
             category = _heading_category(f"h{min(level, 6)}", heading_text, title=normalized_title or None)
+            override_category = normalize_text(
+                str(
+                    _apply_profile_markdown_postprocess(
+                        "",
+                        publisher=publisher,
+                        stage="heading_category",
+                        heading_text=heading_text,
+                        level=level,
+                        category=category,
+                    )
+                    or ""
+                )
+            )
+            if override_category:
+                category = override_category
             if category == "front_matter":
                 in_front_matter = True
                 in_abstract = False

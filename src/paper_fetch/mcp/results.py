@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from ..http import RequestCancelledError
 from ..providers.base import ProviderFailure
+from ..reason_codes import ERROR, NO_ACCESS, NOT_CONFIGURED, RATE_LIMITED
 from ..service import PaperFetchFailure
 
 
@@ -43,9 +44,9 @@ def _validation_reason(error: ValidationError) -> str:
 
 def error_payload_from_exception(error: Exception) -> dict[str, Any]:
     if isinstance(error, ValidationError):
-        return {"status": "error", "reason": _validation_reason(error), "candidates": None, "missing_env": None}
+        return {"status": ERROR, "reason": _validation_reason(error), "candidates": None, "missing_env": None}
     if isinstance(error, RequestCancelledError):
-        return {"status": "error", "reason": "Request cancelled.", "candidates": None, "missing_env": None}
+        return {"status": ERROR, "reason": "Request cancelled.", "candidates": None, "missing_env": None}
     if isinstance(error, PaperFetchFailure):
         return {
             "status": error.status,
@@ -54,13 +55,13 @@ def error_payload_from_exception(error: Exception) -> dict[str, Any]:
             "missing_env": None,
         }
     if isinstance(error, ProviderFailure):
-        status = error.code if error.code in {"no_access", "rate_limited"} else "error"
-        if error.code == "not_configured" and error.missing_env:
-            status = "no_access"
+        status = error.code if error.code in {NO_ACCESS, RATE_LIMITED} else ERROR
+        if error.code == NOT_CONFIGURED and error.missing_env:
+            status = NO_ACCESS
         return {
             "status": status,
             "reason": error.message,
             "candidates": None,
             "missing_env": error.missing_env or None,
         }
-    return {"status": "error", "reason": str(error), "candidates": None, "missing_env": None}
+    return {"status": ERROR, "reason": str(error), "candidates": None, "missing_env": None}

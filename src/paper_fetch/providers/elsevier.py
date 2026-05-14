@@ -16,7 +16,7 @@ from ..config import build_user_agent, resolve_asset_download_concurrency
 from ..http import (
     DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
     HttpTransport,
-    RequestErrorCategory,
+    PDF_MIME_TYPE,
     RequestFailure,
     is_xml_content_type,
 )
@@ -47,12 +47,18 @@ from ._pdf_common import (
     pdf_fetch_result_from_response,
 )
 from ._payloads import build_provider_payload
+from ._retry_categories import (
+    DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
+    NETWORK_RETRYABLE_REASON_TOKENS,
+)
 from ._waterfall import ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
+from ..reason_codes import NO_RESULT, NOT_CONFIGURED, NOT_SUPPORTED, OK, PDF_FALLBACK
 from ..quality.html_availability import (
     assess_plain_text_fulltext_availability,
     assess_structured_article_fulltext_availability,
 )
 from ..extraction.html.assets import download_supplementary_assets as download_generic_supplementary_assets
+from ..extraction.html.signals import ASSET_BLOCKING_REASON_TOKENS
 from .base import (
     ProviderArtifacts,
     ProviderClient,
@@ -66,41 +72,14 @@ from .base import (
 
 
 _ELSEVIER_RETRYABLE_BODY_ASSET_TYPES = frozenset({"image", "table_asset"})
-_ELSEVIER_RETRYABLE_ASSET_ERROR_CATEGORIES = frozenset(
-    {
-        RequestErrorCategory.NETWORK_ERROR.value,
-        RequestErrorCategory.TIMEOUT.value,
-        RequestErrorCategory.TLS_ERROR.value,
-        RequestErrorCategory.DNS_ERROR.value,
-        RequestErrorCategory.CONNECTION_RESET.value,
-        RequestErrorCategory.CONNECTION_CLOSED.value,
-    }
-)
+_ELSEVIER_RETRYABLE_ASSET_ERROR_CATEGORIES = DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES
 _ELSEVIER_NON_RETRYABLE_ASSET_REASON_TOKENS = (
     "unsupported asset url scheme",
     "non-http",
     "non http",
-    "unauthorized",
-    "forbidden",
-    "authentication",
-    "authorization",
-    "permission",
-    "access denied",
-    "access gate",
-    "license",
+    *ASSET_BLOCKING_REASON_TOKENS,
 )
-_ELSEVIER_RETRYABLE_ASSET_REASON_TOKENS = (
-    "network error",
-    "timeout",
-    "timed out",
-    "ssl",
-    "eof",
-    "connection reset",
-    "connection aborted",
-    "connection broken",
-    "remote end closed",
-    "temporary failure",
-)
+_ELSEVIER_RETRYABLE_ASSET_REASON_TOKENS = NETWORK_RETRYABLE_REASON_TOKENS
 
 
 def xml_local_name(tag: str) -> str:
@@ -619,7 +598,7 @@ class ElsevierClient(ProviderClient):
     def _base_headers(self, accept: str) -> dict[str, str]:
         if not self.api_key:
             raise ProviderFailure(
-                "not_configured",
+                NOT_CONFIGURED,
                 "ELSEVIER_API_KEY is not configured.",
                 missing_env=["ELSEVIER_API_KEY"],
             )
@@ -638,7 +617,7 @@ class ElsevierClient(ProviderClient):
         return headers
 
     def probe_status(self) -> ProviderStatusResult:
-        check_status = "ok" if self.api_key else "not_configured"
+        check_status = OK if self.api_key else NOT_CONFIGURED
         message = (
             "Elsevier full-text API credentials are configured."
             if self.api_key
@@ -694,7 +673,7 @@ class ElsevierClient(ProviderClient):
         content_type = str((response.get("headers") or {}).get("content-type") or "text/xml")
         if not is_xml_content_type(content_type):
             raise ProviderFailure(
-                "no_result",
+                NO_RESULT,
                 f"Elsevier official XML route returned unsupported content type: {content_type}",
             )
         return build_provider_payload(
@@ -714,7 +693,7 @@ class ElsevierClient(ProviderClient):
             response = self.transport.request(
                 "GET",
                 url,
-                headers=self._base_headers("application/pdf"),
+                headers=self._base_headers(PDF_MIME_TYPE),
                 query={"view": "FULL"},
                 timeout=DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
                 retry_on_rate_limit=True,
@@ -741,20 +720,20 @@ class ElsevierClient(ProviderClient):
             )
         except PdfFetchFailure as exc:
             message = str(exc) if str(exc).strip() else "Elsevier official PDF fallback was not usable."
-            raise ProviderFailure("no_result", message) from exc
+            raise ProviderFailure(NO_RESULT, message) from exc
 
         return build_provider_payload(
             provider="elsevier",
-            route_kind="pdf_fallback",
+            route_kind=PDF_FALLBACK,
             source_url=pdf_result.final_url,
-            content_type="application/pdf",
+            content_type=PDF_MIME_TYPE,
             body=pdf_result.pdf_bytes,
             markdown_text=pdf_result.markdown_text,
             reason="Downloaded full text from the official Elsevier API PDF fallback.",
             suggested_filename=pdf_result.suggested_filename,
             trace_markers=[
                 fulltext_marker("elsevier", "ok", route="pdf_api"),
-                fulltext_marker("elsevier", "ok", route="pdf_fallback"),
+                fulltext_marker("elsevier", "ok", route=PDF_FALLBACK),
             ],
             needs_local_copy=True,
         )
@@ -800,7 +779,7 @@ class ElsevierClient(ProviderClient):
         doi = normalize_doi(query.get("doi"))
         if not doi:
             raise ProviderFailure(
-                "not_supported",
+                NOT_SUPPORTED,
                 "Elsevier official metadata retrieval needs a DOI in this implementation.",
             )
 
@@ -842,7 +821,7 @@ class ElsevierClient(ProviderClient):
             "keywords": extract_elsevier_keywords(root),
         }
         if not metadata["title"]:
-            raise ProviderFailure("no_result", "Elsevier metadata payload did not contain a title.")
+            raise ProviderFailure(NO_RESULT, "Elsevier metadata payload did not contain a title.")
         return metadata
 
     def download_related_assets(
@@ -880,14 +859,14 @@ class ElsevierClient(ProviderClient):
         context = self._runtime_context(context)
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
-            raise ProviderFailure("not_supported", "Elsevier full-text retrieval requires a DOI.")
+            raise ProviderFailure(NOT_SUPPORTED, "Elsevier full-text retrieval requires a DOI.")
 
         def run_xml(_state: ProviderWaterfallState) -> RawFulltextPayload:
             xml_payload = self._fetch_official_xml_payload(normalized_doi)
             if self._official_payload_is_usable(metadata, xml_payload, context=context):
                 return xml_payload
             raise ProviderFailure(
-                "no_result",
+                NO_RESULT,
                 "Elsevier official XML response did not produce enough article body text.",
             )
 
@@ -910,7 +889,7 @@ class ElsevierClient(ProviderClient):
                     failure_marker=fulltext_marker("elsevier", "fail", route="pdf_api"),
                     success_markers=(
                         fulltext_marker("elsevier", "ok", route="pdf_api"),
-                        fulltext_marker("elsevier", "ok", route="pdf_fallback"),
+                        fulltext_marker("elsevier", "ok", route=PDF_FALLBACK),
                     ),
                     success_warning="Full text was extracted from the Elsevier API PDF fallback after the XML route was not usable.",
                 ),
@@ -935,7 +914,7 @@ class ElsevierClient(ProviderClient):
         warnings = list(raw_payload.warnings)
         trace = list(raw_payload.trace)
 
-        if route == "pdf_fallback":
+        if route == PDF_FALLBACK:
             markdown_text = str((content.markdown_text if content is not None else "") or "").strip()
             if not markdown_text:
                 warnings.append("Elsevier official PDF fallback did not produce usable Markdown.")
@@ -1044,7 +1023,7 @@ class ElsevierClient(ProviderClient):
         )
         content = raw_payload.content
         route = normalize_text(content.route_kind if content is not None else "").lower()
-        if route != "pdf_fallback":
+        if route != PDF_FALLBACK:
             return artifacts
         return ProviderArtifacts(
             assets=list(artifacts.assets),

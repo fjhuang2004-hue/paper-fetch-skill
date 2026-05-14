@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..common_patterns import WORD_TOKEN_PATTERN
+from ..http import is_pdf_content_type
 from ..utils import normalize_text
 from ._flaresolverr import CLOUDFLARE_COOKIE_NAMES, _CLOUDFLARE_COOKIE_PREFIXES
 
@@ -33,8 +35,11 @@ class PdfFetchFailure(Exception):
 
 
 _CONTENT_DISPOSITION_FILENAME_PATTERN = re.compile(r'filename\*?=(?:UTF-8\'\')?"?([^";]+)"?', flags=re.IGNORECASE)
-_PDF_MARKDOWN_WORD_PATTERN = re.compile(r"\b[\w][\w'-]*\b", flags=re.UNICODE)
-_PDF_LICENSE_MARKERS = (
+_PDF_MARKDOWN_WORD_PATTERN = WORD_TOKEN_PATTERN
+# IEEE PDF cover/license pages are the common failure mode this guard was
+# calibrated against; keep the marker name provider-specific so callers do not
+# treat it as a generic publisher-license classifier.
+_IEEE_PDF_LICENSE_MARKERS = (
     "authorized licensed use limited to",
     "restrictions apply",
     "downloaded on",
@@ -104,7 +109,7 @@ def _pdf_markdown_quality(markdown_text: str) -> _PdfMarkdownQuality:
     license_word_count = 0
     for line in lines:
         normalized_line = normalize_text(line).lower()
-        if any(marker in normalized_line for marker in _PDF_LICENSE_MARKERS):
+        if any(marker in normalized_line for marker in _IEEE_PDF_LICENSE_MARKERS):
             license_word_count += _pdf_word_count(line)
     license_only = license_word_count > 0 and (
         word_count < _MIN_USABLE_PDF_MARKDOWN_WORDS
@@ -248,7 +253,11 @@ def render_pdf_markdown(pdf_path: Path) -> str:
 def looks_like_pdf_payload(content_type: str | None, payload: bytes, final_url: str | None = None) -> bool:
     normalized_content_type = normalize_text(content_type).lower()
     normalized_final_url = normalize_text(final_url).lower()
-    return payload.startswith(b"%PDF-") or "application/pdf" in normalized_content_type or normalized_final_url.endswith(".pdf")
+    return (
+        payload.startswith(b"%PDF-")
+        or is_pdf_content_type(normalized_content_type)
+        or normalized_final_url.endswith(".pdf")
+    )
 
 
 def _normalized_response_headers(response: Mapping[str, Any]) -> dict[str, str]:

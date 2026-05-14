@@ -7,6 +7,16 @@ from typing import Callable
 
 from ..tracing import source_trail_from_trace, trace_from_markers
 from .base import ProviderFailure, RawFulltextPayload, combine_provider_failures
+from ..reason_codes import ERROR, NO_ACCESS, NO_RESULT, NOT_CONFIGURED, NOT_SUPPORTED, RATE_LIMITED
+
+DEFAULT_WATERFALL_CONTINUE_CODES = (
+    NO_RESULT,
+    NO_ACCESS,
+    RATE_LIMITED,
+    ERROR,
+    NOT_CONFIGURED,
+    NOT_SUPPORTED,
+)
 
 
 @dataclass
@@ -44,7 +54,7 @@ class ProviderWaterfallStep:
     run: StepRunner
     failure_marker: str | None = None
     success_markers: tuple[str, ...] = ()
-    continue_codes: tuple[str, ...] = ("no_result",)
+    continue_codes: tuple[str, ...] = (NO_RESULT,)
     failure_warning: str | WarningFactory | None = None
     success_warning: str | None = None
     include_failure_trail_on_success: bool = True
@@ -160,5 +170,5 @@ def run_provider_waterfall(
         return payload
 
     if not state.failures:
-        raise ProviderFailure("no_result", "Provider waterfall did not run any retrieval steps.")
+        raise ProviderFailure(NO_RESULT, "Provider waterfall did not run any retrieval steps.")
     raise (final_failure_factory or _default_final_failure)(state)

@@ -6,6 +6,7 @@ import copy
 import re
 from typing import Any, Callable
 
+from ...common_patterns import FIGURE_LABEL_PATTERN, TABLE_LABEL_PATTERN
 from ...extraction.html.formula_rules import (
     display_formula_nodes,
     formula_image_url_from_node,
@@ -21,6 +22,7 @@ from ...extraction.html.semantics import (
     ABSTRACT_ATTR_TOKENS as ABSTRACT_TOKENS,
     ANCILLARY_TOKENS,
     BACK_MATTER_TOKENS,
+    BODY_CONTAINER_TOKENS,
     has_explicit_reference_marker,
     node_identity_text,
     normalize_heading,
@@ -64,14 +66,6 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
     NavigableString = None
     Tag = None
-
-FIGURE_LABEL_PATTERN = re.compile(
-    r"\bfig(?:ure)?\.?\s*(\d+[A-Za-z]?)\b", flags=re.IGNORECASE
-)
-
-
-TABLE_LABEL_PATTERN = re.compile(r"\btable\.?\s*(\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
-
 
 EQUATION_NUMBER_PATTERN = re.compile(r"(\d+[A-Za-z]?)")
 
@@ -273,6 +267,17 @@ def _display_formula_nodes(container: Tag) -> list[Tag]:
 
 
 def _equation_label(node: Tag) -> str:
+    attrs = getattr(node, "attrs", None) or {}
+    explicit_label = normalize_text(str(attrs.get("data-equation-label") or ""))
+    if explicit_label:
+        return explicit_label
+    if normalize_text(str(attrs.get("data-no-equation-label") or "")).lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return ""
+
     candidates: list[str] = []
     for candidate in (
         node.select_one(".label"),
@@ -280,7 +285,7 @@ def _equation_label(node: Tag) -> str:
     ):
         if isinstance(candidate, Tag):
             candidates.append(_short_text(candidate))
-    node_id = normalize_text(str((getattr(node, "attrs", None) or {}).get("id") or ""))
+    node_id = normalize_text(str(attrs.get("id") or ""))
     if node_id:
         id_match = re.search(
             r"(?:^|[-_])(?:disp|eq|equation)[-_]?0*([0-9]+[A-Za-z]?)$",
@@ -433,10 +438,10 @@ def _normalize_inline_formula_image_nodes(container: Tag) -> None:
 
 def _caption_label(node: Tag, *, kind: str) -> str:
     label_pattern = FIGURE_LABEL_PATTERN if kind == "Figure" else TABLE_LABEL_PATTERN
-    for candidate in (
-        node.select_one("header .label"),
-        node.select_one(".label"),
-    ):
+    selectors = ("header .label", ".label")
+    if kind == "Table":
+        selectors = (".tableWrapLabel", *selectors)
+    for candidate in (node.select_one(selector) for selector in selectors):
         if isinstance(candidate, Tag):
             text = _short_text(candidate)
             match = label_pattern.search(text)
@@ -478,6 +483,7 @@ def _strip_caption_label(text: str, label: str) -> str:
 
 def _table_caption_text(node: Tag, label: str) -> str:
     for selector in (
+        ".tableWrapCaption",
         ".article-table-caption",
         ".caption",
         "figcaption",
@@ -504,6 +510,22 @@ def _is_glossary_table(node: Tag) -> bool:
 
 def _table_like_nodes(container: Tag) -> list[Tag]:
     nodes: list[Tag] = []
+    for selector in (".tableWrap", ".table-wrap", ".article-table"):
+        try:
+            matches = container.select(selector)
+        except Exception:
+            continue
+        for match in matches:
+            if not isinstance(match, Tag):
+                continue
+            if _is_glossary_table(match):
+                continue
+            identity = _ancestor_identity_text(match)
+            if any(token in identity for token in BACK_MATTER_TOKENS):
+                continue
+            if match.find("img") is not None or match.find("table") is not None:
+                nodes.append(match)
+
     for table in container.find_all("table"):
         if not isinstance(table, Tag):
             continue
@@ -596,9 +618,11 @@ def _figure_like_nodes(
                 )
             ):
                 continue
-            if any(
-                token in _ancestor_identity_text(match)
-                for token in BACK_MATTER_TOKENS + ANCILLARY_TOKENS
+            identity = _ancestor_identity_text(match)
+            if any(token in identity for token in BACK_MATTER_TOKENS):
+                continue
+            if any(token in identity for token in ANCILLARY_TOKENS) and not any(
+                token in identity for token in BODY_CONTAINER_TOKENS
             ):
                 continue
             if match.find("table") is not None:
@@ -653,6 +677,53 @@ def _render_table_markdown(table_node: Tag, *, label: str, caption: str) -> str:
     )
 
 
+def _table_image_url(node: Tag) -> str:
+    if not isinstance(node, Tag):
+        return ""
+    images = [image for image in node.find_all("img") if isinstance(image, Tag)]
+    for image in images:
+        candidate = normalize_text(
+            str(
+                image.get("data-full-size")
+                or image.get("data-fullsize")
+                or image.get("data-image-full")
+                or image.get("data-download-url")
+                or ""
+            )
+        )
+        if candidate:
+            return candidate
+    for image in images:
+        candidate = normalize_text(
+            str(
+                image.get("data-src")
+                or image.get("data-image-src")
+                or image.get("src")
+                or ""
+            )
+        )
+        if candidate:
+            return candidate
+    return ""
+
+
+def _render_table_image_markdown(node: Tag, *, label: str, caption: str) -> str:
+    image_url = _table_image_url(node)
+    if not image_url:
+        return ""
+    heading_parts: list[str] = []
+    normalized_label = normalize_text(label)
+    normalized_caption = normalize_text(caption)
+    if normalized_label:
+        heading_parts.append(f"**{normalized_label}**")
+    if normalized_caption:
+        heading_parts.append(normalized_caption)
+    heading_line = " ".join(heading_parts).strip()
+    alt_text = normalized_label or "Table"
+    lines = [heading_line, "", f"![{alt_text}]({image_url})"] if heading_line else [f"![{alt_text}]({image_url})"]
+    return "\n".join(lines)
+
+
 def _table_placeholder(index: int) -> str:
     return table_placeholder(index)
 
@@ -669,6 +740,12 @@ def _normalize_table_blocks(container: Tag) -> list[dict[str, str]]:
         label = _caption_label(node, kind="Table")
         caption = _table_caption_text(node, label)
         rendered_markdown = _render_table_markdown(node, label=label, caption=caption)
+        if not rendered_markdown:
+            rendered_markdown = _render_table_image_markdown(
+                node,
+                label=label,
+                caption=caption,
+            )
         if not rendered_markdown:
             continue
         placeholder = _table_placeholder(len(entries) + 1)

@@ -8,16 +8,15 @@ import re
 from typing import Any
 
 from .cache import redact_url_for_cache
+from .content_types import STRUCTURED_TEXT_MIME_TYPES, content_type_base
 from .errors import RequestFailure
 
 DEFAULT_MAX_RESPONSE_BYTES = 32 * 1024 * 1024
 DEFAULT_MAX_COMPRESSED_BODY_MULTIPLIER = 8
 TEXTUAL_CONTENT_TYPES = (
     "text/",
-    "application/xml",
+    *STRUCTURED_TEXT_MIME_TYPES,
     "text/xml",
-    "application/json",
-    "application/jats+xml",
 )
 
 
@@ -78,12 +77,12 @@ class BodyMixin:
 
 
 def is_xml_content_type(content_type: str | None) -> bool:
-    normalized = (content_type or "").split(";", 1)[0].strip().lower()
+    normalized = content_type_base(content_type)
     return normalized in {"application/xml", "text/xml", "application/jats+xml"} or normalized.endswith("+xml")
 
 
 def is_textual_content_type(content_type: str | None) -> bool:
-    normalized = (content_type or "").split(";", 1)[0].strip().lower()
+    normalized = content_type_base(content_type)
     if not normalized:
         return False
     return (
@@ -94,7 +93,7 @@ def is_textual_content_type(content_type: str | None) -> bool:
 
 
 def build_text_preview(body: bytes, content_type: str | None) -> str | None:
-    normalized = (content_type or "").split(";", 1)[0].lower()
+    normalized = content_type_base(content_type)
     if normalized and not is_textual_content_type(normalized):
         return None
     try:

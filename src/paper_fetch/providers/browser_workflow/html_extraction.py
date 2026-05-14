@@ -10,10 +10,21 @@ from ...extraction.html.assets import extract_scoped_html_assets
 from ...extraction.html.signals import HtmlExtractionFailure, detect_html_block, summarize_html
 from ...metadata.types import ProviderMetadata
 from ...models import AssetProfile
+from ...quality.reason_codes import (
+    ABSTRACT_ONLY,
+    CLOUDFLARE_CHALLENGE,
+    INSUFFICIENT_BODY,
+    PUBLISHER_ACCESS_DENIED,
+    PUBLISHER_PAYWALL,
+    REDIRECTED_TO_ABSTRACT,
+    STRUCTURED_ARTICLE_NOT_FULLTEXT,
+    STRUCTURED_MISSING_BODY_SECTIONS,
+)
 from ...runtime import RuntimeContext
 from ...tracing import fulltext_marker, trace_from_markers
 from ...utils import normalize_text
 from .fetchers import _normalized_response_headers
+from .shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
 from .._flaresolverr import (
     DEFAULT_FLARESOLVERR_WAIT_SECONDS,
     DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS,
@@ -36,16 +47,16 @@ if TYPE_CHECKING:
 _DIRECT_PLAYWRIGHT_HTML_TIMEOUT_MS = 15000
 _FAST_FLARESOLVERR_HTML_WAIT_SECONDS = 0
 _FAST_FLARESOLVERR_HTML_WARM_WAIT_SECONDS = 0
-_DIRECT_PLAYWRIGHT_HTML_BLOCKED_RESOURCE_TYPES = {"image", "font", "stylesheet", "media"}
+_DIRECT_PLAYWRIGHT_HTML_BLOCKED_RESOURCE_TYPES = BROWSER_HTML_BLOCKED_RESOURCE_TYPES
 _FAST_FLARESOLVERR_RETRY_KINDS = {
-    "cloudflare_challenge",
-    "publisher_access_denied",
-    "publisher_paywall",
-    "redirected_to_abstract",
-    "abstract_only",
-    "insufficient_body",
-    "structured_article_not_fulltext",
-    "structured_missing_body_sections",
+    CLOUDFLARE_CHALLENGE,
+    PUBLISHER_ACCESS_DENIED,
+    PUBLISHER_PAYWALL,
+    REDIRECTED_TO_ABSTRACT,
+    ABSTRACT_ONLY,
+    INSUFFICIENT_BODY,
+    STRUCTURED_ARTICLE_NOT_FULLTEXT,
+    STRUCTURED_MISSING_BODY_SECTIONS,
 }
 
 __all__ = [
@@ -333,13 +344,17 @@ def _fetch_flaresolverr_html_payload(
         warm_wait_seconds=warm_wait_seconds,
         disable_media=disable_media,
     )
-    markdown_text, extraction = _cached_browser_workflow_markdown(
-        client,
-        html_result.html,
-        html_result.final_url,
-        metadata=metadata,
-        context=context,
-    )
+    try:
+        markdown_text, extraction = _cached_browser_workflow_markdown(
+            client,
+            html_result.html,
+            html_result.final_url,
+            metadata=metadata,
+            context=context,
+        )
+    except HtmlExtractionFailure as exc:
+        setattr(exc, "html_result", html_result)
+        raise
     return html_result, _browser_workflow_html_payload(
         client,
         html_result,

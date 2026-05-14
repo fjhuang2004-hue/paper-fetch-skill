@@ -23,6 +23,8 @@ SourceKind = Literal[
     "arxiv_pdf",
     "copernicus_xml",
     "copernicus_pdf",
+    "ams_html",
+    "ams_pdf",
     "crossref_meta",
 ]
 
@@ -36,6 +38,9 @@ AssetProfile = Literal["none", "body", "all"]
 MaxTokensMode = int | Literal["full_text"]
 
 
+# Public wire/schema contract: keep these Literal values explicit for static
+# typing and generated schemas; do not derive them from runtime reason-code
+# constants even though the string values intentionally match.
 ContentKind = Literal["fulltext", "abstract_only", "metadata_only"]
 
 

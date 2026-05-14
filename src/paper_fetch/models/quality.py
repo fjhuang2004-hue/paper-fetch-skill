@@ -7,6 +7,20 @@ from collections.abc import Sequence
 from typing import Any, Mapping
 
 from ..utils import normalize_text
+from ..quality.reason_codes import (
+    ABSTRACT_ONLY,
+    ACCESS_PAGE_URL,
+    CITATION_ABSTRACT_HTML_URL,
+    DATA_ARTICLE_ACCESS_ABSTRACT,
+    FINAL_URL_MATCHES_CITATION_ABSTRACT_HTML_URL,
+    FULLTEXT,
+    INSUFFICIENT_BODY,
+    METADATA_ONLY,
+    NO_ACCESS,
+    PUBLISHER_PAYWALL,
+    REDIRECTED_TO_ABSTRACT,
+    WT_ABSTRACT_PAGE_TYPE,
+)
 from .markdown import strip_markdown_images
 from .schema import (
     ArticleModel,
@@ -32,7 +46,7 @@ from .tokens import build_token_estimate_breakdown, coerce_token_estimate_breakd
 QUALITY_FLAG_ACCESS_GATE_DETECTED = "access_gate_detected"
 
 
-QUALITY_FLAG_INSUFFICIENT_BODY = "insufficient_body"
+QUALITY_FLAG_INSUFFICIENT_BODY = INSUFFICIENT_BODY
 
 
 QUALITY_FLAG_WEAK_BODY_STRUCTURE = "weak_body_structure"
@@ -61,10 +75,10 @@ QUALITY_FLAG_CACHED_WITH_CURRENT_REVISION = "cached_with_current_revision"
 
 _QUALITY_ACCESS_SIGNAL_TOKENS = frozenset(
     {
-        "publisher_paywall",
+        PUBLISHER_PAYWALL,
         "access",
         "redirect",
-        "no_access",
+        NO_ACCESS,
         "abstract_page",
         "citation_abstract",
         "wt_abstract",
@@ -79,16 +93,16 @@ _QUALITY_ACCESS_SIGNAL_TOKENS = frozenset(
 
 _QUALITY_DOWNGRADE_REASONS = frozenset(
     {
-        "publisher_paywall",
-        "insufficient_body",
-        "abstract_only",
-        "no_access",
-        "redirected_to_abstract",
-        "access_page_url",
-        "final_url_matches_citation_abstract_html_url",
-        "data_article_access_abstract",
-        "wt_abstract_page_type",
-        "citation_abstract_html_url",
+        PUBLISHER_PAYWALL,
+        INSUFFICIENT_BODY,
+        ABSTRACT_ONLY,
+        NO_ACCESS,
+        REDIRECTED_TO_ABSTRACT,
+        ACCESS_PAGE_URL,
+        FINAL_URL_MATCHES_CITATION_ABSTRACT_HTML_URL,
+        DATA_ARTICLE_ACCESS_ABSTRACT,
+        WT_ABSTRACT_PAGE_TYPE,
+        CITATION_ABSTRACT_HTML_URL,
     }
 )
 
@@ -152,10 +166,10 @@ def coerce_semantic_losses(value: SemanticLosses | Mapping[str, Any] | None) -> 
 
 def classify_content(*, sections: Sequence["Section"], abstract_text: str | None) -> ContentKind:
     if filtered_body_sections(sections):
-        return "fulltext"
+        return FULLTEXT
     if normalize_text(abstract_text) or abstract_sections(sections):
-        return "abstract_only"
-    return "metadata_only"
+        return ABSTRACT_ONLY
+    return METADATA_ONLY
 
 
 def classify_article_content(article: "ArticleModel") -> ContentKind:
@@ -389,14 +403,14 @@ def _refresh_article_quality(
     content_kind = explicit_content_kind or classify_content(sections=article.sections, abstract_text=article.metadata.abstract)
     article.quality.content_kind = content_kind
     article.quality.has_abstract = bool(first_abstract_text(abstract_text=article.metadata.abstract, sections=article.sections))
-    article.quality.has_fulltext = content_kind == "fulltext"
+    article.quality.has_fulltext = content_kind == FULLTEXT
 
 
 def _downgrade_article(article: "ArticleModel", *, target_kind: ContentKind) -> None:
-    if target_kind == "metadata_only":
+    if target_kind == METADATA_ONLY:
         article.sections = []
         article.assets = []
-        _refresh_article_quality(article, explicit_content_kind="metadata_only")
+        _refresh_article_quality(article, explicit_content_kind=METADATA_ONLY)
         return
     article.sections = [
         section
@@ -406,9 +420,9 @@ def _downgrade_article(article: "ArticleModel", *, target_kind: ContentKind) -> 
     article.assets = []
     if not first_abstract_text(abstract_text=article.metadata.abstract, sections=article.sections):
         article.sections = []
-        _refresh_article_quality(article, explicit_content_kind="metadata_only")
+        _refresh_article_quality(article, explicit_content_kind=METADATA_ONLY)
         return
-    _refresh_article_quality(article, explicit_content_kind="abstract_only")
+    _refresh_article_quality(article, explicit_content_kind=ABSTRACT_ONLY)
 
 
 def _semantic_loss_warning_messages(losses: SemanticLosses) -> list[str]:
@@ -439,7 +453,7 @@ def _resolve_quality_confidence(
         and [normalize_text(item) for item in diagnostics.get("hard_negative_signals") or [] if normalize_text(item)]
     )
     if (
-        content_kind != "fulltext"
+        content_kind != FULLTEXT
         or hard_negative
         or QUALITY_FLAG_ACCESS_GATE_DETECTED in normalized_flags
         or QUALITY_FLAG_INSUFFICIENT_BODY in normalized_flags
@@ -474,9 +488,9 @@ def apply_quality_assessment(
 
     if _diagnostics_access_gate_detected(availability_diagnostics):
         flags.append(QUALITY_FLAG_ACCESS_GATE_DETECTED)
-    if reason == "insufficient_body":
+    if reason == INSUFFICIENT_BODY:
         flags.append(QUALITY_FLAG_INSUFFICIENT_BODY)
-    if article.quality.content_kind == "fulltext" and _has_weak_body_structure(body_metrics):
+    if article.quality.content_kind == FULLTEXT and _has_weak_body_structure(body_metrics):
         flags.append(QUALITY_FLAG_WEAK_BODY_STRUCTURE)
     if losses.table_fallback_count > 0:
         flags.append(QUALITY_FLAG_TABLE_FALLBACK_PRESENT)
@@ -498,8 +512,8 @@ def apply_quality_assessment(
         body_metrics=body_metrics,
     ):
         target_kind = normalize_text((availability_diagnostics or {}).get("content_kind") if isinstance(availability_diagnostics, Mapping) else "").lower()
-        if target_kind not in {"abstract_only", "metadata_only"}:
-            target_kind = "abstract_only" if first_abstract_text(abstract_text=article.metadata.abstract, sections=article.sections) else "metadata_only"
+        if target_kind not in {ABSTRACT_ONLY, METADATA_ONLY}:
+            target_kind = ABSTRACT_ONLY if first_abstract_text(abstract_text=article.metadata.abstract, sections=article.sections) else METADATA_ONLY
         _downgrade_article(article, target_kind=target_kind)
     else:
         _refresh_article_quality(article, recompute_tokens=recompute_tokens)

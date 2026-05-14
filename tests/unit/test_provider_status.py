@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from paper_fetch.providers import _flaresolverr
+from paper_fetch.providers.ams import AmsClient
 from paper_fetch.providers.arxiv import ArxivClient
 from paper_fetch.providers.base import ProviderFailure
 from paper_fetch.providers.crossref import CrossrefClient
@@ -31,6 +32,8 @@ class DummyTransport:
 
 class ProviderStatusTests(unittest.TestCase):
     def _browser_client(self, provider: str, env: dict[str, str]):
+        if provider == "ams":
+            return AmsClient(DummyTransport(), env)
         if provider == "science":
             return ScienceClient(DummyTransport(), env)
         return PnasClient(DummyTransport(), env)
@@ -174,7 +177,7 @@ class ProviderStatusTests(unittest.TestCase):
         self.assertTrue(all(check.status == "ok" for check in checks.values()))
 
     def test_browser_workflow_providers_missing_env_are_not_configured(self) -> None:
-        for provider in ("science", "pnas"):
+        for provider in ("science", "pnas", "ams"):
             with self.subTest(provider=provider):
                 result = self._browser_client(provider, {}).probe_status()
                 checks = {check.name: check for check in result.checks}
@@ -187,7 +190,7 @@ class ProviderStatusTests(unittest.TestCase):
                 self.assertEqual(checks["flaresolverr_health"].status, "not_configured")
 
     def test_browser_workflow_providers_missing_repo_local_workflow_are_not_configured(self) -> None:
-        for provider in ("science", "pnas"):
+        for provider in ("science", "pnas", "ams"):
             with self.subTest(provider=provider), tempfile.TemporaryDirectory() as tmpdir:
                 env = self._browser_env(tmpdir, provider=provider, create_env_file=True, create_workflow=False)
                 result = self._browser_client(provider, env).probe_status()
@@ -199,7 +202,7 @@ class ProviderStatusTests(unittest.TestCase):
                 self.assertEqual(checks["flaresolverr_health"].status, "not_configured")
 
     def test_browser_workflow_providers_health_failures_are_reported(self) -> None:
-        for provider in ("science", "pnas"):
+        for provider in ("science", "pnas", "ams"):
             with self.subTest(provider=provider), tempfile.TemporaryDirectory() as tmpdir:
                 env = self._browser_env(tmpdir, provider=provider, create_env_file=True, create_workflow=True)
                 with mock.patch.object(
@@ -216,7 +219,7 @@ class ProviderStatusTests(unittest.TestCase):
                 self.assertEqual(checks["flaresolverr_health"].status, "not_configured")
 
     def test_browser_workflow_providers_ignore_legacy_rate_limit_env(self) -> None:
-        for provider in ("science", "pnas"):
+        for provider in ("science", "pnas", "ams"):
             with self.subTest(provider=provider), tempfile.TemporaryDirectory() as tmpdir:
                 env = {
                     **self._browser_env(tmpdir, provider=provider, create_env_file=True, create_workflow=True),
@@ -234,7 +237,7 @@ class ProviderStatusTests(unittest.TestCase):
                 self.assertNotIn("rate_limit_window", checks)
 
     def test_browser_workflow_providers_ready_status_checks_all_pass(self) -> None:
-        for provider in ("science", "pnas"):
+        for provider in ("science", "pnas", "ams"):
             with self.subTest(provider=provider), tempfile.TemporaryDirectory() as tmpdir:
                 env = self._browser_env(tmpdir, provider=provider, create_env_file=True, create_workflow=True)
                 with mock.patch.object(_flaresolverr, "health_check", return_value=None):

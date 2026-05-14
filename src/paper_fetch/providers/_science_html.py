@@ -23,6 +23,9 @@ from ..quality.html_profiles import (
 from ..quality.html_signals import AAAS_DATALAYER_PATTERN
 from ..utils import dedupe_authors, normalize_text
 from ._html_authors import (
+    ATYPON_AUTHOR_COUNT_PATTERN,
+    ATYPON_AUTHOR_COLLAPSE_UI_TEXT,
+    ATYPON_AUTHOR_NOISE_TEXT,
     AuthorExtractionPipeline,
     extract_property_authors,
     normalized_author_tokens,
@@ -37,19 +40,21 @@ PDF_PATH_TEMPLATES: tuple[str, ...] = provider_pdf_path_templates("science")
 CROSSREF_PDF_POSITION = provider_crossref_pdf_position("science")
 NOISE_PROFILE = provider_html_rules("science").noise_profile
 SITE_RULE_OVERRIDES: dict[str, Any] = SCIENCE_SITE_RULE_OVERRIDES
-SCIENCE_AUTHOR_COUNT_PATTERN = re.compile(r"^\+\s*\d+\s+authors?$", flags=re.IGNORECASE)
+SCIENCE_AUTHOR_COUNT_PATTERN = ATYPON_AUTHOR_COUNT_PATTERN
 SCIENCE_STRUCTURED_SUBHEADING_PATTERN = re.compile(
     r"(?m)^###\s+([A-Z][A-Z0-9 /-]*)\s*$"
 )
 SCIENCE_IGNORED_AUTHOR_TEXT = {
-    "authors info & affiliations",
-    "fewer",
-    "orcid",
-    "view all articles by this author",
+    *ATYPON_AUTHOR_NOISE_TEXT,
+    *ATYPON_AUTHOR_COLLAPSE_UI_TEXT,
 }
 SCIENCE_CANONICAL_ABSTRACT_HEADING = "abstract"
 SCIENCE_STRUCTURED_ABSTRACT_HEADING = "structured abstract"
-POST_CONTENT_BREAK_TOKENS = (
+# SITE_UI_COPY_REGRESSION_MARKER: site-owned UI copy; rerun extraction rules
+# when publisher text changes.
+# STRUCTURAL_UI_COPY_HOOK: provider-specific post-content cutoff, not generic
+# body denylist.
+SCIENCE_POST_CONTENT_BREAK_TOKENS = (
     "purchase access to other journals in the science family",
     "become a aaas member",
     "activate your aaas id",
@@ -70,8 +75,7 @@ def _load_aaas_datalayer(html_text: str) -> Mapping[str, Any] | None:
     return payload if isinstance(payload, Mapping) else None
 
 
-def blocking_fallback_signals(html_text: str) -> list[str]:
-    return science_blocking_fallback_signals(html_text)
+blocking_fallback_signals = science_blocking_fallback_signals
 
 
 def _extract_datalayer_authors(html_text: str) -> list[str]:

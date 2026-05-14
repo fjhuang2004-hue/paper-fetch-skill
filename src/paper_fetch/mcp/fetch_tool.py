@@ -17,6 +17,7 @@ from ..http import HttpTransport
 from ..models import ArticleModel, Asset, FetchEnvelope
 from ..provider_catalog import is_official_provider, provider_status_order
 from ..providers.base import ProviderStatusResult, build_provider_status_check
+from ..reason_codes import ERROR
 from ..providers.registry import build_clients as _build_clients
 from ..runtime import RuntimeContext
 from ..service import fetch_paper as _service_fetch_paper
@@ -317,11 +318,11 @@ def _provider_status_error_payload(
 ) -> dict[str, Any]:
     return ProviderStatusResult(
         provider=provider,
-        status="error",
+        status=ERROR,
         available=False,
         official_provider=official_provider,
         notes=[],
-        checks=[build_provider_status_check("diagnostics", "error", message)],
+        checks=[build_provider_status_check("diagnostics", ERROR, message)],
     ).to_dict()
 
 

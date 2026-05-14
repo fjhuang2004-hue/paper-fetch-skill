@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..common_patterns import FIGURE_LABEL_CORE_PATTERN, HEADING_TAG_PATTERN, INLINE_WHITESPACE_PATTERN
 from ..extraction.html.formula_rules import (
     formula_image_url_from_node,
     is_display_formula_node,
@@ -20,6 +21,10 @@ from ..extraction.html.inline import (
     render_inline_tokens,
 )
 from ..extraction.html.semantics import has_explicit_reference_marker, normalize_section_title
+from ..extraction.html.ui_tokens import (
+    FIGURE_FULL_SIZE_IMAGE_LABEL,
+    FIGURE_POWERPOINT_SLIDE_LABEL,
+)
 from ..formula.convert import normalize_latex_macros
 from ..models import normalize_text
 from ._article_markdown_math import render_external_mathml_expression, render_mathml_expression
@@ -33,17 +38,26 @@ except ImportError:  # pragma: no cover - exercised implicitly when dependency i
     NavigableString = None
     Tag = None
 
-HEADING_TAG_PATTERN = re.compile(r"^h[1-6]$")
 INLINE_IMAGE_SPACING_PATTERN = re.compile(r"(?<=[^\s])(!\[)")
-INLINE_WHITESPACE_PATTERN = re.compile(r"[ \t\r\f\v]+")
 LINE_EDGE_WHITESPACE_PATTERN = re.compile(r" *\n *")
 MARKDOWN_BLANK_RUN_PATTERN = re.compile(r"\n{3,}")
 ORDERED_LIST_PREFIX_PATTERN = re.compile(r"^\s*(?:\(?\d+[A-Za-z]?\)?|[ivxlcdm]+)[.)]\s+", flags=re.IGNORECASE)
 UNORDERED_LIST_PREFIX_PATTERN = re.compile(r"^\s*[•◦▪▫‣⁃∙●○◾◽◼□■]\s*")
 MARKDOWN_LIST_ITEM_PATTERN = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
-FIGURE_LABEL_PATTERN = re.compile(r"^\s*(?:fig(?:ure)?\.?)\s*(\d+[A-Za-z]?)\s*[:.]?\s*(.*)$", flags=re.IGNORECASE)
+# The shared figure label core is reused here, but this renderer also needs a
+# line-start anchor and a second capture for the caption remainder.
+FIGURE_LABEL_PATTERN = re.compile(
+    rf"^\s*{FIGURE_LABEL_CORE_PATTERN}\s*[:.]?\s*(.*)$",
+    flags=re.IGNORECASE,
+)
 FIGURE_ID_PATTERN = re.compile(r"(?:^|[-_ ])figure[-_ ]?(\d+[A-Za-z]?)$", flags=re.IGNORECASE)
-FIGURE_TRAILING_LINK_PATTERN = re.compile(r"\b(?:PowerPoint slide|Full size image)\b.*$", flags=re.IGNORECASE)
+# Cross-publisher figure action links often trail the caption text in Atypon
+# and Springer/Nature DOMs. Keep the caption parser generic by trimming only
+# action labels, not provider-specific caption wording.
+FIGURE_ACTION_TRAILING_LINK_PATTERN = re.compile(
+    rf"\b(?:{re.escape(FIGURE_POWERPOINT_SLIDE_LABEL)}|{re.escape(FIGURE_FULL_SIZE_IMAGE_LABEL)})\b.*$",
+    flags=re.IGNORECASE,
+)
 FIGURE_DESCRIPTION_SELECTORS = (
     "figcaption",
     ".c-article-section__figure-description",
@@ -327,7 +341,7 @@ def _clean_figure_text_candidate(text: str) -> str:
     normalized = normalize_text(text.replace("\n", " "))
     if not normalized:
         return ""
-    normalized = FIGURE_TRAILING_LINK_PATTERN.sub("", normalized).strip()
+    normalized = FIGURE_ACTION_TRAILING_LINK_PATTERN.sub("", normalized).strip()
     return normalize_text(normalized)
 
 

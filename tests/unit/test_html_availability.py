@@ -15,6 +15,12 @@ from paper_fetch.quality.html_availability import (
     assess_plain_text_fulltext_availability,
     assess_structured_article_fulltext_availability,
 )
+from paper_fetch.quality.reason_codes import (
+    ABSTRACT_ONLY,
+    CITATION_ABSTRACT_HTML_URL,
+    DATA_ARTICLE_ACCESS_NO,
+    FULLTEXT,
+)
 from tests.block_fixtures import block_asset
 from tests.golden_criteria import golden_criteria_asset
 
@@ -725,9 +731,30 @@ class HtmlAvailabilityTests(unittest.TestCase):
         )
 
         self.assertFalse(diagnostics.accepted)
-        self.assertEqual(diagnostics.content_kind, "abstract_only")
-        self.assertEqual(diagnostics.reason, "abstract_only")
-        self.assertIn("citation_abstract_html_url", diagnostics.soft_positive_signals)
+        self.assertEqual(diagnostics.content_kind, ABSTRACT_ONLY)
+        self.assertEqual(diagnostics.reason, ABSTRACT_ONLY)
+        self.assertIn(CITATION_ABSTRACT_HTML_URL, diagnostics.soft_positive_signals)
+
+    def test_assess_html_records_data_article_access_no_signal(self) -> None:
+        diagnostics = assess_html_fulltext_availability(
+            "# Abstract Example\n\nThis page exposes only abstract-level access.",
+            {
+                "title": "Abstract Example",
+                "abstract": "This page exposes only abstract-level access.",
+            },
+            provider="generic",
+            html_text=(
+                "<html><body><article data-article-access='no'>"
+                "<h1>Abstract Example</h1>"
+                "<p>This page exposes only abstract-level access.</p>"
+                "</article></body></html>"
+            ),
+            title="Abstract Example",
+        )
+
+        self.assertFalse(diagnostics.accepted)
+        self.assertEqual(diagnostics.content_kind, ABSTRACT_ONLY)
+        self.assertIn(DATA_ARTICLE_ACCESS_NO, diagnostics.blocking_fallback_signals)
 
     def test_assess_html_accepts_single_long_body_block_without_headings(self) -> None:
         paragraph = (
@@ -743,7 +770,7 @@ class HtmlAvailabilityTests(unittest.TestCase):
         )
 
         self.assertTrue(diagnostics.accepted)
-        self.assertEqual(diagnostics.content_kind, "fulltext")
+        self.assertEqual(diagnostics.content_kind, FULLTEXT)
         self.assertEqual(diagnostics.reason, "body_sufficient")
 
     def test_assess_html_rejects_science_paywall_sample_with_abstract(self) -> None:

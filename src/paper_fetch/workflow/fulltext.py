@@ -18,6 +18,8 @@ from ..provider_catalog import (
 )
 from ..providers.base import ProviderArtifacts, ProviderFailure, ProviderFetchResult
 from ..providers.protocols import AssetProvider, FulltextProvider, RawFulltextProvider
+from ..reason_codes import ABSTRACT_ONLY, ERROR, METADATA_ONLY, NOT_SUPPORTED
+from ..quality.reason_codes import FULLTEXT
 from ..runtime import RUNTIME_UNSET, RuntimeContext, resolve_runtime_context
 from ..tracing import fallback_marker, fulltext_marker, resolve_marker, trace_from_markers
 from ..utils import (
@@ -126,7 +128,7 @@ def _provider_fetch_result(
         )
 
     if not isinstance(provider_client, RawFulltextProvider):
-        raise ProviderFailure("not_supported", "Provider does not implement raw full-text retrieval.")
+        raise ProviderFailure(NOT_SUPPORTED, "Provider does not implement raw full-text retrieval.")
 
     raw_payload = provider_client.fetch_raw_fulltext(doi, metadata, context=context)
     downloaded_assets: list[Mapping[str, Any]] = []
@@ -254,7 +256,7 @@ def _try_official_provider(
         )
         article = provider_result.article
         extend_unique(source_trail, article.quality.source_trail)
-        if article.quality.content_kind == "fulltext":
+        if article.quality.content_kind == FULLTEXT:
             emit_structured_log(
                 logger,
                 logging.DEBUG,
@@ -267,18 +269,18 @@ def _try_official_provider(
             )
             extend_unique(source_trail, [fulltext_marker(provider_name, "article_ok")])
             return finalize_article(article, warnings=warnings, source_trail=source_trail)
-        if article.quality.content_kind == "abstract_only":
+        if article.quality.content_kind == ABSTRACT_ONLY:
             emit_structured_log(
                 logger,
                 logging.DEBUG,
                 "official_provider_result",
                 provider=provider_name,
                 url=provider_result.content.source_url if provider_result.content is not None else None,
-                status="abstract_only",
+                status=ABSTRACT_ONLY,
                 elapsed_ms=round((time.monotonic() - attempt_started_at) * 1000, 3),
                 attempt=1,
             )
-            extend_unique(source_trail, [fulltext_marker(provider_name, "abstract_only")])
+            extend_unique(source_trail, [fulltext_marker(provider_name, ABSTRACT_ONLY)])
             if provider_name in PROVIDER_MANAGED_ABSTRACT_ONLY_PROVIDERS:
                 warnings.append("Official full text only contained abstract-level content; returning abstract-only provider result.")
                 return finalize_article(article, warnings=warnings, source_trail=source_trail)
@@ -323,11 +325,11 @@ def _fallback_to_metadata_only(
     source_trail: list[str],
 ) -> ArticleModel:
     if not metadata:
-        raise PaperFetchFailure("error", "Unable to resolve metadata or full text for the requested paper.")
+        raise PaperFetchFailure(ERROR, "Unable to resolve metadata or full text for the requested paper.")
     if not strategy.allow_metadata_only_fallback:
-        raise PaperFetchFailure("error", "Full text was not available and metadata-only fallback is disabled.")
+        raise PaperFetchFailure(ERROR, "Full text was not available and metadata-only fallback is disabled.")
     warnings.append("Full text was not available; returning metadata and abstract only.")
-    extend_unique(source_trail, [fallback_marker("metadata_only")])
+    extend_unique(source_trail, [fallback_marker(METADATA_ONLY)])
     return build_metadata_only_result(metadata, resolved=resolved, warnings=warnings, source_trail=source_trail)
 
 

@@ -23,15 +23,19 @@ from ..extraction.html.assets import (
     extract_scoped_html_assets,
     split_body_and_supplementary_assets,
 )
-from ..extraction.html.assets.supplementary import has_supplementary_file_suffix
+from ..extraction.html.assets.supplementary import (
+    GENERIC_SUPPLEMENTARY_TEXT_TOKENS,
+    has_supplementary_file_suffix,
+)
+from ..extraction.html.asset_fields import DEFAULT_ASSET_URL_FIELDS
 from ..extraction.html.landing import LandingRedirectLimitExceeded, fetch_landing_html
 from ..extraction.html.parsing import choose_parser
 from ..extraction.html.semantics import collect_html_section_hints
 from ..extraction.html.renderer import clean_rendered_markdown
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
+from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYPE, RequestFailure
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
-from ..publisher_identity import normalize_doi
+from ..publisher_identity import DOI_PATTERN, normalize_doi
 from ..quality.html_availability import HtmlQualityAssessor, availability_failure_message
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
@@ -43,10 +47,17 @@ from ..utils import (
     strip_html_tags,
 )
 from ._html_section_markdown import render_container_markdown
+from .browser_workflow.shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http, fetch_pdf_with_playwright
 from ._payloads import build_provider_payload
-from ._waterfall import ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
+from ._waterfall import (
+    DEFAULT_WATERFALL_CONTINUE_CODES,
+    ProviderWaterfallStep,
+    ProviderWaterfallState,
+    run_provider_waterfall,
+)
 from ._script_json import extract_assignment_json
+from ..reason_codes import ABSTRACT_ONLY, ERROR, NO_RESULT, NOT_SUPPORTED, OK, PDF_FALLBACK
 from .base import (
     ProviderArtifacts,
     ProviderClient,
@@ -89,10 +100,7 @@ IEEE_SCRIPT_VALUE_PATTERN_TEMPLATE = r"""["']?{key}["']?\s*:\s*(?P<value>"(?:\\.
 IEEE_SUPPORT_ICON_PATH = "/assets/img/icon.support.gif"
 IEEE_MEDIASTORE_PATH_PREFIX = "/mediastore/ieee/content/media/"
 IEEE_SUPPLEMENTARY_SEMANTIC_TOKENS = (
-    "supplementary",
-    "supplemental",
-    "supporting information",
-    "supporting material",
+    *GENERIC_SUPPLEMENTARY_TEXT_TOKENS,
     "supporting-information",
     "supporting-material",
     "multimedia",
@@ -115,38 +123,24 @@ IEEE_SUPPLEMENTARY_EXTRA_FILE_SUFFIXES = (
     ".wav",
     ".tar.gz",
 )
-IEEE_ASSET_URL_FIELDS = (
-    "url",
-    "full_size_url",
-    "preview_url",
-    "original_url",
-    "download_url",
-    "source_url",
-    "figure_page_url",
-)
 IEEE_ASSET_KIND_PRIORITY = {
     "formula": 10,
     "figure": 20,
     "table": 30,
 }
-IEEE_WATERFALL_CONTINUE_CODES = (
-    "no_result",
-    "no_access",
-    "rate_limited",
-    "error",
-    "not_configured",
-    "not_supported",
-)
-IEEE_STRONG_ASSET_IDENTITY_FIELDS = (
+IEEE_ASSET_URL_FIELDS = (
+    *DEFAULT_ASSET_URL_FIELDS,
     "download_url",
-    "source_url",
-    "full_size_url",
-    "url",
-)
-IEEE_WEAK_ASSET_IDENTITY_FIELDS = (
-    "original_url",
-    "preview_url",
     "figure_page_url",
+)
+_IEEE_STRONG_ASSET_IDENTITY_FIELD_NAMES = frozenset(
+    {"download_url", "source_url", "full_size_url", "url"}
+)
+IEEE_STRONG_ASSET_IDENTITY_FIELDS = tuple(
+    field for field in IEEE_ASSET_URL_FIELDS if field in _IEEE_STRONG_ASSET_IDENTITY_FIELD_NAMES
+)
+IEEE_WEAK_ASSET_IDENTITY_FIELDS = tuple(
+    field for field in IEEE_ASSET_URL_FIELDS if field not in _IEEE_STRONG_ASSET_IDENTITY_FIELD_NAMES
 )
 IEEE_DOWNLOAD_MERGE_FIELDS = (
     "path",
@@ -172,7 +166,6 @@ IEEE_ASSET_URL_ATTRS = (
 IEEE_REFERENCE_PAGE_SIZE = 30
 IEEE_MAX_REFERENCE_PAGES = 20
 IEEE_SECTION_MARKER_PATTERN = re.compile(r"^SECTION\s+(?:[IVXLCDM]+|\d+)\s*[.:]?$", flags=re.IGNORECASE)
-IEEE_REFERENCE_DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[^\s\"'<>]+", flags=re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -361,15 +354,22 @@ def _reference_doi_from_ieee_reference(item: Mapping[str, Any]) -> str:
     if isinstance(links, Mapping):
         for key in ("crossRefLink", "doiLink"):
             value = normalize_text(str(links.get(key) or ""))
-            match = IEEE_REFERENCE_DOI_PATTERN.search(value)
+            match = _reference_doi_match(value)
             if match is not None:
                 return normalize_doi(match.group(0).rstrip(").,;")) or ""
     for key in ("doi", "googleScholarStructredQuery", "googleScholarStructuredQuery", "text"):
         value = normalize_text(str(item.get(key) or ""))
-        match = IEEE_REFERENCE_DOI_PATTERN.search(value)
+        match = _reference_doi_match(value)
         if match is not None:
             return normalize_doi(match.group(0).rstrip(").,;")) or ""
     return ""
+
+
+def _reference_doi_match(value: str) -> re.Match[str] | None:
+    for match in DOI_PATTERN.finditer(value):
+        if match.start() == 0 or not value[match.start() - 1].isalnum():
+            return match
+    return None
 
 
 def _references_from_ieee_reference_payload(payload: Mapping[str, Any]) -> list[dict[str, str | None]]:
@@ -1256,24 +1256,24 @@ def _extract_ieee_html(
     context: RuntimeContext | None = None,
 ) -> IeeeHtmlExtraction:
     if BeautifulSoup is None:
-        raise ProviderFailure("error", "IEEE HTML extraction requires BeautifulSoup.")
+        raise ProviderFailure(ERROR, "IEEE HTML extraction requires BeautifulSoup.")
     if _looks_like_ieee_block_page(html_text, context=context, source_url=source_url):
-        raise ProviderFailure("no_result", "IEEE dynamic HTML endpoint returned an access, challenge, or unable page.")
+        raise ProviderFailure(NO_RESULT, "IEEE dynamic HTML endpoint returned an access, challenge, or unable page.")
 
     html_for_parse = re.sub(r"^\s*<\?xml[^>]*>\s*", "", html_text)
     soup = BeautifulSoup(html_for_parse, choose_parser())
     article = soup.select_one("#article")
     if not isinstance(article, Tag):
-        raise ProviderFailure("no_result", "IEEE dynamic HTML endpoint did not include #article.")
+        raise ProviderFailure(NO_RESULT, "IEEE dynamic HTML endpoint did not include #article.")
     asset_html = str(article)
     _clean_ieee_article(article)
     _annotate_ieee_inline_media_blocks(article, source_url)
     marker_counts = _ieee_marker_counts(article)
     article_text = normalize_text(article.get_text(" ", strip=True))
     if not article_text and not any(marker_counts.values()):
-        raise ProviderFailure("no_result", "IEEE dynamic HTML endpoint returned an empty #article shell.")
+        raise ProviderFailure(NO_RESULT, "IEEE dynamic HTML endpoint returned an empty #article shell.")
     if marker_counts["paragraphs"] <= 0 and marker_counts["sections"] <= 0:
-        raise ProviderFailure("no_result", "IEEE dynamic HTML endpoint did not include article body sections or paragraphs.")
+        raise ProviderFailure(NO_RESULT, "IEEE dynamic HTML endpoint did not include article body sections or paragraphs.")
 
     section_hints = collect_html_section_hints(
         article,
@@ -1283,7 +1283,7 @@ def _extract_ieee_html(
     render_container_markdown(article, lines, level=2)
     markdown_text = clean_rendered_markdown("\n".join(lines), noise_profile="ieee")
     if not normalize_text(markdown_text):
-        raise ProviderFailure("no_result", "IEEE dynamic HTML endpoint did not produce usable Markdown.")
+        raise ProviderFailure(NO_RESULT, "IEEE dynamic HTML endpoint did not produce usable Markdown.")
     cleaned_html = str(article)
     extracted_assets = extract_scoped_html_assets(
         cleaned_html,
@@ -1415,13 +1415,13 @@ class IeeeClient(ProviderClient):
             checks=[
                 build_provider_status_check(
                     "html_route",
-                    "ok",
+                    OK,
                     "IEEE Xplore direct REST HTML and clean-browser HTML fallback routes are available when the article exposes ml_html/full HTML.",
                     details={"mode": "direct_rest_html_or_clean_browser_html"},
                 ),
                 build_provider_status_check(
-                    "pdf_fallback",
-                    "ok",
+                    PDF_FALLBACK,
+                    OK,
                     "IEEE Xplore PDF fallback is available for text-only full text when direct HTTP or a seeded browser returns a real PDF payload.",
                     details={"mode": "direct_http_pdf_or_seeded_browser_pdf"},
                 ),
@@ -1548,7 +1548,7 @@ class IeeeClient(ProviderClient):
 
     def fetch_metadata(self, query: Mapping[str, str | None]) -> ProviderMetadata:
         raise ProviderFailure(
-            "not_supported",
+            NOT_SUPPORTED,
             "IEEE publisher metadata is read from the Xplore landing page during full-text retrieval; routing relies on Crossref metadata.",
         )
 
@@ -1564,7 +1564,7 @@ class IeeeClient(ProviderClient):
     def _fetch_landing_attempt(self, doi: str, metadata: Mapping[str, Any]) -> IeeeLandingAttempt:
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
-            raise ProviderFailure("not_supported", "IEEE full-text retrieval requires a DOI.")
+            raise ProviderFailure(NOT_SUPPORTED, "IEEE full-text retrieval requires a DOI.")
         landing_url = self._resolve_landing_url(normalized_doi, metadata)
         try:
             landing_fetch = fetch_landing_html(
@@ -1578,7 +1578,7 @@ class IeeeClient(ProviderClient):
             )
         except LandingRedirectLimitExceeded as exc:
             raise ProviderFailure(
-                "error",
+                ERROR,
                 f"IEEE landing retrieval exceeded {MAX_IEEE_LANDING_REDIRECTS} redirects.",
             ) from exc
         except RequestFailure as exc:
@@ -1592,7 +1592,7 @@ class IeeeClient(ProviderClient):
             or _article_number_from_url(landing_url)
         )
         if not article_number:
-            raise ProviderFailure("no_result", "IEEE landing page did not expose an article number.")
+            raise ProviderFailure(NO_RESULT, "IEEE landing page did not expose an article number.")
         merged_metadata = _merge_ieee_metadata(metadata, landing_metadata, landing_fetch.final_url)
         reference_count = 0
         try:
@@ -1663,7 +1663,7 @@ class IeeeClient(ProviderClient):
             section_hints=extraction.section_hints,
         )
         if not diagnostics.accepted:
-            raise ProviderFailure("no_result", availability_failure_message(diagnostics))
+            raise ProviderFailure(NO_RESULT, availability_failure_message(diagnostics))
         content_type = _header_value(response.get("headers"), "content-type", "text/html")
         cleaned_body = extraction.html_text.encode("utf-8")
         extracted_assets = self._html_extraction_assets_with_landing_payloads(extraction, landing_attempt)
@@ -1699,7 +1699,7 @@ class IeeeClient(ProviderClient):
             from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
         except Exception as exc:  # pragma: no cover - exercised by missing dependency deployments
             raise ProviderFailure(
-                "error",
+                ERROR,
                 "Playwright is not installed; cannot use IEEE browser HTML fallback.",
             ) from exc
 
@@ -1730,7 +1730,7 @@ class IeeeClient(ProviderClient):
             def route_handler(route: Any) -> None:
                 try:
                     resource_type = normalize_text(getattr(route.request, "resource_type", "")).lower()
-                    if resource_type in {"image", "font", "stylesheet", "media"}:
+                    if resource_type in BROWSER_HTML_BLOCKED_RESOURCE_TYPES:
                         route.abort()
                         return
                     route.continue_()
@@ -1790,7 +1790,7 @@ class IeeeClient(ProviderClient):
                     has_article = False
                 if not has_article:
                     raise ProviderFailure(
-                        "no_result",
+                        NO_RESULT,
                         "IEEE browser HTML fallback did not capture REST full-text HTML or #article DOM.",
                     )
                 html_text = str(page.content() or "")
@@ -1803,7 +1803,7 @@ class IeeeClient(ProviderClient):
             raise
         except Exception as exc:
             message = normalize_text(str(exc)) or exc.__class__.__name__
-            raise ProviderFailure("error", f"IEEE browser HTML fallback failed ({message}).") from exc
+            raise ProviderFailure(ERROR, f"IEEE browser HTML fallback failed ({message}).") from exc
         finally:
             if page is not None:
                 try:
@@ -1833,7 +1833,7 @@ class IeeeClient(ProviderClient):
             section_hints=extraction.section_hints,
         )
         if not diagnostics.accepted:
-            raise ProviderFailure("no_result", availability_failure_message(diagnostics))
+            raise ProviderFailure(NO_RESULT, availability_failure_message(diagnostics))
         content_type = _header_value(response_headers, "content-type", "text/html")
         cleaned_body = extraction.html_text.encode("utf-8")
         extracted_assets = self._html_extraction_assets_with_landing_payloads(extraction, landing_attempt)
@@ -1955,13 +1955,13 @@ class IeeeClient(ProviderClient):
         )
         return build_provider_payload(
             provider=self.name,
-            route_kind="pdf_fallback",
+            route_kind=PDF_FALLBACK,
             source_url=pdf_result.final_url,
-            content_type="application/pdf",
+            content_type=PDF_MIME_TYPE,
             body=pdf_result.pdf_bytes,
             markdown_text=pdf_result.markdown_text,
             merged_metadata=landing_attempt.merged_metadata,
-            diagnostics={"pdf_fallback": pdf_diagnostics},
+            diagnostics={PDF_FALLBACK: pdf_diagnostics},
             reason=(
                 "Downloaded full text from the IEEE Xplore seeded-browser PDF fallback route."
                 if fetcher == "seeded_browser"
@@ -1973,7 +1973,7 @@ class IeeeClient(ProviderClient):
             warnings=payload_warnings,
             trace_markers=[
                 *list(html_trace_markers or [fulltext_marker("ieee", "fail", route="html")]),
-                fulltext_marker("ieee", "ok", route="pdf_fallback"),
+                fulltext_marker("ieee", "ok", route=PDF_FALLBACK),
             ],
             needs_local_copy=True,
         )
@@ -1985,14 +1985,14 @@ class IeeeClient(ProviderClient):
         warnings: list[str],
         trace_markers: list[str],
         diagnostics: Mapping[str, Any] | None = None,
-    ) -> RawFulltextPayload:
+        ) -> RawFulltextPayload:
         markdown_text = _abstract_markdown(landing_attempt.merged_metadata)
         if not markdown_text:
-            raise ProviderFailure("no_result", "IEEE landing metadata did not include provider abstract content.")
+            raise ProviderFailure(NO_RESULT, "IEEE landing metadata did not include provider abstract content.")
         body = markdown_text.encode("utf-8")
         return build_provider_payload(
             provider=self.name,
-            route_kind="abstract_only",
+            route_kind=ABSTRACT_ONLY,
             source_url=landing_attempt.response_url,
             content_type="text/markdown",
             body=body,
@@ -2001,7 +2001,7 @@ class IeeeClient(ProviderClient):
             diagnostics=diagnostics,
             reason="IEEE provider route only exposed abstract-level content.",
             warnings=warnings,
-            trace_markers=[*trace_markers, fulltext_marker("ieee", "abstract_only")],
+            trace_markers=[*trace_markers, fulltext_marker("ieee", ABSTRACT_ONLY)],
         )
 
     def fetch_raw_fulltext(
@@ -2041,7 +2041,7 @@ class IeeeClient(ProviderClient):
                 )
             except PdfFetchFailure as exc:
                 pdf_failure_diagnostics = _pdf_failure_diagnostics(exc)
-                raise ProviderFailure("no_result", exc.message) from exc
+                raise ProviderFailure(NO_RESULT, exc.message) from exc
 
         def run_abstract(state: ProviderWaterfallState) -> RawFulltextPayload:
             return self._abstract_only_payload(
@@ -2051,23 +2051,23 @@ class IeeeClient(ProviderClient):
                 diagnostics={
                     "html_failure": _provider_failure_diagnostics(state.failure("html")),
                     "browser_html_failure": _provider_failure_diagnostics(state.failure("browser_html")),
-                    "pdf_fallback": pdf_failure_diagnostics
+                    PDF_FALLBACK: pdf_failure_diagnostics
                     or _provider_failure_diagnostics(state.failure("pdf")),
                 },
             )
 
         def final_failure(state: ProviderWaterfallState) -> ProviderFailure:
             failures = [
-                ("html", state.failure("html") or ProviderFailure("no_result", "IEEE dynamic HTML route failed.")),
+                ("html", state.failure("html") or ProviderFailure(NO_RESULT, "IEEE dynamic HTML route failed.")),
                 (
                     "browser_html",
                     state.failure("browser_html")
-                    or ProviderFailure("no_result", "IEEE browser HTML fallback failed."),
+                    or ProviderFailure(NO_RESULT, "IEEE browser HTML fallback failed."),
                 ),
-                ("pdf", state.failure("pdf") or ProviderFailure("no_result", "IEEE PDF fallback failed.")),
+                ("pdf", state.failure("pdf") or ProviderFailure(NO_RESULT, "IEEE PDF fallback failed.")),
                 (
                     "abstract",
-                    state.failure("abstract") or ProviderFailure("no_result", "IEEE abstract fallback failed."),
+                    state.failure("abstract") or ProviderFailure(NO_RESULT, "IEEE abstract fallback failed."),
                 ),
             ]
             combined = combine_provider_failures(failures)
@@ -2088,7 +2088,7 @@ class IeeeClient(ProviderClient):
                     label="html",
                     run=lambda _state: self._fetch_dynamic_html_payload(landing_attempt, context=runtime_context),
                     failure_marker=fulltext_marker("ieee", "fail", route="html"),
-                    continue_codes=IEEE_WATERFALL_CONTINUE_CODES,
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         f"IEEE dynamic HTML route was not usable ({failure.message}); "
                         "attempting clean-browser HTML fallback."
@@ -2098,7 +2098,7 @@ class IeeeClient(ProviderClient):
                     label="browser_html",
                     run=run_browser_html,
                     failure_marker=fulltext_marker("ieee", "fail", route="browser_html"),
-                    continue_codes=IEEE_WATERFALL_CONTINUE_CODES,
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         f"IEEE browser HTML fallback was not usable ({failure.message}); attempting PDF fallback."
                     ),
@@ -2107,7 +2107,7 @@ class IeeeClient(ProviderClient):
                     label="pdf",
                     run=run_pdf,
                     failure_marker=fulltext_marker("ieee", "fail", route="pdf"),
-                    continue_codes=IEEE_WATERFALL_CONTINUE_CODES,
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         f"IEEE PDF fallback was not usable ({failure.message})."
                     ),
@@ -2115,7 +2115,7 @@ class IeeeClient(ProviderClient):
                 ProviderWaterfallStep(
                     label="abstract",
                     run=run_abstract,
-                    continue_codes=IEEE_WATERFALL_CONTINUE_CODES,
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                 ),
             ],
             final_failure_factory=final_failure,
@@ -2253,7 +2253,7 @@ class IeeeClient(ProviderClient):
         doi = normalize_doi(str(article_metadata.get("doi") or metadata.get("doi") or ""))
         markdown_text = str((content.markdown_text if content is not None else "") or "").strip()
         route = normalize_text(content.route_kind if content is not None else "").lower()
-        source = "ieee_pdf" if route == "pdf_fallback" else "ieee_html"
+        source = "ieee_pdf" if route == PDF_FALLBACK else "ieee_html"
         trace = list(raw_payload.trace or trace_from_markers([fulltext_marker("ieee", "ok", route="html")]))
         warnings = list(raw_payload.warnings)
         if asset_failures:
@@ -2316,7 +2316,7 @@ class IeeeClient(ProviderClient):
             asset_failures=asset_failures,
         )
         content = raw_payload.content
-        if normalize_text(content.route_kind if content is not None else "").lower() != "pdf_fallback":
+        if normalize_text(content.route_kind if content is not None else "").lower() != PDF_FALLBACK:
             return artifacts
         return ProviderArtifacts(
             assets=list(artifacts.assets),

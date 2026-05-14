@@ -14,6 +14,7 @@ from paper_fetch.extraction.html import assets as html_assets
 from paper_fetch.extraction.image_payloads import image_mime_type_from_bytes
 from paper_fetch.providers import (
     _flaresolverr,
+    ams as ams_provider,
     browser_workflow,
     pnas as pnas_provider,
     science as science_provider,

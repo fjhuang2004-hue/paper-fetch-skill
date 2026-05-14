@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime
+from importlib import resources
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 import html as html_lib
+import json
 import re
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -21,26 +23,41 @@ from ..arxiv_id import (
     normalize_arxiv_id,
 )
 from ..config import build_user_agent, resolve_asset_download_concurrency
+from ..common_patterns import EXTENDED_DATA_FIGURE_LABEL, WORD_TOKEN_PATTERN
 from ..extraction.html import assets as html_assets
 from ..extraction.html._runtime import clean_markdown
+from ..extraction.html.html_tags import HTML_DROP_TAGS
 from ..extraction.html.semantics import (
+    HTML_BLOCK_TAGS,
     SECTION_HEADING_PATTERN,
     heading_category,
     node_source_selector,
     section_hint_kind_for_category,
 )
 from ..extraction.html.tables import (
+    TABLE_PLACEHOLDER_PREFIX,
     inject_inline_table_blocks,
     render_table_markdown,
     table_placeholder,
 )
 from ..formula.convert import normalize_latex
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, HttpTransport, RequestErrorCategory, RequestFailure
+from ..http import (
+    DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
+    DEFAULT_TIMEOUT_SECONDS,
+    HttpTransport,
+    PDF_ACCEPT_HEADER,
+    PDF_MIME_TYPE,
+    RequestErrorCategory,
+    RequestFailure,
+    is_pdf_content_type,
+)
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..models.markdown import normalize_markdown_text
 from ..provider_catalog import register_metadata_probe_short_circuit
+from ..publisher_identity import DOI_PATTERN
 from ..quality.html_availability import assess_plain_text_fulltext_availability
+from ..quality.reason_codes import FULLTEXT
 from ..runtime import RuntimeContext
 from ..tracing import download_marker, fulltext_marker, trace_from_markers
 from ..utils import dedupe_authors, empty_asset_results, normalize_text
@@ -53,8 +70,18 @@ from ._html_section_markdown import (
 )
 from ._html_asset_engine import merge_assets_by_identity
 from ._payloads import build_provider_payload
+from ._retry_categories import (
+    DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
+    NETWORK_RETRYABLE_REASON_TOKENS,
+)
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
-from ._waterfall import ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
+from ._waterfall import (
+    DEFAULT_WATERFALL_CONTINUE_CODES,
+    ProviderWaterfallStep,
+    ProviderWaterfallState,
+    run_provider_waterfall,
+)
+from ..reason_codes import ERROR, NO_RESULT, NOT_CONFIGURED, NOT_SUPPORTED, OK, PDF_FALLBACK
 from .base import (
     ProviderArtifacts,
     ProviderClient,
@@ -73,14 +100,6 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     Tag = None
 
 
-ARXIV_WATERFALL_CONTINUE_CODES = (
-    "no_result",
-    "no_access",
-    "rate_limited",
-    "error",
-    "not_configured",
-    "not_supported",
-)
 MIN_HTML_MARKDOWN_WORDS = 500
 ARXIV_ASSET_DOWNLOAD_CONCURRENCY_LIMIT = 2
 ARXIV_IMAGE_ACCEPT = "image/avif,image/webp,image/*,*/*;q=0.8"
@@ -92,8 +111,7 @@ _ARXIV_ATOM_NAMESPACES = {
     "atom": "http://www.w3.org/2005/Atom",
     "arxiv": "http://arxiv.org/schemas/atom",
 }
-_WORD_PATTERN = re.compile(r"\b[\w][\w'-]*\b", flags=re.UNICODE)
-_REFERENCE_DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[^\s\"<>]+", flags=re.IGNORECASE)
+_WORD_PATTERN = WORD_TOKEN_PATTERN
 _REFERENCE_YEAR_PATTERN = re.compile(r"\b((?:18|19|20)\d{2})\b")
 _ARXIV_WATERMARK_PATTERN = re.compile(
     r"arxiv:\s*(?P<arxiv_id>[^\s\[]+)(?:\s+\[(?P<category>[^\]]+)\])?(?:\s+(?P<date>\d{1,2}\s+[A-Za-z]{3}\s+\d{4}))?",
@@ -102,85 +120,96 @@ _ARXIV_WATERMARK_PATTERN = re.compile(
 _ARXIV_AUTHOR_LABEL_PATTERN = re.compile(
     r"(?P<name>[^\d,;]+?)\s+(?:\d+(?:\s*,\s*\d+)*)\b"
 )
-_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_TOKENS = (
-    "Department",
-    "University",
-    "Institute",
-    "Instituto",
-    "School",
-    "College",
-    "Faculty",
-    "Laboratory",
-    "Laboratories",
-    "Lab",
-    "Center",
-    "Centre",
-    "Consortium",
-    "Technologies",
-    "Company",
-    "Corporation",
-    "Inc.?",
-    "LLC",
-    "Ltd.?",
-    "GmbH",
+_ARXIV_AUTHOR_BOUNDARY_PACKAGE = "paper_fetch.resources.arxiv"
+_ARXIV_AUTHOR_BOUNDARY_RESOURCE = "author_boundaries.json"
+
+
+def _load_arxiv_author_boundary_tokens(
+    key: str, *, resource_name: str = _ARXIV_AUTHOR_BOUNDARY_RESOURCE
+) -> tuple[str, ...]:
+    """Load ar5iv/plain-text author-affiliation fallback boundaries.
+
+    These are not a general country or institution knowledge base; they only
+    mark common author/frontmatter boundary strings when arXiv HTML lacks clean
+    person/affiliation structure.
+    """
+
+    try:
+        payload = json.loads(
+            resources.files(_ARXIV_AUTHOR_BOUNDARY_PACKAGE)
+            .joinpath(resource_name)
+            .read_text(encoding="utf-8")
+        )
+    except (
+        AttributeError,
+        FileNotFoundError,
+        ModuleNotFoundError,
+        OSError,
+        json.JSONDecodeError,
+    ):
+        return ()
+    if not isinstance(payload, dict):
+        return ()
+    values = payload.get(key)
+    if not isinstance(values, list):
+        return ()
+    return tuple(token for item in values if (token := str(item).strip()))
+
+
+def _compile_arxiv_author_boundary_pattern(
+    tokens: Sequence[str], *, prefix: str, suffix: str
+) -> re.Pattern[str]:
+    if not tokens:
+        return re.compile(r"a\A")
+    return re.compile(prefix + "|".join(tokens) + suffix, flags=re.IGNORECASE)
+
+
+def _compile_arxiv_author_country_boundary_pattern(
+    tokens: Sequence[str],
+) -> re.Pattern[str]:
+    return _compile_arxiv_author_boundary_pattern(
+        tokens, prefix=r"[,;]\s*(?:", suffix=r")(?![A-Za-z])"
+    )
+
+
+def _compile_arxiv_author_institution_boundary_pattern(
+    tokens: Sequence[str],
+) -> re.Pattern[str]:
+    return _compile_arxiv_author_boundary_pattern(
+        tokens, prefix=r"(?<![A-Za-z])(?:", suffix=r")(?![A-Za-z])"
+    )
+
+
+_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_TOKENS = _load_arxiv_author_boundary_tokens(
+    "institution_boundary_patterns"
 )
-_ARXIV_AUTHOR_COUNTRY_BOUNDARY_TOKENS = (
-    "Argentina",
-    "Australia",
-    "Belgium",
-    "Brazil",
-    "Canada",
-    "China",
-    "Denmark",
-    "Egypt",
-    "Finland",
-    "France",
-    "Germany",
-    "Greece",
-    "India",
-    "Israel",
-    "Italy",
-    "Japan",
-    "Korea",
-    "Mexico",
-    "Netherlands",
-    "Norway",
-    "Poland",
-    "Russia",
-    "Singapore",
-    "South Africa",
-    "Spain",
-    "Sweden",
-    "Switzerland",
-    "Turkey",
-    "U\\.S\\.A\\.?",
-    "U\\.K\\.?",
-    "USA",
-    "United Kingdom",
-    "United States",
+_ARXIV_AUTHOR_COUNTRY_BOUNDARY_TOKENS = _load_arxiv_author_boundary_tokens(
+    "country_boundary_patterns"
 )
-_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_PATTERN = re.compile(
-    r"(?<![A-Za-z])(?:"
-    + "|".join(_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_TOKENS)
-    + r")(?![A-Za-z])",
-    flags=re.IGNORECASE,
+_ARXIV_AUTHOR_INSTITUTION_BOUNDARY_PATTERN = (
+    _compile_arxiv_author_institution_boundary_pattern(
+        _ARXIV_AUTHOR_INSTITUTION_BOUNDARY_TOKENS
+    )
 )
-_ARXIV_AUTHOR_COUNTRY_BOUNDARY_PATTERN = re.compile(
-    r"[,;]\s*(?:"
-    + "|".join(_ARXIV_AUTHOR_COUNTRY_BOUNDARY_TOKENS)
-    + r")(?![A-Za-z])",
-    flags=re.IGNORECASE,
+_ARXIV_AUTHOR_COUNTRY_BOUNDARY_PATTERN = (
+    _compile_arxiv_author_country_boundary_pattern(
+        _ARXIV_AUTHOR_COUNTRY_BOUNDARY_TOKENS
+    )
 )
-_ARXIV_AUTHOR_ADDRESS_BOUNDARY_PATTERN = re.compile(r"[,;]\s*(?:[A-Z]{1,3}[- ]?)?\d{3,}\b")
+_ARXIV_AUTHOR_ADDRESS_BOUNDARY_PATTERN = re.compile(
+    r"[,;]\s*(?:[A-Z]{1,3}[- ]?)?\d{3,}\b"
+)
 _ARXIV_AUTHOR_COUNTRY_CODE_BOUNDARY_PATTERN = re.compile(r"[,;]\s*[A-Z]{2,3}\.?\s*$")
 _ARXIV_EMAIL_PATTERN = re.compile(r"\b\S+@\S+\b")
-_ARXIV_ORCID_PATTERN = re.compile(r"\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b", flags=re.IGNORECASE)
+_ARXIV_ORCID_PATTERN = re.compile(
+    r"\b\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b", flags=re.IGNORECASE
+)
 _ARXIV_INITIAL_TOKEN_PATTERN = re.compile(r"^[A-Z]\.?$")
+_ARXIV_BASE_CHROME_SELECTORS = ("script", "style")
 _ARXIV_AR5IV_SELECTORS: Mapping[str, tuple[str, ...]] = {
     "watermark": ("#watermark-tr", ".ltx_page_header", ".ltx_page_footer"),
     "frontmatter_noise": (
-        "script",
-        "style",
+        *_ARXIV_BASE_CHROME_SELECTORS,
         "math",
         ".ltx_note",
         ".ltx_contact",
@@ -198,7 +227,11 @@ _ARXIV_AR5IV_SELECTORS: Mapping[str, tuple[str, ...]] = {
     "abstract_heading": (".ltx_title_abstract", "h1", "h2", "h3", "h4", "h5", "h6"),
     "bibliography_containers": ("section.ltx_bibliography", "section#bib"),
     "bibliography_items": (".ltx_bibitem", "li.ltx_bibitem"),
-    "reference_noise": ("script", "style", ".ltx_bib_cited", ".ltx_bib_links"),
+    "reference_noise": (
+        *_ARXIV_BASE_CHROME_SELECTORS,
+        ".ltx_bib_cited",
+        ".ltx_bib_links",
+    ),
     "reference_links": (".ltx_bib_links", ".ltx_bib_cited"),
     "reference_blocks": (".ltx_bibblock",),
     "reference_year": (".ltx_bib_year",),
@@ -213,8 +246,7 @@ _ARXIV_AR5IV_SELECTORS: Mapping[str, tuple[str, ...]] = {
     "listing_lines": (".ltx_listingline",),
     "article_root": ("article.ltx_document",),
     "article_chrome": (
-        "script",
-        "style",
+        *_ARXIV_BASE_CHROME_SELECTORS,
         "nav",
         "header",
         "footer",
@@ -229,38 +261,39 @@ _ARXIV_AR5IV_SELECTORS: Mapping[str, tuple[str, ...]] = {
         ".ltx_pagination",
     ),
 }
-# These strings document the ar5iv/LaTeXML fallback-page contract that arXiv
-# official HTML currently exposes when server-side conversion fails.
+# SITE_UI_COPY_REGRESSION_MARKER: site-owned UI copy; rerun extraction rules
+# when publisher text changes.
+# Legacy compatibility for ar5iv/LaTeXML failure pages whose DOM did not expose
+# structured ltx_ERROR nodes; structural selectors remain the primary guard.
 _ARXIV_AR5IV_FATAL_ERROR_TEXTS = (
     "an error in the conversion from latex to xml has occurred",
 )
 _ARXIV_UNDEFINED_MACRO_PATTERN = re.compile(r"^\\[A-Za-z@]+\*?$")
-_ARXIV_TABLE_ID_PATTERN = re.compile(r"(?:^|[.])T(?P<number>\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
-_ARXIV_ALGORITHM_ID_PATTERN = re.compile(r"(?:^|[.])algorithm(?P<number>\d+)\b", flags=re.IGNORECASE)
+_ARXIV_TABLE_ID_PATTERN = re.compile(
+    r"(?:^|[.])T(?P<number>\d+[A-Za-z]?)\b", flags=re.IGNORECASE
+)
+_ARXIV_ALGORITHM_ID_PATTERN = re.compile(
+    r"(?:^|[.])algorithm(?P<number>\d+)\b", flags=re.IGNORECASE
+)
 _ARXIV_CAPTION_LABEL_PATTERN = re.compile(
     r"^(?P<label>(?:Table|Algorithm)\s+\d+[A-Za-z]?)[.:]?\s*(?P<caption>.*)$",
     flags=re.IGNORECASE,
 )
+# ar5iv can expose Nature preprint captions, including Extended Data figures;
+# keep this provider-scoped to preserve the caption remainder capture.
 _ARXIV_FIGURE_CAPTION_LABEL_PATTERN = re.compile(
-    r"^(?P<label>(?:Figure|Fig\.?|Extended Data Fig\.?)\s+\d+[A-Za-z]?)[.:]?\s*(?P<caption>.*)$",
+    rf"^(?P<label>(?:Figure|Fig\.?|{re.escape(EXTENDED_DATA_FIGURE_LABEL)}\.?)\s+\d+[A-Za-z]?)[.:]?\s*(?P<caption>.*)$",
     flags=re.IGNORECASE,
 )
 _ARXIV_FIGURE_ID_PATTERN = re.compile(
     r"(?:^|[.])F(?P<number>\d+[A-Za-z]?(?:\.\d+[A-Za-z]?)?)(?=$|[.])",
     flags=re.IGNORECASE,
 )
-_ARXIV_PLACEHOLDER_PATTERN = re.compile(rf"\b{re.escape('PAPER_FETCH_TABLE_PLACEHOLDER_')}\d{{4}}\b")
-_ARXIV_UNESCAPED_DOLLAR_PATTERN = re.compile(r"(?<!\\)\$")
-_ARXIV_RETRYABLE_ASSET_ERROR_CATEGORIES = frozenset(
-    {
-        RequestErrorCategory.NETWORK_ERROR.value,
-        RequestErrorCategory.TIMEOUT.value,
-        RequestErrorCategory.TLS_ERROR.value,
-        RequestErrorCategory.DNS_ERROR.value,
-        RequestErrorCategory.CONNECTION_RESET.value,
-        RequestErrorCategory.CONNECTION_CLOSED.value,
-    }
+_ARXIV_PLACEHOLDER_PATTERN = re.compile(
+    rf"\b{re.escape(TABLE_PLACEHOLDER_PREFIX)}\d{{4}}\b"
 )
+_ARXIV_UNESCAPED_DOLLAR_PATTERN = re.compile(r"(?<!\\)\$")
+_ARXIV_RETRYABLE_ASSET_ERROR_CATEGORIES = DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES
 _ARXIV_HTML_FATAL_ERROR_PATTERNS = (
     *(
         re.compile(r"\s+".join(re.escape(part) for part in text.split()), re.IGNORECASE)
@@ -280,17 +313,12 @@ _ARXIV_SECTION_HINT_SKIP_CLASS_TOKENS = {
     "ltx_role_thanks",
     "ltx_note_frontmatter",
 }
-_ARXIV_SECTION_HINT_SKIP_TAGS = {
+_ARXIV_SECTION_HINT_STRUCTURAL_SKIP_TAGS = (
     "aside",
     "figcaption",
-    "figure",
     "footer",
     "header",
-    "math",
     "nav",
-    "script",
-    "style",
-    "svg",
     "table",
     "tbody",
     "td",
@@ -298,6 +326,12 @@ _ARXIV_SECTION_HINT_SKIP_TAGS = {
     "th",
     "thead",
     "tr",
+)
+_ARXIV_SECTION_HINT_SKIP_TAGS = {
+    "figure",
+    "math",
+    *(tag for tag in HTML_DROP_TAGS if tag in {"script", "style", "svg"}),
+    *(tag for tag in _ARXIV_SECTION_HINT_STRUCTURAL_SKIP_TAGS if tag in HTML_BLOCK_TAGS),
 }
 
 
@@ -346,7 +380,9 @@ def _atom_text(entry: ET.Element, path: str) -> str:
     return re.sub(
         r"\s+",
         " ",
-        normalize_text(entry.findtext(path, default="", namespaces=_ARXIV_ATOM_NAMESPACES)),
+        normalize_text(
+            entry.findtext(path, default="", namespaces=_ARXIV_ATOM_NAMESPACES)
+        ),
     ).strip()
 
 
@@ -364,12 +400,14 @@ def _atom_pdf_url(entry: ET.Element) -> str:
             continue
         title = normalize_text(link.get("title")).lower()
         content_type = normalize_text(link.get("type")).lower()
-        if title == "pdf" or content_type == "application/pdf" or "/pdf/" in href:
+        if title == "pdf" or is_pdf_content_type(content_type) or "/pdf/" in href:
             return href
     return ""
 
 
-def _parse_arxiv_atom_result(entry: ET.Element, *, requested_ids: Sequence[str]) -> ArxivApiResult:
+def _parse_arxiv_atom_result(
+    entry: ET.Element, *, requested_ids: Sequence[str]
+) -> ArxivApiResult:
     entry_id = _atom_text(entry, "atom:id")
     short_id = arxiv_id_from_query(entry_id)
     if not short_id and len(requested_ids) == 1:
@@ -407,7 +445,9 @@ def _parse_arxiv_atom_result(entry: ET.Element, *, requested_ids: Sequence[str])
     )
 
 
-def _parse_arxiv_atom_results(body: bytes, *, requested_ids: Sequence[str]) -> list[ArxivApiResult]:
+def _parse_arxiv_atom_results(
+    body: bytes, *, requested_ids: Sequence[str]
+) -> list[ArxivApiResult]:
     try:
         root = ET.fromstring(body.decode("utf-8", errors="replace"))
     except ET.ParseError as exc:
@@ -530,7 +570,9 @@ def _trim_arxiv_author_text_at_boundary(text: str) -> str:
     return normalize_text(text[:boundary_start])
 
 
-def _first_header_value(headers: Mapping[str, Any] | None, key: str, default: str = "") -> str:
+def _first_header_value(
+    headers: Mapping[str, Any] | None, key: str, default: str = ""
+) -> str:
     lowered = key.lower()
     for raw_key, value in (headers or {}).items():
         if str(raw_key).lower() == lowered:
@@ -571,12 +613,22 @@ def _result_authors(result: Any) -> list[str]:
     return authors
 
 
-def metadata_from_arxiv_result(result: Any, *, requested_arxiv_id: str | None = None) -> ProviderMetadata:
+def metadata_from_arxiv_result(
+    result: Any, *, requested_arxiv_id: str | None = None
+) -> ProviderMetadata:
     arxiv_id = _result_short_id(result) or normalize_arxiv_id(requested_arxiv_id)
     if not arxiv_id:
-        raise ProviderFailure("no_result", "arXiv API result did not include a usable arXiv ID.")
-    pdf_url = normalize_text(getattr(result, "pdf_url", "")) or canonical_arxiv_pdf_url(arxiv_id)
-    categories = [normalize_text(item) for item in list(getattr(result, "categories", []) or []) if normalize_text(item)]
+        raise ProviderFailure(
+            NO_RESULT, "arXiv API result did not include a usable arXiv ID."
+        )
+    pdf_url = normalize_text(getattr(result, "pdf_url", "")) or canonical_arxiv_pdf_url(
+        arxiv_id
+    )
+    categories = [
+        normalize_text(item)
+        for item in list(getattr(result, "categories", []) or [])
+        if normalize_text(item)
+    ]
     external_doi = normalize_text(getattr(result, "doi", ""))
     metadata: dict[str, Any] = {
         "provider": "arxiv",
@@ -592,7 +644,8 @@ def metadata_from_arxiv_result(result: Any, *, requested_arxiv_id: str | None = 
         "publisher": "arXiv",
         "landing_page_url": canonical_arxiv_abs_url(arxiv_id),
         "arxiv_id": arxiv_id,
-        "primary_category": normalize_text(getattr(result, "primary_category", "")) or None,
+        "primary_category": normalize_text(getattr(result, "primary_category", ""))
+        or None,
         "categories": categories,
         "keywords": categories,
         "license_urls": [],
@@ -608,7 +661,7 @@ def metadata_from_arxiv_result(result: Any, *, requested_arxiv_id: str | None = 
             },
             {
                 "url": pdf_url,
-                "content_type": "application/pdf",
+                "content_type": PDF_MIME_TYPE,
                 "content_version": arxiv_id,
                 "intended_application": "full_text",
             },
@@ -640,7 +693,7 @@ def _default_arxiv_fulltext_links(arxiv_id: str, pdf_url: str) -> list[dict[str,
         },
         {
             "url": pdf_url,
-            "content_type": "application/pdf",
+            "content_type": PDF_MIME_TYPE,
             "content_version": arxiv_id,
             "intended_application": "full_text",
         },
@@ -660,7 +713,10 @@ def _minimal_arxiv_metadata(
         {
             "provider": "arxiv",
             "official_provider": True,
-            "doi": canonical_arxiv_doi(arxiv_id) or normalize_text(doi) or normalize_text(metadata.get("doi")) or None,
+            "doi": canonical_arxiv_doi(arxiv_id)
+            or normalize_text(doi)
+            or normalize_text(metadata.get("doi"))
+            or None,
             "journal_title": normalize_text(metadata.get("journal_title")) or "arXiv",
             "publisher": normalize_text(metadata.get("publisher")) or "arXiv",
             "landing_page_url": canonical_arxiv_abs_url(arxiv_id),
@@ -689,7 +745,7 @@ def minimal_arxiv_metadata(
 
     normalized = normalize_arxiv_id(arxiv_id)
     if not normalized:
-        raise ProviderFailure("not_supported", "A valid arXiv ID is required.")
+        raise ProviderFailure(NOT_SUPPORTED, "A valid arXiv ID is required.")
     return _minimal_arxiv_metadata(normalized, doi=doi, metadata=metadata or {})
 
 
@@ -740,7 +796,9 @@ def _extract_arxiv_watermark_metadata(root: Any) -> dict[str, Any]:
         candidates.extend(root.select(selector))
     candidates.append(root)
     for node in candidates:
-        text = normalize_text(node.get_text(" ", strip=True) if isinstance(node, Tag) else "")
+        text = normalize_text(
+            node.get_text(" ", strip=True) if isinstance(node, Tag) else ""
+        )
         match = _ARXIV_WATERMARK_PATTERN.search(text)
         if match is None:
             continue
@@ -864,7 +922,11 @@ def _split_arxiv_author_text(text: str) -> list[str]:
 def _extract_arxiv_html_authors(article: Any) -> list[str]:
     if Tag is None or not isinstance(article, Tag):
         return []
-    creators = [node for node in _arxiv_select(article, "author_creators") if isinstance(node, Tag)]
+    creators = [
+        node
+        for node in _arxiv_select(article, "author_creators")
+        if isinstance(node, Tag)
+    ]
     if len(creators) > 1:
         authors: list[str] = []
         for creator in creators:
@@ -915,7 +977,11 @@ def _select_arxiv_abstract_node(article: Any) -> Any:
             continue
         identity = _arxiv_node_identity_text(candidate)
         heading_node = candidate.find(SECTION_HEADING_PATTERN)
-        title = normalize_text(render_heading_text_from_html(heading_node) if isinstance(heading_node, Tag) else "").lower()
+        title = normalize_text(
+            render_heading_text_from_html(heading_node)
+            if isinstance(heading_node, Tag)
+            else ""
+        ).lower()
         if "abstract" in identity or title.strip(" .:") == "abstract":
             return candidate
     return None
@@ -930,15 +996,16 @@ def _extract_arxiv_html_frontmatter(
 ) -> dict[str, Any]:
     if Tag is None or not isinstance(article, Tag):
         return {}
-    arxiv_id = (
-        _arxiv_id_from_metadata_or_doi(str(metadata.get("doi") or ""), metadata)
-        or arxiv_id_from_query(source_url)
-    )
+    arxiv_id = _arxiv_id_from_metadata_or_doi(
+        str(metadata.get("doi") or ""), metadata
+    ) or arxiv_id_from_query(source_url)
     watermark_metadata = _extract_arxiv_watermark_metadata(soup)
     arxiv_id = normalize_arxiv_id(watermark_metadata.get("arxiv_id")) or arxiv_id
 
     title_node = _select_arxiv_title_node(article)
-    title = _clean_arxiv_frontmatter_text(title_node) if isinstance(title_node, Tag) else ""
+    title = (
+        _clean_arxiv_frontmatter_text(title_node) if isinstance(title_node, Tag) else ""
+    )
     abstract_node = _select_arxiv_abstract_node(article)
     abstract = ""
     if isinstance(abstract_node, Tag):
@@ -966,7 +1033,9 @@ def _extract_arxiv_html_frontmatter(
                 "landing_page_url": canonical_arxiv_abs_url(arxiv_id),
                 "html_url": canonical_arxiv_html_url(arxiv_id),
                 "pdf_url": canonical_arxiv_pdf_url(arxiv_id),
-                "fulltext_links": _default_arxiv_fulltext_links(arxiv_id, canonical_arxiv_pdf_url(arxiv_id)),
+                "fulltext_links": _default_arxiv_fulltext_links(
+                    arxiv_id, canonical_arxiv_pdf_url(arxiv_id)
+                ),
             }
         )
     if title:
@@ -1002,9 +1071,17 @@ def _merge_arxiv_metadata_layers(
         for key, value in layer.items():
             if key == "source_url" or value in (None, "", []):
                 continue
-            if key in {"authors", "keywords", "license_urls", "fulltext_links", "categories"}:
+            if key in {
+                "authors",
+                "keywords",
+                "license_urls",
+                "fulltext_links",
+                "categories",
+            }:
                 if replace_lists or not merged.get(key):
-                    merged[key] = list(value or []) if isinstance(value, list) else [value]
+                    merged[key] = (
+                        list(value or []) if isinstance(value, list) else [value]
+                    )
                 else:
                     merged[key] = list(merged.get(key) or []) + list(value or [])
                 continue
@@ -1020,15 +1097,25 @@ def _merge_arxiv_metadata_layers(
         merged["doi"] = canonical_arxiv_doi(arxiv_id)
         merged["landing_page_url"] = canonical_arxiv_abs_url(arxiv_id)
         merged["html_url"] = canonical_arxiv_html_url(arxiv_id)
-        merged["pdf_url"] = normalize_text(merged.get("pdf_url")) or canonical_arxiv_pdf_url(arxiv_id)
-        merged["fulltext_links"] = _default_arxiv_fulltext_links(arxiv_id, normalize_text(merged.get("pdf_url")))
+        merged["pdf_url"] = normalize_text(
+            merged.get("pdf_url")
+        ) or canonical_arxiv_pdf_url(arxiv_id)
+        merged["fulltext_links"] = _default_arxiv_fulltext_links(
+            arxiv_id, normalize_text(merged.get("pdf_url"))
+        )
     merged["provider"] = "arxiv"
     merged["official_provider"] = True
     merged["journal_title"] = normalize_text(merged.get("journal_title")) or "arXiv"
     merged["publisher"] = normalize_text(merged.get("publisher")) or "arXiv"
-    merged["authors"] = dedupe_authors([str(item) for item in (merged.get("authors") or [])])
-    merged["keywords"] = _dedupe_strings(str(item) for item in (merged.get("keywords") or []))
-    merged["license_urls"] = _dedupe_strings(str(item) for item in (merged.get("license_urls") or []))
+    merged["authors"] = dedupe_authors(
+        [str(item) for item in (merged.get("authors") or [])]
+    )
+    merged["keywords"] = _dedupe_strings(
+        str(item) for item in (merged.get("keywords") or [])
+    )
+    merged["license_urls"] = _dedupe_strings(
+        str(item) for item in (merged.get("license_urls") or [])
+    )
     if references:
         merged["references"] = [dict(item) for item in references]
     else:
@@ -1038,7 +1125,9 @@ def _merge_arxiv_metadata_layers(
 
 
 def _arxiv_asset_download_concurrency(env: Mapping[str, str] | None) -> int:
-    return min(resolve_asset_download_concurrency(env), ARXIV_ASSET_DOWNLOAD_CONCURRENCY_LIMIT)
+    return min(
+        resolve_asset_download_concurrency(env), ARXIV_ASSET_DOWNLOAD_CONCURRENCY_LIMIT
+    )
 
 
 def _asset_candidate_urls(asset: Mapping[str, Any]) -> set[str]:
@@ -1046,7 +1135,14 @@ def _asset_candidate_urls(asset: Mapping[str, Any]) -> set[str]:
         normalized
         for normalized in (
             normalize_text(str(asset.get(field) or ""))
-            for field in ("url", "full_size_url", "preview_url", "download_url", "original_url", "link")
+            for field in (
+                "url",
+                "full_size_url",
+                "preview_url",
+                "download_url",
+                "original_url",
+                "link",
+            )
         )
         if normalized
     }
@@ -1061,32 +1157,26 @@ def _is_retryable_arxiv_asset_failure(failure: Mapping[str, Any]) -> bool:
     reason = normalize_text(str(failure.get("reason") or "")).lower()
     if not reason or "unsupported asset url scheme" in reason:
         return False
-    return any(
-        token in reason
-        for token in (
-            "network error",
-            "timeout",
-            "timed out",
-            "ssl",
-            "eof",
-            "connection reset",
-            "connection aborted",
-            "connection broken",
-            "remote end closed",
-            "temporary failure",
-        )
+    return any(token in reason for token in NETWORK_RETRYABLE_REASON_TOKENS)
+
+
+def _asset_matches_failure(
+    asset: Mapping[str, Any], failure: Mapping[str, Any]
+) -> bool:
+    failure_url = normalize_text(
+        str(failure.get("source_url") or failure.get("url") or "")
     )
-
-
-def _asset_matches_failure(asset: Mapping[str, Any], failure: Mapping[str, Any]) -> bool:
-    failure_url = normalize_text(str(failure.get("source_url") or failure.get("url") or ""))
     if failure_url and failure_url in _asset_candidate_urls(asset):
         return True
     failure_heading = normalize_text(str(failure.get("heading") or ""))
     asset_heading = normalize_text(str(asset.get("heading") or ""))
     failure_caption = normalize_text(str(failure.get("caption") or ""))
     asset_caption = normalize_text(str(asset.get("caption") or ""))
-    return bool(failure_heading and failure_heading == asset_heading and failure_caption == asset_caption)
+    return bool(
+        failure_heading
+        and failure_heading == asset_heading
+        and failure_caption == asset_caption
+    )
 
 
 def _assets_for_arxiv_network_retry(
@@ -1095,7 +1185,9 @@ def _assets_for_arxiv_network_retry(
 ) -> list[dict[str, Any]]:
     retry_assets: list[dict[str, Any]] = []
     seen: set[tuple[tuple[str, ...], str, str]] = set()
-    retry_failures = [failure for failure in failures if _is_retryable_arxiv_asset_failure(failure)]
+    retry_failures = [
+        failure for failure in failures if _is_retryable_arxiv_asset_failure(failure)
+    ]
     for failure in retry_failures:
         for asset in assets:
             if not _asset_matches_failure(asset, failure):
@@ -1151,20 +1243,29 @@ def _extract_reference_doi(node: Any) -> str | None:
         return None
     for anchor in node.find_all("a", href=True):
         href = normalize_text(str(anchor.get("href") or ""))
-        match = _REFERENCE_DOI_PATTERN.search(href)
+        match = _reference_doi_match(href)
         if match is not None:
             return normalize_text(match.group(0).rstrip(").,;"))
     text = normalize_text(node.get_text(" ", strip=True))
-    match = _REFERENCE_DOI_PATTERN.search(text)
+    match = _reference_doi_match(text)
     if match is None:
         return None
     return normalize_text(match.group(0).rstrip(").,;"))
 
 
+def _reference_doi_match(value: str) -> re.Match[str] | None:
+    for match in DOI_PATTERN.finditer(value):
+        if match.start() == 0 or not value[match.start() - 1].isalnum():
+            return match
+    return None
+
+
 def _extract_reference_year(text: str, node: Any) -> str | None:
     if Tag is not None and isinstance(node, Tag):
         year_node = _arxiv_select_one(node, "reference_year")
-        year_text = normalize_text(year_node.get_text(" ", strip=True) if isinstance(year_node, Tag) else "")
+        year_text = normalize_text(
+            year_node.get_text(" ", strip=True) if isinstance(year_node, Tag) else ""
+        )
         year_match = _REFERENCE_YEAR_PATTERN.search(year_text)
         if year_match is not None:
             return year_match.group(1)
@@ -1176,7 +1277,9 @@ def _extract_reference_title(node: Any) -> str | None:
     if Tag is None or not isinstance(node, Tag):
         return None
     title_node = _arxiv_select_one(node, "reference_title")
-    title = normalize_text(title_node.get_text(" ", strip=True) if isinstance(title_node, Tag) else "")
+    title = normalize_text(
+        title_node.get_text(" ", strip=True) if isinstance(title_node, Tag) else ""
+    )
     return title or None
 
 
@@ -1233,7 +1336,9 @@ def _candidate_arxiv_bibliography_containers(root: Any) -> list[Any]:
         heading = candidate.find(SECTION_HEADING_PATTERN)
         if not isinstance(heading, Tag):
             continue
-        title = normalize_text(render_heading_text_from_html(heading)).lower().strip(" .:")
+        title = (
+            normalize_text(render_heading_text_from_html(heading)).lower().strip(" .:")
+        )
         if title in {"references", "bibliography"} and id(candidate) not in seen:
             seen.add(id(candidate))
             containers.append(candidate)
@@ -1298,7 +1403,9 @@ def _asset_has_download_candidate(asset: Mapping[str, Any]) -> bool:
     )
 
 
-def _extract_arxiv_html_assets(article_html: str, source_url: str) -> list[dict[str, Any]]:
+def _extract_arxiv_html_assets(
+    article_html: str, source_url: str
+) -> list[dict[str, Any]]:
     assets = [
         _postprocess_arxiv_html_asset(item)
         for item in html_assets.extract_figure_assets(article_html, source_url)
@@ -1317,8 +1424,8 @@ def _arxiv_figure_label_from_text(text: str) -> str:
     number_match = re.search(r"(\d+[A-Za-z]?)$", raw_label)
     if number_match is None:
         return raw_label.rstrip(".:")
-    if raw_label.lower().startswith("extended data"):
-        return f"Extended Data Fig. {number_match.group(1)}"
+    if raw_label.lower().startswith(EXTENDED_DATA_FIGURE_LABEL.lower()):
+        return f"{EXTENDED_DATA_FIGURE_LABEL}. {number_match.group(1)}"
     return f"Figure {number_match.group(1)}"
 
 
@@ -1338,11 +1445,13 @@ def _postprocess_arxiv_html_asset(asset: Mapping[str, Any]) -> dict[str, Any]:
     result = dict(asset)
     caption = _clean_arxiv_asset_caption(result.get("caption"))
     heading = _clean_arxiv_asset_caption(result.get("heading")) or "Figure"
-    short_heading = _arxiv_figure_label_from_text(caption) or _arxiv_figure_label_from_text(heading)
+    short_heading = _arxiv_figure_label_from_text(
+        caption
+    ) or _arxiv_figure_label_from_text(heading)
     if not short_heading:
-        short_heading = _arxiv_figure_label_from_dom_id(result.get("dom_id")) or _arxiv_figure_label_from_dom_id(
-            result.get("image_id")
-        )
+        short_heading = _arxiv_figure_label_from_dom_id(
+            result.get("dom_id")
+        ) or _arxiv_figure_label_from_dom_id(result.get("image_id"))
     result["heading"] = short_heading or heading
     result["caption"] = caption
     return result
@@ -1353,8 +1462,16 @@ def _arxiv_node_classes(node: Any) -> set[str]:
         return set()
     raw_classes = (getattr(node, "attrs", None) or {}).get("class") or []
     if isinstance(raw_classes, str):
-        return {normalize_text(item).lower() for item in raw_classes.split() if normalize_text(item)}
-    return {normalize_text(str(item)).lower() for item in raw_classes if normalize_text(str(item))}
+        return {
+            normalize_text(item).lower()
+            for item in raw_classes.split()
+            if normalize_text(item)
+        }
+    return {
+        normalize_text(str(item)).lower()
+        for item in raw_classes
+        if normalize_text(str(item))
+    }
 
 
 def _arxiv_node_has_class(node: Any, class_name: str) -> bool:
@@ -1372,11 +1489,21 @@ def _is_arxiv_table_figure(node: Any) -> bool:
 
 
 def _is_arxiv_tabular_table(node: Any) -> bool:
-    return Tag is not None and isinstance(node, Tag) and node.name == "table" and _arxiv_node_has_class(node, "ltx_tabular")
+    return (
+        Tag is not None
+        and isinstance(node, Tag)
+        and node.name == "table"
+        and _arxiv_node_has_class(node, "ltx_tabular")
+    )
 
 
 def _is_arxiv_listing_node(node: Any) -> bool:
-    return Tag is not None and isinstance(node, Tag) and node.name == "div" and _arxiv_node_has_class(node, "ltx_listing")
+    return (
+        Tag is not None
+        and isinstance(node, Tag)
+        and node.name == "div"
+        and _arxiv_node_has_class(node, "ltx_listing")
+    )
 
 
 def _is_arxiv_algorithm_figure(node: Any) -> bool:
@@ -1392,7 +1519,9 @@ def _is_arxiv_inline_figure_container(node: Any) -> bool:
     if Tag is None or not isinstance(node, Tag) or node.name != "figure":
         return False
     classes = _arxiv_node_classes(node)
-    if classes.intersection({"ltx_table", "ltx_algorithm", "ltx_equation", "ltx_listing"}):
+    if classes.intersection(
+        {"ltx_table", "ltx_algorithm", "ltx_equation", "ltx_listing"}
+    ):
         return False
     return not _is_arxiv_table_figure(node) and not _is_arxiv_algorithm_figure(node)
 
@@ -1444,7 +1573,12 @@ def _arxiv_url_reference_candidates(raw_value: Any, source_url: str = "") -> set
             continue
         parsed = urllib.parse.urlsplit(normalized)
         path = parsed.path or normalized
-        for candidate in (normalized, urllib.parse.unquote(normalized), path, urllib.parse.unquote(path)):
+        for candidate in (
+            normalized,
+            urllib.parse.unquote(normalized),
+            path,
+            urllib.parse.unquote(path),
+        ):
             cleaned = normalize_text(candidate).replace("\\", "/").strip()
             if not cleaned:
                 continue
@@ -1461,7 +1595,9 @@ def _arxiv_url_candidate_sets_match(left: set[str], right: set[str]) -> bool:
         return True
     for left_item in left:
         for right_item in right:
-            if left_item.endswith(f"/{right_item}") or right_item.endswith(f"/{left_item}"):
+            if left_item.endswith(f"/{right_item}") or right_item.endswith(
+                f"/{left_item}"
+            ):
                 return True
     return False
 
@@ -1482,10 +1618,14 @@ def _arxiv_image_url_candidates(image: Any, source_url: str) -> set[str]:
             if not isinstance(source, Tag):
                 continue
             for attr in ("src", "data-src"):
-                candidates |= _arxiv_url_reference_candidates(source.get(attr), source_url)
+                candidates |= _arxiv_url_reference_candidates(
+                    source.get(attr), source_url
+                )
             for attr in ("srcset", "data-srcset"):
                 for srcset_url in _arxiv_srcset_url_candidates(source.get(attr)):
-                    candidates |= _arxiv_url_reference_candidates(srcset_url, source_url)
+                    candidates |= _arxiv_url_reference_candidates(
+                        srcset_url, source_url
+                    )
 
     anchor = image.find_parent("a", href=True)
     if isinstance(anchor, Tag):
@@ -1494,7 +1634,14 @@ def _arxiv_image_url_candidates(image: Any, source_url: str) -> set[str]:
 
 
 def _arxiv_inline_asset_url(asset: Mapping[str, Any]) -> str:
-    for field in ("url", "full_size_url", "preview_url", "download_url", "original_url", "link"):
+    for field in (
+        "url",
+        "full_size_url",
+        "preview_url",
+        "download_url",
+        "original_url",
+        "link",
+    ):
         candidate = normalize_text(str(asset.get(field) or ""))
         if candidate:
             return candidate
@@ -1560,7 +1707,10 @@ def _annotate_arxiv_inline_figure_images(
     image_by_id: dict[str, Any] = {}
     image_url_candidates: dict[int, set[str]] = {}
     for image in article.find_all("img"):
-        if not isinstance(image, Tag) or _arxiv_inline_figure_for_image(image, article) is None:
+        if (
+            not isinstance(image, Tag)
+            or _arxiv_inline_figure_for_image(image, article) is None
+        ):
             continue
         eligible_images.append(image)
         image_id = normalize_text(str(image.get("id") or ""))
@@ -1589,7 +1739,11 @@ def _annotate_arxiv_inline_figure_images(
             dom_id = normalize_text(str(asset.get("dom_id") or ""))
             order = _arxiv_asset_order(asset)
             figure = figure_by_id.get(dom_id) if dom_id else None
-            figure_images = _arxiv_inline_images_for_figure(figure, article) if figure is not None else []
+            figure_images = (
+                _arxiv_inline_images_for_figure(figure, article)
+                if figure is not None
+                else []
+            )
             if order is not None and order < len(figure_images):
                 candidate = figure_images[order]
                 if id(candidate) not in consumed_image_ids:
@@ -1598,7 +1752,9 @@ def _annotate_arxiv_inline_figure_images(
         if matched_image is None:
             asset_candidates = set()
             for candidate_url in _asset_candidate_urls(asset):
-                asset_candidates |= _arxiv_url_reference_candidates(candidate_url, source_url)
+                asset_candidates |= _arxiv_url_reference_candidates(
+                    candidate_url, source_url
+                )
             for image in eligible_images:
                 if id(image) in consumed_image_ids:
                     continue
@@ -1646,7 +1802,9 @@ def _arxiv_topmost_figure_ancestor(node: Any, article: Any) -> Any:
     return topmost
 
 
-def _replace_arxiv_semantic_node_with_placeholder(node: Any, article: Any, soup: Any, placeholder: str) -> None:
+def _replace_arxiv_semantic_node_with_placeholder(
+    node: Any, article: Any, soup: Any, placeholder: str
+) -> None:
     if Tag is None or not isinstance(node, Tag):
         return
     placeholder_node = soup.new_string(f"\n\n{placeholder}\n\n")
@@ -1676,10 +1834,9 @@ def _clean_official_html_latexml_noise(article: Any) -> dict[str, int]:
             continue
         classes = _arxiv_node_classes(node)
         text = normalize_text(node.get_text("", strip=True))
-        if (
-            "ltx_error" in classes
-            or "undefined" in classes
-        ) and (not text or _ARXIV_UNDEFINED_MACRO_PATTERN.fullmatch(text)):
+        if ("ltx_error" in classes or "undefined" in classes) and (
+            not text or _ARXIV_UNDEFINED_MACRO_PATTERN.fullmatch(text)
+        ):
             node.decompose()
             removed_error_nodes += 1
 
@@ -1791,7 +1948,11 @@ def _normalize_official_html_latexml_notes(article: Any) -> int:
         if "ltx_role_footnote" not in classes and "ltx_role_endnote" not in classes:
             continue
         marker_node = _arxiv_select_one(note, "note_markers")
-        marker = normalize_text(marker_node.get_text(" ", strip=True) if isinstance(marker_node, Tag) else "")
+        marker = normalize_text(
+            marker_node.get_text(" ", strip=True)
+            if isinstance(marker_node, Tag)
+            else ""
+        )
         content_node = _arxiv_select_one(note, "note_content")
         if not isinstance(content_node, Tag):
             continue
@@ -1802,7 +1963,9 @@ def _normalize_official_html_latexml_notes(article: Any) -> int:
             continue
         for duplicate_marker in _arxiv_select(content, "note_markers"):
             duplicate_marker.decompose()
-        content_text = normalize_text(render_clean_text_from_html(content).replace("\n", " "))
+        content_text = normalize_text(
+            render_clean_text_from_html(content).replace("\n", " ")
+        )
         if not marker and not content_text:
             continue
 
@@ -1844,11 +2007,15 @@ def _arxiv_caption_label_and_text(node: Any, *, default_label: str) -> tuple[str
     if Tag is not None and isinstance(node, Tag):
         caption_node = node.find("figcaption")
         if isinstance(caption_node, Tag):
-            caption = _normalize_arxiv_caption_text(render_clean_text_from_html(caption_node))
+            caption = _normalize_arxiv_caption_text(
+                render_clean_text_from_html(caption_node)
+            )
     label = _arxiv_label_from_identifier(node, default_label=default_label)
     if caption:
         match = _ARXIV_CAPTION_LABEL_PATTERN.match(caption)
-        if match is not None and match.group("label").lower().startswith(default_label.lower()):
+        if match is not None and match.group("label").lower().startswith(
+            default_label.lower()
+        ):
             raw_label = normalize_text(match.group("label"))
             number = raw_label.split(None, 1)[1] if " " in raw_label else ""
             label = f"{default_label} {number}.".strip() if number else label
@@ -1860,13 +2027,21 @@ def _arxiv_table_markdown_has_body(markdown_text: str) -> bool:
     normalized = normalize_text(markdown_text)
     if not normalized:
         return False
-    lines = [line.strip() for line in markdown_text.splitlines() if normalize_text(line)]
-    return any(line.startswith("|") for line in lines) or any(line.startswith("- ") for line in lines)
+    lines = [
+        line.strip() for line in markdown_text.splitlines() if normalize_text(line)
+    ]
+    return any(line.startswith("|") for line in lines) or any(
+        line.startswith("- ") for line in lines
+    )
 
 
 def _arxiv_table_markdown_is_key_value_fallback(markdown_text: str) -> bool:
-    lines = [line.strip() for line in markdown_text.splitlines() if normalize_text(line)]
-    return any(line.startswith("- ") for line in lines) and not any(line.startswith("|") for line in lines)
+    lines = [
+        line.strip() for line in markdown_text.splitlines() if normalize_text(line)
+    ]
+    return any(line.startswith("- ") for line in lines) and not any(
+        line.startswith("|") for line in lines
+    )
 
 
 def _render_arxiv_table_block(node: Any) -> tuple[str, bool, bool]:
@@ -1882,7 +2057,11 @@ def _render_arxiv_table_block(node: Any) -> tuple[str, bool, bool]:
         render_inline_text=render_clean_text_from_html,
     )
     rendered = _arxiv_table_markdown_has_body(markdown)
-    return normalize_markdown_text(markdown), rendered, _arxiv_table_markdown_is_key_value_fallback(markdown)
+    return (
+        normalize_markdown_text(markdown),
+        rendered,
+        _arxiv_table_markdown_is_key_value_fallback(markdown),
+    )
 
 
 def _clean_arxiv_listing_line_node(line_node: Any) -> Any:
@@ -1917,7 +2096,9 @@ def _render_arxiv_listing_lines(listing_node: Any) -> list[str]:
 def _render_arxiv_listing_block(node: Any) -> tuple[str, bool]:
     if Tag is None or not isinstance(node, Tag):
         return "", False
-    listing = _arxiv_select_one(node, "algorithm_listing") if node.name == "figure" else node
+    listing = (
+        _arxiv_select_one(node, "algorithm_listing") if node.name == "figure" else node
+    )
     if not isinstance(listing, Tag):
         return "", False
     label, caption = _arxiv_caption_label_and_text(node, default_label="Algorithm")
@@ -1946,7 +2127,9 @@ def _prepare_arxiv_semantic_blocks(article: Any, soup: Any) -> ArxivSemanticPrep
     semantic_loss_count = 0
 
     for node in list(article.find_all(True)):
-        if id(node) in selected_ancestor_ids or selected_ancestor_ids.intersection(_arxiv_parent_identities(node)):
+        if id(node) in selected_ancestor_ids or selected_ancestor_ids.intersection(
+            _arxiv_parent_identities(node)
+        ):
             continue
 
         kind = ""
@@ -1961,11 +2144,15 @@ def _prepare_arxiv_semantic_blocks(article: Any, soup: Any) -> ArxivSemanticPrep
             kind = "table"
             table_total += 1
             markdown, rendered, key_value_fallback = _render_arxiv_table_block(node)
-        elif _is_arxiv_tabular_table(node) and not any(_is_arxiv_table_figure(parent) for parent in node.parents):
+        elif _is_arxiv_tabular_table(node) and not any(
+            _is_arxiv_table_figure(parent) for parent in node.parents
+        ):
             kind = "table"
             table_total += 1
             markdown, rendered, key_value_fallback = _render_arxiv_table_block(node)
-        elif _is_arxiv_listing_node(node) and not any(_is_arxiv_algorithm_figure(parent) for parent in node.parents):
+        elif _is_arxiv_listing_node(node) and not any(
+            _is_arxiv_algorithm_figure(parent) for parent in node.parents
+        ):
             kind = "listing"
             listing_total += 1
             markdown, rendered = _render_arxiv_listing_block(node)
@@ -1974,7 +2161,9 @@ def _prepare_arxiv_semantic_blocks(article: Any, soup: Any) -> ArxivSemanticPrep
             continue
         if not rendered:
             semantic_loss_count += 1
-            warnings.append(f"arXiv HTML {kind} block could not be rendered with semantic content.")
+            warnings.append(
+                f"arXiv HTML {kind} block could not be rendered with semantic content."
+            )
             continue
 
         placeholder = table_placeholder(len(entries))
@@ -2005,10 +2194,14 @@ def _prepare_arxiv_semantic_blocks(article: Any, soup: Any) -> ArxivSemanticPrep
         "semantic_block_rendered_count": table_rendered + listing_rendered,
         "semantic_block_loss_count": semantic_loss_count,
     }
-    return ArxivSemanticPreparation(entries=entries, diagnostics=diagnostics, warnings=warnings)
+    return ArxivSemanticPreparation(
+        entries=entries, diagnostics=diagnostics, warnings=warnings
+    )
 
 
-def _split_markdown_block_around_placeholder(block: str, placeholder: str, replacement: str) -> list[str]:
+def _split_markdown_block_around_placeholder(
+    block: str, placeholder: str, replacement: str
+) -> list[str]:
     pieces: list[str] = []
     remaining = block
     while placeholder in remaining:
@@ -2039,16 +2232,25 @@ def _inject_arxiv_semantic_blocks(
         clean_markdown_fn=clean_markdown,
     )
     replacement_by_placeholder = {
-        normalize_text(str(entry.get("placeholder") or "")): normalize_markdown_text(str(entry.get("markdown") or ""))
+        normalize_text(str(entry.get("placeholder") or "")): normalize_markdown_text(
+            str(entry.get("markdown") or "")
+        )
         for entry in entries
-        if normalize_text(str(entry.get("placeholder") or "")) and normalize_text(str(entry.get("markdown") or ""))
+        if normalize_text(str(entry.get("placeholder") or ""))
+        and normalize_text(str(entry.get("markdown") or ""))
     }
     inserted: set[str] = {
         placeholder
         for placeholder, replacement in replacement_by_placeholder.items()
-        if replacement and replacement in markdown_text and placeholder not in markdown_text
+        if replacement
+        and replacement in markdown_text
+        and placeholder not in markdown_text
     }
-    blocks = [normalize_markdown_text(block) for block in re.split(r"\n\s*\n", markdown_text) if normalize_text(block)]
+    blocks = [
+        normalize_markdown_text(block)
+        for block in re.split(r"\n\s*\n", markdown_text)
+        if normalize_text(block)
+    ]
     injected: list[str] = []
     for block in blocks:
         placeholders = [
@@ -2065,7 +2267,11 @@ def _inject_arxiv_semantic_blocks(
             next_blocks: list[str] = []
             for pending_block in pending_blocks:
                 if placeholder in pending_block:
-                    next_blocks.extend(_split_markdown_block_around_placeholder(pending_block, placeholder, replacement))
+                    next_blocks.extend(
+                        _split_markdown_block_around_placeholder(
+                            pending_block, placeholder, replacement
+                        )
+                    )
                     inserted.add(placeholder)
                 else:
                     next_blocks.append(pending_block)
@@ -2088,11 +2294,19 @@ def _inject_arxiv_semantic_blocks(
             f"arXiv HTML semantic block placeholders could not all be reinserted; appended {appended_count} block(s) at document end."
         )
     cleaned = clean_markdown("\n\n".join([*injected, *appended_markdown]))
-    return cleaned, {"inserted_count": len(inserted), "appended_count": appended_count}, warnings
+    return (
+        cleaned,
+        {"inserted_count": len(inserted), "appended_count": appended_count},
+        warnings,
+    )
 
 
 def _clean_arxiv_html_markdown_noise(markdown_text: str) -> str:
-    blocks = [normalize_markdown_text(block) for block in re.split(r"\n\s*\n", markdown_text) if normalize_text(block)]
+    blocks = [
+        normalize_markdown_text(block)
+        for block in re.split(r"\n\s*\n", markdown_text)
+        if normalize_text(block)
+    ]
     cleaned_blocks: list[str] = []
     for block in blocks:
         normalized = normalize_text(block)
@@ -2111,7 +2325,9 @@ def _clean_arxiv_html_markdown_noise(markdown_text: str) -> str:
 
 def _arxiv_html_contains_fatal_conversion_error(markdown_text: str) -> bool:
     normalized = normalize_text(markdown_text)
-    return any(pattern.search(normalized) for pattern in _ARXIV_HTML_FATAL_ERROR_PATTERNS)
+    return any(
+        pattern.search(normalized) for pattern in _ARXIV_HTML_FATAL_ERROR_PATTERNS
+    )
 
 
 def _is_arxiv_bibliography_title_heading(node: Any) -> bool:
@@ -2134,13 +2350,17 @@ def _arxiv_heading_in_skipped_hint_scope(node: Any, article: Any) -> bool:
         classes = _arxiv_node_classes(current)
         if classes.intersection(_ARXIV_SECTION_HINT_SKIP_CLASS_TOKENS):
             return True
-        if "ltx_bibliography" in classes and not _is_arxiv_bibliography_title_heading(node):
+        if "ltx_bibliography" in classes and not _is_arxiv_bibliography_title_heading(
+            node
+        ):
             return True
         current = getattr(current, "parent", None)
     return False
 
 
-def _arxiv_section_hint_kind(node: Any, heading: str, *, title: str | None) -> str | None:
+def _arxiv_section_hint_kind(
+    node: Any, heading: str, *, title: str | None
+) -> str | None:
     node_name = normalize_text(getattr(node, "name", "") or "").lower()
     category = heading_category(node_name, heading, title=title)
     if category in {"abstract", "front_matter"}:
@@ -2151,12 +2371,16 @@ def _arxiv_section_hint_kind(node: Any, heading: str, *, title: str | None) -> s
     return "body"
 
 
-def _collect_arxiv_html_section_hints(article: Any, *, title: str | None = None) -> list[dict[str, Any]]:
+def _collect_arxiv_html_section_hints(
+    article: Any, *, title: str | None = None
+) -> list[dict[str, Any]]:
     if Tag is None or not isinstance(article, Tag):
         return []
     hints: list[dict[str, Any]] = []
     for node in article.find_all(SECTION_HEADING_PATTERN):
-        if not isinstance(node, Tag) or _arxiv_heading_in_skipped_hint_scope(node, article):
+        if not isinstance(node, Tag) or _arxiv_heading_in_skipped_hint_scope(
+            node, article
+        ):
             continue
         heading = normalize_text(render_heading_text_from_html(node))
         if not heading:
@@ -2164,9 +2388,13 @@ def _collect_arxiv_html_section_hints(article: Any, *, title: str | None = None)
         kind = _arxiv_section_hint_kind(node, heading, title=title)
         if kind is None:
             continue
-        level_match = SECTION_HEADING_PATTERN.fullmatch(normalize_text(node.name or "").lower())
+        level_match = SECTION_HEADING_PATTERN.fullmatch(
+            normalize_text(node.name or "").lower()
+        )
         level = int(level_match.group(1)) if level_match else 2
-        selector_node = node.parent if isinstance(getattr(node, "parent", None), Tag) else node
+        selector_node = (
+            node.parent if isinstance(getattr(node, "parent", None), Tag) else node
+        )
         hints.append(
             {
                 "heading": heading,
@@ -2187,11 +2415,16 @@ def _extract_arxiv_html_markdown(
     metadata: Mapping[str, Any],
 ) -> ArxivHtmlExtraction:
     if BeautifulSoup is None:
-        raise ProviderFailure("not_configured", "beautifulsoup4 is not installed; cannot parse arXiv HTML.")
+        raise ProviderFailure(
+            NOT_CONFIGURED,
+            "beautifulsoup4 is not installed; cannot parse arXiv HTML.",
+        )
     soup = BeautifulSoup(html_text, "html.parser")
     article = _arxiv_select_one(soup, "article_root") or soup.find("article")
     if not isinstance(article, Tag):
-        raise ProviderFailure("no_result", "arXiv official HTML did not expose a LaTeXML article body.")
+        raise ProviderFailure(
+            NO_RESULT, "arXiv official HTML did not expose a LaTeXML article body."
+        )
 
     html_frontmatter = _extract_arxiv_html_frontmatter(
         soup,
@@ -2203,7 +2436,9 @@ def _extract_arxiv_html_markdown(
     extracted_references = _extract_arxiv_html_references(article)
     extracted_assets = _extract_arxiv_html_assets(str(article), source_url)
     semantic_preparation = _prepare_arxiv_semantic_blocks(article, soup)
-    inline_figure_diagnostics = _annotate_arxiv_inline_figure_images(article, extracted_assets, source_url)
+    inline_figure_diagnostics = _annotate_arxiv_inline_figure_images(
+        article, extracted_assets, source_url
+    )
 
     for selector in _arxiv_ar5iv_selectors("article_chrome"):
         for node in article.select(selector):
@@ -2216,17 +2451,25 @@ def _extract_arxiv_html_markdown(
     lines: list[str] = []
     render_container_markdown(article, lines, level=2, section_content_selectors=())
     markdown_text = normalize_markdown_text("\n".join(lines))
-    markdown_text, insertion_diagnostics, insertion_warnings = _inject_arxiv_semantic_blocks(
-        markdown_text,
-        entries=semantic_preparation.entries,
+    markdown_text, insertion_diagnostics, insertion_warnings = (
+        _inject_arxiv_semantic_blocks(
+            markdown_text,
+            entries=semantic_preparation.entries,
+        )
     )
     markdown_text = _clean_arxiv_html_markdown_noise(markdown_text)
     if _arxiv_html_contains_fatal_conversion_error(markdown_text):
-        raise ProviderFailure("no_result", "arXiv official HTML was not classified as usable full text.")
+        raise ProviderFailure(
+            NO_RESULT, "arXiv official HTML was not classified as usable full text."
+        )
     if _markdown_word_count(markdown_text) < MIN_HTML_MARKDOWN_WORDS:
-        raise ProviderFailure("no_result", "arXiv official HTML did not expose enough body text.")
+        raise ProviderFailure(
+            NO_RESULT, "arXiv official HTML did not expose enough body text."
+        )
     if "##" not in markdown_text:
-        raise ProviderFailure("no_result", "arXiv official HTML did not expose section headings.")
+        raise ProviderFailure(
+            NO_RESULT, "arXiv official HTML did not expose section headings."
+        )
 
     diagnostics = assess_plain_text_fulltext_availability(
         markdown_text,
@@ -2234,8 +2477,10 @@ def _extract_arxiv_html_markdown(
         title=normalize_text(metadata.get("title")),
         section_hints=section_hints,
     ).to_dict()
-    if diagnostics.get("content_kind") != "fulltext":
-        raise ProviderFailure("no_result", "arXiv official HTML was not classified as usable full text.")
+    if diagnostics.get("content_kind") != FULLTEXT:
+        raise ProviderFailure(
+            NO_RESULT, "arXiv official HTML was not classified as usable full text."
+        )
     diagnostics.setdefault("extraction", {})
     diagnostics["extraction"] = {
         **dict(diagnostics.get("extraction") or {}),
@@ -2250,11 +2495,17 @@ def _extract_arxiv_html_markdown(
         **inline_figure_diagnostics,
         **semantic_preparation.diagnostics,
         **{
-            "semantic_block_inserted_count": insertion_diagnostics.get("inserted_count", 0),
-            "semantic_block_appended_count": insertion_diagnostics.get("appended_count", 0),
+            "semantic_block_inserted_count": insertion_diagnostics.get(
+                "inserted_count", 0
+            ),
+            "semantic_block_appended_count": insertion_diagnostics.get(
+                "appended_count", 0
+            ),
         },
     }
-    semantic_loss_count = int(semantic_preparation.diagnostics.get("semantic_block_loss_count") or 0)
+    semantic_loss_count = int(
+        semantic_preparation.diagnostics.get("semantic_block_loss_count") or 0
+    )
     diagnostics["semantic_losses"] = {
         "table_fallback_count": semantic_loss_count,
         "table_semantic_loss_count": semantic_loss_count,
@@ -2299,7 +2550,7 @@ class ArxivClient(ProviderClient):
             checks=[
                 build_provider_status_check(
                     "metadata_api",
-                    "ok",
+                    OK,
                     "arXiv API metadata route is an optional metadata enrichment path.",
                     details={
                         "mode": "arxiv_api",
@@ -2310,13 +2561,13 @@ class ArxivClient(ProviderClient):
                 ),
                 build_provider_status_check(
                     "html_route",
-                    "ok",
+                    OK,
                     "arXiv official HTML route is the primary full-text path and is available without local converters.",
                     details={"mode": "direct_http_html"},
                 ),
                 build_provider_status_check(
-                    "pdf_fallback",
-                    "ok",
+                    PDF_FALLBACK,
+                    OK,
                     (
                         "arXiv PDF fallback is available as text-only full text when official HTML "
                         "is not usable."
@@ -2340,7 +2591,7 @@ class ArxivClient(ProviderClient):
 
     def _pdf_headers(self, *, referer: str | None = None) -> dict[str, str]:
         headers = {
-            "Accept": "application/pdf,*/*;q=0.8",
+            "Accept": PDF_ACCEPT_HEADER,
             "User-Agent": self.user_agent,
         }
         if referer:
@@ -2355,23 +2606,37 @@ class ArxivClient(ProviderClient):
             or arxiv_id_from_query(query.get("url"))
         )
         if not arxiv_id:
-            raise ProviderFailure("not_supported", "arXiv metadata retrieval requires an arXiv ID or arXiv DOI.")
+            raise ProviderFailure(
+                NOT_SUPPORTED,
+                "arXiv metadata retrieval requires an arXiv ID or arXiv DOI.",
+            )
         try:
             search = ArxivSearch(id_list=[arxiv_id], max_results=1)
             results = list(self.api_client.results(search))
         except Exception as exc:
-            raise ProviderFailure("error", f"arXiv API metadata retrieval failed: {exc}") from exc
+            raise ProviderFailure(
+                ERROR, f"arXiv API metadata retrieval failed: {exc}"
+            ) from exc
         if not results:
-            raise ProviderFailure("no_result", f"arXiv API returned no result for {arxiv_id}.")
+            raise ProviderFailure(
+                NO_RESULT, f"arXiv API returned no result for {arxiv_id}."
+            )
         return metadata_from_arxiv_result(results[0], requested_arxiv_id=arxiv_id)
 
-    def _ensure_derived_metadata(self, doi: str, metadata: Mapping[str, Any]) -> ProviderMetadata:
+    def _ensure_derived_metadata(
+        self, doi: str, metadata: Mapping[str, Any]
+    ) -> ProviderMetadata:
         arxiv_id = _arxiv_id_from_metadata_or_doi(doi, metadata)
         if not arxiv_id:
-            raise ProviderFailure("not_supported", "arXiv full-text retrieval requires an arXiv ID or arXiv DOI.")
+            raise ProviderFailure(
+                NOT_SUPPORTED,
+                "arXiv full-text retrieval requires an arXiv ID or arXiv DOI.",
+            )
         return _minimal_arxiv_metadata(arxiv_id, doi=doi, metadata=metadata)
 
-    def _fetch_api_metadata_optional(self, arxiv_id: str) -> tuple[ProviderMetadata | None, list[str]]:
+    def _fetch_api_metadata_optional(
+        self, arxiv_id: str
+    ) -> tuple[ProviderMetadata | None, list[str]]:
         try:
             return self.fetch_metadata({"arxiv_id": arxiv_id}), []
         except ProviderFailure as exc:
@@ -2394,7 +2659,9 @@ class ArxivClient(ProviderClient):
             payload.warnings = warnings
             return payload
         content = payload.content
-        content_metadata = content.merged_metadata if content is not None else payload.merged_metadata
+        content_metadata = (
+            content.merged_metadata if content is not None else payload.merged_metadata
+        )
         references = (
             list(content_metadata.get("references") or [])
             if isinstance(content_metadata, Mapping)
@@ -2402,7 +2669,9 @@ class ArxivClient(ProviderClient):
         )
         merged_metadata = _merge_arxiv_metadata_layers(
             derived_metadata,
-            html_metadata=content_metadata if isinstance(content_metadata, Mapping) else None,
+            html_metadata=content_metadata
+            if isinstance(content_metadata, Mapping)
+            else None,
             api_metadata=api_metadata,
             references=references,
         )
@@ -2412,11 +2681,17 @@ class ArxivClient(ProviderClient):
             payload.content = replace(content, merged_metadata=merged_metadata)
         return payload
 
-    def _fetch_html_payload(self, api_metadata: Mapping[str, Any]) -> RawFulltextPayload:
+    def _fetch_html_payload(
+        self, api_metadata: Mapping[str, Any]
+    ) -> RawFulltextPayload:
         arxiv_id = normalize_arxiv_id(str(api_metadata.get("arxiv_id") or ""))
-        html_url = normalize_text(str(api_metadata.get("html_url") or "")) or canonical_arxiv_html_url(arxiv_id)
+        html_url = normalize_text(
+            str(api_metadata.get("html_url") or "")
+        ) or canonical_arxiv_html_url(arxiv_id)
         if not html_url:
-            raise ProviderFailure("no_result", "arXiv metadata did not expose an HTML candidate.")
+            raise ProviderFailure(
+                NO_RESULT, "arXiv metadata did not expose an HTML candidate."
+            )
         try:
             response = self.transport.request(
                 "GET",
@@ -2429,12 +2704,20 @@ class ArxivClient(ProviderClient):
             raise map_request_failure(exc) from exc
 
         body = bytes(response.get("body") or b"")
-        final_url = urllib.parse.urljoin(html_url, normalize_text(str(response.get("url") or "")) or html_url)
-        content_type = _first_header_value(response.get("headers"), "content-type", "text/html")
+        final_url = urllib.parse.urljoin(
+            html_url, normalize_text(str(response.get("url") or "")) or html_url
+        )
+        content_type = _first_header_value(
+            response.get("headers"), "content-type", "text/html"
+        )
         if not _looks_like_html(content_type, body):
-            raise ProviderFailure("no_result", "arXiv official HTML candidate did not return HTML.")
+            raise ProviderFailure(
+                NO_RESULT, "arXiv official HTML candidate did not return HTML."
+            )
         html_text = body.decode("utf-8", errors="replace")
-        extraction = _extract_arxiv_html_markdown(html_text, final_url, metadata=api_metadata)
+        extraction = _extract_arxiv_html_markdown(
+            html_text, final_url, metadata=api_metadata
+        )
         return build_provider_payload(
             provider=self.name,
             route_kind="html",
@@ -2468,8 +2751,16 @@ class ArxivClient(ProviderClient):
             ]
         )
         if not candidates:
-            raise ProviderFailure("no_result", "arXiv metadata did not expose a PDF candidate.")
-        referer = normalize_text(str(api_metadata.get("html_url") or api_metadata.get("landing_page_url") or ""))
+            raise ProviderFailure(
+                NO_RESULT, "arXiv metadata did not expose a PDF candidate."
+            )
+        referer = normalize_text(
+            str(
+                api_metadata.get("html_url")
+                or api_metadata.get("landing_page_url")
+                or ""
+            )
+        )
         try:
             pdf_result = PdfFallbackStrategy(
                 transport=self.transport,
@@ -2478,18 +2769,20 @@ class ArxivClient(ProviderClient):
                 fetcher=fetch_pdf_over_http,
             ).fetch(candidates)
         except PdfFetchFailure as exc:
-            raise ProviderFailure("no_result", exc.message) from exc
-        final_url = urllib.parse.urljoin(pdf_result.source_url or candidates[0], pdf_result.final_url)
+            raise ProviderFailure(NO_RESULT, exc.message) from exc
+        final_url = urllib.parse.urljoin(
+            pdf_result.source_url or candidates[0], pdf_result.final_url
+        )
         return build_provider_payload(
             provider=self.name,
-            route_kind="pdf_fallback",
+            route_kind=PDF_FALLBACK,
             source_url=final_url,
-            content_type="application/pdf",
+            content_type=PDF_MIME_TYPE,
             body=pdf_result.pdf_bytes,
             markdown_text=pdf_result.markdown_text,
             merged_metadata=api_metadata,
             diagnostics={
-                "pdf_fallback": {
+                PDF_FALLBACK: {
                     "candidates": candidates,
                     "previous_failure_message": previous_failure_message,
                 }
@@ -2497,7 +2790,9 @@ class ArxivClient(ProviderClient):
             reason="Downloaded full text from arXiv PDF fallback after arXiv official HTML was not usable.",
             suggested_filename=pdf_result.suggested_filename,
             html_failure_message=previous_failure_message,
-            warnings=["Full text was extracted from arXiv PDF fallback after arXiv official HTML was not usable."],
+            warnings=[
+                "Full text was extracted from arXiv PDF fallback after arXiv official HTML was not usable."
+            ],
             content_needs_local_copy=True,
             needs_local_copy=True,
         )
@@ -2522,8 +2817,12 @@ class ArxivClient(ProviderClient):
                 for label in ("html",)
                 if (failure := state.failure(label)) is not None
             ]
-            previous_failure_message = "; ".join(failure_messages) or "arXiv official HTML route failed."
-            return self._fetch_pdf_payload(derived_metadata, previous_failure_message=previous_failure_message)
+            previous_failure_message = (
+                "; ".join(failure_messages) or "arXiv official HTML route failed."
+            )
+            return self._fetch_pdf_payload(
+                derived_metadata, previous_failure_message=previous_failure_message
+            )
 
         payload = run_provider_waterfall(
             [
@@ -2532,7 +2831,7 @@ class ArxivClient(ProviderClient):
                     run=run_html,
                     failure_marker=fulltext_marker(self.name, "fail", route="html"),
                     success_markers=(fulltext_marker(self.name, "ok", route="html"),),
-                    continue_codes=ARXIV_WATERFALL_CONTINUE_CODES,
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         "arXiv official HTML route was not usable "
                         f"({failure.message}); attempting PDF fallback."
@@ -2542,8 +2841,10 @@ class ArxivClient(ProviderClient):
                     label="pdf",
                     run=run_pdf,
                     failure_marker=fulltext_marker(self.name, "fail", route="pdf"),
-                    success_markers=(fulltext_marker(self.name, "ok", route="pdf_fallback"),),
-                    continue_codes=ARXIV_WATERFALL_CONTINUE_CODES,
+                    success_markers=(
+                        fulltext_marker(self.name, "ok", route=PDF_FALLBACK),
+                    ),
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         f"arXiv PDF fallback was not usable ({failure.message})."
                     ),
@@ -2576,7 +2877,9 @@ class ArxivClient(ProviderClient):
         if output_dir is None or asset_profile == "none":
             return empty_asset_results()
         content = raw_payload.content
-        route_kind = normalize_text(content.route_kind if content is not None else "").lower()
+        route_kind = normalize_text(
+            content.route_kind if content is not None else ""
+        ).lower()
         if route_kind != "html":
             return empty_asset_results()
         extracted_assets = [
@@ -2586,7 +2889,11 @@ class ArxivClient(ProviderClient):
         ]
         if not extracted_assets:
             return empty_asset_results()
-        merged_metadata = content.merged_metadata if content is not None else raw_payload.merged_metadata
+        merged_metadata = (
+            content.merged_metadata
+            if content is not None
+            else raw_payload.merged_metadata
+        )
         arxiv_id = normalize_arxiv_id(
             str((merged_metadata or {}).get("arxiv_id") or "")
         ) or _arxiv_id_from_metadata_or_doi(doi, merged_metadata or {})
@@ -2635,21 +2942,40 @@ class ArxivClient(ProviderClient):
     ):
         del context
         content = raw_payload.content
-        merged_metadata = content.merged_metadata if content is not None else raw_payload.merged_metadata
-        article_metadata = dict(merged_metadata if isinstance(merged_metadata, Mapping) else metadata)
+        merged_metadata = (
+            content.merged_metadata
+            if content is not None
+            else raw_payload.merged_metadata
+        )
+        article_metadata = dict(
+            merged_metadata if isinstance(merged_metadata, Mapping) else metadata
+        )
         arxiv_id = normalize_arxiv_id(str(article_metadata.get("arxiv_id") or ""))
-        doi = canonical_arxiv_doi(arxiv_id) or str(article_metadata.get("doi") or metadata.get("doi") or "")
-        route = normalize_text(content.route_kind if content is not None else "").lower()
+        doi = canonical_arxiv_doi(arxiv_id) or str(
+            article_metadata.get("doi") or metadata.get("doi") or ""
+        )
+        route = normalize_text(
+            content.route_kind if content is not None else ""
+        ).lower()
         source = {
-            "pdf_fallback": "arxiv_pdf",
+            PDF_FALLBACK: "arxiv_pdf",
             "html": "arxiv_html",
         }.get(route, "arxiv_html")
-        markdown_text = str((content.markdown_text if content is not None else "") or "").strip()
-        default_route = "pdf_fallback" if route == "pdf_fallback" else "html"
-        trace = list(raw_payload.trace or trace_from_markers([fulltext_marker(self.name, "ok", route=default_route)]))
+        markdown_text = str(
+            (content.markdown_text if content is not None else "") or ""
+        ).strip()
+        default_route = PDF_FALLBACK if route == PDF_FALLBACK else "html"
+        trace = list(
+            raw_payload.trace
+            or trace_from_markers(
+                [fulltext_marker(self.name, "ok", route=default_route)]
+            )
+        )
         warnings = list(raw_payload.warnings)
         if asset_failures:
-            warnings.append(f"arXiv related assets were only partially downloaded ({len(asset_failures)} failed).")
+            warnings.append(
+                f"arXiv related assets were only partially downloaded ({len(asset_failures)} failed)."
+            )
         if not markdown_text:
             warnings.append("arXiv retrieval did not produce usable Markdown.")
             return metadata_only_article(
@@ -2661,12 +2987,14 @@ class ArxivClient(ProviderClient):
             )
         availability_diagnostics = (
             dict(content.diagnostics.get("availability_diagnostics") or {})
-            if content is not None and isinstance(content.diagnostics.get("availability_diagnostics"), Mapping)
+            if content is not None
+            and isinstance(content.diagnostics.get("availability_diagnostics"), Mapping)
             else None
         )
         semantic_losses = (
             dict(content.diagnostics.get("semantic_losses") or {})
-            if content is not None and isinstance(content.diagnostics.get("semantic_losses"), Mapping)
+            if content is not None
+            and isinstance(content.diagnostics.get("semantic_losses"), Mapping)
             else (
                 dict(availability_diagnostics.get("semantic_losses") or {})
                 if isinstance(availability_diagnostics, Mapping)
@@ -2676,7 +3004,8 @@ class ArxivClient(ProviderClient):
         )
         extraction_payload = (
             content.diagnostics.get("extraction")
-            if content is not None and isinstance(content.diagnostics.get("extraction"), Mapping)
+            if content is not None
+            and isinstance(content.diagnostics.get("extraction"), Mapping)
             else {}
         )
         section_hints = (
@@ -2714,7 +3043,10 @@ class ArxivClient(ProviderClient):
             asset_failures=asset_failures,
         )
         content = raw_payload.content
-        if normalize_text(content.route_kind if content is not None else "").lower() != "pdf_fallback":
+        if (
+            normalize_text(content.route_kind if content is not None else "").lower()
+            != PDF_FALLBACK
+        ):
             return artifacts
         return ProviderArtifacts(
             assets=list(artifacts.assets),
@@ -2725,7 +3057,9 @@ class ArxivClient(ProviderClient):
                 "arXiv PDF fallback currently returns text-only full text; "
                 "figure and supplementary asset downloads are not implemented for PDF fallback."
             ),
-            skip_trace=trace_from_markers([download_marker("arxiv_assets_skipped_text_only")]),
+            skip_trace=trace_from_markers(
+                [download_marker("arxiv_assets_skipped_text_only")]
+            ),
         )
 
 

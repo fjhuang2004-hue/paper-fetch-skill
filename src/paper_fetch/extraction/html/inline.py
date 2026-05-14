@@ -6,6 +6,10 @@ from dataclasses import dataclass
 import re
 from typing import Any, Callable, Literal, Sequence
 
+from ...markdown.citations import (
+    NUMERIC_CITATION_SENTINEL_PATTERN,
+    NUMERIC_CITATION_SENTINEL_PREFIX,
+)
 from ...markdown.inline_spacing import normalize_inline_sup_sub_tag_bodies
 
 InlineTextPolicy = Literal["body", "heading", "table_cell"]
@@ -13,10 +17,8 @@ SupSubTag = Literal["sub", "sup"]
 
 HTML_NO_SPACE_AFTER_CHARS = set("([{/+-–—−")
 HTML_NO_SPACE_BEFORE_CHARS = set(")]},.;:!?%/+-–—−")
-NUMERIC_CITATION_SENTINEL_PREFIX = "@@PF_CITE:"
-NUMERIC_CITATION_SENTINEL_PATTERN = re.compile(r"@@PF_CITE:(?P<payload>[^@\n]+)@@")
 INLINE_MARKDOWN_TOKEN_PATTERN = re.compile(
-    r"(?P<citation>@@PF_CITE:(?P<payload>[^@\n]+)@@)"
+    rf"(?P<citation>{re.escape(NUMERIC_CITATION_SENTINEL_PREFIX)}(?P<payload>[^@\n]+)@@)"
     r"|(?P<br><br\s*/?>)"
     r"|<(?P<tag>sub|sup)>(?P<body>[^<>]*)</(?P=tag)>",
     flags=re.IGNORECASE,

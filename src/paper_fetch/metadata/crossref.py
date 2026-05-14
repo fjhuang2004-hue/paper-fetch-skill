@@ -12,6 +12,7 @@ from ..http import DEFAULT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
 from ..metadata.types import CrossrefMetadata, FulltextLink, ReferenceMetadata
 from ..publisher_identity import normalize_doi
 from ..providers.base import map_request_failure
+from ..reason_codes import NO_RESULT, NOT_SUPPORTED
 from ..utils import (
     date_parts_to_string,
     first_list_item,
@@ -68,13 +69,13 @@ class CrossrefLookupClient:
 
         if not article_title:
             raise ProviderFailure(
-                "not_supported",
+                NOT_SUPPORTED,
                 "Crossref metadata search requires a DOI or article_title in this implementation.",
             )
 
         candidates = self.search_bibliographic_candidates(article_title, journal_title=journal_title, rows=5)
         if not candidates:
-            raise ProviderFailure("no_result", "Crossref returned no metadata results.")
+            raise ProviderFailure(NO_RESULT, "Crossref returned no metadata results.")
         return candidates[0]
 
     def search_bibliographic_candidates(
@@ -86,7 +87,7 @@ class CrossrefLookupClient:
     ) -> list[CrossrefMetadata]:
         normalized_title = article_title.strip()
         if not normalized_title:
-            raise ProviderFailure("not_supported", "Crossref bibliographic search requires a non-empty title query.")
+            raise ProviderFailure(NOT_SUPPORTED, "Crossref bibliographic search requires a non-empty title query.")
 
         params = self.query_params()
         params.update(

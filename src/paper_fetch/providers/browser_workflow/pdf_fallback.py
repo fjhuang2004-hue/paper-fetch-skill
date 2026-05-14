@@ -5,8 +5,10 @@ from __future__ import annotations
 import sys
 from typing import Any, Mapping
 
+from ...http import PDF_MIME_TYPE
 from ...runtime import RuntimeContext
 from ...tracing import trace_from_markers
+from ...reason_codes import PDF_FALLBACK
 from .._flaresolverr import (
     warm_browser_context_with_flaresolverr as _warm_browser_context_with_flaresolverr,
 )
@@ -34,7 +36,7 @@ def fetch_seeded_browser_pdf_payload(
     warnings: list[str] | None = None,
     success_source_trail: list[str] | None = None,
     success_warning: str = "Full text was extracted from PDF fallback after the HTML path was not usable.",
-    artifact_subdir: str = "pdf_fallback",
+    artifact_subdir: str = PDF_FALLBACK,
     context: RuntimeContext | None = None,
 ) -> RawFulltextPayload:
     pdf_browser_context_seed = _facade_attr(
@@ -68,12 +70,12 @@ def fetch_seeded_browser_pdf_payload(
     return RawFulltextPayload(
         provider=provider,
         source_url=pdf_result.final_url,
-        content_type="application/pdf",
+        content_type=PDF_MIME_TYPE,
         body=pdf_result.pdf_bytes,
         content=ProviderContent(
-            route_kind="pdf_fallback",
+            route_kind=PDF_FALLBACK,
             source_url=pdf_result.final_url,
-            content_type="application/pdf",
+            content_type=PDF_MIME_TYPE,
             body=pdf_result.pdf_bytes,
             markdown_text=pdf_result.markdown_text,
             html_failure_reason=html_failure_reason,

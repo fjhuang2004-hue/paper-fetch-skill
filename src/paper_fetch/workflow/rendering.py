@@ -12,6 +12,8 @@ from ..artifacts import ArtifactStore
 from ..models import ArticleModel, FetchEnvelope, OutputMode, RenderOptions
 from ..models.markdown import replace_markdown_images
 from ..provider_catalog import known_article_source_names
+from ..reason_codes import METADATA_ONLY
+from ..quality.reason_codes import FULLTEXT
 from ..tracing import download_marker, fallback_marker, merge_trace, source_trail_from_trace, trace_from_markers
 from ..utils import extend_unique, normalize_text, sanitize_filename
 from .types import effective_asset_profile
@@ -31,8 +33,8 @@ def finalize_article(
 
 
 def public_source_for_article(article: ArticleModel) -> str:
-    if fallback_marker("metadata_only") in article.quality.source_trail:
-        return "metadata_only"
+    if fallback_marker(METADATA_ONLY) in article.quality.source_trail:
+        return METADATA_ONLY
     if article.source in known_article_source_names():
         return article.source
     return article.source
@@ -278,7 +280,7 @@ def save_markdown_to_disk(
     markdown_filename: str | None = None,
     request_label: str = "save_markdown",
 ) -> Path | None:
-    has_usable_fulltext = bool(envelope.content_kind == "fulltext" and envelope.markdown and envelope.article)
+    has_usable_fulltext = bool(envelope.content_kind == FULLTEXT and envelope.markdown and envelope.article)
     if not has_usable_fulltext:
         _extend_envelope_status(
             envelope,

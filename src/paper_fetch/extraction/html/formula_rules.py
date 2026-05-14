@@ -6,6 +6,7 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any
 
+from .asset_fields import FULL_SIZE_IMAGE_ATTRS, PREVIEW_IMAGE_ATTRS
 from ...utils import normalize_text
 from .provider_rules import (
     provider_display_formula_selectors,
@@ -27,44 +28,28 @@ GENERIC_FORMULA_CONTAINER_TOKENS = (
     "disp-formula",
     "display-formula",
 )
-FORMULA_CONTAINER_TOKENS = (
-    *GENERIC_FORMULA_CONTAINER_TOKENS,
-)
 FORMULA_IMAGE_ATTRS = (
     "data-altimg",
     "data-alt-image",
-    "data-original",
-    "data-full-size",
-    "data-fullsize",
-    "data-zoom-src",
-    "data-zoom-image",
-    "data-lg-src",
-    "data-hi-res-src",
-    "data-hires",
-    "data-large-src",
-    "data-image-full",
-    "data-download-url",
-    "data-src",
-    "src",
-    "data-lazy-src",
+    *FULL_SIZE_IMAGE_ATTRS,
+    *PREVIEW_IMAGE_ATTRS,
     "location",
 )
 FORMULA_IMAGE_SRCSET_ATTRS = ("srcset", "data-srcset")
 GENERIC_DISPLAY_FORMULA_SELECTORS = (
-    ".display-formula",
-    ".disp-formula",
-    ".display-equation",
-    ".inline-equation",
+    *(f".{token}" for token in GENERIC_FORMULA_CONTAINER_TOKENS),
     "math[display='block']",
     "div[role='math']",
 )
-DISPLAY_FORMULA_SELECTORS = (
-    *GENERIC_DISPLAY_FORMULA_SELECTORS,
+GENERIC_DISPLAY_FORMULA_IDENTITY_TOKENS = tuple(
+    token for token in GENERIC_FORMULA_CONTAINER_TOKENS if token != "inline-equation"
 )
-GENERIC_DISPLAY_FORMULA_IDENTITY_TOKENS = (
-    "display-equation",
-    "disp-formula",
-    "display-formula",
+MATHML_SCRIPT_TYPES = frozenset(
+    {
+        "math/mml",
+        "application/mathml+xml",
+        "text/mml",
+    }
 )
 
 
@@ -243,16 +228,33 @@ def mathml_element_from_html_node(node: Any) -> ET.Element | None:
     if Tag is None or not isinstance(node, Tag):
         return None
     math_node = node if normalize_text(node.name or "").lower() == "math" else node.find("math")
-    if not isinstance(math_node, Tag):
+    if isinstance(math_node, Tag):
+        parsed = _parse_mathml(str(math_node))
+        if parsed is not None:
+            return parsed
+    for script in node.find_all("script"):
+        if not isinstance(script, Tag):
+            continue
+        script_type = normalize_text(str(script.get("type") or "")).lower()
+        if script_type not in MATHML_SCRIPT_TYPES:
+            continue
+        raw_mathml = script.string if script.string is not None else script.decode_contents()
+        parsed = _parse_mathml(str(raw_mathml or ""))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _parse_mathml(raw_mathml: str) -> ET.Element | None:
+    raw_mathml = raw_mathml.strip()
+    if not raw_mathml:
         return None
-    raw_mathml = str(math_node)
-    try:
-        return ET.fromstring(raw_mathml)
-    except ET.ParseError:
+    for candidate in (raw_mathml, raw_mathml.replace("&nbsp;", " ")):
         try:
-            return ET.fromstring(raw_mathml.replace("&nbsp;", " "))
+            return ET.fromstring(candidate)
         except ET.ParseError:
-            return None
+            continue
+    return None
 
 
 def display_formula_nodes(container: Any, *, noise_profile: str | None = None) -> list[Any]:

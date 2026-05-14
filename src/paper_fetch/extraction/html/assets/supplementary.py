@@ -25,7 +25,6 @@ GENERIC_SUPPLEMENTARY_TEXT_TOKENS = (
     "supporting information",
     "supporting material",
 )
-SUPPLEMENTARY_TEXT_TOKENS = GENERIC_SUPPLEMENTARY_TEXT_TOKENS
 
 
 GENERIC_SUPPLEMENTARY_FILE_SUFFIXES = (
@@ -45,7 +44,6 @@ GENERIC_SUPPLEMENTARY_FILE_SUFFIXES = (
     ".tif",
     ".tiff",
 )
-SUPPLEMENTARY_FILE_TOKENS = GENERIC_SUPPLEMENTARY_FILE_SUFFIXES
 
 
 def supplementary_text_tokens_for_profile(noise_profile: str | None = None) -> tuple[str, ...]:
@@ -177,8 +175,6 @@ def extract_scoped_html_assets(
 
 
 __all__ = [
-    "SUPPLEMENTARY_TEXT_TOKENS",
-    "SUPPLEMENTARY_FILE_TOKENS",
     "GENERIC_SUPPLEMENTARY_TEXT_TOKENS",
     "GENERIC_SUPPLEMENTARY_FILE_SUFFIXES",
     "extract_supplementary_assets",

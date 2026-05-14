@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import re
 
+from ..common_patterns import REFERENCE_TOKEN_VOCABULARY
 from ..utils import normalize_text
 
+_REFERENCE_HREF_TOKEN_PATTERN = "|".join(re.escape(token) for token in REFERENCE_TOKEN_VOCABULARY)
 REFERENCE_HREF_FRAGMENT_PATTERN = re.compile(
     r"(?:"
-    r"(?:^|[-_/])(?:ref|refs|reference|bib|bibr|bibliography|cite|citation|cr)\b[-_\w]*"
+    rf"(?:^|[-_/])(?:{_REFERENCE_HREF_TOKEN_PATTERN})\b[-_\w]*"
     r"|(?:^core-collateral-r\d+[a-z0-9-]*$)"
     r"|(?:^(?:r|ref|bibr|bib|cr)\d+[a-z0-9-]*$)"
     r")",

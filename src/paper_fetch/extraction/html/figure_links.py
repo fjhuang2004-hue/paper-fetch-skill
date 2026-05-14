@@ -7,15 +7,20 @@ import re
 import urllib.parse
 from typing import Any, Callable, Mapping
 
+from ...common_patterns import FIGURE_LABEL_PATTERN
 from ...models import normalize_markdown_text
 from ...utils import normalize_text
+from .asset_fields import DEFAULT_ASSET_URL_FIELDS
 
-FIGURE_LABEL_PATTERN = re.compile(r"\bfig(?:ure)?\.?\s*(\d+[A-Za-z]?)\b", flags=re.IGNORECASE)
-FIGURE_BASENAME_PATTERN = re.compile(r"(?:^|[^a-z])fig(?:ure)?[_-]?0*(\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE)
-SHORT_FIGURE_BASENAME_PATTERN = re.compile(r"(?:^|[^a-z])f[_-]?0*(\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE)
+FIGURE_BASENAME_PATTERN = re.compile(r"(?:^|[^a-z])fig(?:ure)?[_-]?0*([A-Za-z]?\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE)
+SHORT_FIGURE_BASENAME_PATTERN = re.compile(r"(?:^|[^a-z])f[_-]?0*([A-Za-z]?\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE)
 MARKDOWN_FIGURE_BLOCK_PATTERN = re.compile(r"^\*\*(Figure\s+\d+[A-Za-z]?\.?)\*\*(?:[\s\S]*)$", flags=re.IGNORECASE)
 MARKDOWN_IMAGE_BLOCK_PATTERN = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)$")
-FIGURE_ASSET_URL_FIELDS = ("full_size_url", "url", "preview_url", "source_url", "original_url", "path")
+FIGURE_ASSET_URL_FIELDS = (
+    "full_size_url",
+    *(field for field in DEFAULT_ASSET_URL_FIELDS if field != "full_size_url"),
+    "path",
+)
 
 
 def canonical_figure_label(text: str) -> str | None:
@@ -56,6 +61,9 @@ def canonical_figure_label_from_asset(asset: Mapping[str, Any]) -> str | None:
 def inline_figure_markdown_entries(figure_assets: list[Mapping[str, Any]] | None) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for asset in figure_assets or []:
+        kind = normalize_text(str(asset.get("kind") or "")).lower()
+        if kind and kind != "figure":
+            continue
         url = normalize_text(
             str(
                 asset.get("path")

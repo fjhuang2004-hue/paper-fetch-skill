@@ -18,17 +18,25 @@ from paper_fetch.models import (
 )
 from paper_fetch.providers.registry import build_clients
 from paper_fetch.quality.issues import collect_issue_flags
+from paper_fetch.quality.reason_codes import FULLTEXT
+from paper_fetch.reason_codes import (
+    ERROR,
+    METADATA_ONLY,
+    NO_RESULT,
+    NOT_CONFIGURED,
+    RATE_LIMITED,
+)
 from paper_fetch.runtime import RuntimeContext
 from paper_fetch.service import FetchStrategy, PaperFetchFailure, fetch_paper
 
 GEOGRAPHY_PROVIDER_ORDER = ("elsevier", "springer", "wiley", "science", "pnas")
 GEOGRAPHY_RESULT_STATUSES = (
-    "fulltext",
-    "metadata_only",
-    "not_configured",
-    "rate_limited",
-    "no_result",
-    "error",
+    FULLTEXT,
+    METADATA_ONLY,
+    NOT_CONFIGURED,
+    RATE_LIMITED,
+    NO_RESULT,
+    ERROR,
 )
 REPORT_RESULT_WARNING = "Full text was not available; returning metadata and abstract only."
 
@@ -148,12 +156,12 @@ class GeographyLiveReport:
                 "| {provider} | {attempted} | {fulltext} | {metadata_only} | {not_configured} | {rate_limited} | {no_result} | {error} |".format(
                     provider=summary.provider,
                     attempted=summary.attempted,
-                    fulltext=counts.get("fulltext", 0),
-                    metadata_only=counts.get("metadata_only", 0),
-                    not_configured=counts.get("not_configured", 0),
-                    rate_limited=counts.get("rate_limited", 0),
-                    no_result=counts.get("no_result", 0),
-                    error=counts.get("error", 0),
+                    fulltext=counts.get(FULLTEXT, 0),
+                    metadata_only=counts.get(METADATA_ONLY, 0),
+                    not_configured=counts.get(NOT_CONFIGURED, 0),
+                    rate_limited=counts.get(RATE_LIMITED, 0),
+                    no_result=counts.get(NO_RESULT, 0),
+                    error=counts.get(ERROR, 0),
                 )
             )
 
@@ -291,7 +299,7 @@ def run_geography_live_report(
                     provider=sample.provider,
                     doi=sample.doi,
                     title=sample.title,
-                    status="error",
+                    status=ERROR,
                     source=None,
                     content_kind=None,
                     has_fulltext=False,
@@ -310,7 +318,7 @@ def run_geography_live_report(
                     provider=sample.provider,
                     doi=sample.doi,
                     title=sample.title,
-                    status="error",
+                    status=ERROR,
                     source=None,
                     content_kind=None,
                     has_fulltext=False,
@@ -365,24 +373,24 @@ def build_report_result(
 
 
 def classify_result_status(provider: str, envelope: FetchEnvelope) -> tuple[str, str | None]:
-    if envelope.content_kind == "fulltext":
-        return "fulltext", None
+    if envelope.content_kind == FULLTEXT:
+        return FULLTEXT, None
 
     source_trail = set(envelope.source_trail)
-    if f"fulltext:{provider}_not_configured" in source_trail:
-        return "not_configured", "not_configured"
-    if f"fulltext:{provider}_rate_limited" in source_trail:
-        return "rate_limited", "rate_limited"
+    if f"fulltext:{provider}_{NOT_CONFIGURED}" in source_trail:
+        return NOT_CONFIGURED, NOT_CONFIGURED
+    if f"fulltext:{provider}_{RATE_LIMITED}" in source_trail:
+        return RATE_LIMITED, RATE_LIMITED
     if (
         f"fulltext:{provider}_fail" in source_trail
         or f"fulltext:{provider}_not_usable" in source_trail
     ):
-        return "no_result", "no_result"
-    return "metadata_only", None
+        return NO_RESULT, NO_RESULT
+    return METADATA_ONLY, None
 
 
 def detect_error_message(status: str, envelope: FetchEnvelope) -> str | None:
-    if status in {"fulltext", "metadata_only"}:
+    if status in {FULLTEXT, METADATA_ONLY}:
         return None
     for warning in envelope.warnings:
         if warning != REPORT_RESULT_WARNING:
@@ -406,12 +414,12 @@ def build_provider_summaries(
                 provider=provider,
                 attempted=len(provider_results),
                 status_counts={status: counts.get(status, 0) for status in GEOGRAPHY_RESULT_STATUSES},
-                success_sources=sorted({item.source for item in provider_results if item.status == "fulltext" and item.source}),
+                success_sources=sorted({item.source for item in provider_results if item.status == FULLTEXT and item.source}),
                 success_source_trails=sorted(
                     {
                         success_path_signature(item.source_trail)
                         for item in provider_results
-                        if item.status == "fulltext"
+                        if item.status == FULLTEXT
                     }
                 ),
                 sample_dois=[item.doi for item in provider_results[:3]],
@@ -442,7 +450,7 @@ def build_analysis_notes(
     providers: Sequence[str],
 ) -> list[GeographyAnalysisNote]:
     notes: list[GeographyAnalysisNote] = []
-    precheck_results = [item for item in results if item.status in {"not_configured", "rate_limited", "no_result"}]
+    precheck_results = [item for item in results if item.status in {NOT_CONFIGURED, RATE_LIMITED, NO_RESULT}]
     notes.append(
         GeographyAnalysisNote(
             key="precheck_gap",
@@ -486,7 +494,7 @@ def build_analysis_notes(
 
     stability_parts: list[str] = []
     for provider in providers:
-        provider_results = [item for item in results if item.provider == provider and item.status == "fulltext"]
+        provider_results = [item for item in results if item.provider == provider and item.status == FULLTEXT]
         signatures = sorted({success_path_signature(item.source_trail) for item in provider_results})
         if not signatures:
             stability_parts.append(f"{provider}: no fulltext successes")
@@ -497,7 +505,7 @@ def build_analysis_notes(
         GeographyAnalysisNote(
             key="source_trail_stability",
             summary="; ".join(stability_parts),
-            sample_dois=[item.doi for item in results if item.status == "fulltext"][:5],
+            sample_dois=[item.doi for item in results if item.status == FULLTEXT][:5],
         )
     )
     return notes

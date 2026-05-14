@@ -3,7 +3,10 @@ from __future__ import annotations
 import unittest
 
 from paper_fetch.extraction.html.signals import (
+    ACCESS_GATE_LABELS,
     ACCESS_GATE_PATTERNS,
+    ASSET_ACCESS_BLOCK_LABELS,
+    MARKDOWN_ACCESS_NOISE_LABELS,
     detect_html_access_signals,
     detect_html_block,
     html_failure_message,
@@ -76,6 +79,14 @@ class HtmlAccessSignalsTests(unittest.TestCase):
                 "institutional login",
             ],
         )
+
+    def test_access_gate_labels_feed_markdown_noise_and_asset_blocking_vocabularies(
+        self,
+    ) -> None:
+        self.assertIn("access provided by", ACCESS_GATE_LABELS)
+        self.assertIn("access provided by", MARKDOWN_ACCESS_NOISE_LABELS)
+        self.assertIn("view access options", MARKDOWN_ACCESS_NOISE_LABELS)
+        self.assertIn("access denied", ASSET_ACCESS_BLOCK_LABELS)
 
     def test_summarize_html_extracts_readable_text(self) -> None:
         summary = summarize_html(

@@ -126,7 +126,8 @@ provider 内部多步骤 fallback 应使用 `paper_fetch.providers._waterfall.ru
 - HTML-to-Markdown 编排：`paper_fetch.extraction.html.renderer`
 - Fulltext / abstract-only 判定：`paper_fetch.quality.html_availability`
 - Section hints：`paper_fetch.extraction.section_hints`、`paper_fetch.extraction.html.semantics`
-- Access-gate 文案与匹配顺序：`paper_fetch.extraction.html.signals.ACCESS_GATE_PATTERNS`
+- Access-gate 文案与匹配顺序：`paper_fetch.extraction.html.signals.ACCESS_GATE_LABELS` / `ACCESS_GATE_PATTERNS`
+- 通用 figure/table label core 与 Extended Data prefix 判断：`paper_fetch.common_patterns`
 - Reference anchor 判定：`paper_fetch.extraction.html.semantics` 中的 `looks_like_reference_anchor()` / `has_explicit_reference_marker()` 以及底层 `paper_fetch.extraction.citation_anchors.looks_like_reference_href()`；不要在 provider 或 runtime 中复制 `data-test`、`role`、`class`、`href` fragment 规则。
 - HTML table：`paper_fetch.extraction.html.tables`
 - Citation cleanup：`paper_fetch.markdown.citations`，只负责 numeric payload / Markdown cleanup；reference href 判定委托 `citation_anchors`
@@ -139,9 +140,10 @@ Provider-specific 代码只负责：
 
 - 找到 publisher 的 article container 或 XML root。
 - 把 publisher DOM/XML 映射成已有中间结构。
-- 在 `paper_fetch.extraction.html.provider_rules` 注册 publisher cleanup profile、Markdown promo tokens、availability site rule、access-block tokens、availability override callback、公式 container/selector、supplementary 文本扩展和必要 alias；authorless quality heading signature 属于 `paper_fetch.quality.html_signals`。不要在 `_runtime.py`、`formula_rules.py`、`assets/supplementary.py` 或 `quality/issues.py` 直接追加 publisher 私有 token。
+- 在 `paper_fetch.extraction.html.provider_rules` 注册 publisher cleanup profile、Markdown promo tokens、availability site rule、access-block tokens、availability override callback、公式 container/selector、supplementary 文本扩展和必要 alias；运行时通过 `paper_fetch.extraction.html._runtime.html_cleanup_rules()` 合成 DOM / Markdown 清洗规则。authorless quality heading signature 属于 `paper_fetch.quality.html_signals`。不要在 `_runtime.py`、`formula_rules.py`、`assets/supplementary.py` 或 `quality/issues.py` 直接追加 publisher 私有 token。
+- Provider-specific figure/table caption regex 可以保留行首锚定、caption remainder、Extended Data 变体或 ar5iv 兼容分支，但应复用 `common_patterns` 的 label core / prefix helper 或在旁边说明差异。
 - Provider HTML availability signal 也通过 `paper_fetch.extraction.html.provider_rules` 注册，不再通过 `quality/html_profiles.py` 的 dict 分发。
-- 新 access-gate 文案先登记到共享 `ACCESS_GATE_PATTERNS`；provider markdown/postprocess break tokens 只放非访问门的站点 chrome。
+- 新 access-gate 文案先登记到共享 `ACCESS_GATE_LABELS` 或 `ACCESS_GATE_PATTERNS`；Markdown 降噪复用 `MARKDOWN_ACCESS_NOISE_LABELS`，provider markdown/postprocess break tokens 只放非访问门的站点 chrome。
 - 定义 asset scope 和 fallback 候选。
 - 把提取结果写入 `ProviderContent.diagnostics`，而不是塞进 legacy metadata。
 

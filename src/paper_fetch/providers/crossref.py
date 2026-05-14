@@ -13,6 +13,7 @@ from .base import (
     build_provider_status_check,
     summarize_capability_status,
 )
+from ..reason_codes import OK
 
 
 class CrossrefClient(ProviderClient):
@@ -42,7 +43,7 @@ class CrossrefClient(ProviderClient):
             checks=[
                 build_provider_status_check(
                     "metadata_api",
-                    "ok",
+                    OK,
                     "Crossref metadata lookup is available without local credentials.",
                     details={"mailto_configured": bool(self.mailto)},
                 )

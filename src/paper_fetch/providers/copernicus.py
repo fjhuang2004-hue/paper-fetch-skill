@@ -18,7 +18,7 @@ from ..extraction.html.assets import (
     split_body_and_supplementary_assets,
 )
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, RequestFailure
+from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_HEADER, PDF_MIME_TYPE, RequestFailure
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
 from ..provider_catalog import provider_body_text_thresholds
@@ -30,7 +30,13 @@ from ._article_markdown_common import first_child, first_descendant, iter_descen
 from ._article_markdown_copernicus import CopernicusExtraction, parse_copernicus_xml
 from ._payloads import build_provider_payload
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
-from ._waterfall import ProviderWaterfallState, ProviderWaterfallStep, run_provider_waterfall
+from ._waterfall import (
+    DEFAULT_WATERFALL_CONTINUE_CODES,
+    ProviderWaterfallState,
+    ProviderWaterfallStep,
+    run_provider_waterfall,
+)
+from ..reason_codes import ERROR, NO_RESULT, NOT_SUPPORTED, OK, PDF_FALLBACK
 from .base import (
     ProviderArtifacts,
     ProviderClient,
@@ -51,14 +57,6 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     Tag = None
 
 
-COPERNICUS_WATERFALL_CONTINUE_CODES = (
-    "no_result",
-    "no_access",
-    "rate_limited",
-    "error",
-    "not_configured",
-    "not_supported",
-)
 MIN_BODY_CHARS = provider_body_text_thresholds("copernicus").min_chars
 COPERNICUS_XML_DOI_PATTERN = re.compile(
     r"^10\.5194/(?P<journal>[a-z0-9]+)-(?P<volume>\d+)-(?P<page>.+)-(?P<year>\d{4})$",
@@ -222,13 +220,13 @@ class CopernicusClient(ProviderClient):
             checks=[
                 build_provider_status_check(
                     "xml_route",
-                    "ok",
+                    OK,
                     "Copernicus direct NLM/JATS XML route is available without provider credentials.",
                     details={"mode": "direct_xml"},
                 ),
                 build_provider_status_check(
-                    "pdf_fallback",
-                    "ok",
+                    PDF_FALLBACK,
+                    OK,
                     "Copernicus PDF fallback is available as text-only full text when XML is not usable.",
                     details={"mode": "direct_http_pdf"},
                 ),
@@ -252,7 +250,7 @@ class CopernicusClient(ProviderClient):
 
     def _pdf_headers(self, *, referer: str | None = None) -> dict[str, str]:
         headers = {
-            "Accept": "application/pdf,*/*;q=0.8",
+            "Accept": PDF_ACCEPT_HEADER,
             "User-Agent": self.user_agent,
         }
         if referer:
@@ -284,7 +282,7 @@ class CopernicusClient(ProviderClient):
             )
         except LandingRedirectLimitExceeded as exc:
             raise ProviderFailure(
-                "error",
+                ERROR,
                 f"Copernicus landing retrieval exceeded {self.landing_max_redirects} redirects.",
             ) from exc
         except RequestFailure as exc:
@@ -324,7 +322,7 @@ class CopernicusClient(ProviderClient):
     def _prepare_landing_attempt(self, doi: str, metadata: Mapping[str, Any]) -> CopernicusLandingAttempt:
         normalized_doi = normalize_doi(doi)
         if not normalized_doi:
-            raise ProviderFailure("not_supported", "Copernicus full-text retrieval requires a DOI.")
+            raise ProviderFailure(NOT_SUPPORTED, "Copernicus full-text retrieval requires a DOI.")
         landing_url = self._resolve_landing_url(normalized_doi, metadata)
         try:
             landing = self._fetch_landing(landing_url)
@@ -390,9 +388,9 @@ class CopernicusClient(ProviderClient):
     ) -> CopernicusExtraction:
         root = xml_root
         if xml_local_name(root.tag) != "article":
-            raise ProviderFailure("no_result", "Copernicus XML payload root is not a JATS article.")
+            raise ProviderFailure(NO_RESULT, "Copernicus XML payload root is not a JATS article.")
         if extraction is None:
-            raise ProviderFailure("no_result", "Copernicus XML payload is not parseable NLM/JATS article XML.")
+            raise ProviderFailure(NO_RESULT, "Copernicus XML payload is not parseable NLM/JATS article XML.")
         article_meta = first_descendant(first_child(root, "front"), "article-meta")
         body = first_child(root, "body")
         body_sections = list(iter_descendants(body, "sec"))
@@ -408,19 +406,19 @@ class CopernicusClient(ProviderClient):
                 body_section_paragraph_chars += section_chars
         abstract_text = normalize_text(str(extraction.metadata.get("abstract") or ""))
         if article_meta is None or body is None or not body_sections:
-            raise ProviderFailure("no_result", "Copernicus XML payload is missing article metadata or body sections.")
+            raise ProviderFailure(NO_RESULT, "Copernicus XML payload is missing article metadata or body sections.")
         if not abstract_text:
-            raise ProviderFailure("no_result", "Copernicus XML payload did not expose a non-empty abstract.")
+            raise ProviderFailure(NO_RESULT, "Copernicus XML payload did not expose a non-empty abstract.")
         if body_sections_with_paragraphs == 0:
-            raise ProviderFailure("no_result", "Copernicus XML payload did not expose body paragraphs.")
+            raise ProviderFailure(NO_RESULT, "Copernicus XML payload did not expose body paragraphs.")
         if body_section_paragraph_chars < MIN_BODY_CHARS:
-            raise ProviderFailure("no_result", "Copernicus XML payload did not expose enough body text.")
+            raise ProviderFailure(NO_RESULT, "Copernicus XML payload did not expose enough body text.")
         return extraction
 
     def _fetch_xml_payload(self, attempt: CopernicusLandingAttempt) -> RawFulltextPayload:
         if not attempt.xml_candidates:
             raise ProviderFailure(
-                "no_result",
+                NO_RESULT,
                 "Copernicus landing page did not expose an XML candidate.",
                 warnings=list(attempt.warnings or []),
                 source_trail=list(attempt.source_trail or []),
@@ -432,7 +430,7 @@ class CopernicusClient(ProviderClient):
                 try:
                     xml_root = ET.fromstring(body)
                 except ET.ParseError as exc:
-                    raise ProviderFailure("no_result", "Copernicus XML payload could not be parsed.") from exc
+                    raise ProviderFailure(NO_RESULT, "Copernicus XML payload could not be parsed.") from exc
                 extraction = self._validate_xml_extraction(
                     parse_copernicus_xml(
                         body,
@@ -475,7 +473,7 @@ class CopernicusClient(ProviderClient):
                 warnings=[*list(attempt.warnings or []), *combined.warnings],
                 source_trail=[*list(attempt.source_trail or []), *combined.source_trail],
             )
-        raise ProviderFailure("no_result", "Copernicus XML route did not run.")
+        raise ProviderFailure(NO_RESULT, "Copernicus XML route did not run.")
 
     def _fetch_pdf_payload(
         self,
@@ -485,7 +483,7 @@ class CopernicusClient(ProviderClient):
         warnings: list[str],
     ) -> RawFulltextPayload:
         if not attempt.pdf_candidates:
-            raise ProviderFailure("no_result", "Copernicus landing page did not expose a PDF candidate.")
+            raise ProviderFailure(NO_RESULT, "Copernicus landing page did not expose a PDF candidate.")
         try:
             pdf_result = PdfFallbackStrategy(
                 transport=self.transport,
@@ -494,17 +492,17 @@ class CopernicusClient(ProviderClient):
                 fetcher=fetch_pdf_over_http,
             ).fetch(attempt.pdf_candidates)
         except PdfFetchFailure as exc:
-            raise ProviderFailure("no_result", exc.message) from exc
+            raise ProviderFailure(NO_RESULT, exc.message) from exc
         final_url = urllib.parse.urljoin(pdf_result.source_url or attempt.response_url, pdf_result.final_url)
         return build_provider_payload(
             provider=self.name,
-            route_kind="pdf_fallback",
+            route_kind=PDF_FALLBACK,
             source_url=final_url,
-            content_type="application/pdf",
+            content_type=PDF_MIME_TYPE,
             body=pdf_result.pdf_bytes,
             markdown_text=pdf_result.markdown_text,
             merged_metadata=attempt.merged_metadata,
-            diagnostics={"pdf_fallback": {"candidates": list(attempt.pdf_candidates)}},
+            diagnostics={PDF_FALLBACK: {"candidates": list(attempt.pdf_candidates)}},
             reason="Downloaded full text from Copernicus PDF fallback after XML was not usable.",
             suggested_filename=pdf_result.suggested_filename,
             html_failure_message=xml_failure_message,
@@ -561,7 +559,7 @@ class CopernicusClient(ProviderClient):
                     run=run_xml,
                     failure_marker=fulltext_marker(self.name, "fail", route="xml"),
                     success_markers=(fulltext_marker(self.name, "ok", route="xml"),),
-                    continue_codes=COPERNICUS_WATERFALL_CONTINUE_CODES,
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         f"Copernicus XML route was not usable ({failure.message}); attempting PDF fallback."
                     ),
@@ -570,8 +568,8 @@ class CopernicusClient(ProviderClient):
                     label="pdf",
                     run=run_pdf,
                     failure_marker=fulltext_marker(self.name, "fail", route="pdf"),
-                    success_markers=(fulltext_marker(self.name, "ok", route="pdf_fallback"),),
-                    continue_codes=COPERNICUS_WATERFALL_CONTINUE_CODES,
+                    success_markers=(fulltext_marker(self.name, "ok", route=PDF_FALLBACK),),
+                    continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,
                     failure_warning=lambda failure, _state: (
                         f"Copernicus PDF fallback was not usable ({failure.message})."
                     ),
@@ -594,7 +592,7 @@ class CopernicusClient(ProviderClient):
             return empty_asset_results()
         content = raw_payload.content
         route = normalize_text(content.route_kind if content is not None else "").lower()
-        if route == "pdf_fallback":
+        if route == PDF_FALLBACK:
             return empty_asset_results()
         extracted_assets = _filter_assets_for_profile(
             list(content.extracted_assets if content is not None else []),
@@ -687,7 +685,7 @@ class CopernicusClient(ProviderClient):
             warnings.append(f"Copernicus related assets were only partially downloaded ({len(asset_failures)} failed).")
 
         source = "copernicus_xml"
-        if route == "pdf_fallback":
+        if route == PDF_FALLBACK:
             source = "copernicus_pdf"
 
         if route == "xml":
@@ -772,7 +770,7 @@ class CopernicusClient(ProviderClient):
             asset_failures=asset_failures,
         )
         content = raw_payload.content
-        if normalize_text(content.route_kind if content is not None else "").lower() != "pdf_fallback":
+        if normalize_text(content.route_kind if content is not None else "").lower() != PDF_FALLBACK:
             return artifacts
         return ProviderArtifacts(
             assets=list(artifacts.assets),

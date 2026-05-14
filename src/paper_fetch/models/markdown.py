@@ -8,6 +8,7 @@ import html
 import re
 from typing import Any
 
+from ..common_patterns import EXTENDED_DATA_LABEL, INLINE_WHITESPACE_PATTERN
 from ..utils import normalize_text, safe_text
 
 MARKDOWN_FENCE_PATTERN = re.compile(r"^\s*(```+|~~~+)")
@@ -18,26 +19,48 @@ MARKDOWN_TABLE_RULE_PATTERN = re.compile(r"^\s*[-+:| ]{3,}\s*$")
 
 MARKDOWN_LIST_MARKER_PATTERN = re.compile(r"^(\s{0,3}(?:[-*+]|\d+[.)])\s+)(.*)$")
 
+ABSTRACT_PREFIX_VOCAB = ("Abstract", "Summary")
+_ABSTRACT_PREFIX_TITLE_CASE_PATTERN = "|".join(
+    f"[{token[0].upper()}{token[0].lower()}]{re.escape(token[1:])}"
+    for token in ABSTRACT_PREFIX_VOCAB
+)
+_ABSTRACT_PREFIX_PATTERN = "|".join(re.escape(token) for token in ABSTRACT_PREFIX_VOCAB)
 
-ABSTRACT_PREFIX_PATTERN = re.compile(r"^(?:[Aa]bstract|[Ss]ummary)\b[:.\-\s]+(?=[A-Z])")
+ABSTRACT_PREFIX_PATTERN = re.compile(
+    rf"^(?:{_ABSTRACT_PREFIX_TITLE_CASE_PATTERN})\b[:.\-\s]+(?=[A-Z])"
+)
 
 
 INLINE_HTML_TAG_PATTERN = re.compile(r"</?(?:sub|sup|br)\b[^>]*>", flags=re.IGNORECASE)
 
 
-INLINE_MARKDOWN_ABSTRACT_PREFIX_PATTERN = re.compile(r"^\*\*(?:Abstract|Summary)\.?\*\*\s*", re.IGNORECASE)
+INLINE_MARKDOWN_ABSTRACT_PREFIX_PATTERN = re.compile(
+    rf"^\*\*(?:{_ABSTRACT_PREFIX_PATTERN})\.?\*\*\s*",
+    re.IGNORECASE,
+)
 
 
-MARKDOWN_ABSTRACT_PREFIX_PATTERN = re.compile(r"^(?:\*\*|__)(?:[Aa]bstract|[Ss]ummary)\.?(?:\*\*|__)\s*")
+MARKDOWN_ABSTRACT_PREFIX_PATTERN = re.compile(
+    rf"^(?:\*\*|__)(?:{_ABSTRACT_PREFIX_TITLE_CASE_PATTERN})\.?(?:\*\*|__)\s*"
+)
 
 
-MARKDOWN_IMAGE_URL_PATTERN = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+_MARKDOWN_IMAGE_ALT_PATTERN = r"[^\]]*"
+_MARKDOWN_IMAGE_URL_TARGET_PATTERN = r"[^)]+"
+
+MARKDOWN_IMAGE_URL_PATTERN = re.compile(
+    rf"!\[{_MARKDOWN_IMAGE_ALT_PATTERN}\]\(({_MARKDOWN_IMAGE_URL_TARGET_PATTERN})\)"
+)
 
 
-MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\([^)]+\)")
+MARKDOWN_IMAGE_PATTERN = re.compile(
+    rf"!\[{_MARKDOWN_IMAGE_ALT_PATTERN}\]\({_MARKDOWN_IMAGE_URL_TARGET_PATTERN}\)"
+)
 
 
-MARKDOWN_IMAGE_LINK_PATTERN = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+MARKDOWN_IMAGE_LINK_PATTERN = re.compile(
+    rf"!\[({_MARKDOWN_IMAGE_ALT_PATTERN})\]\(({_MARKDOWN_IMAGE_URL_TARGET_PATTERN})\)"
+)
 
 
 @dataclass(frozen=True)
@@ -58,14 +81,18 @@ class MarkdownImageMatch:
         return self.text[: self.attrs_start - self.start].rstrip()
 
 
+_MARKDOWN_BLOCK_IMAGE_ALT_PATTERN = (
+    rf"fig(?:ure)?\.?|(?:{re.escape(EXTENDED_DATA_LABEL)}|supplementary)?\s*table|supplementary\s+fig(?:ure)?\.?"
+)
+
 MARKDOWN_BLOCK_IMAGE_ALT_PATTERN = re.compile(
-    r"^\s*(?:fig(?:ure)?\.?|(?:extended data|supplementary)?\s*table|supplementary\s+fig(?:ure)?\.?)\b",
+    rf"^\s*(?:{_MARKDOWN_BLOCK_IMAGE_ALT_PATTERN})\b",
     flags=re.IGNORECASE,
 )
 
 
 MARKDOWN_STANDALONE_IMAGE_ALT_PATTERN = re.compile(
-    r"^\s*(?:fig(?:ure)?\.?|(?:extended data|supplementary)?\s*table|supplementary\s+fig(?:ure)?\.?|formula|equation)\b",
+    rf"^\s*(?:{_MARKDOWN_BLOCK_IMAGE_ALT_PATTERN}|formula|equation)\b",
     flags=re.IGNORECASE,
 )
 
@@ -77,15 +104,12 @@ TABLE_LIKE_FIGURE_ASSET_PATTERN = re.compile(
 
 
 NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN = re.compile(
-    r"^extended data\s+table\s+\d+[A-Za-z]?\b",
+    rf"^{re.escape(EXTENDED_DATA_LABEL)}\s+table\s+\d+[A-Za-z]?\b",
     flags=re.IGNORECASE,
 )
 
 
 NUMBERED_REFERENCE_PATTERN = re.compile(r"^\s*(?:\[\d+[A-Za-z]?\]|\d+[A-Za-z]?[.)])\s+")
-
-
-INLINE_WHITESPACE_PATTERN = re.compile(r"[ \t\r\f\v]+")
 
 
 SLASH_RUN_PATTERN = re.compile(r"/+")

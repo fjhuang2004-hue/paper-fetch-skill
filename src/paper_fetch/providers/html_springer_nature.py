@@ -6,11 +6,20 @@ import re
 import urllib.parse
 from typing import Any
 
+from ..common_patterns import EXTENDED_DATA_PREFIX_PATTERN
+from ..extraction.html.ui_tokens import SPRINGER_NATURE_SOURCE_DATA_LABEL
+
+from ..extraction.html.cleanup_policy import classify_dom_cleanup_node
 from ..extraction.html.parsing import choose_parser
-from ..extraction.html.provider_rules import normalize_provider_heading
+from ..extraction.html.provider_rules import (
+    cleanup_policy_for_profile,
+    normalize_provider_heading,
+)
 from ..models import normalize_text
 from ..provider_catalog import matching_provider_domain, provider_domain_matches
 from ..extraction.html.semantics import (
+    ANCILLARY_HEADINGS,
+    BACK_MATTER_HEADINGS,
     heading_category,
     identity_category,
     node_identity_text,
@@ -45,40 +54,20 @@ SPRINGER_NATURE_ROOT_SELECTORS = (
     "div.c-article-body",
 )
 SPRINGER_NATURE_SECTION_CONTENT_SELECTORS = ("div.c-article-section__content",)
-SPRINGER_NATURE_CHROME_TEXTS = {
-    "aims and scope",
-    "save article",
-    "submit manuscript",
-    "view saved research",
-}
-SPRINGER_NATURE_CHROME_SECTION_TITLES = {
-    "about this article",
-    "article information",
-    "author information",
-    "authors and affiliations",
-    "cite this article",
-    "open access",
-    "permissions",
-    "rights and permissions",
-    "reprints and permissions",
-}
-SPRINGER_NATURE_SCIENTIFIC_BACK_MATTER_TITLES = {
-    "acknowledgements",
-    "acknowledgments",
-    "additional information",
-    "author contributions",
-    "competing interests",
-    "ethics declarations",
-    "funding",
-    "supplementary information",
-}
-SPRINGER_NATURE_LICENSE_WORD_LIMIT = 180
-SPRINGER_NATURE_CHROME_ATTR_TOKENS = (
-    "article-actions",
-    "article-metrics",
-    "saved-research",
-    "save-article",
-    "submit-manuscript",
+SPRINGER_NATURE_SCIENTIFIC_BACK_MATTER_TITLES = (
+    (
+        BACK_MATTER_HEADINGS
+        & {
+            "acknowledgements",
+            "acknowledgments",
+            "author contributions",
+            "competing interests",
+            "funding",
+            "supplementary information",
+        }
+    )
+    | (ANCILLARY_HEADINGS & {"additional information"})
+    | {"ethics declarations"}
 )
 SPRINGER_NATURE_INLINE_ARTICLE_LINK_PATTERN = re.compile(
     r"\[([^\]]+)\]\((?:/(?:article|articles)/[^)]+|#[^)]+)\)"
@@ -86,8 +75,11 @@ SPRINGER_NATURE_INLINE_ARTICLE_LINK_PATTERN = re.compile(
 SPRINGER_NATURE_INLINE_LINK_UNWRAP_PATTERNS = (
     SPRINGER_NATURE_INLINE_ARTICLE_LINK_PATTERN,
 )
+# Springer/Nature citation cleanup accepts abbreviated Extended Data figure and
+# table labels, so it keeps a provider-owned regex derived from the shared prefix.
 SPRINGER_NATURE_EXTENDED_DATA_LABEL_PATTERN = re.compile(
-    r"\b((?:Extended Data\s+(?:Fig|Figs|Tab|Tabs)|Extended Data))\.?\s+(\d+[A-Za-z]?)\b",
+    rf"\b((?:{EXTENDED_DATA_PREFIX_PATTERN}\s+(?:Fig|Figs|Tab|Tabs)|{EXTENDED_DATA_PREFIX_PATTERN}))"
+    r"\.?\s+(\d+[A-Za-z]?)\b",
     flags=re.IGNORECASE,
 )
 SPRINGER_NATURE_CITATION_LABEL_PATTERNS = (
@@ -95,9 +87,11 @@ SPRINGER_NATURE_CITATION_LABEL_PATTERNS = (
     COMMON_LABEL_PATTERN,
 )
 SPRINGER_NATURE_EXTENDED_DATA_FIGURE_LINE_PATTERN = re.compile(
-    r"(?im)^extended data\s+fig\.\s*[a-z0-9.-]+:.*$"
+    rf"(?im)^{EXTENDED_DATA_PREFIX_PATTERN}\s+fig\.\s*[a-z0-9.-]+:.*$"
 )
-SPRINGER_NATURE_SOURCE_DATA_LINE_PATTERN = re.compile(r"(?im)^\s*source data\s*$")
+SPRINGER_NATURE_SOURCE_DATA_LINE_PATTERN = re.compile(
+    rf"(?im)^\s*{re.escape(SPRINGER_NATURE_SOURCE_DATA_LABEL)}\s*$"
+)
 SPRINGER_NATURE_FIGURE_LINE_PATTERNS = (
     COMMON_FIGURE_LINE_PATTERN,
     SPRINGER_NATURE_EXTENDED_DATA_FIGURE_LINE_PATTERN,
@@ -122,7 +116,10 @@ def _candidate_score(node: Any) -> int:
     if not text:
         return 0
     score = count_words(text)
-    if isinstance(node, Tag) and node.select_one("div.c-article-body div.main-content") is not None:
+    if (
+        isinstance(node, Tag)
+        and node.select_one("div.c-article-body div.main-content") is not None
+    ):
         score += 1000
     if isinstance(node, Tag) and node.find("h1") is not None:
         score += 100
@@ -183,31 +180,47 @@ def _is_descendant_of(node: Any, ancestor: Any) -> bool:
     while isinstance(current, Tag):
         if current is ancestor:
             return True
-        current = current.parent if isinstance(getattr(current, "parent", None), Tag) else None
+        current = (
+            current.parent
+            if isinstance(getattr(current, "parent", None), Tag)
+            else None
+        )
     return False
 
 
 def _is_availability_section_title(title_key: str) -> bool:
-    return heading_category("h2", title_key) in {"data_availability", "code_availability"}
+    return heading_category("h2", title_key) in {
+        "data_availability",
+        "code_availability",
+    }
 
 
 def _is_scientific_back_matter_title(title_key: str) -> bool:
-    return title_key in SPRINGER_NATURE_SCIENTIFIC_BACK_MATTER_TITLES or _is_availability_section_title(title_key)
+    return (
+        title_key in SPRINGER_NATURE_SCIENTIFIC_BACK_MATTER_TITLES
+        or _is_availability_section_title(title_key)
+    )
 
 
-def _has_creative_commons_license_link(node: Any) -> bool:
+def _has_policy_license_link(node: Any, cleanup_policy: Any) -> bool:
     if not isinstance(node, Tag):
+        return False
+    hosts = tuple(host.lower() for host in cleanup_policy.license_link_hosts)
+    path_prefixes = tuple(
+        prefix.lower() for prefix in cleanup_policy.license_link_path_prefixes
+    )
+    if not hosts or not path_prefixes:
         return False
     for anchor in node.find_all("a", href=True, recursive=False):
         if not isinstance(anchor, Tag):
             continue
         href = normalize_text(str(anchor.get("href") or ""))
         parsed = urllib.parse.urlparse(href)
-        hostname = parsed.netloc.lower()
+        hostname = (parsed.hostname or parsed.netloc).lower()
         path = parsed.path.lower()
-        if (hostname == "creativecommons.org" or hostname.endswith(".creativecommons.org")) and path.startswith(
-            "/licenses/"
-        ):
+        if any(
+            hostname == host or hostname.endswith(f".{host}") for host in hosts
+        ) and any(path.startswith(prefix) for prefix in path_prefixes):
             return True
     return False
 
@@ -215,26 +228,38 @@ def _has_creative_commons_license_link(node: Any) -> bool:
 def _prune_springer_nature_chrome(root: Any) -> None:
     if BeautifulSoup is None or not isinstance(root, Tag):
         return
+    cleanup_policy = cleanup_policy_for_profile("springer_nature")
     for node in list(root.find_all(True)):
         if not isinstance(node, Tag):
             continue
         title_key = _section_title_key(node)
-        if title_key in SPRINGER_NATURE_CHROME_SECTION_TITLES:
+        if title_key in cleanup_policy.chrome_section_headings:
             node.decompose()
             continue
         text = normalize_text(node.get_text(" ", strip=True))
-        lowered = text.lower()
-        if lowered in SPRINGER_NATURE_CHROME_TEXTS:
+        if (
+            classify_dom_cleanup_node(
+                node,
+                policy=cleanup_policy,
+                stage="extraction",
+                text=text,
+            ).action
+            == "drop"
+        ):
             node.decompose()
             continue
-        if normalize_section_title(extract_section_title(node)) == "open access":
+        if (
+            "open access" in cleanup_policy.chrome_section_headings
+            and normalize_section_title(extract_section_title(node)) == "open access"
+        ):
             node.decompose()
             continue
         node_name = normalize_text(getattr(node, "name", "") or "").lower()
         if (
             node_name not in {"html", "body", "main", "article"}
-            and _has_creative_commons_license_link(node)
-            and count_words(text) <= SPRINGER_NATURE_LICENSE_WORD_LIMIT
+            and cleanup_policy.license_word_limit > 0
+            and _has_policy_license_link(node, cleanup_policy)
+            and count_words(text) <= cleanup_policy.license_word_limit
         ):
             node.decompose()
             continue
@@ -246,7 +271,10 @@ def _prune_springer_nature_chrome(root: Any) -> None:
             else:
                 attr_parts.append(normalize_text(str(value)).lower())
         attr_blob = " ".join(part for part in attr_parts if part)
-        if any(token in attr_blob for token in SPRINGER_NATURE_CHROME_ATTR_TOKENS) and count_words(text) <= 80:
+        if (
+            any(token in attr_blob for token in cleanup_policy.chrome_attr_tokens)
+            and count_words(text) <= 80
+        ):
             node.decompose()
 
 
@@ -261,7 +289,11 @@ def _render_scientific_back_matter_sections(
         return
     seen: set[int] = set()
     for section in article.find_all("section"):
-        if not isinstance(section, Tag) or id(section) in seen or _is_descendant_of(section, main):
+        if (
+            not isinstance(section, Tag)
+            or id(section) in seen
+            or _is_descendant_of(section, main)
+        ):
             continue
         seen.add(id(section))
         title_key = _section_title_key(section)
@@ -274,7 +306,9 @@ def _render_scientific_back_matter_sections(
             section,
             lines,
             level=2,
-            force_heading=extract_section_title(section) or normalize_text(str(section.get("data-title") or "")) or None,
+            force_heading=extract_section_title(section)
+            or normalize_text(str(section.get("data-title") or ""))
+            or None,
             section_content_selectors=SPRINGER_NATURE_SECTION_CONTENT_SELECTORS,
         )
 
@@ -282,16 +316,27 @@ def _render_scientific_back_matter_sections(
 def select_nature_abstract_section(body: Any):
     if BeautifulSoup is None or body is None:
         return None
-    direct_children = [child for child in body.find_all(["section", "div"], recursive=False) if isinstance(child, Tag)]
+    direct_children = [
+        child
+        for child in body.find_all(["section", "div"], recursive=False)
+        if isinstance(child, Tag)
+    ]
     for section in direct_children:
         if identity_category(node_identity_text(section)) == "abstract":
             return section
     for section in direct_children:
-        if any(section.select_one(selector) is not None for selector in SPRINGER_NATURE_SECTION_CONTENT_SELECTORS):
+        if any(
+            section.select_one(selector) is not None
+            for selector in SPRINGER_NATURE_SECTION_CONTENT_SELECTORS
+        ):
             if identity_category(node_identity_text(section)) == "abstract":
                 return section
             label_text = normalize_text(
-                str((getattr(section, "attrs", None) or {}).get("data-title") or (getattr(section, "attrs", None) or {}).get("aria-labelledby") or "")
+                str(
+                    (getattr(section, "attrs", None) or {}).get("data-title")
+                    or (getattr(section, "attrs", None) or {}).get("aria-labelledby")
+                    or ""
+                )
             )
             if "abstract" in label_text.lower():
                 return section
@@ -332,7 +377,9 @@ def _render_nature_main_child_markdown(child: Any, lines: list[str]) -> bool:
         return False
     if child.name == "section":
         heading = _normalized_nature_section_heading(child)
-        if normalize_section_title(heading) == "main" and not section_has_direct_renderable_content(
+        if normalize_section_title(
+            heading
+        ) == "main" and not section_has_direct_renderable_content(
             child,
             section_content_selectors=SPRINGER_NATURE_SECTION_CONTENT_SELECTORS,
         ):
@@ -383,7 +430,11 @@ def extract_springer_nature_markdown(html_text: str, source_url: str) -> str:
         return ""
 
     soup = BeautifulSoup(html_text, choose_parser())
-    article = select_springer_nature_article_root(soup) or soup.select_one("article") or soup.select_one("main")
+    article = (
+        select_springer_nature_article_root(soup)
+        or soup.select_one("article")
+        or soup.select_one("main")
+    )
     if article is None:
         return ""
     _prune_springer_nature_chrome(article)
@@ -420,7 +471,9 @@ def extract_springer_nature_markdown(html_text: str, source_url: str) -> str:
                 level=2,
                 section_content_selectors=SPRINGER_NATURE_SECTION_CONTENT_SELECTORS,
             )
-        _render_scientific_back_matter_sections(article, main, lines, availability_only=True)
+        _render_scientific_back_matter_sections(
+            article, main, lines, availability_only=True
+        )
     else:
         body = article.select_one("div.c-article-body") or article
         main = body.select_one("div.main-content") or body
@@ -433,7 +486,10 @@ def extract_springer_nature_markdown(html_text: str, source_url: str) -> str:
         )
         _render_scientific_back_matter_sections(article, main, lines)
 
-    rendered = clean_markdown(_remove_duplicate_title_headings("\n".join(lines), title_text), noise_profile="springer_nature")
+    rendered = clean_markdown(
+        _remove_duplicate_title_headings("\n".join(lines), title_text),
+        noise_profile="springer_nature",
+    )
     return postprocess_springer_nature_markdown(rendered)
 
 

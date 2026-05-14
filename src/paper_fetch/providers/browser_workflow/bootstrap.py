@@ -20,6 +20,7 @@ from .html_extraction import (
 from .shared import (
     preferred_html_candidate_from_landing_page as _preferred_html_candidate_from_landing_page,
 )
+from .._pdf_candidates import extract_pdf_candidate_urls_from_html
 from .._flaresolverr import (
     FlareSolverrFailure,
     ensure_runtime_ready as _ensure_runtime_ready,
@@ -27,6 +28,7 @@ from .._flaresolverr import (
     load_runtime_config as _load_runtime_config,
 )
 from ..base import ProviderFailure
+from ...reason_codes import NOT_SUPPORTED
 from .profile import BrowserWorkflowBootstrapResult
 
 if TYPE_CHECKING:
@@ -70,7 +72,7 @@ def bootstrap_browser_workflow(
     normalized_doi = normalize_doi(doi)
     if not normalized_doi:
         raise ProviderFailure(
-            "not_supported", f"{client.name} full-text retrieval requires a DOI."
+            NOT_SUPPORTED, f"{client.name} full-text retrieval requires a DOI."
         )
 
     landing_page_url = str(metadata.get("landing_page_url") or "") or None
@@ -180,6 +182,20 @@ def bootstrap_browser_workflow(
         result.html_failure_reason = exc.kind
         result.html_failure_message = exc.message
     except HtmlExtractionFailure as exc:
+        html_result = getattr(exc, "html_result", None)
+        if html_result is not None:
+            result.browser_context_seed = (
+                getattr(html_result, "browser_context_seed", None)
+                or result.browser_context_seed
+            )
+            for pdf_candidate in reversed(
+                extract_pdf_candidate_urls_from_html(
+                    getattr(html_result, "html", "") or "",
+                    getattr(html_result, "final_url", "") or "",
+                )
+            ):
+                if pdf_candidate and pdf_candidate not in result.pdf_candidates:
+                    result.pdf_candidates.insert(0, pdf_candidate)
         result.html_failure_reason = exc.reason
         result.html_failure_message = exc.message
 

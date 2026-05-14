@@ -10,10 +10,10 @@
 这份文档不解决：
 
 - provider 差异、路由规则和限速语义
-- Wiley / Science / PNAS 的详细运维步骤
+- Wiley / Science / PNAS / AMS 的详细运维步骤
 - 架构实现细节
 
-provider 与环境变量说明见 [`providers.md`](providers.md)，Wiley / Science / PNAS 运维说明见 [`flaresolverr.md`](flaresolverr.md)。
+provider 与环境变量说明见 [`providers.md`](providers.md)，Wiley / Science / PNAS / AMS 运维说明见 [`flaresolverr.md`](flaresolverr.md)。
 
 ## 1. 安装 Python 包
 
@@ -57,6 +57,15 @@ CI 自动发布规则：
 - release job 会下载本次运行产出的 `paper-fetch-skill-*` artifacts，确认上面 5 个文件都存在且没有额外文件，然后把它们作为 release assets 上传。
 - 手动运行 workflow 时，只有在 `v*` tag 上显式设置 `publish_release=true` 才会发布，确保 release tag 和本次构建产物来自同一个 commit。
 - 发布使用 workflow 内置的 `GITHUB_TOKEN`，release job 单独声明 `contents: write` 和 `actions: read` 权限，不需要额外 PAT。
+
+主包版本号同步清单：
+
+- `pyproject.toml` 的 `[project].version` 是 Python 包和离线构建脚本读取的主版本来源。
+- `src/paper_fetch/config.py` 的 `DEFAULT_USER_AGENT` 需要同步默认 `paper-fetch-skill/<version>`。
+- `skills/paper-fetch-skill/references/environment.md` 需要同步默认 User-Agent 文档。
+- `installer/paper-fetch-skill.iss` 的 `AppVersion` 默认值需要同步；正常 Windows 构建会从 `pyproject.toml` 传入覆盖值，但直接运行 Inno Setup 模板时会使用这里的默认值。
+- `tests/unit/test_offline_install.py` 中用于离线安装测试的假 `paper_fetch_skill-<version>-py3-none-any.whl` 文件名需要同步。
+- `CHANGELOG.md` 需要新增对应版本章节。`paper-fetch-skill-formula-tools` 的 `package.json` / `package-lock.json` 是公式辅助 Node 包版本，除非单独发布该辅助包，否则不跟随 Python 主包版本。
 
 Linux 目标机解压后运行：
 
@@ -259,13 +268,13 @@ scripts/clean-local-artifacts.sh --days 7
 
 该脚本只删除 `git check-ignore` 确认为 ignored 的目标；未被 `.gitignore` 覆盖的路径会跳过。
 
-## 4. Elsevier / Wiley / Science / PNAS / IEEE 接入入口
+## 4. Elsevier / Wiley / Science / PNAS / AMS / IEEE 接入入口
 
 `elsevier` 现在不再依赖 FlareSolverr 浏览器链路；它只需要官方 API 凭据，并走 `官方 XML/API -> 官方 API PDF fallback -> metadata-only`。
 
 `ieee` 不需要 FlareSolverr 或 IEEE API key；它走 `landing metadata / article number -> direct REST HTML -> clean-browser HTML -> direct HTTP PDF fallback -> seeded-browser PDF fallback`，但全文是否可用仍取决于当前环境对 IEEE Xplore 的合法访问上下文。clean-browser HTML 使用新的 Playwright context，不读取本机浏览器 profile、不复用用户登录态、不自动登录、不处理验证码，也不绕过访问权限。direct HTTP PDF 返回 `stamp.jsp` HTML wrapper 或 access/challenge 页面时，seeded-browser PDF fallback 只复用当前页面运行期间获得的合法 IEEE cookies/session。
 
-`wiley`、`science`、`pnas` 仍然不是“装完 wheel 就自动可用”的浏览器路径。
+`wiley`、`science`、`pnas`、`ams` 仍然不是“装完 wheel 就自动可用”的浏览器路径。
 
 如果你要启用后面三家的浏览器链路，至少还需要：
 
@@ -274,12 +283,12 @@ scripts/clean-local-artifacts.sh --days 7
 
 补充：
 
-- `wiley` / `science` / `pnas` 还需要 Playwright Chromium，因为 PNAS direct HTML preflight、HTML 正文图片资产下载和 seeded-browser PDF/ePDF fallback 都会使用 browser context
+- `wiley` / `science` / `pnas` / `ams` 还需要 Playwright Chromium，因为 PNAS direct HTML preflight、HTML 正文图片资产下载和 seeded-browser PDF/ePDF fallback 都会使用 browser context
 - `elsevier` 只需要 `ELSEVIER_API_KEY`
 - `ieee` 不需要额外 env；普通 fetch 在无授权或 REST/browser/PDF route 返回非全文时会降级到 provider abstract-only / metadata-only；golden criteria live review 面向具备合法 IEEE Xplore 授权上下文的机器，IEEE 样本预期为 fulltext，降级会作为 blocked live fetch 暴露；配置了 `download_dir` 时 PDF fallback 的最后一个非 PDF HTML 会保存在 `ieee_pdf_fallback/pdf.failure.html`
 - `arxiv` 不需要额外 env；路径细节见 [`providers.md` 的 arXiv 小节](providers.md#arxiv)。
 - 如果只想启用 `wiley` 的官方 TDM API PDF lane，可以只配置 `WILEY_TDM_CLIENT_TOKEN`；这不会启用 HTML 资产下载或 seeded-browser PDF/ePDF fallback
-- `wiley` / `science` / `pnas` 的 browser workflow 顺序见 [`providers.md`](providers.md#wiley-science-pnas-browser-workflow)。
+- `wiley` / `science` / `pnas` / `ams` 的 browser workflow 顺序见 [`providers.md`](providers.md#wiley-science-pnas-browser-workflow)。
 - 本地 FlareSolverr 限速变量与账本移除说明见 [`providers.md`](providers.md#flaresolverr-rate-limit-removal)。
 
 最常见入口是：
@@ -442,7 +451,7 @@ PYTHONPATH=src pytest
 PAPER_FETCH_RUN_FULL_GOLDEN=1 PYTHONPATH=src python3 -m pytest tests/integration/test_golden_corpus.py -q
 ```
 
-如果你要额外验证 `wiley` / `science` / `pnas` live 路径，请先按 [`flaresolverr.md`](flaresolverr.md) 准备环境，再运行对应 live 测试。
+如果你要额外验证 `wiley` / `science` / `pnas` / `ams` live 路径，请先按 [`flaresolverr.md`](flaresolverr.md) 准备环境，再运行对应 live 测试。
 
 ## 相关文档
 

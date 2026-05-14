@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping, Pattern
 
+from ..extraction.html.signals import ACCESS_GATE_PATTERNS
 from ..utils import normalize_text
 
 try:
@@ -15,20 +16,25 @@ try:
 except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
 
+def _attr_markers(name: str, value: str) -> tuple[str, str]:
+    return (f'{name}="{value}"', f"{name}='{value}'")
+
+
+def provider_datalayer_assignment_pattern(name: str) -> Pattern[str]:
+    return re.compile(rf"\b{re.escape(name)}\s*=", flags=re.DOTALL)
+
+
 HTML_STRONG_FULLTEXT_MARKERS = (
-    'property="articleBody"',
-    "property='articleBody'",
-    'itemprop="articleBody"',
-    "itemprop='articleBody'",
+    *_attr_markers("property", "articleBody"),
+    *_attr_markers("itemprop", "articleBody"),
 )
 HTML_STRUCTURE_MARKERS = (
-    'data-article-access="full"',
-    "data-article-access='full'",
-    'data-article-access-type="full"',
-    "data-article-access-type='full'",
-    'id="bodymatter"',
-    "id='bodymatter'",
+    *_attr_markers("data-article-access", "full"),
+    *_attr_markers("data-article-access-type", "full"),
+    *_attr_markers("id", "bodymatter"),
 )
+# SITE_UI_COPY_REGRESSION_MARKER: site-owned UI copy; rerun extraction rules
+# when publisher text changes.
 NATURE_RESEARCH_BRIEFING_HEADING_SIGNATURE = (
     "the question",
     "the discovery",
@@ -46,8 +52,8 @@ PROVIDER_AUTHORLESS_HEADING_SIGNATURES: Mapping[str, tuple[tuple[str, ...], ...]
         }
     )
 )
-AAAS_DATALAYER_PATTERN = re.compile(r"\bAAASdataLayer\s*=", flags=re.DOTALL)
-PNAS_DATALAYER_PATTERN = re.compile(r"\bPNASdataLayer\s*=", flags=re.DOTALL)
+AAAS_DATALAYER_PATTERN = provider_datalayer_assignment_pattern("AAASdataLayer")
+PNAS_DATALAYER_PATTERN = provider_datalayer_assignment_pattern("PNASdataLayer")
 WILEY_DATALAYER_PATTERN = re.compile(
     r"\bwindow\.adobeDataLayer\.push\s*\(", flags=re.DOTALL
 )
@@ -292,10 +298,6 @@ def pnas_blocking_fallback_signals(html_text: str) -> list[str]:
     return []
 
 
-def pnas_positive_signals(html_text: str) -> tuple[list[str], list[str], list[str]]:
-    return default_positive_signals(html_text)
-
-
 def wiley_blocking_fallback_signals(html_text: str) -> list[str]:
     datalayer = load_provider_datalayer(html_text, WILEY_DATALAYER_SCHEMA)
     if datalayer is None:
@@ -312,8 +314,38 @@ def wiley_blocking_fallback_signals(html_text: str) -> list[str]:
     return dedupe_signals(signals)
 
 
-def wiley_positive_signals(html_text: str) -> tuple[list[str], list[str], list[str]]:
-    return default_positive_signals(html_text)
+def ams_blocking_fallback_signals(html_text: str) -> list[str]:
+    lowered = normalize_text(html_text).lower()
+    signals: list[str] = []
+    has_body_marker = any(
+        token in lowered
+        for token in (
+            "id=\"bodymatter\"",
+            "id='bodymatter'",
+            "articlebody",
+            "nlm_body",
+            "articlefulltext",
+        )
+    )
+    if not has_body_marker and "check access" in ACCESS_GATE_PATTERNS and "check access" in lowered:
+        signals.append("ams_check_access_without_body")
+    if not has_body_marker and "purchase this article" in ACCESS_GATE_PATTERNS and "purchase this article" in lowered:
+        signals.append("ams_purchase_without_body")
+    return dedupe_signals(signals)
+
+
+def ams_positive_signals(html_text: str) -> tuple[list[str], list[str], list[str]]:
+    strong, soft, abstract_only = default_positive_signals(html_text)
+    lowered = html_text.lower()
+    if "id=\"bodymatter\"" in lowered or "id='bodymatter'" in lowered:
+        strong.append("ams_bodymatter")
+    if "nlm_body" in lowered or "articlefulltext" in lowered:
+        soft.append("ams_body_container")
+    if "citation_fulltext_html_url" in lowered:
+        soft.append("ams_fulltext_meta")
+    if "citation_pdf_url" in lowered:
+        soft.append("ams_pdf_meta")
+    return dedupe_signals(strong), dedupe_signals(soft), dedupe_signals(abstract_only)
 
 
 def ieee_blocking_fallback_signals(html_text: str) -> list[str]:

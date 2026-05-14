@@ -24,6 +24,7 @@ from ..models import (
     coerce_semantic_losses,
     coerce_token_estimate_breakdown,
 )
+from ..reason_codes import METADATA_ONLY
 from ..runtime import RuntimeContext
 from ..tracing import TraceEvent, trace_event
 from ..utils import normalize_text, sanitize_filename
@@ -141,7 +142,7 @@ def quality_from_payload(value: Mapping[str, Any] | None) -> Quality:
     payload = value or {}
     return Quality(
         has_fulltext=bool(payload.get("has_fulltext")),
-        content_kind=normalize_text(payload.get("content_kind")) or "metadata_only",
+        content_kind=normalize_text(payload.get("content_kind")) or METADATA_ONLY,
         has_abstract=bool(payload.get("has_abstract")),
         token_estimate=int(payload.get("token_estimate") or 0),
         warnings=[normalize_text(item) for item in payload.get("warnings") or [] if normalize_text(item)],
@@ -247,9 +248,9 @@ def envelope_from_payload(payload: Mapping[str, Any]) -> FetchEnvelope:
         quality = article.quality
     return FetchEnvelope(
         doi=normalize_text(payload.get("doi")) or None,
-        source=normalize_text(payload.get("source")) or "metadata_only",
+        source=normalize_text(payload.get("source")) or METADATA_ONLY,
         has_fulltext=bool(payload.get("has_fulltext")),
-        content_kind=normalize_text(payload.get("content_kind")) or "metadata_only",
+        content_kind=normalize_text(payload.get("content_kind")) or METADATA_ONLY,
         has_abstract=bool(payload.get("has_abstract")),
         warnings=[normalize_text(item) for item in payload.get("warnings") or [] if normalize_text(item)],
         source_trail=[normalize_text(item) for item in payload.get("source_trail") or [] if normalize_text(item)],

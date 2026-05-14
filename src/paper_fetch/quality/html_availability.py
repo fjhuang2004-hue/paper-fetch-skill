@@ -6,8 +6,16 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Mapping
 
+from ..common_patterns import HEADING_TAG_PATTERN
+from ..extraction.html.container_selectors import ARTICLE_BODY_SELECTORS
+from ..extraction.html.cleanup_policy import classify_dom_cleanup_node
 from ..extraction.html._runtime import body_metrics, has_sufficient_article_body
-from ..extraction.html.provider_rules import front_matter_footer_prefixes
+from ..extraction.html.front_matter import ARTICLE_TYPE_FRONT_MATTER_PREFIXES
+from ..extraction.html.formula_rules import MATHML_SCRIPT_TYPES
+from ..extraction.html.provider_rules import (
+    cleanup_policy_for_profile,
+    front_matter_footer_prefixes,
+)
 from ..extraction.html.signals import (
     CHALLENGE_PATTERNS,
     contains_access_gate_text,
@@ -41,6 +49,22 @@ from .html_profiles import (
     provider_positive_signals,
     site_rule_for_publisher,
 )
+from .reason_codes import (
+    ABSTRACT_ONLY,
+    ACCESS_PAGE_URL,
+    BODY_SUFFICIENT,
+    CITATION_ABSTRACT_HTML_URL,
+    DATA_ARTICLE_ACCESS_ABSTRACT,
+    DATA_ARTICLE_ACCESS_NO,
+    FINAL_URL_MATCHES_CITATION_ABSTRACT_HTML_URL,
+    FULLTEXT,
+    INSUFFICIENT_BODY,
+    METADATA_ONLY,
+    PUBLISHER_PAYWALL,
+    STRUCTURED_ARTICLE_NOT_FULLTEXT,
+    STRUCTURED_MISSING_BODY_SECTIONS,
+    WT_ABSTRACT_PAGE_TYPE,
+)
 
 try:
     from bs4 import BeautifulSoup, Tag
@@ -48,6 +72,9 @@ except ImportError:  # pragma: no cover - dependency is declared in pyproject
     BeautifulSoup = None
     Tag = None
 
+# Narrative labels relax structural availability thresholds for short
+# commentary/news-style content. They are not front-matter cleanup tokens; the
+# provider cleanup layer keeps its own article-type chrome vocabulary.
 NARRATIVE_ARTICLE_TYPES = {
     "review",
     "perspective",
@@ -58,36 +85,12 @@ NARRATIVE_ARTICLE_TYPES = {
     "editorial",
 }
 NARRATIVE_BODY_RUN_MIN_CHARS = 400
-ARTICLE_TYPE_FRONT_MATTER_PREFIXES = (
-    "regular paper",
-    "research article",
-    "original article",
-    "review article",
-    "short communication",
-    "brief communication",
-    "case report",
-    "letter to the editor",
-)
 HTML_CONTAINER_SCORE_AVAILABILITY = "availability"
 HTML_CONTAINER_SCORE_BROWSER_WORKFLOW = "browser_workflow"
 HTML_CONTAINER_DROP_AVAILABILITY = "availability"
 HTML_CONTAINER_DROP_BROWSER_WORKFLOW = "browser_workflow"
 HTML_CONTAINER_BROWSER_WORKFLOW_FALLBACK_TAGS = ("article", "main", "body")
-HTML_CONTAINER_BODY_SELECTORS = (
-    "#bodymatter",
-    "[data-extent='bodymatter']",
-    "[property='articleBody']",
-    "[itemprop='articleBody']",
-    ".article__body",
-    ".article-body",
-    ".article__content",
-    ".article-section__content",
-    ".article__fulltext",
-    ".epub-section",
-)
-HEADING_TAG_PATTERN = re.compile(r"^h[1-6]$")
-
-
+HTML_CONTAINER_BODY_SELECTORS = ARTICLE_BODY_SELECTORS
 @dataclass(frozen=True)
 class HtmlContainerSelectionPolicy:
     score_profile: str = HTML_CONTAINER_SCORE_AVAILABILITY
@@ -159,6 +162,12 @@ def _sentence_count(text: str) -> int:
 def _is_substantial_prose(text: str) -> bool:
     normalized = normalize_text(text)
     return len(normalized) >= 80 or _sentence_count(normalized) >= 2
+
+
+def _is_mathml_script(node: Tag) -> bool:
+    return normalize_text(getattr(node, "name", "")).lower() == "script" and normalize_text(
+        str((getattr(node, "attrs", None) or {}).get("type") or "")
+    ).lower() in MATHML_SCRIPT_TYPES
 
 
 def _looks_like_explicit_body_container(node: Tag | None) -> bool:
@@ -461,22 +470,15 @@ def select_best_container(
 
 
 def _should_drop_browser_workflow_node(node: Tag, publisher: str | None) -> bool:
-    if node.name in {"script", "style", "noscript", "svg", "iframe", "button", "input", "form"}:
-        return True
-
-    identity = node_identity_text(node)
-    text = normalize_text(node.get_text(" ", strip=True))
-    if contains_access_gate_text(text):
-        return False
-    short_text = len(text) <= 200
-    for keyword in site_rule_for_publisher(publisher)["drop_keywords"]:
-        if keyword in identity and short_text:
-            return True
-    if short_text and text in site_rule_for_publisher(publisher)["drop_text"]:
-        return True
-    if short_text and any(pattern in text.lower() for pattern in {"share this", "view metrics", "article metrics"}):
-        return True
-    return False
+    decision = classify_dom_cleanup_node(
+        node,
+        policy=cleanup_policy_for_profile(publisher),
+        stage="browser_workflow",
+        identity=node_identity_text(node),
+        text=normalize_text(node.get_text(" ", strip=True)),
+        is_mathml_script=_is_mathml_script(node),
+    )
+    return decision.action == "drop"
 
 
 def should_drop_node(
@@ -487,17 +489,34 @@ def should_drop_node(
 ) -> bool:
     if drop_profile == HTML_CONTAINER_DROP_BROWSER_WORKFLOW:
         return _should_drop_browser_workflow_node(node, publisher)
-    rule = site_rule_for_publisher(publisher)
+    policy = cleanup_policy_for_profile(publisher)
     identity = node_identity_text(node)
     text = normalize_text(node.get_text(" ", strip=True))
-    if any(token in identity for token in rule["drop_keywords"]):
-        return True
-    if text in rule["drop_text"]:
-        return True
-    if node.name in {"script", "style", "noscript", "iframe", "svg"}:
+    decision = classify_dom_cleanup_node(
+        node,
+        policy=policy,
+        stage="availability",
+        identity=identity,
+        text=text,
+        is_mathml_script=_is_mathml_script(node),
+    )
+    if decision.action == "drop":
         return True
     try:
-        return any(node.select_one(selector) is node for selector in rule["remove_selectors"])
+        return any(
+            classify_dom_cleanup_node(
+                node,
+                policy=policy,
+                stage="availability",
+                identity=identity,
+                text=text,
+                matched_selector=selector,
+                is_mathml_script=_is_mathml_script(node),
+            ).action
+            == "drop"
+            for selector in policy.availability_remove_selectors
+            if node.select_one(selector) is node
+        )
     except Exception:
         return False
 
@@ -508,11 +527,27 @@ def clean_container(
     *,
     drop_profile: str = HTML_CONTAINER_DROP_AVAILABILITY,
 ) -> Tag:
-    for selector in site_rule_for_publisher(publisher)["remove_selectors"]:
+    policy = cleanup_policy_for_profile(publisher)
+    stage = (
+        "browser_workflow"
+        if drop_profile == HTML_CONTAINER_DROP_BROWSER_WORKFLOW
+        else "availability"
+    )
+    for selector in policy.availability_remove_selectors:
         try:
             for node in list(container.select(selector)):
                 if isinstance(node, Tag):
-                    node.decompose()
+                    decision = classify_dom_cleanup_node(
+                        node,
+                        policy=policy,
+                        stage=stage,
+                        identity=node_identity_text(node),
+                        text=normalize_text(node.get_text(" ", strip=True)),
+                        matched_selector=selector,
+                        is_mathml_script=_is_mathml_script(node),
+                    )
+                    if decision.action == "drop":
+                        node.decompose()
         except Exception:
             continue
     for node in list(container.find_all(True)):
@@ -918,7 +953,7 @@ def _structure_accepts_fulltext(analysis: StructuredBodyAnalysis) -> bool:
 
 
 def availability_failure_message(diagnostics: FulltextAvailabilityDiagnostics) -> str:
-    if diagnostics.reason in {"structured_article_not_fulltext", "structured_missing_body_sections"}:
+    if diagnostics.reason in {STRUCTURED_ARTICLE_NOT_FULLTEXT, STRUCTURED_MISSING_BODY_SECTIONS}:
         return html_failure_message(diagnostics.reason)
     return html_failure_message(diagnostics.reason)
 
@@ -934,12 +969,12 @@ def _diagnostics_content_kind(
     blocking_fallback_signals: list[str] | None = None,
 ) -> str:
     if blocking_fallback_signals:
-        return "abstract_only" if has_abstract else "metadata_only"
+        return ABSTRACT_ONLY if has_abstract else METADATA_ONLY
     if body_ok:
-        return "fulltext"
+        return FULLTEXT
     if has_abstract:
-        return "abstract_only"
-    return "metadata_only"
+        return ABSTRACT_ONLY
+    return METADATA_ONLY
 
 
 def _normalized_text_field(value: Any) -> str:
@@ -959,8 +994,8 @@ def _dom_access_hints(
     blocking_fallback_signals: list[str] = []
     if BeautifulSoup is None:
         if _final_url_looks_like_access_page(final_url):
-            abstract_only_hints.append("access_page_url")
-            blocking_fallback_signals.append("access_page_url")
+            abstract_only_hints.append(ACCESS_PAGE_URL)
+            blocking_fallback_signals.append(ACCESS_PAGE_URL)
         return (
             _dedupe_signals(hard_negative_signals),
             _dedupe_signals(abstract_only_hints),
@@ -969,11 +1004,11 @@ def _dom_access_hints(
 
     soup = BeautifulSoup(html_text, choose_parser())
     if soup.select_one(".accessDenialWidget"):
-        hard_negative_signals.append("publisher_paywall")
-        blocking_fallback_signals.append("publisher_paywall")
+        hard_negative_signals.append(PUBLISHER_PAYWALL)
+        blocking_fallback_signals.append(PUBLISHER_PAYWALL)
     if _final_url_looks_like_access_page(final_url):
-        abstract_only_hints.append("access_page_url")
-        blocking_fallback_signals.append("access_page_url")
+        abstract_only_hints.append(ACCESS_PAGE_URL)
+        blocking_fallback_signals.append(ACCESS_PAGE_URL)
     for node in soup.select("[data-article-access], [data-article-access-type]"):
         attrs = getattr(node, "attrs", None) or {}
         access_value = normalize_text(str(attrs.get("data-article-access") or "")).lower()
@@ -981,30 +1016,30 @@ def _dom_access_hints(
         values = [access_value, access_type]
         joined = " ".join(value.lower() for value in values if value)
         if access_value == "no":
-            blocking_fallback_signals.append("data_article_access_no")
+            blocking_fallback_signals.append(DATA_ARTICLE_ACCESS_NO)
         if any(token in joined for token in {"abstract", "summary", "preview", "teaser", "limited"}):
-            abstract_only_hints.append("data_article_access_abstract")
-            blocking_fallback_signals.append("data_article_access_abstract")
+            abstract_only_hints.append(DATA_ARTICLE_ACCESS_ABSTRACT)
+            blocking_fallback_signals.append(DATA_ARTICLE_ACCESS_ABSTRACT)
         if any(token in joined for token in {"denied", "subscription", "restricted", "paywall"}):
-            hard_negative_signals.append("publisher_paywall")
-            blocking_fallback_signals.append("publisher_paywall")
+            hard_negative_signals.append(PUBLISHER_PAYWALL)
+            blocking_fallback_signals.append(PUBLISHER_PAYWALL)
     wt_node = soup.select_one("meta[name='WT.z_cg_type']")
     if wt_node is not None:
         wt_value = normalize_text(str((getattr(wt_node, "attrs", None) or {}).get("content") or "")).lower()
         if "abstract" in wt_value or "summary" in wt_value:
-            abstract_only_hints.append("wt_abstract_page_type")
-            blocking_fallback_signals.append("wt_abstract_page_type")
-    citation_abstract_url = normalize_text(str((metadata or {}).get("citation_abstract_html_url") or ""))
+            abstract_only_hints.append(WT_ABSTRACT_PAGE_TYPE)
+            blocking_fallback_signals.append(WT_ABSTRACT_PAGE_TYPE)
+    citation_abstract_url = normalize_text(str((metadata or {}).get(CITATION_ABSTRACT_HTML_URL) or ""))
     citation_fulltext_url = normalize_text(str((metadata or {}).get("citation_fulltext_html_url") or ""))
     normalized_final_url = normalize_text(final_url or "")
     if citation_abstract_url:
-        abstract_only_hints.append("citation_abstract_html_url")
+        abstract_only_hints.append(CITATION_ABSTRACT_HTML_URL)
         if normalized_final_url and normalized_final_url == citation_abstract_url:
-            abstract_only_hints.append("final_url_matches_citation_abstract_html_url")
-            blocking_fallback_signals.append("final_url_matches_citation_abstract_html_url")
+            abstract_only_hints.append(FINAL_URL_MATCHES_CITATION_ABSTRACT_HTML_URL)
+            blocking_fallback_signals.append(FINAL_URL_MATCHES_CITATION_ABSTRACT_HTML_URL)
     if citation_fulltext_url and normalized_final_url and normalized_final_url == citation_fulltext_url:
-        hard_negative_signals = [signal for signal in hard_negative_signals if signal != "publisher_paywall"]
-        blocking_fallback_signals = [signal for signal in blocking_fallback_signals if signal != "publisher_paywall"]
+        hard_negative_signals = [signal for signal in hard_negative_signals if signal != PUBLISHER_PAYWALL]
+        blocking_fallback_signals = [signal for signal in blocking_fallback_signals if signal != PUBLISHER_PAYWALL]
     return (
         _dedupe_signals(hard_negative_signals),
         _dedupe_signals(abstract_only_hints),
@@ -1085,7 +1120,7 @@ def assess_html_fulltext_availability(
     blocking_fallback_signals: list[str] = list(hard_negative_signals)
     figure_count = _count_figures_from_html(html_text or "") if html_text else 0
     if body_ok:
-        strong_positive_signals.append("body_sufficient")
+        strong_positive_signals.append(BODY_SUFFICIENT)
     if structure.explicit_body_container:
         strong_positive_signals.append("explicit_body_container")
     if structure.post_abstract_body_run:
@@ -1124,8 +1159,8 @@ def assess_html_fulltext_availability(
         blocking_fallback_signals.extend(structure.provider_blocking_fallback_signals)
     blocking_fallback_signals.extend(structure.access_gate_markers)
     if not blocking_fallback_signals and not body_ok and structure.paywall_gate_detected:
-        hard_negative_signals.append("publisher_paywall")
-        blocking_fallback_signals.append("publisher_paywall")
+        hard_negative_signals.append(PUBLISHER_PAYWALL)
+        blocking_fallback_signals.append(PUBLISHER_PAYWALL)
     if not body_ok and not metrics["char_count"] and abstract_only_hints:
         metrics["abstract_only_hints"] = _dedupe_signals(abstract_only_hints)
     has_abstract = bool(metrics.get("has_abstract"))
@@ -1135,15 +1170,15 @@ def assess_html_fulltext_availability(
         has_abstract=has_abstract,
         blocking_fallback_signals=blocking_fallback_signals,
     )
-    if not blocking_fallback_signals and content_kind != "fulltext" and abstract_only_hints and has_abstract:
-        content_kind = "abstract_only"
+    if not blocking_fallback_signals and content_kind != FULLTEXT and abstract_only_hints and has_abstract:
+        content_kind = ABSTRACT_ONLY
     reason = hard_negative_signals[0] if hard_negative_signals else (
-        "abstract_only"
+        ABSTRACT_ONLY
         if blocking_fallback_signals and has_abstract
         else (
-            "publisher_paywall"
+            PUBLISHER_PAYWALL
             if blocking_fallback_signals
-            else ("body_sufficient" if body_ok else ("abstract_only" if content_kind == "abstract_only" else "insufficient_body"))
+            else (BODY_SUFFICIENT if body_ok else (ABSTRACT_ONLY if content_kind == ABSTRACT_ONLY else INSUFFICIENT_BODY))
         )
     )
     return FulltextAvailabilityDiagnostics(
@@ -1208,12 +1243,12 @@ def assess_plain_text_fulltext_availability(
     return FulltextAvailabilityDiagnostics(
         accepted=body_ok and not blocking_fallback_signals,
         reason=(
-            "abstract_only"
-            if blocking_fallback_signals and content_kind == "abstract_only"
+            ABSTRACT_ONLY
+            if blocking_fallback_signals and content_kind == ABSTRACT_ONLY
             else (
-                "publisher_paywall"
+                PUBLISHER_PAYWALL
                 if blocking_fallback_signals
-                else ("body_sufficient" if body_ok else ("abstract_only" if content_kind == "abstract_only" else "insufficient_body"))
+                else (BODY_SUFFICIENT if body_ok else (ABSTRACT_ONLY if content_kind == ABSTRACT_ONLY else INSUFFICIENT_BODY))
             )
         ),
         content_kind=content_kind,
@@ -1221,7 +1256,7 @@ def assess_plain_text_fulltext_availability(
         strong_positive_signals=[
             signal
             for signal, enabled in (
-                ("body_sufficient", body_ok),
+                (BODY_SUFFICIENT, body_ok),
                 ("post_abstract_body_run", structure.post_abstract_body_run),
                 ("body_run_paragraph_count", structure.body_run_paragraph_count > 0),
             )
@@ -1263,9 +1298,9 @@ def assess_structured_article_fulltext_availability(
     )
     soft_positive_signals = ["has_figures"] if figure_count else []
     content_kind = classify_article_content(article)
-    accepted = content_kind == "fulltext" and bool(body_sections)
+    accepted = content_kind == FULLTEXT and bool(body_sections)
     reason = "structured_body_sections" if accepted else (
-        "structured_missing_body_sections" if content_kind == "abstract_only" else "structured_article_not_fulltext"
+        STRUCTURED_MISSING_BODY_SECTIONS if content_kind == ABSTRACT_ONLY else STRUCTURED_ARTICLE_NOT_FULLTEXT
     )
     return FulltextAvailabilityDiagnostics(
         accepted=accepted,

@@ -17,6 +17,9 @@ from ..shared import (
     image_magic_type as _image_magic_type,
 )
 from .dom import (
+    SUPPLEMENTARY_BLOCKING_BODY_TOKENS,
+    SUPPLEMENTARY_BLOCKING_TITLE_TOKENS,
+    _CLOUDFLARE_CHALLENGE_TOKENS,
     _response_dimensions,
     _response_header,
     looks_like_full_size_asset_url,
@@ -40,35 +43,6 @@ from .state import (
     resolution_from_attempt as _resolution_from_attempt,
     resolve_asset_downloads_in_order as _resolve_asset_downloads_in_order,
 )
-
-_CLOUDFLARE_CHALLENGE_TOKENS = (
-    "just a moment",
-    "attention required",
-    "checking your browser",
-)
-
-
-SUPPLEMENTARY_BLOCKING_TITLE_TOKENS = (
-    "just a moment",
-    "attention required",
-    "checking your browser",
-    "sign in",
-    "sign-in",
-    "login",
-    "log in",
-    "access denied",
-)
-
-
-SUPPLEMENTARY_BLOCKING_BODY_TOKENS = (
-    "checking your browser",
-    "enable javascript and cookies",
-    "cloudflare",
-    "please sign in",
-    "institutional login",
-    "access denied",
-)
-
 
 ImageDocumentFetcher = Callable[[str, Mapping[str, Any]], dict[str, Any] | None]
 

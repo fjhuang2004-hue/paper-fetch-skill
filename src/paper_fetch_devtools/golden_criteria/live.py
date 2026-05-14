@@ -20,6 +20,16 @@ from paper_fetch.logging_utils import emit_structured_log
 from paper_fetch.models import Asset, FetchEnvelope, RenderOptions
 from paper_fetch.providers.registry import build_clients
 from paper_fetch.quality.issues import is_authorless_briefing_like
+from paper_fetch.quality.reason_codes import FULLTEXT, INSUFFICIENT_BODY
+from paper_fetch.reason_codes import (
+    ABSTRACT_ONLY,
+    ERROR,
+    METADATA_ONLY,
+    NO_RESULT,
+    NOT_CONFIGURED,
+    OK,
+    RATE_LIMITED,
+)
 from paper_fetch.runtime import RuntimeContext
 from paper_fetch.service import FetchStrategy, PaperFetchFailure, fetch_paper
 from paper_fetch.utils import normalize_text, sanitize_filename
@@ -27,7 +37,7 @@ from paper_fetch.workflow.rendering import rewrite_markdown_asset_links
 
 logger = logging.getLogger("paper_fetch_devtools.golden_criteria.live")
 
-SUPPORTED_PROVIDERS = ("elsevier", "springer", "wiley", "science", "pnas", "ieee", "arxiv")
+SUPPORTED_PROVIDERS = ("elsevier", "springer", "wiley", "science", "pnas", "ieee", "arxiv", "ams")
 UNSUPPORTED_PROVIDER_STATUS = "skipped_unsupported_provider"
 DEFAULT_REVIEW_ROOT_NAME = "golden-criteria-review"
 RUN_LIVE_ENV_VAR = "PAPER_FETCH_RUN_LIVE"
@@ -45,7 +55,7 @@ ISSUE_CATEGORIES = (
     "unsupported_provider",
 )
 QUALITY_FLAG_CATEGORY_MAP = {
-    "insufficient_body": "content_missing",
+    INSUFFICIENT_BODY: "content_missing",
     "weak_body_structure": "section_structure",
     "table_fallback_present": "figure_table_loss",
     "table_semantic_loss": "figure_table_loss",
@@ -435,7 +445,7 @@ def provider_status_payload(
             providers.append(
                 {
                     "provider": provider_name,
-                    "status": "error",
+                    "status": ERROR,
                     "available": False,
                     "official_provider": True,
                     "missing_env": [],
@@ -450,7 +460,7 @@ def provider_status_payload(
             providers.append(
                 {
                     "provider": provider_name,
-                    "status": "error",
+                    "status": ERROR,
                     "available": False,
                     "official_provider": bool(getattr(client, "official_provider", True)),
                     "missing_env": [],
@@ -466,20 +476,20 @@ def sample_output_dir(output_root: Path, sample: GoldenCriteriaLiveSample) -> Pa
 
 
 def classify_envelope_status(sample: GoldenCriteriaLiveSample, envelope: FetchEnvelope) -> tuple[str, str | None, str | None]:
-    if envelope.content_kind == "fulltext":
-        return "fulltext", None, None
+    if envelope.content_kind == FULLTEXT:
+        return FULLTEXT, None, None
 
     source_trail = set(envelope.source_trail)
-    for status in ("not_configured", "rate_limited"):
+    for status in (NOT_CONFIGURED, RATE_LIMITED):
         if f"fulltext:{sample.provider}_{status}" in source_trail:
             return status, status, _first_non_generic_warning(envelope.warnings)
     if (
         f"fulltext:{sample.provider}_fail" in source_trail
         or f"fulltext:{sample.provider}_not_usable" in source_trail
     ):
-        return "blocked_live_fetch", "no_result", _first_non_generic_warning(envelope.warnings)
-    if envelope.content_kind in {"abstract_only", "metadata_only"}:
-        return "metadata_only", None, _first_non_generic_warning(envelope.warnings)
+        return "blocked_live_fetch", NO_RESULT, _first_non_generic_warning(envelope.warnings)
+    if envelope.content_kind in {ABSTRACT_ONLY, METADATA_ONLY}:
+        return METADATA_ONLY, None, _first_non_generic_warning(envelope.warnings)
     return "blocked_live_fetch", "blocked_live_fetch", _first_non_generic_warning(envelope.warnings)
 
 
@@ -500,7 +510,7 @@ def issue_categories_for_result(
     categories: list[str] = []
     if unsupported_provider:
         categories.append("unsupported_provider")
-    elif status != "fulltext":
+    elif status != FULLTEXT:
         categories.append("live_fetch_blocked")
 
     if envelope is not None:
@@ -644,7 +654,7 @@ def _markdown_has_unlocalized_downloaded_ieee_mediastore_asset(envelope: FetchEn
 def review_status_for(status: str, issue_categories: Sequence[str]) -> str:
     if status == UNSUPPORTED_PROVIDER_STATUS:
         return "skipped"
-    if status != "fulltext":
+    if status != FULLTEXT:
         return "blocked"
     return "issue" if issue_categories else "ok"
 
@@ -653,7 +663,7 @@ def sample_expected_outcome_applies(sample: GoldenCriteriaLiveSample, status: st
     expected_live_status = normalize_text(sample.expected_live_status).lower()
     normalized_status = normalize_text(status).lower()
     status_matches = expected_live_status == normalized_status
-    if expected_live_status == "metadata_only" and normalized_status == "blocked_live_fetch":
+    if expected_live_status == METADATA_ONLY and normalized_status == "blocked_live_fetch":
         status_matches = True
     if expected_live_status and not status_matches:
         return False
@@ -1044,7 +1054,7 @@ def precheck_blocked_result(
     *,
     provider_status_entry: Mapping[str, Any],
 ) -> GoldenCriteriaLiveResult:
-    status = normalize_text(provider_status_entry.get("status")).lower() or "not_configured"
+    status = normalize_text(provider_status_entry.get("status")).lower() or NOT_CONFIGURED
     message = provider_status_message(provider_status_entry)
     categories = issue_categories_for_result(status=status)
     return GoldenCriteriaLiveResult(
@@ -1052,7 +1062,7 @@ def precheck_blocked_result(
         provider=sample.provider,
         doi=sample.doi,
         title=sample.title,
-        status=status if status in {"not_configured", "rate_limited", "error"} else "blocked_live_fetch",
+        status=status if status in {NOT_CONFIGURED, RATE_LIMITED, ERROR} else "blocked_live_fetch",
         content_kind=None,
         source=None,
         has_fulltext=False,
@@ -1077,7 +1087,7 @@ def provider_status_message(provider_status_entry: Mapping[str, Any]) -> str | N
     for check in provider_status_entry.get("checks") or []:
         if not isinstance(check, Mapping):
             continue
-        if normalize_text(check.get("status")).lower() == "ok":
+        if normalize_text(check.get("status")).lower() == OK:
             continue
         text = normalize_text(check.get("message"))
         if text:
@@ -1165,7 +1175,7 @@ def fetch_sample_result(
             total_seconds=elapsed_seconds,
             runtime_stage_timings=runtime_context.stage_timings,
         )
-        status = exc.status if exc.status in {"not_configured", "rate_limited"} else "blocked_live_fetch"
+        status = exc.status if exc.status in {NOT_CONFIGURED, RATE_LIMITED} else "blocked_live_fetch"
         categories = issue_categories_for_result(status=status)
         http_cache_stats = _cache_stats_delta(cache_stats_before, _transport_cache_stats(transport))
         result = GoldenCriteriaLiveResult(
@@ -1206,7 +1216,7 @@ def fetch_sample_result(
             provider=sample.provider,
             doi=sample.doi,
             title=sample.title,
-            status="error",
+            status=ERROR,
             content_kind=None,
             source=None,
             has_fulltext=False,
@@ -1239,7 +1249,7 @@ def build_provider_summaries(results: Sequence[GoldenCriteriaLiveResult]) -> lis
                 provider=provider,
                 attempted=len(provider_results),
                 status_counts=dict(sorted(counts.items())),
-                fulltext=counts.get("fulltext", 0),
+                fulltext=counts.get(FULLTEXT, 0),
                 blocked=sum(1 for result in provider_results if result.review_status == "blocked"),
                 skipped=sum(1 for result in provider_results if result.review_status == "skipped"),
             )
