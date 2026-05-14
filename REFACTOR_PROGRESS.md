@@ -94,5 +94,5 @@
   - 验收: S17 grep（`docs/ai-onboarding` banner、`Human reference only`、AI docs 禁词）通过；AI onboarding markdown 链接均可解析；`test_human_docs_drift.py` / `test_provider_manifest_schema.py` / `test_manifest_bundle_sync.py` 12 passed + 1 warning（human-only API drift warning，按 S17 规则不阻断）；`python3 scripts/validate_extraction_rules.py` 通过；`python3 -m ruff check .` 通过；全量 unit 1246 passed + 1 warning + 264 subtests；full golden corpus 174 passed。
 
 ### 最终验收点
-- commit: 3d9a101
-- 覆盖: S1-S17 均已落地并按阶段记录；S17 后 AI provider onboarding 权威源为 `docs/ai-onboarding/`，旧人类文档保留但不作为 AI worker 输入；最新全量 unit 为 1246 passed + 1 warning + 264 subtests，full golden corpus 为 174 passed；warning 来自 best-effort human docs drift 检测。
+- commit: 319baab
+- 覆盖: S1-S17 均已落地并按阶段记录；S17 后 AI provider onboarding 权威源为 `docs/ai-onboarding/`，旧人类文档保留但不作为 AI worker 输入；audit §4 最终全量验收 17 段命令、结构断言和端到端 demo 均通过；最终 gate 修复将 `provider_catalog.py` 压到 279 行，并清空 availability override 函数 grep；最新全量 unit 为 1246 passed + 1 warning + 264 subtests，full golden corpus 为 174 passed；warning 来自 best-effort human docs drift 检测。
