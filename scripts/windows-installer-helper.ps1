@@ -460,7 +460,7 @@ function Invoke-SmokeChecks {
     Write-Log "Running bundled Python smoke checks"
     Invoke-Checked -FilePath $python -Arguments @(
         "-X", "utf8", "-c",
-        "import paper_fetch; from paper_fetch.mcp.tools import provider_status_payload; payload = provider_status_payload(); assert 'providers' in payload"
+        "import paper_fetch; from paper_fetch.mcp.fetch_tool import provider_status_payload; payload = provider_status_payload(); assert 'providers' in payload"
     )
 
     $playwrightCheck = @'

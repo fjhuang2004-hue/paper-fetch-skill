@@ -11,8 +11,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "service_fetch_paper", side_effect=fake_service_fetch_with_cached_downloads),
@@ -34,8 +32,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(
@@ -60,8 +56,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(
@@ -107,8 +101,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "service_fetch_paper", return_value=envelope),
@@ -135,8 +127,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "service_fetch_paper", side_effect=fake_service_fetch_with_cached_downloads),
@@ -161,8 +151,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
             ):
@@ -191,8 +179,6 @@ class McpServerResourceTests(unittest.IsolatedAsyncioTestCase):
             ctx = FakeContext()
 
             with (
-                mock.patch.object(mcp_server, "build_runtime_env", return_value={}),
-                mock.patch.object(mcp_server, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "build_runtime_env", return_value={}),
                 mock.patch.object(mcp_tools, "resolve_mcp_download_dir", return_value=default_dir),
                 mock.patch.object(mcp_tools, "service_fetch_paper", side_effect=fake_service_fetch_with_cached_downloads),

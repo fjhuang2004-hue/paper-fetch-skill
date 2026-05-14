@@ -11,14 +11,12 @@ from typing import Any, Callable, Mapping
 from mcp.server.fastmcp import Context
 from mcp.types import CallToolResult
 
-from ..config import build_runtime_env as _build_runtime_env
 from ..reason_codes import RATE_LIMITED
 from ..runtime import RuntimeContext
+from ._deps import MCPDeps, default_mcp_deps
 from .log_bridge import PaperFetchLogBridge
 from .results import _tool_result, error_payload_from_exception
 from .schemas import BatchCheckRequest, BatchResolveRequest
-
-build_runtime_env = _build_runtime_env
 
 _BATCH_CHECK_MODES = {
     "article": ["article"],
@@ -112,17 +110,19 @@ def _run_batch_check_item(
     mode: str,
     context: RuntimeContext,
     requested_modes: list[str],
+    deps: MCPDeps = default_mcp_deps(),
 ) -> dict[str, Any]:
     from . import fetch_tool
 
     if mode == "metadata":
-        payload = fetch_tool._call_service_probe_has_fulltext(query, context=context).to_dict()
+        payload = fetch_tool._call_service_probe_has_fulltext(query, context=context, deps=deps).to_dict()
     else:
         payload = fetch_tool.fetch_paper_payload(
             query=query,
             modes=requested_modes,
             download_dir=None,
             context=context,
+            deps=deps,
         )
     return _batch_check_success_payload(query, payload, mode=mode)
 
@@ -249,16 +249,17 @@ def batch_resolve_payload(
     queries: list[str],
     concurrency: int = 1,
     env: Mapping[str, str] | None = None,
+    deps: MCPDeps = default_mcp_deps(),
 ) -> dict[str, Any]:
     from . import fetch_tool
 
     request = BatchResolveRequest(queries=queries, concurrency=concurrency)
-    runtime_env = build_runtime_env(env)
+    runtime_env = deps.build_runtime_env(env)
     runtime_context = RuntimeContext(env=runtime_env)
     results, abort_reason = _run_batch_sync(
         queries=request.queries,
         concurrency=request.concurrency,
-        process_item=lambda query: fetch_tool.resolve_paper_payload(query=query, context=runtime_context),
+        process_item=lambda query: fetch_tool.resolve_paper_payload(query=query, context=runtime_context, deps=deps),
     )
 
     return {
@@ -274,9 +275,10 @@ def batch_check_payload(
     mode: str = "metadata",
     concurrency: int = 1,
     env: Mapping[str, str] | None = None,
+    deps: MCPDeps = default_mcp_deps(),
 ) -> dict[str, Any]:
     request = BatchCheckRequest(queries=queries, mode=mode, concurrency=concurrency)
-    runtime_env = build_runtime_env(env)
+    runtime_env = deps.build_runtime_env(env)
     runtime_context = RuntimeContext(env=runtime_env, download_dir=None)
     runtime_context.get_clients()
     requested_modes = _BATCH_CHECK_MODES[request.mode]
@@ -288,6 +290,7 @@ def batch_check_payload(
             mode=request.mode,
             context=runtime_context,
             requested_modes=requested_modes,
+            deps=deps,
         ),
     )
 
@@ -304,9 +307,13 @@ def batch_resolve_tool(
     queries: list[str],
     concurrency: int = 1,
     env: Mapping[str, str] | None = None,
+    deps: MCPDeps = default_mcp_deps(),
 ) -> CallToolResult:
     try:
-        return _tool_result(batch_resolve_payload(queries=queries, concurrency=concurrency, env=env), is_error=False)
+        return _tool_result(
+            batch_resolve_payload(queries=queries, concurrency=concurrency, env=env, deps=deps),
+            is_error=False,
+        )
     except Exception as error:
         return _tool_result(error_payload_from_exception(error), is_error=True)
 
@@ -317,10 +324,11 @@ def batch_check_tool(
     mode: str = "metadata",
     concurrency: int = 1,
     env: Mapping[str, str] | None = None,
+    deps: MCPDeps = default_mcp_deps(),
 ) -> CallToolResult:
     try:
         return _tool_result(
-            batch_check_payload(queries=queries, mode=mode, concurrency=concurrency, env=env),
+            batch_check_payload(queries=queries, mode=mode, concurrency=concurrency, env=env, deps=deps),
             is_error=False,
         )
     except Exception as error:
@@ -333,6 +341,7 @@ async def batch_resolve_tool_async(
     concurrency: int = 1,
     env: Mapping[str, str] | None = None,
     ctx: Context | None = None,
+    deps: MCPDeps = default_mcp_deps(),
 ) -> CallToolResult:
     from . import fetch_tool
 
@@ -344,7 +353,7 @@ async def batch_resolve_tool_async(
     total_queries = len(request.queries)
     await report_progress(ctx, 0, total_queries, "Starting batch_resolve")
 
-    runtime_env = build_runtime_env(env)
+    runtime_env = deps.build_runtime_env(env)
     cancelled = threading.Event()
     runtime_context = RuntimeContext(env=runtime_env, cancel_check=cancelled.is_set)
     loop = asyncio.get_running_loop()
@@ -356,7 +365,7 @@ async def batch_resolve_tool_async(
         results, abort_reason = await _run_batch_async(
             queries=request.queries,
             concurrency=request.concurrency,
-            process_item=lambda query: fetch_tool.resolve_paper_payload(query=query, context=runtime_context),
+            process_item=lambda query: fetch_tool.resolve_paper_payload(query=query, context=runtime_context, deps=deps),
             ctx=ctx,
             progress_prefix="Resolved",
             cancel_event=cancelled,
@@ -389,6 +398,7 @@ async def batch_check_tool_async(
     concurrency: int = 1,
     env: Mapping[str, str] | None = None,
     ctx: Context | None = None,
+    deps: MCPDeps = default_mcp_deps(),
 ) -> CallToolResult:
     try:
         request = BatchCheckRequest(queries=queries, mode=mode, concurrency=concurrency)
@@ -398,7 +408,7 @@ async def batch_check_tool_async(
     total_queries = len(request.queries)
     await report_progress(ctx, 0, total_queries, "Starting batch_check")
 
-    runtime_env = build_runtime_env(env)
+    runtime_env = deps.build_runtime_env(env)
     cancelled = threading.Event()
     runtime_context = RuntimeContext(env=runtime_env, download_dir=None, cancel_check=cancelled.is_set)
     runtime_context.get_clients()
@@ -417,6 +427,7 @@ async def batch_check_tool_async(
                 mode=request.mode,
                 context=runtime_context,
                 requested_modes=requested_modes,
+                deps=deps,
             ),
             ctx=ctx,
             progress_prefix="Checked",

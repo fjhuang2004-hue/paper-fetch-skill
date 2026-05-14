@@ -16,8 +16,9 @@ from mcp.server.fastmcp.resources import FileResource, FunctionResource
 from mcp.shared.message import SessionMessage
 from mcp.types import CallToolResult, ToolAnnotations
 
-from ..config import build_runtime_env, resolve_mcp_download_dir
 from ._instructions import fetch_tool_description, server_instructions
+from ._deps import MCPDeps, default_mcp_deps
+from .batch import batch_check_tool_async, batch_resolve_tool_async
 from .cache_index import (
     CACHE_INDEX_RESOURCE_URI,
     CACHED_RESOURCE_TEMPLATE,
@@ -30,6 +31,8 @@ from .cache_index import (
     scoped_cached_resource_uri,
     scoped_cached_resource_uri_prefix,
 )
+from .cache_payloads import cached_entry_payload, get_cached_tool, list_cached_payload, list_cached_tool
+from .fetch_tool import fetch_paper_tool_async, has_fulltext_tool, provider_status_tool, resolve_paper_tool
 from .output_schemas import (
     BatchCheckOutput,
     BatchResolveOutput,
@@ -43,18 +46,6 @@ from .output_schemas import (
 from .prompts import summarize_paper_prompt, verify_citation_list_prompt
 from .schemas import FetchStrategyInput
 from .server_compat import enable_resource_list_changed_capability, resource_registry, run_stdio_server
-from .tools import (
-    batch_check_tool_async,
-    batch_resolve_tool_async,
-    cached_entry_payload,
-    fetch_paper_tool_async,
-    has_fulltext_tool,
-    get_cached_tool,
-    list_cached_payload,
-    list_cached_tool,
-    provider_status_tool,
-    resolve_paper_tool,
-)
 
 
 _STDIO_SENTINEL = object()
@@ -113,8 +104,8 @@ async def _threaded_stdio_server():
             task_group.cancel_scope.cancel()
 
 
-def _default_download_dir() -> Path:
-    return resolve_mcp_download_dir(build_runtime_env())
+def _default_download_dir(*, deps: MCPDeps = default_mcp_deps()) -> Path:
+    return deps.resolve_mcp_download_dir(deps.build_runtime_env())
 
 
 def _parse_download_dir(download_dir: str | None) -> Path | None:
@@ -124,11 +115,15 @@ def _parse_download_dir(download_dir: str | None) -> Path | None:
     return Path(text).expanduser()
 
 
-def _cache_index_resource_payload(download_dir: Path | None = None) -> dict[str, object]:
+def _cache_index_resource_payload(
+    download_dir: Path | None = None,
+    *,
+    deps: MCPDeps = default_mcp_deps(),
+) -> dict[str, object]:
     tool_kwargs: dict[str, object] = {}
     if download_dir is not None:
         tool_kwargs["download_dir"] = download_dir
-    return list_cached_payload(**tool_kwargs)
+    return list_cached_payload(**tool_kwargs, deps=deps)
 
 
 def _read_only_annotations(*, open_world: bool) -> ToolAnnotations:
@@ -228,9 +223,14 @@ def _sync_cache_resources(
     return before_uris != after_uris
 
 
-def _sync_resources_for_download_dir(server: FastMCP, download_dir: Path | None) -> bool:
+def _sync_resources_for_download_dir(
+    server: FastMCP,
+    download_dir: Path | None,
+    *,
+    deps: MCPDeps = default_mcp_deps(),
+) -> bool:
     if download_dir is None:
-        return _sync_cache_resources(server, download_dir=_default_download_dir())
+        return _sync_cache_resources(server, download_dir=_default_download_dir(deps=deps))
     return _sync_cache_resources(server, download_dir=download_dir, scope_id=cache_scope_id(download_dir))
 
 
@@ -275,6 +275,7 @@ def _enable_resource_list_changed_capability(server: FastMCP) -> None:
 
 
 def build_server() -> FastMCP:
+    deps = default_mcp_deps()
     server = FastMCP(
         name="paper-fetch",
         instructions=server_instructions(),
@@ -282,9 +283,12 @@ def build_server() -> FastMCP:
     )
     _enable_resource_list_changed_capability(server)
 
+    def default_cache_index_resource_payload() -> dict[str, object]:
+        return _cache_index_resource_payload(deps=deps)
+
     server.add_resource(
         FunctionResource.from_function(
-            _cache_index_resource_payload,
+            default_cache_index_resource_payload,
             uri=CACHE_INDEX_RESOURCE_URI,
             name="cache_index",
             description="JSON index of cached MCP downloads in the default shared download directory.",
@@ -299,7 +303,7 @@ def build_server() -> FastMCP:
         mime_type="application/octet-stream",
     )
     def cached_entry_resource(entry_id: str) -> str | bytes:
-        entry = cached_entry_payload(entry_id=entry_id)
+        entry = cached_entry_payload(entry_id=entry_id, deps=deps)
         if entry is None:
             raise FileNotFoundError(f"Unknown cached entry: {entry_id}")
         path = Path(str(entry["path"]))
@@ -307,7 +311,7 @@ def build_server() -> FastMCP:
             return path.read_text(encoding="utf-8")
         return path.read_bytes()
 
-    _sync_resources_for_download_dir(server, None)
+    _sync_resources_for_download_dir(server, None, deps=deps)
 
     @server.prompt(
         name="summarize_paper",
@@ -340,6 +344,7 @@ def build_server() -> FastMCP:
             title=title,
             authors=authors,
             year=year,
+            deps=deps,
         )
 
     @server.tool(
@@ -349,7 +354,7 @@ def build_server() -> FastMCP:
         structured_output=True,
     )
     def has_fulltext(query: str) -> Annotated[CallToolResult, HasFulltextOutput]:
-        return has_fulltext_tool(query=query)
+        return has_fulltext_tool(query=query, deps=deps)
 
     @server.tool(
         name="fetch_paper",
@@ -390,6 +395,7 @@ def build_server() -> FastMCP:
             ),
             markdown_filename=markdown_filename,
             ctx=ctx,
+            deps=deps,
             **tool_kwargs,
         )
         if not result.isError:
@@ -401,7 +407,7 @@ def build_server() -> FastMCP:
                 markdown_saved=bool(result.structuredContent.get("saved_markdown_path")),
                 parsed_markdown_output_dir=parsed_markdown_output_dir,
             ):
-                resources_changed = _sync_resources_for_download_dir(server, sync_dir) or resources_changed
+                resources_changed = _sync_resources_for_download_dir(server, sync_dir, deps=deps) or resources_changed
             if resources_changed:
                 await _notify_resource_list_changed(ctx)
         return result
@@ -420,9 +426,9 @@ def build_server() -> FastMCP:
         tool_kwargs: dict[str, object] = {}
         if parsed_download_dir is not None:
             tool_kwargs["download_dir"] = parsed_download_dir
-        result = list_cached_tool(**tool_kwargs)
+        result = list_cached_tool(**tool_kwargs, deps=deps)
         if not result.isError:
-            resources_changed = _sync_resources_for_download_dir(server, parsed_download_dir)
+            resources_changed = _sync_resources_for_download_dir(server, parsed_download_dir, deps=deps)
             if resources_changed:
                 await _notify_resource_list_changed(ctx)
         return result
@@ -442,9 +448,9 @@ def build_server() -> FastMCP:
         tool_kwargs: dict[str, object] = {}
         if parsed_download_dir is not None:
             tool_kwargs["download_dir"] = parsed_download_dir
-        result = get_cached_tool(doi=doi, **tool_kwargs)
+        result = get_cached_tool(doi=doi, **tool_kwargs, deps=deps)
         if not result.isError:
-            resources_changed = _sync_resources_for_download_dir(server, parsed_download_dir)
+            resources_changed = _sync_resources_for_download_dir(server, parsed_download_dir, deps=deps)
             if resources_changed:
                 await _notify_resource_list_changed(ctx)
         return result
@@ -460,7 +466,7 @@ def build_server() -> FastMCP:
         concurrency: int = 1,
         ctx: Context | None = None,
     ) -> Annotated[CallToolResult, BatchResolveOutput]:
-        return await batch_resolve_tool_async(queries=queries, concurrency=concurrency, ctx=ctx)
+        return await batch_resolve_tool_async(queries=queries, concurrency=concurrency, ctx=ctx, deps=deps)
 
     @server.tool(
         name="batch_check",
@@ -477,7 +483,7 @@ def build_server() -> FastMCP:
         concurrency: int = 1,
         ctx: Context | None = None,
     ) -> Annotated[CallToolResult, BatchCheckOutput]:
-        return await batch_check_tool_async(queries=queries, mode=mode, concurrency=concurrency, ctx=ctx)
+        return await batch_check_tool_async(queries=queries, mode=mode, concurrency=concurrency, ctx=ctx, deps=deps)
 
     @server.tool(
         name="provider_status",
@@ -486,7 +492,7 @@ def build_server() -> FastMCP:
         structured_output=True,
     )
     def provider_status() -> Annotated[CallToolResult, ProviderStatusOutput]:
-        return provider_status_tool()
+        return provider_status_tool(deps=deps)
 
     return server
 

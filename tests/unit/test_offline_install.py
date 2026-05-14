@@ -771,7 +771,7 @@ class OfflineInstallTests(unittest.TestCase):
         self.assertIn("provider_status_payload", script)
         self.assertIn("manager.chromium.executable_path", script)
         self.assertIn("assert root in executable.parents", script)
-        self.assertIn("paper_fetch.mcp.tools", script)
+        self.assertIn("paper_fetch.mcp.fetch_tool", script)
 
     def test_windows_uninstaller_removes_managed_skills_path_and_mcp(self) -> None:
         script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")

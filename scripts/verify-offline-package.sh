@@ -96,7 +96,7 @@ texmath --help >/dev/null
 
 log "Verifying provider_status payload entrypoint"
 python - <<'PY'
-from paper_fetch.mcp.tools import provider_status_payload
+from paper_fetch.mcp.fetch_tool import provider_status_payload
 
 payload = provider_status_payload()
 assert "providers" in payload, payload

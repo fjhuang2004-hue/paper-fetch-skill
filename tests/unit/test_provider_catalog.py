@@ -49,7 +49,7 @@ from paper_fetch.quality.issues import EXPECTED_FULLTEXT_SOURCES_BY_PROVIDER
 from paper_fetch.models.schema import SourceKind
 from paper_fetch.providers import _pdf_candidates, html_springer_nature
 from paper_fetch import utils
-from paper_fetch.mcp import tools as mcp_tools
+from paper_fetch.mcp.fetch_tool import _PROVIDER_STATUS_ORDER
 from paper_fetch.providers.registry import build_clients
 from paper_fetch.workflow import fulltext, routing
 
@@ -138,8 +138,8 @@ class ProviderCatalogTests(unittest.TestCase):
             fulltext.PROVIDER_MANAGED_ABSTRACT_ONLY_PROVIDERS,
             provider_managed_abstract_only_names(),
         )
-        self.assertEqual(mcp_tools._PROVIDER_STATUS_ORDER, provider_names())
-        self.assertEqual(mcp_tools._PROVIDER_STATUS_ORDER, provider_status_order())
+        self.assertEqual(_PROVIDER_STATUS_ORDER, provider_names())
+        self.assertEqual(_PROVIDER_STATUS_ORDER, provider_status_order())
 
     def test_provider_display_name_helper_wraps_catalog(self) -> None:
         for name, display_name in provider_display_names().items():

@@ -26,12 +26,15 @@ SERVER_SCRIPT = textwrap.dedent(
     from pathlib import Path
 
     from paper_fetch.models import ArticleModel, Asset, FetchEnvelope, Metadata, Quality, Section, TokenEstimateBreakdown
+    from dataclasses import replace
+
+    from paper_fetch.mcp import server as mcp_server
+    from paper_fetch.mcp._deps import default_mcp_deps
     from paper_fetch.mcp.server import main
     from paper_fetch.providers.base import ProviderStatusResult, build_provider_status_check
     from paper_fetch.resolve.query import ResolvedQuery
     from paper_fetch.service import HasFulltextProbeResult
     from paper_fetch.utils import sanitize_filename
-    import paper_fetch.mcp.tools as tools
 
     def fake_resolve(query, *, context=None):
         return ResolvedQuery(
@@ -307,10 +310,16 @@ SERVER_SCRIPT = textwrap.dedent(
             ),
         }
 
-    tools.service_resolve_paper = fake_resolve
-    tools.service_fetch_paper = fake_fetch
-    tools.service_probe_has_fulltext = fake_probe
-    tools.build_clients = fake_build_clients
+    def fake_default_mcp_deps():
+        return replace(
+            default_mcp_deps(),
+            service_resolve_paper=fake_resolve,
+            service_fetch_paper=fake_fetch,
+            service_probe_has_fulltext=fake_probe,
+            build_clients=fake_build_clients,
+        )
+
+    mcp_server.default_mcp_deps = fake_default_mcp_deps
     main()
     """
 )
