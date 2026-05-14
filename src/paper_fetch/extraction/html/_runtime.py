@@ -39,6 +39,7 @@ from ...extraction.html.semantics import (
     match_next_html_section_hint,
     parse_markdown_heading,
 )
+from ...extraction.html.section_scan import SectionScanState
 from ...extraction.html.signals import (
     contains_access_gate_text,
 )
@@ -611,13 +612,19 @@ def _filtered_body_blocks(
     abstract_blocks: list[str] = []
     body_heading_count = 0
     body_block_count = 0
-    in_abstract = False
-    in_back_matter = False
-    in_front_matter = False
-    in_data_availability = False
-    in_auxiliary = False
+    state = SectionScanState(
+        enabled_states=frozenset(
+            {
+                "body",
+                "abstract",
+                "back_matter",
+                "front_matter",
+                "data_availability",
+                "auxiliary",
+            }
+        )
+    )
     in_formula = False
-    saw_abstract_heading = False
     section_hint_index = 0
 
     for block in blocks:
@@ -638,47 +645,17 @@ def _filtered_body_blocks(
                 if matched_hint is not None
                 else None,
             )
-            if category == "abstract":
-                in_abstract = True
-                in_back_matter = False
-                in_front_matter = False
-                in_data_availability = False
-                in_auxiliary = False
-                saw_abstract_heading = True
+            if category in {
+                "abstract",
+                "auxiliary",
+                "front_matter",
+                "references_or_back_matter",
+                "data_availability",
+                "code_availability",
+            }:
+                state.transition(category, is_heading=True)
                 continue
-            if category == "auxiliary":
-                in_auxiliary = True
-                in_abstract = False
-                in_back_matter = False
-                in_front_matter = False
-                in_data_availability = False
-                continue
-            if category == "front_matter":
-                in_front_matter = True
-                in_abstract = False
-                in_back_matter = False
-                in_data_availability = False
-                in_auxiliary = False
-                continue
-            if category == "references_or_back_matter":
-                in_back_matter = True
-                in_abstract = False
-                in_front_matter = False
-                in_data_availability = False
-                in_auxiliary = False
-                continue
-            if category in {"data_availability", "code_availability"}:
-                in_abstract = False
-                in_back_matter = False
-                in_front_matter = False
-                in_data_availability = True
-                in_auxiliary = False
-                continue
-            in_abstract = False
-            in_back_matter = False
-            in_front_matter = False
-            in_data_availability = False
-            in_auxiliary = False
+            state.transition("body_heading", is_heading=True)
             filtered_blocks.append(block)
             body_heading_count += 1
             continue
@@ -688,17 +665,11 @@ def _filtered_body_blocks(
         if normalized_block == "$$":
             in_formula = not in_formula
             continue
-        if in_abstract:
+        if state.in_abstract:
             if normalized_block:
                 abstract_blocks.append(normalized_block)
             continue
-        if (
-            in_back_matter
-            or in_front_matter
-            or in_data_availability
-            or in_auxiliary
-            or in_formula
-        ):
+        if state.in_skipped_section() or in_formula:
             continue
         if (
             _looks_like_access_block(normalized_block, rules=cleanup_rules)
@@ -730,7 +701,7 @@ def _filtered_body_blocks(
         "abstract_text": abstract_text,
         "body_heading_count": body_heading_count,
         "body_block_count": body_block_count,
-        "has_abstract": bool(saw_abstract_heading or abstract_text),
+        "has_abstract": bool(state.abstract_seen or abstract_text),
     }
 
 

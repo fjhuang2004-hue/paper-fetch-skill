@@ -10,6 +10,7 @@ from ...extraction.html.figure_links import (
     rewrite_inline_figure_links as _rewrite_inline_figure_links,
 )
 from ...extraction.html.language import collect_html_abstract_blocks
+from ...extraction.html.section_scan import SectionScanState
 from ...extraction.html.semantics import normalize_heading, node_source_selector
 from ...extraction.html.shared import short_text as _short_text
 from ...extraction.html.tables import inject_inline_table_blocks
@@ -333,10 +334,7 @@ def _postprocess_browser_workflow_markdown(
     known_abstract_blocks = [normalize_text(text) for text in abstract_block_texts or [] if normalize_text(text)]
     title_kept = False
     started_content = False
-    in_front_matter = False
-    in_abstract = False
-    in_back_matter = False
-    in_data_availability = False
+    state = SectionScanState()
     abstract_prose_blocks_seen = 0
 
     for block in blocks:
@@ -348,10 +346,7 @@ def _postprocess_browser_workflow_markdown(
                 if not title_kept:
                     kept.append(f"# {normalized_title}")
                     title_kept = True
-                in_front_matter = False
-                in_abstract = False
-                in_back_matter = False
-                in_data_availability = False
+                state.transition("front_matter", is_heading=False)
                 abstract_prose_blocks_seen = 0
                 continue
 
@@ -372,19 +367,16 @@ def _postprocess_browser_workflow_markdown(
             if override_category:
                 category = override_category
             if category == "front_matter":
-                in_front_matter = True
-                in_abstract = False
-                in_back_matter = False
-                in_data_availability = False
+                state.transition(category, is_heading=True)
                 abstract_prose_blocks_seen = 0
                 continue
             if category in {"references_or_back_matter", "ancillary"}:
                 if category == "ancillary" and started_content:
                     break
-                in_front_matter = False
-                in_abstract = False
-                in_back_matter = category == "references_or_back_matter"
-                in_data_availability = False
+                if category == "ancillary":
+                    state.transition("front_matter", is_heading=False)
+                else:
+                    state.transition(category, is_heading=True)
                 abstract_prose_blocks_seen = 0
                 continue
             if category == "abstract":
@@ -393,10 +385,7 @@ def _postprocess_browser_workflow_markdown(
                     title_kept = True
                 kept.append(block)
                 started_content = True
-                in_front_matter = False
-                in_abstract = True
-                in_back_matter = False
-                in_data_availability = False
+                state.transition(category, is_heading=True)
                 abstract_prose_blocks_seen = 0
                 continue
             if category in {"data_availability", "code_availability"}:
@@ -406,10 +395,7 @@ def _postprocess_browser_workflow_markdown(
                 cleaned_heading = _strip_heading_terminal_punctuation(heading_text)
                 kept.append(f"{'#' * level} {cleaned_heading}")
                 started_content = True
-                in_front_matter = False
-                in_abstract = False
-                in_back_matter = False
-                in_data_availability = True
+                state.transition(category, is_heading=True)
                 abstract_prose_blocks_seen = 0
                 continue
             if category == "body_heading":
@@ -419,10 +405,7 @@ def _postprocess_browser_workflow_markdown(
                 cleaned_heading = _strip_heading_terminal_punctuation(heading_text)
                 kept.append(f"{'#' * level} {cleaned_heading}")
                 started_content = True
-                in_front_matter = False
-                in_abstract = False
-                in_back_matter = False
-                in_data_availability = False
+                state.transition(category, is_heading=True)
                 abstract_prose_blocks_seen = 0
                 continue
 
@@ -434,9 +417,9 @@ def _postprocess_browser_workflow_markdown(
             if started_content:
                 break
             continue
-        if in_front_matter:
+        if state.in_front_matter:
             continue
-        if in_abstract:
+        if state.in_abstract:
             if (
                 known_abstract_blocks
                 and _is_substantial_prose(normalized_block)
@@ -462,7 +445,7 @@ def _postprocess_browser_workflow_markdown(
                     abstract_prose_blocks_seen += 1
                     continue
                 kept.append("## Main Text")
-                in_abstract = False
+                state.transition("body_heading", is_heading=True)
                 abstract_prose_blocks_seen = 0
             else:
                 if not title_kept and normalized_title:
@@ -473,9 +456,9 @@ def _postprocess_browser_workflow_markdown(
                 if _is_substantial_prose(normalized_block) and not is_auxiliary_block:
                     abstract_prose_blocks_seen += 1
                 continue
-        if in_back_matter:
+        if state.in_back_matter:
             continue
-        if in_data_availability:
+        if state.in_data_availability:
             if not title_kept and normalized_title:
                 kept.insert(0, f"# {normalized_title}")
                 title_kept = True

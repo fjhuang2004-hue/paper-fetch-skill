@@ -16,6 +16,7 @@ from ..extraction.html.provider_rules import (
     cleanup_policy_for_profile,
     front_matter_footer_prefixes,
 )
+from ..extraction.html.section_scan import SectionScanState
 from ..extraction.html.signals import (
     CHALLENGE_PATTERNS,
     contains_access_gate_text,
@@ -668,14 +669,7 @@ def _analyze_html_structure(
     blocks = iter_html_blocks(container)
     body_chunks: list[str] = []
     normalized_title_heading = normalize_heading(title or "")
-    in_abstract = False
-    in_back_matter = False
-    in_front_matter = False
-    in_data_availability = False
-    abstract_seen = False
-    body_heading_after_abstract = False
-    current_run_paragraphs = 0
-    current_run_chars = 0
+    state = SectionScanState()
 
     for block in blocks:
         if block["kind"] == "marker":
@@ -687,13 +681,8 @@ def _analyze_html_structure(
         access_gate_markers = matched_access_gate_patterns(text)
         if block["kind"] == "heading":
             if normalized_title_heading and normalize_heading(text) == normalized_title_heading:
-                in_abstract = False
-                in_back_matter = False
-                in_front_matter = False
-                in_data_availability = False
-                if current_run_paragraphs:
-                    current_run_paragraphs = 0
-                    current_run_chars = 0
+                state.transition("front_matter", is_heading=False)
+                state.reset_body_run()
                 continue
             category = heading_category(normalize_text(node.name or "").lower(), text, title=title)
         elif block["kind"] == "figure_or_table":
@@ -703,10 +692,10 @@ def _analyze_html_structure(
                 node,
                 text,
                 title=title,
-                in_back_matter=in_back_matter,
-                in_front_matter=in_front_matter,
-                in_abstract=in_abstract,
-                in_data_availability=in_data_availability,
+                in_back_matter=state.in_back_matter,
+                in_front_matter=state.in_front_matter,
+                in_abstract=state.in_abstract,
+                in_data_availability=state.in_data_availability,
                 looks_like_front_matter_paragraph=lambda value: _looks_like_front_matter_paragraph(value, title=title),
                 is_substantial_prose=_is_substantial_prose,
                 looks_like_access_gate_text=_looks_like_access_gate_text,
@@ -715,76 +704,41 @@ def _analyze_html_structure(
             analysis.access_gate_markers.extend(access_gate_markers)
 
         if category == "abstract":
-            abstract_seen = True
-            in_abstract = True
-            in_back_matter = False
-            in_front_matter = False
-            in_data_availability = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=block["kind"] == "heading")
+            state.reset_body_run()
             continue
         if category == "references_or_back_matter":
-            in_back_matter = True
-            in_abstract = False
-            in_front_matter = False
-            in_data_availability = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=block["kind"] == "heading")
+            state.reset_body_run()
             continue
         if category in {"data_availability", "code_availability"}:
-            in_data_availability = True
-            in_abstract = False
-            in_back_matter = False
-            in_front_matter = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=block["kind"] == "heading")
+            state.reset_body_run()
             continue
         if category == "front_matter":
-            in_front_matter = block["kind"] == "heading"
-            in_abstract = False
-            in_back_matter = False
-            in_data_availability = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=block["kind"] == "heading")
+            state.reset_body_run()
             continue
         if category == "ancillary":
-            in_front_matter = False
-            in_data_availability = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=block["kind"] == "heading")
+            state.reset_body_run()
             continue
         if category == "body_heading":
-            in_abstract = False
-            in_back_matter = False
-            in_front_matter = False
-            in_data_availability = False
-            if abstract_seen:
-                body_heading_after_abstract = True
+            state.transition(category, is_heading=block["kind"] == "heading")
             continue
         if category == "figure_or_table":
             continue
         if category != "body_paragraph":
             if _run_candidate_barrier(category):
-                current_run_paragraphs = 0
-                current_run_chars = 0
+                state.reset_body_run()
             continue
 
-        in_abstract = False
-        in_back_matter = False
-        in_front_matter = False
-        in_data_availability = False
-        analysis.body_paragraph_count += 1
         body_chunks.append(text)
-        current_run_paragraphs += 1
-        current_run_chars += len(normalize_text(text))
-        analysis.body_run_paragraph_count = max(analysis.body_run_paragraph_count, current_run_paragraphs)
-        analysis.body_run_char_count = max(analysis.body_run_char_count, current_run_chars)
-        if abstract_seen and body_heading_after_abstract:
+        state.record_body_paragraph(text_len=len(normalize_text(text)))
+        analysis.body_paragraph_count = state.body_paragraph_count
+        analysis.body_run_paragraph_count = state.body_run_paragraph_count
+        analysis.body_run_char_count = state.body_run_char_count
+        if state.abstract_seen and state.body_heading_after_abstract:
             analysis.post_abstract_body_run = True
 
     analysis.body_candidate_text = "\n\n".join(body_chunks)
@@ -819,14 +773,7 @@ def _analyze_markdown_structure(
     blocks = [normalize_text(block) for block in re.split(r"\n\s*\n", markdown_text) if normalize_text(block)]
     normalized_title_heading = normalize_heading(title or "")
     coerced_section_hints = coerce_html_section_hints(section_hints)
-    in_abstract = False
-    in_back_matter = False
-    in_front_matter = False
-    in_data_availability = False
-    abstract_seen = False
-    body_heading_after_abstract = False
-    current_run_paragraphs = 0
-    current_run_chars = 0
+    state = SectionScanState()
     body_chunks: list[str] = []
     section_hint_index = 0
 
@@ -839,12 +786,8 @@ def _analyze_markdown_structure(
             heading = normalize_text(match.group(2) if match else stripped)
             level = len(match.group(1)) if match else 2
             if normalized_title_heading and normalize_heading(heading) == normalized_title_heading:
-                in_abstract = False
-                in_back_matter = False
-                in_front_matter = False
-                in_data_availability = False
-                current_run_paragraphs = 0
-                current_run_chars = 0
+                state.transition("front_matter", is_heading=False)
+                state.reset_body_run()
                 continue
             matched_hint, next_hint_index = match_next_html_section_hint(coerced_section_hints, section_hint_index, heading)
             if matched_hint is not None:
@@ -854,13 +797,13 @@ def _analyze_markdown_structure(
                 category = heading_category(f"h{min(level, 6)}", heading, title=title)
         else:
             category = "body_paragraph" if _is_substantial_prose(block) and not _looks_like_front_matter_paragraph(block, title=title) else "front_matter"
-            if in_back_matter:
+            if state.in_back_matter:
                 category = "references_or_back_matter"
-            elif in_front_matter:
+            elif state.in_front_matter:
                 category = "front_matter"
-            elif in_data_availability:
+            elif state.in_data_availability:
                 category = "data_availability"
-            elif in_abstract:
+            elif state.in_abstract:
                 category = "abstract"
             elif _looks_like_access_gate_text(block):
                 category = "ancillary"
@@ -868,68 +811,37 @@ def _analyze_markdown_structure(
             analysis.access_gate_markers.extend(access_gate_markers)
 
         if category == "abstract":
-            abstract_seen = True
-            in_abstract = True
-            in_back_matter = False
-            in_front_matter = False
-            in_data_availability = False
-            current_run_paragraphs = 0
-            current_run_chars = 0
+            state.transition(category, is_heading=is_heading)
+            state.reset_body_run()
             continue
         if category == "references_or_back_matter":
-            in_back_matter = True
-            in_abstract = False
-            in_front_matter = False
-            in_data_availability = False
-            current_run_paragraphs = 0
-            current_run_chars = 0
+            state.transition(category, is_heading=is_heading)
+            state.reset_body_run()
             continue
         if category in {"data_availability", "code_availability"}:
-            in_data_availability = True
-            in_abstract = False
-            in_back_matter = False
-            in_front_matter = False
-            current_run_paragraphs = 0
-            current_run_chars = 0
+            state.transition(category, is_heading=is_heading)
+            state.reset_body_run()
             continue
         if category == "front_matter":
-            in_front_matter = is_heading
-            in_abstract = False
-            in_back_matter = False
-            in_data_availability = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=is_heading)
+            state.reset_body_run()
             continue
         if category == "ancillary":
-            in_front_matter = False
-            in_data_availability = False
-            if current_run_paragraphs:
-                current_run_paragraphs = 0
-                current_run_chars = 0
+            state.transition(category, is_heading=is_heading)
+            state.reset_body_run()
             continue
         if category == "body_heading":
-            in_abstract = False
-            in_back_matter = False
-            in_front_matter = False
-            in_data_availability = False
-            if abstract_seen:
-                body_heading_after_abstract = True
+            state.transition(category, is_heading=is_heading)
             continue
         if category != "body_paragraph":
             continue
 
-        in_abstract = False
-        in_back_matter = False
-        in_front_matter = False
-        in_data_availability = False
-        analysis.body_paragraph_count += 1
         body_chunks.append(block)
-        current_run_paragraphs += 1
-        current_run_chars += len(normalize_text(block))
-        analysis.body_run_paragraph_count = max(analysis.body_run_paragraph_count, current_run_paragraphs)
-        analysis.body_run_char_count = max(analysis.body_run_char_count, current_run_chars)
-        if abstract_seen and body_heading_after_abstract:
+        state.record_body_paragraph(text_len=len(normalize_text(block)))
+        analysis.body_paragraph_count = state.body_paragraph_count
+        analysis.body_run_paragraph_count = state.body_run_paragraph_count
+        analysis.body_run_char_count = state.body_run_char_count
+        if state.abstract_seen and state.body_heading_after_abstract:
             analysis.post_abstract_body_run = True
 
     analysis.body_candidate_text = "\n\n".join(body_chunks)
