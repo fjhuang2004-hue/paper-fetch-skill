@@ -76,3 +76,41 @@ Forbidden paths include:
 - shared onboarding docs
 
 Coordinator must treat any forbidden write as `WORKER_MODIFIED_FORBIDDEN_FILE` and discard that worker result before retrying.
+
+## scaffold/from-manifest
+
+`scaffold` worker 必须把已校验的 provider manifest 作为唯一 provider 输入源。Brief 必须包含：
+
+```yaml
+task_id: mdpi-scaffold
+current_step: scaffold
+runtime: coding-agent-subagent
+input_manifest: docs/ai-onboarding/manifests/mdpi.yml
+schema: docs/ai-onboarding/provider-manifest.schema.json
+scaffold_command:
+  - python3
+  - scripts/scaffold_provider.py
+  - --from-manifest
+  - docs/ai-onboarding/manifests/mdpi.yml
+files_allowed_to_modify:
+  - src/paper_fetch/providers/_mdpi_html.py
+  - src/paper_fetch/providers/mdpi.py
+  - tests/unit/test_mdpi_provider.py
+  - tests/fixtures/golden_criteria/
+  - tests/fixtures/golden_criteria/manifest.json
+  - docs/ai-onboarding/capture-commands/mdpi.txt
+  - docs/providers.md
+  - docs/extraction-rules.md
+  - CHANGELOG.md
+files_must_not_modify:
+  - docs/ai-onboarding/manifests/mdpi.yml
+no_commit: true
+```
+
+### scaffold/from-manifest Rules
+
+- `input_manifest` 必须等于传给 `scripts/scaffold_provider.py --from-manifest` 的路径。
+- `--from-manifest` 不能和 legacy scaffold 输入混用，包括 `--name`、`--doi`、`--source`、`--fulltext-client` 或 `--html-capable`。
+- Worker 不得修改 `input_manifest`；schema 修复属于 `discover-manifest`。
+- 命令 stdout 是 JSON artifact summary。Coordinator 应记录其中的 `generated_files` 和 `docs_files`。
+- 如果 scaffold 以 `MANIFEST_SCHEMA_INVALID` 退出，coordinator 应把 JSON stderr 回派给 manifest repair，而不是要求 scaffold patch manifest。

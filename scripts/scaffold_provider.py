@@ -4,7 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
@@ -13,6 +16,46 @@ PROVIDERS_MATRIX_MARKER = "<!-- SCAFFOLD: providers-capability-matrix -->"
 PROVIDERS_DETAILS_MARKER = "<!-- SCAFFOLD: provider-docs -->"
 EXTRACTION_RULES_MARKER = "<!-- SCAFFOLD: extraction-rules-unstable-doi -->"
 CHANGELOG_UNRELEASED_MARKER = "<!-- SCAFFOLD: changelog-unreleased -->"
+MANIFEST_SCHEMA_INVALID = "MANIFEST_SCHEMA_INVALID"
+
+
+@dataclass(frozen=True)
+class FixtureSample:
+    purpose: str
+    doi: str
+
+
+@dataclass(frozen=True)
+class ScaffoldInput:
+    name: str
+    doi: str
+    source: str
+    fulltext_client: bool
+    html_capable: bool
+    display_name: str | None = None
+    domains: tuple[str, ...] = ()
+    doi_prefixes: tuple[str, ...] = ()
+    domain_suffixes: tuple[str, ...] = ()
+    publisher_aliases: tuple[str, ...] = ()
+    asset_default: str = "none"
+    asset_profile_none: tuple[str, ...] = ()
+    asset_profile_body: tuple[str, ...] = ()
+    asset_profile_all: tuple[str, ...] = ()
+    env_requirements: tuple[str, ...] = ()
+    requires_playwright: bool = False
+    requires_flaresolverr: bool = False
+    provider_managed_abstract_only: bool = False
+    waterfall_steps: tuple[str, ...] = ("landing", "html", "xml", "pdf")
+    fixture_samples: tuple[FixtureSample, ...] = ()
+    skipped_fixture_purposes: tuple[str, ...] = ()
+    docs_providers_md_capability_row: str | None = None
+    docs_changelog_summary: str | None = None
+    docs_extraction_rules_summary: str | None = None
+    manifest_path: Path | None = None
+
+
+class ManifestSchemaError(ValueError):
+    pass
 
 
 def _repo_root() -> Path:
@@ -34,6 +77,24 @@ def _parse_html_capable(value: str) -> bool:
     if normalized in {"0", "false", "no"}:
         return False
     raise argparse.ArgumentTypeError("--html-capable must be true or false")
+
+
+def _format_py_string(value: str) -> str:
+    return json.dumps(value)
+
+
+def _format_py_tuple(values: tuple[str, ...] | list[str]) -> str:
+    normalized = tuple(str(value) for value in values)
+    if not normalized:
+        return "()"
+    rendered = ", ".join(_format_py_string(value) for value in normalized)
+    if len(normalized) == 1:
+        rendered += ","
+    return f"({rendered})"
+
+
+def _step_function_name(name: str, step: str) -> str:
+    return f"{name}_fetch_{step}_step"
 
 
 def _write_new(path: Path, content: str = "") -> None:
@@ -155,39 +216,171 @@ def _load_manifest(path: Path) -> dict[str, object]:
     return manifest
 
 
+def _load_provider_manifest(path: Path) -> dict[str, Any]:
+    try:
+        import yaml
+        from jsonschema import Draft202012Validator
+    except ImportError as exc:
+        raise ManifestSchemaError(f"manifest validation dependency is missing: {exc}") from exc
+
+    try:
+        manifest = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise ManifestSchemaError(str(exc)) from exc
+    except yaml.YAMLError as exc:
+        raise ManifestSchemaError(f"manifest YAML is invalid: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise ManifestSchemaError("manifest root must be an object")
+
+    schema_path = _repo_root() / "docs" / "ai-onboarding" / "provider-manifest.schema.json"
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ManifestSchemaError(f"provider manifest schema cannot be loaded: {exc}") from exc
+
+    validator = Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(manifest), key=lambda error: list(error.path))
+    if errors:
+        error = errors[0]
+        path_text = ".".join(str(part) for part in error.path)
+        prefix = f"{path_text}: " if path_text else ""
+        raise ManifestSchemaError(f"{prefix}{error.message}") from None
+    return manifest
+
+
+def _asset_default_from_manifest(asset_profile: dict[str, Any]) -> str:
+    if asset_profile.get("body"):
+        return "body"
+    if asset_profile.get("all"):
+        return "all"
+    return "none"
+
+
+def _fixture_samples_from_manifest(
+    fixtures: dict[str, Any],
+) -> tuple[tuple[FixtureSample, ...], tuple[str, ...]]:
+    samples: list[FixtureSample] = []
+    skipped: list[str] = []
+    doi_samples = fixtures.get("doi_samples", {})
+    if not isinstance(doi_samples, dict):
+        return (), ()
+    for purpose, sample in doi_samples.items():
+        doi = sample.get("doi") if isinstance(sample, dict) else None
+        if doi:
+            samples.append(FixtureSample(purpose=str(purpose), doi=str(doi)))
+        else:
+            skipped.append(str(purpose))
+    return tuple(samples), tuple(skipped)
+
+
+def _scaffold_input_from_manifest(manifest_path: Path) -> ScaffoldInput:
+    manifest = _load_provider_manifest(manifest_path)
+    name = str(manifest["name"])
+    display_source = str(manifest["display_source"])
+    routing = manifest["routing"]
+    asset_profile = manifest["asset_profile"]
+    probe = manifest["probe"]
+    docs = manifest["docs"]
+    main_path = tuple(str(step) for step in manifest["main_path"])
+    fixture_samples, skipped_purposes = _fixture_samples_from_manifest(
+        manifest["fixtures"]
+    )
+    placeholder_doi = next((sample.doi for sample in fixture_samples), None)
+    if placeholder_doi is None:
+        raise ManifestSchemaError("fixtures.doi_samples must contain at least one DOI")
+
+    return ScaffoldInput(
+        name=name,
+        doi=placeholder_doi,
+        source=display_source,
+        fulltext_client=bool(main_path),
+        html_capable=any(step in {"landing_html", "article_html"} for step in main_path),
+        display_name=name.replace("_", " ").title(),
+        domains=tuple(str(value) for value in routing["domains"]),
+        doi_prefixes=tuple(str(value) for value in routing["doi_prefixes"]),
+        domain_suffixes=tuple(str(value) for value in routing["domain_suffixes"]),
+        publisher_aliases=tuple(str(value) for value in routing["publisher_aliases"]),
+        asset_default=_asset_default_from_manifest(asset_profile),
+        asset_profile_none=tuple(str(value) for value in asset_profile["none"]),
+        asset_profile_body=tuple(str(value) for value in asset_profile["body"]),
+        asset_profile_all=tuple(str(value) for value in asset_profile["all"]),
+        env_requirements=tuple(str(value) for value in probe["env_requirements"]),
+        requires_playwright=bool(probe["requires_playwright"]),
+        requires_flaresolverr=bool(probe["requires_flaresolverr"]),
+        provider_managed_abstract_only=(
+            manifest["abstract_only_strategy"] == "provider_managed"
+        ),
+        waterfall_steps=main_path,
+        fixture_samples=fixture_samples,
+        skipped_fixture_purposes=skipped_purposes,
+        docs_providers_md_capability_row=str(docs["providers_md_capability_row"]),
+        docs_changelog_summary=str(docs["changelog_summary"]),
+        docs_extraction_rules_summary=(
+            str(docs["extraction_rules_summary"])
+            if docs.get("extraction_rules_summary") is not None
+            else None
+        ),
+        manifest_path=manifest_path,
+    )
+
+
+def _legacy_scaffold_input(args: argparse.Namespace) -> ScaffoldInput:
+    source = args.source or args.name
+    return ScaffoldInput(
+        name=args.name,
+        doi=args.doi,
+        source=source,
+        fulltext_client=args.fulltext_client,
+        html_capable=True if args.html_capable is None else args.html_capable,
+        doi_prefixes=(args.doi.split("/", 1)[0] + "/",),
+        publisher_aliases=(source,),
+        fixture_samples=(FixtureSample(purpose="content", doi=args.doi),),
+    )
+
+
 def _html_module_content(
     *,
-    name: str,
-    doi: str,
-    source: str,
-    fulltext_client: bool,
-    html_capable: bool,
+    spec: ScaffoldInput,
 ) -> str:
+    name = spec.name
     display_name = name.replace("_", " ").title()
-    doi_prefix = doi.split("/", 1)[0] + "/"
     client_factory_path = (
-        f"paper_fetch.providers.{name}:{_class_name(name)}" if fulltext_client else ""
+        f"paper_fetch.providers.{name}:{_class_name(name)}" if spec.fulltext_client else ""
     )
     catalog_lines = [
         "        catalog=ProviderSpec(",
         f'            name="{name}",',
-        f'            display_name="{display_name}",',
+        f'            display_name="{spec.display_name or display_name}",',
         "            official=True,",
-        "            domains=(),",
-        f'            doi_prefixes=("{doi_prefix}",),',
-        f'            publisher_aliases=("{source}",),',
-        '            asset_default="none",',
+        f"            domains={_format_py_tuple(spec.domains)},",
+        f"            doi_prefixes={_format_py_tuple(spec.doi_prefixes)},",
+        f"            publisher_aliases={_format_py_tuple(spec.publisher_aliases)},",
+        f'            asset_default="{spec.asset_default}",',
         '            probe_capability="routing_signal",',
-        "            provider_managed_abstract_only=False,",
+        f"            provider_managed_abstract_only={spec.provider_managed_abstract_only},",
         f'            client_factory_path="{client_factory_path}",',
         "            status_order=999,",
     ]
-    if not html_capable:
+    if spec.domain_suffixes or spec.manifest_path is not None:
+        catalog_lines.append(
+            f"            domain_suffixes={_format_py_tuple(spec.domain_suffixes)},"
+        )
+    if spec.env_requirements or spec.manifest_path is not None:
+        catalog_lines.append(
+            f"            env_requirements={_format_py_tuple(spec.env_requirements)},"
+        )
+    if spec.requires_playwright or spec.manifest_path is not None:
+        catalog_lines.append(f"            requires_playwright={spec.requires_playwright},")
+    if spec.requires_flaresolverr or spec.manifest_path is not None:
+        catalog_lines.append(
+            f"            requires_flaresolverr={spec.requires_flaresolverr},"
+        )
+    if not spec.html_capable:
         catalog_lines.append("            html_capable=False,")
     catalog_lines.append("        ),")
 
     bundle_lines = [*catalog_lines]
-    if html_capable:
+    if spec.html_capable:
         bundle_lines.extend(
             [
                 "        html_rules=ProviderHtmlRules(",
@@ -199,7 +392,7 @@ def _html_module_content(
                 "        ),",
             ]
         )
-    bundle_lines.append(f'        sources=("{source}",),')
+    bundle_lines.append(f"        sources={_format_py_tuple((spec.source,))},")
 
     imports = [
         '"""Provider scaffold for TODO: fill provider-specific HTML extraction rules."""',
@@ -208,7 +401,7 @@ def _html_module_content(
         "",
         "from typing import Any",
     ]
-    if html_capable:
+    if spec.html_capable:
         imports.extend(
             [
                 "",
@@ -216,7 +409,7 @@ def _html_module_content(
                 "from ..extraction.html.provider_rules import ProviderHtmlRules",
             ]
         )
-    if fulltext_client:
+    if spec.fulltext_client:
         imports.extend(
             [
                 "from ..reason_codes import NOT_SUPPORTED",
@@ -231,6 +424,10 @@ def _html_module_content(
             "",
             "register_provider_bundle(",
             "    ProviderBundle(",
+            "        # asset_profile from manifest:",
+            f"        # none={_format_py_tuple(spec.asset_profile_none)},",
+            f"        # body={_format_py_tuple(spec.asset_profile_body)},",
+            f"        # all={_format_py_tuple(spec.asset_profile_all)},",
             *bundle_lines,
             "    )",
             ")",
@@ -249,37 +446,36 @@ def _html_module_content(
             "",
         ]
     )
-    if fulltext_client:
-        imports.extend(
-            [
-                "",
-                "",
-                f"def {name}_fetch_landing_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
-                "    del client, doi, metadata, context",
-                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} landing fallback is not implemented yet.")',
-                "",
-                "",
-                f"def {name}_fetch_html_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
-                "    del client, doi, metadata, context",
-                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} HTML fallback is not implemented yet.")',
-                "",
-                "",
-                f"def {name}_fetch_xml_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
-                "    del client, doi, metadata, context",
-                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} XML fallback is not implemented yet.")',
-                "",
-                "",
-                f"def {name}_fetch_pdf_step(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
-                "    del client, doi, metadata, context",
-                f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} PDF fallback is not implemented yet.")',
-                "",
-            ]
-        )
+    if spec.fulltext_client:
+        for step in spec.waterfall_steps:
+            imports.extend(
+                [
+                    "",
+                    "",
+                    f"def {_step_function_name(name, step)}(client: object, doi: str, metadata: dict[str, object], *, context: object | None = None):",
+                    "    del client, doi, metadata, context",
+                    f'    raise ProviderFailure(NOT_SUPPORTED, "{display_name} {step} fallback is not implemented yet.")',
+                    "",
+                ]
+            )
     return "\n".join(imports)
 
 
-def _client_module_content(name: str) -> str:
+def _client_module_content(name: str, waterfall_steps: tuple[str, ...]) -> str:
     class_name = _class_name(name)
+    step_lines: list[str] = []
+    for step in waterfall_steps:
+        step_lines.extend(
+            [
+                "        WaterfallStep(",
+                f'            label="{step}",',
+                f"            run=_provider_rules.{_step_function_name(name, step)},",
+                f'            failure_marker="fulltext:{name}_{step}_failed",',
+                f'            success_markers=("fulltext:{name}_{step}_ok",),',
+                "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
+                "        ),",
+            ]
+        )
     return "\n".join(
         [
             f'"""TODO: fill {name} full-text client implementation."""',
@@ -294,34 +490,7 @@ def _client_module_content(name: str) -> str:
             f"class {class_name}(ProviderClient):",
             f'    name = "{name}"',
             "    waterfall_steps = (",
-            "        WaterfallStep(",
-            '            label="landing",',
-            f"            run=_provider_rules.{name}_fetch_landing_step,",
-            f'            failure_marker="fulltext:{name}_landing_failed",',
-            f'            success_markers=("fulltext:{name}_landing_ok",),',
-            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
-            "        ),",
-            "        WaterfallStep(",
-            '            label="html",',
-            f"            run=_provider_rules.{name}_fetch_html_step,",
-            f'            failure_marker="fulltext:{name}_html_failed",',
-            f'            success_markers=("fulltext:{name}_html_ok",),',
-            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
-            "        ),",
-            "        WaterfallStep(",
-            '            label="xml",',
-            f"            run=_provider_rules.{name}_fetch_xml_step,",
-            f'            failure_marker="fulltext:{name}_xml_failed",',
-            f'            success_markers=("fulltext:{name}_xml_ok",),',
-            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
-            "        ),",
-            "        WaterfallStep(",
-            '            label="pdf",',
-            f"            run=_provider_rules.{name}_fetch_pdf_step,",
-            f'            failure_marker="fulltext:{name}_pdf_failed",',
-            f'            success_markers=("fulltext:{name}_pdf_ok",),',
-            "            continue_codes=DEFAULT_WATERFALL_CONTINUE_CODES,",
-            "        ),",
+            *step_lines,
             "    )",
             "",
             "",
@@ -390,7 +559,8 @@ def _manifest_entry(*, name: str, doi: str, html_capable: bool) -> dict[str, obj
     }
 
 
-def _sync_docs_placeholders(root: Path, *, name: str) -> list[Path]:
+def _sync_docs_placeholders(root: Path, *, spec: ScaffoldInput) -> list[Path]:
+    name = spec.name
     docs_paths = [
         root / "docs" / "providers.md",
         root / "docs" / "extraction-rules.md",
@@ -412,6 +582,11 @@ def _sync_docs_placeholders(root: Path, *, name: str) -> list[Path]:
         providers_changed = False
         provider_section_changed = False
     else:
+        providers_row = (
+            f"| {spec.docs_providers_md_capability_row} | <!-- {todo} --> |"
+            if spec.docs_providers_md_capability_row
+            else providers_row
+        )
         providers_text, providers_changed = _insert_table_row_after_marker(
             providers_text,
             PROVIDERS_MATRIX_MARKER,
@@ -439,9 +614,12 @@ def _sync_docs_placeholders(root: Path, *, name: str) -> list[Path]:
         providers_path.write_text(providers_text, encoding="utf-8")
 
     extraction_text = extraction_path.read_text(encoding="utf-8")
+    extraction_summary = (
+        spec.docs_extraction_rules_summary
+        or "skipped: manifest docs.extraction_rules_summary is null; fill after fixture replay."
+    )
     extraction_row = (
-        f"| `{name}` | <!-- {todo} --> | 新 provider scaffold 占位，"
-        "补真实 replay 或 scenario 后更新。 | TODO |"
+        f"| `{name}` | <!-- {todo} --> | {extraction_summary} | TODO |"
     )
     if todo in extraction_text:
         extraction_changed = False
@@ -455,9 +633,11 @@ def _sync_docs_placeholders(root: Path, *, name: str) -> list[Path]:
         extraction_path.write_text(extraction_text, encoding="utf-8")
 
     changelog_text = changelog_path.read_text(encoding="utf-8")
-    changelog_entry = (
-        f"- <!-- {todo} --> Add `{name}` provider scaffold docs before enabling the provider."
+    changelog_summary = (
+        spec.docs_changelog_summary
+        or f"Add `{name}` provider scaffold docs before enabling the provider."
     )
+    changelog_entry = f"- <!-- {todo} --> {changelog_summary}"
     if todo in changelog_text:
         changelog_changed = False
     else:
@@ -472,29 +652,48 @@ def _sync_docs_placeholders(root: Path, *, name: str) -> list[Path]:
     return docs_paths
 
 
-def scaffold(args: argparse.Namespace) -> tuple[list[Path], list[Path]]:
+def scaffold(args: argparse.Namespace) -> tuple[list[Path], list[Path], ScaffoldInput]:
     root = Path(args.output_dir).resolve()
-    name = args.name
-    source = args.source or name
-    slug = _doi_slug(args.doi)
+    spec = (
+        _scaffold_input_from_manifest(Path(args.from_manifest))
+        if args.from_manifest
+        else _legacy_scaffold_input(args)
+    )
+    name = spec.name
 
     if not NAME_RE.fullmatch(name):
         raise ValueError("--name must be snake_case starting with a lowercase letter")
-    if not NAME_RE.fullmatch(source):
+    if not NAME_RE.fullmatch(spec.source):
         raise ValueError("--source must be snake_case when provided")
-    if not DOI_RE.fullmatch(args.doi):
+    if not DOI_RE.fullmatch(spec.doi):
         raise ValueError("--doi must look like a DOI, for example 10.1234/sample")
+    for sample in spec.fixture_samples:
+        if not DOI_RE.fullmatch(sample.doi):
+            raise ValueError(f"manifest DOI sample must look like a DOI: {sample.doi}")
 
     html_module = root / "src" / "paper_fetch" / "providers" / f"_{name}_html.py"
     client_module = root / "src" / "paper_fetch" / "providers" / f"{name}.py"
     test_module = root / "tests" / "unit" / f"test_{name}_provider.py"
-    fixture_keep = (
-        root / "tests" / "fixtures" / "golden_criteria" / slug / ".gitkeep"
+    fixture_keeps = tuple(
+        root
+        / "tests"
+        / "fixtures"
+        / "golden_criteria"
+        / _doi_slug(sample.doi)
+        / ".gitkeep"
+        for sample in spec.fixture_samples
     )
     manifest_path = root / "tests" / "fixtures" / "golden_criteria" / "manifest.json"
+    capture_commands_path = (
+        root / "docs" / "ai-onboarding" / "capture-commands" / f"{name}.txt"
+        if spec.manifest_path is not None
+        else None
+    )
 
-    planned = [html_module, test_module, fixture_keep]
-    if args.fulltext_client:
+    planned = [html_module, test_module, *fixture_keeps]
+    if capture_commands_path is not None:
+        planned.append(capture_commands_path)
+    if spec.fulltext_client:
         planned.append(client_module)
     for path in planned:
         if path.exists():
@@ -502,45 +701,98 @@ def scaffold(args: argparse.Namespace) -> tuple[list[Path], list[Path]]:
 
     manifest = _load_manifest(manifest_path)
     samples = manifest["samples"]
-    if slug in samples:
-        raise FileExistsError(f"manifest sample already exists: {slug}")
+    for sample in spec.fixture_samples:
+        slug = _doi_slug(sample.doi)
+        if slug in samples:
+            raise FileExistsError(f"manifest sample already exists: {slug}")
 
     written: list[Path] = []
     _write_new(
         html_module,
         _html_module_content(
-            name=name,
-            doi=args.doi,
-            source=source,
-            fulltext_client=args.fulltext_client,
-            html_capable=args.html_capable,
+            spec=spec,
         ),
     )
     written.append(html_module)
-    if args.fulltext_client:
-        _write_new(client_module, _client_module_content(name))
+    if spec.fulltext_client:
+        _write_new(client_module, _client_module_content(name, spec.waterfall_steps))
         written.append(client_module)
-    _write_new(fixture_keep)
-    written.append(fixture_keep)
+    seen_fixture_keeps: set[Path] = set()
+    for fixture_keep in fixture_keeps:
+        if fixture_keep in seen_fixture_keeps:
+            continue
+        seen_fixture_keeps.add(fixture_keep)
+        _write_new(fixture_keep)
+        written.append(fixture_keep)
     _write_new(
         test_module,
-        _test_module_content(name, args.doi, html_capable=args.html_capable),
+        _test_module_content(name, spec.doi, html_capable=spec.html_capable),
     )
     written.append(test_module)
 
-    samples[slug] = _manifest_entry(
-        name=name,
-        doi=args.doi,
-        html_capable=args.html_capable,
-    )
+    purposes_by_slug: dict[str, list[str]] = {}
+    for sample in spec.fixture_samples:
+        purposes_by_slug.setdefault(_doi_slug(sample.doi), []).append(sample.purpose)
+    for sample in spec.fixture_samples:
+        slug = _doi_slug(sample.doi)
+        if slug in samples:
+            continue
+        entry = _manifest_entry(
+            name=name,
+            doi=sample.doi,
+            html_capable=spec.html_capable,
+        )
+        if spec.manifest_path is not None:
+            entry["fixture_purposes"] = purposes_by_slug[slug]
+        samples[slug] = entry
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=False) + "\n",
         encoding="utf-8",
     )
     written.append(manifest_path)
-    docs_paths = _sync_docs_placeholders(root, name=name) if args.sync_docs else []
-    return written, docs_paths
+    if capture_commands_path is not None:
+        capture_lines = [
+            f"# Capture commands for {name}",
+            "",
+        ]
+        for sample in spec.fixture_samples:
+            capture_lines.extend(
+                [
+                    f"# purpose: {sample.purpose}",
+                    "python3 scripts/capture_fixture.py "
+                    f"--doi {sample.doi} "
+                    f"--provider {name} "
+                    f"--purpose {sample.purpose}",
+                ]
+            )
+        for purpose in spec.skipped_fixture_purposes:
+            capture_lines.append(f"# skipped: {purpose} has null DOI in manifest")
+        _write_new(capture_commands_path, "\n".join(capture_lines) + "\n")
+        written.append(capture_commands_path)
+    docs_paths = _sync_docs_placeholders(root, spec=spec) if args.sync_docs else []
+    return written, docs_paths, spec
+
+
+def _json_summary(
+    paths: list[Path],
+    root: Path,
+    *,
+    docs_paths: list[Path],
+    provider: str,
+) -> dict[str, object]:
+    def rel(path: Path) -> str:
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            return path.as_posix()
+
+    return {
+        "status": "OK",
+        "provider": provider,
+        "generated_files": [rel(path) for path in paths],
+        "docs_files": [rel(path) for path in docs_paths],
+    }
 
 
 def _print_checklist(paths: list[Path], root: Path, *, docs_paths: list[Path]) -> None:
@@ -571,8 +823,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Scaffold provider-owned bundle, tests, and golden fixture placeholders."
     )
-    parser.add_argument("--name", required=True, help="provider name in snake_case")
-    parser.add_argument("--doi", required=True, help="placeholder golden DOI")
+    parser.add_argument("--from-manifest", help="provider manifest YAML input path")
+    parser.add_argument("--name", help="provider name in snake_case")
+    parser.add_argument("--doi", help="placeholder golden DOI")
     parser.add_argument(
         "--source",
         help="public source name to register; defaults to --name",
@@ -585,7 +838,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--html-capable",
         type=_parse_html_capable,
-        default=True,
+        default=None,
         metavar="true|false",
         help="set to false to skip ProviderHtmlRules placeholder",
     )
@@ -611,14 +864,54 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_input_mode(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    legacy_values = {
+        "--name": args.name,
+        "--doi": args.doi,
+        "--source": args.source,
+    }
+    if args.from_manifest:
+        mixed = [flag for flag, value in legacy_values.items() if value is not None]
+        if args.fulltext_client:
+            mixed.append("--fulltext-client")
+        if args.html_capable is not None:
+            mixed.append("--html-capable")
+        if mixed:
+            parser.error("--from-manifest cannot be combined with " + ", ".join(mixed))
+        return
+    missing = [flag for flag in ("--name", "--doi") if getattr(args, flag[2:]) is None]
+    if missing:
+        parser.error("the following arguments are required: " + ", ".join(missing))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    _validate_input_mode(parser, args)
     try:
-        paths, docs_paths = scaffold(args)
+        paths, docs_paths, spec = scaffold(args)
+    except ManifestSchemaError as exc:
+        print(
+            json.dumps(
+                {"status": MANIFEST_SCHEMA_INVALID, "reason": str(exc)},
+                ensure_ascii=False,
+            ),
+            file=sys.stderr,
+        )
+        return 2
     except (FileExistsError, ValueError) as exc:
         parser.exit(2, f"error: {exc}\n")
-    _print_checklist(paths, Path(args.output_dir).resolve(), docs_paths=docs_paths)
+    root = Path(args.output_dir).resolve()
+    if args.from_manifest:
+        print(
+            json.dumps(
+                _json_summary(paths, root, docs_paths=docs_paths, provider=spec.name),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+    else:
+        _print_checklist(paths, root, docs_paths=docs_paths)
     return 0
 
 
