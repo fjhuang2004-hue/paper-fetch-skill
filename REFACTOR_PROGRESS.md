@@ -10,7 +10,10 @@
   - commit: 405f9a8
   - 摘要: `provider_rules.py` 删除 `_X_hooks_module()` / provider hook wrapper / `importlib` 桥接，规则表按访问时构建并直接绑定 provider-owned hook 函数。
   - 验收: S1 grep 为空，`provider_rules.py` 778 行，`test_provider_html_rules_shape.py` / `test_html_profiles.py` / `test_provider_typed_hooks.py` / import-boundary 相关测试通过；全量 unit 仍为 1138 passed + 264 subtests。
-- [ ] S2: 数据化 provider availability / blocking signals
+- [x] S2: 数据化 provider availability / blocking signals
+  - commit: ce92370（另有 5b3fe71 刷新进入本阶段前已 stale 的 9 个 AMS golden summary）
+  - 摘要: `AvailabilityPolicy` 迁移到 datalayer/text-marker/override typed 字段，删除 provider 专属 signal/override callable 与 `html_profiles` façade，provider 和 browser-workflow callsite 改走 typed evaluator。
+  - 验收: S2 grep 为空，`html_signals.py` 331 行，S2 局部 pytest 43 passed + 6 subtests；全量 unit 1143 passed + 264 subtests；full golden corpus 174 passed。
 - [ ] S3: 引入 ProviderBundle
 - [ ] S4: onboarding 完整性 lint
 - [ ] S5: Scaffold 脚本
