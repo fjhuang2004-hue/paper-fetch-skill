@@ -7,6 +7,7 @@ from typing import Any
 from ..extraction.html.provider_rules import (
     DEFAULT_SITE_RULE,
     availability_rules_for_provider,
+    merged_site_rule,
     provider_html_rules,
 )
 from ..utils import normalize_text
@@ -36,30 +37,7 @@ def _rules_for_publisher(publisher: str | None):
 
 
 def site_rule_for_publisher(publisher: str | None) -> dict[str, Any]:
-    rules = availability_rules_for_provider(normalize_text(publisher or "").lower())
-    merged = {
-        key: (
-            list(value)
-            if isinstance(value, list)
-            else set(value)
-            if isinstance(value, set)
-            else value
-        )
-        for key, value in DEFAULT_SITE_RULE.items()
-    }
-    for key, value in rules.site_rule_overrides.items():
-        default_value = merged.get(key)
-        if isinstance(default_value, list):
-            merged[key] = [
-                *default_value,
-                *[item for item in value if item not in default_value],
-            ]
-            continue
-        if isinstance(default_value, set):
-            merged[key] = set(default_value) | set(value)
-            continue
-        merged[key] = value
-    return merged
+    return merged_site_rule(_rules_for_publisher(publisher))
 
 
 def noise_profile_for_publisher(publisher: str | None) -> str:

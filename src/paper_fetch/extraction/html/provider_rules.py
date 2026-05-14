@@ -558,7 +558,7 @@ def provider_html_rules(name: str | None) -> ProviderHtmlRules:
     return _RULE_LOOKUP.get(_normalize_rule_key(name), GENERIC_HTML_RULES)
 
 
-def _merged_site_rule(rules: ProviderHtmlRules) -> dict[str, Any]:
+def merged_site_rule(rules: ProviderHtmlRules) -> dict[str, Any]:
     merged = copy.deepcopy(DEFAULT_SITE_RULE)
     for key, value in rules.availability_site_rule_overrides.items():
         default_value = merged.get(key)
@@ -576,7 +576,7 @@ def _merged_site_rule(rules: ProviderHtmlRules) -> dict[str, Any]:
 
 
 def _cleanup_policy_from_rules(rules: ProviderHtmlRules) -> CleanupPolicy:
-    site_rule = _merged_site_rule(rules)
+    site_rule = merged_site_rule(rules)
     return build_cleanup_policy(
         rules.noise_profile,
         markdown_contains_tokens=(
@@ -756,6 +756,7 @@ __all__ = [
     "front_matter_publication_keywords_for_profile",
     "front_matter_rules_for_profile",
     "markdown_promo_tokens_for_profile",
+    "merged_site_rule",
     "normalize_noise_profile",
     "normalize_provider_heading",
     "provider_display_formula_selectors",
