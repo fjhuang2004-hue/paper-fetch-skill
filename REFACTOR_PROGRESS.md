@@ -59,8 +59,15 @@
 - [x] S12: scaffold --from-manifest
   - commit: b246ab7
   - 摘要: `scaffold_provider.py` 增加 `--from-manifest`，先按 ProviderManifest schema 校验输入，再从 manifest 生成 ProviderSpec routing/probe/asset 占位、manifest 顺序的 `waterfall_steps`、多 DOI fixture `.gitkeep`、capture command 清单、docs/changelog 占位和 JSON artifact summary；legacy flags 保留为 fallback，但禁止与 manifest 输入混用。
-  - 验收: S12 help/gitreps 通过；真实 `arxiv.yml` `/tmp` scaffold probe 输出 JSON summary；`test_scaffold_provider_from_manifest.py` / `test_scaffold_provider.py` 18 passed；S11 manifest/schema/known-provider 回归 7 passed；`python3 -m ruff check .` 通过；`validate_extraction_rules.py` 通过；全量 unit 1217 passed + 264 subtests。
-- [ ] S13: manifest ↔ bundle 同步 lint（含 sync-back）
+  - 验收: S12 help/git grep 通过；真实 `arxiv.yml` `/tmp` scaffold probe 输出 JSON summary；`test_scaffold_provider_from_manifest.py` / `test_scaffold_provider.py` 18 passed；S11 manifest/schema/known-provider 回归 7 passed；`python3 -m ruff check .` 通过；`validate_extraction_rules.py` 通过；全量 unit 1217 passed + 264 subtests。
+- [x] S13: manifest ↔ bundle 同步 lint（含 sync-back）
+  - commit: 86d41fc
+  - 摘要: 新增 manifest/bundle sync helper、`test_manifest_bundle_sync.py`、`manifest_sync_back.py` 和 round-trip 测试，按 known-providers 中的 manifest 校验 ProviderBundle/ProviderSpec 的 name、routing、asset profile、abstract-only、probe、display_source 与 sync-back 字段；Wiley ProviderSpec 补齐 manifest 已声明的 browser/FlareSolverr probe 依赖。
+  - 验收: S13 文件/git grep 通过；`test_manifest_bundle_sync.py` / `test_known_providers_sync.py` / `test_manifest_sync_back.py` 11 passed；阶段 B manifest/scaffold/sync 回归 32 passed；`python3 -m ruff check .` 通过；AI onboarding 禁词 grep 通过；`validate_extraction_rules.py` 通过；全量 unit 1225 passed + 264 subtests；已 review `arxiv.yml` DOI sample evidence 字段。
+
+### 阶段 B 验收点
+- commit: 86d41fc
+- 覆盖: S11A discovery help、S12 `--from-manifest` help、S13 manifest sync grep 均通过；`test_manifest_discovery_brief.py` / `test_onboard_from_manifests.py` / `test_provider_manifest_schema.py` / `test_known_providers_sync.py` / `test_scaffold_provider_from_manifest.py` / `test_manifest_bundle_sync.py` / `test_manifest_sync_back.py` 共 32 passed；全量 unit 1225 passed + 264 subtests。
 
 ### 阶段 C：批量调度与自动恢复（S14-S16）
 - [ ] S14: Coordinator 编排脚本（单 provider 串行 + coding agent CLI）
