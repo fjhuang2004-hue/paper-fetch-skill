@@ -1,0 +1,144 @@
+schema_version: 1
+name: wiley
+display_source: wiley_browser
+generation:
+  generated_by: manual_replay
+  generated_at: "2026-05-15T00:00:00Z"
+  source_queries:
+    - "paper_fetch.provider_catalog wiley ProviderSpec"
+    - "tests/fixtures/golden_criteria wiley samples"
+  confidence: high
+routing:
+  primary: doi_prefix
+  doi_prefixes:
+    - "10.1002/"
+    - "10.1111/"
+  domains:
+    - onlinelibrary.wiley.com
+    - wiley.com
+    - www.wiley.com
+  domain_suffixes: []
+  publisher_aliases:
+    - wiley
+    - wiley blackwell
+    - john wiley and sons
+    - john wiley sons
+  crossref_publisher: null
+main_path:
+  - article_html
+  - pdf_fallback
+  - abstract_only
+success_criteria: {}
+asset_profile:
+  none: []
+  body:
+    - figures
+    - body_tables
+    - formula_images
+  all:
+    - figures
+    - body_tables
+    - formula_images
+    - supplementary
+supplementary_scope:
+  selector: "#support-information-section"
+  url_pattern: "/action/downloadSupplement"
+abstract_only_strategy: provider_managed
+probe:
+  env_requirements:
+    - CROSSREF_MAILTO
+    - FLARESOLVERR_ENV_FILE
+  requires_playwright: true
+  requires_flaresolverr: true
+  ping_url: https://onlinelibrary.wiley.com/
+fixtures:
+  doi_samples:
+    structure:
+      doi: "10.1111/gcb.16414"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16414"
+      evidence_reason: "Provider benchmark and golden fixture cover the Wiley browser HTML route with body sections."
+      observed_signals:
+        - browser_html
+        - body_sections
+      confidence: high
+    table:
+      doi: "10.1111/cas.16395"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/cas.16395"
+      evidence_reason: "Golden fixture contains body table markup and unit coverage renders it as Markdown table."
+      observed_signals:
+        - browser_html
+        - body_table
+      confidence: high
+    formula:
+      doi: "10.1111/gcb.15322"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.15322"
+      evidence_reason: "Golden fixture contains Wiley formula image fallback markup used by provider tests."
+      observed_signals:
+        - browser_html
+        - formula_images
+      confidence: high
+    figure:
+      doi: "10.1111/gcb.16414"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16414"
+      evidence_reason: "Golden fixture contains inline Wiley figure blocks and figure asset links."
+      observed_signals:
+        - browser_html
+        - figures
+        - image_assets
+      confidence: high
+    supplementary:
+      doi: "10.1111/gcb.16414"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16414"
+      evidence_reason: "Golden fixture contains a Supporting Information section with downloadable supplement links."
+      observed_signals:
+        - browser_html
+        - supplementary
+      confidence: high
+    references:
+      doi: "10.1111/gcb.16998"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16998"
+      evidence_reason: "Expected golden criteria records Wiley reference extraction for this fixture."
+      observed_signals:
+        - browser_html
+        - references
+      confidence: high
+    pdf_fallback:
+      doi: "10.1111/cas.16395"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/cas.16395"
+      evidence_reason: "Wiley PDF fallback sample exercises publisher PDF and TDM API fallback lanes."
+      observed_signals:
+        - browser_html
+        - pdf_link
+        - pdf_fallback
+      confidence: high
+    abstract_only:
+      doi: "10.1111/gcb.16998"
+      evidence_url: "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.16998"
+      evidence_reason: "Unit coverage exercises provider-managed abstract-only return when PDF recovery fails."
+      observed_signals:
+        - provider_managed_abstract_only
+        - browser_html
+      confidence: medium
+    access_gate:
+      doi: null
+      evidence_url: "https://onlinelibrary.wiley.com/"
+      evidence_reason: "Current golden corpus has no Wiley access-gate sample."
+      observed_signals: []
+      confidence: low
+    empty_shell:
+      doi: null
+      evidence_url: "https://onlinelibrary.wiley.com/"
+      evidence_reason: "Current golden corpus has no Wiley empty-shell sample."
+      observed_signals: []
+      confidence: low
+extraction_hints:
+  datalayer_signal_set: null
+  text_marker_signal_set: []
+  front_matter: null
+  asset_retry: null
+  metadata_merge: []
+owner_reuse_exceptions: []
+docs:
+  providers_md_capability_row: "Wiley | Crossref merge | FlareSolverr HTML -> seeded-browser publisher PDF/ePDF -> Wiley TDM API PDF | HTML body/all assets | wiley_browser"
+  changelog_summary: "Add Wiley browser HTML provider with PDF and TDM fallback."
+  extraction_rules_summary: null
