@@ -1,6 +1,14 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
+from paper_fetch.providers import (
+    _ieee_block_page,
+    _ieee_browser_html,
+    _ieee_html,
+    _ieee_metadata,
+    _ieee_url,
+)
+
 from ._ieee_provider_support import *
 
 
@@ -11,12 +19,12 @@ class IeeeProviderRouteTests(unittest.TestCase):
         self.assertEqual(strategy.normalized_preferred_providers(), {"ieee"})
     def test_landing_metadata_and_article_number_parsing(self) -> None:
         html = _landing_html(article_number="10388355").decode("utf-8")
-        metadata = ieee_provider._parse_landing_metadata(html)
+        metadata = _ieee_metadata._parse_landing_metadata(html)
 
         self.assertEqual(metadata["articleNumber"], "10388355")
-        self.assertEqual(ieee_provider._article_number_from_url("https://ieeexplore.ieee.org/document/10388355/"), "10388355")
-        self.assertEqual(ieee_provider._article_number_from_url("https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10388355"), "")
-        self.assertEqual(ieee_provider._article_number_from_url("https://ieeexplore.ieee.org/rest/document/10388355/references"), "")
+        self.assertEqual(_ieee_url._article_number_from_url("https://ieeexplore.ieee.org/document/10388355/"), "10388355")
+        self.assertEqual(_ieee_url._article_number_from_url("https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=10388355"), "")
+        self.assertEqual(_ieee_url._article_number_from_url("https://ieeexplore.ieee.org/rest/document/10388355/references"), "")
         self.assertTrue(metadata["isDynamicHtml"])
 
     def test_ieee_block_page_detection_is_cached_in_runtime_context(self) -> None:
@@ -24,13 +32,13 @@ class IeeeProviderRouteTests(unittest.TestCase):
         html = "<html><body>Your request has been blocked. Verify you are human.</body></html>"
         try:
             with mock.patch.object(
-                ieee_provider,
+                _ieee_block_page,
                 "_scan_ieee_block_page_tokens",
-                wraps=ieee_provider._scan_ieee_block_page_tokens,
+                wraps=_ieee_block_page._scan_ieee_block_page_tokens,
             ) as scanner:
                 for _ in range(2):
                     with self.assertRaises(ieee_provider.ProviderFailure):
-                        ieee_provider._extract_ieee_html(
+                        _ieee_html._extract_ieee_html(
                             html,
                             "https://ieeexplore.ieee.org/rest/document/10388355/?logAccess=true",
                             metadata={"title": "Blocked"},
@@ -259,7 +267,7 @@ class IeeeProviderRouteTests(unittest.TestCase):
         article_number = "10772041"
         document_url = f"https://ieeexplore.ieee.org/document/{article_number}/"
         rest_url = f"https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true"
-        landing_attempt = ieee_provider.IeeeLandingAttempt(
+        landing_attempt = _ieee_metadata.IeeeLandingAttempt(
             normalized_doi=doi,
             landing_url=document_url,
             response_url=document_url,
@@ -315,7 +323,7 @@ class IeeeProviderRouteTests(unittest.TestCase):
                 return None
 
             def wait_for_timeout(self, timeout):
-                assert timeout == ieee_provider.IEEE_BROWSER_HTML_REST_WAIT_TIMEOUT_MS
+                assert timeout == _ieee_browser_html.IEEE_BROWSER_HTML_REST_WAIT_TIMEOUT_MS
 
             def close(self):
                 self.closed = True

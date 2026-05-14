@@ -13,10 +13,21 @@ from unittest import mock
 from paper_fetch import artifacts as paper_fetch_artifacts
 from paper_fetch import service as paper_fetch
 from paper_fetch.arxiv_id import canonical_arxiv_html_url, canonical_arxiv_pdf_url
+from paper_fetch.extraction.html import assets as html_assets
 from paper_fetch.extraction.html.assets.dom import preview_dimensions_are_acceptable
-import paper_fetch.providers.arxiv as arxiv_provider
+from paper_fetch.http import RequestErrorCategory
+from paper_fetch.models import article_from_markdown
+from paper_fetch.providers import (
+    _arxiv_assets,
+    _arxiv_atom,
+    _arxiv_authors,
+    _arxiv_html,
+    _arxiv_metadata,
+    _arxiv_references,
+)
 from paper_fetch.providers.arxiv import ArxivClient
 from paper_fetch.providers.base import ProviderFailure
+from paper_fetch.providers._html_section_markdown import render_container_markdown
 from paper_fetch.resolve.query import resolve_query
 
 from tests.paths import FIXTURE_DIR
@@ -268,8 +279,8 @@ class ArxivProviderTests(unittest.TestCase):
         arxiv_id = "2605.06663v1"
         transport = RecordingTransport(
             {
-                ("GET", arxiv_provider.ARXIV_API_URL): _response(
-                    arxiv_provider.ARXIV_API_URL,
+                ("GET", _arxiv_atom.ARXIV_API_URL): _response(
+                    _arxiv_atom.ARXIV_API_URL,
                     _atom_feed(arxiv_id),
                     "application/atom+xml",
                 )
@@ -295,7 +306,7 @@ class ArxivProviderTests(unittest.TestCase):
             {"id_list": arxiv_id, "max_results": "1"},
         )
         self.assertEqual(
-            transport.calls[0]["headers"]["Accept"], arxiv_provider.ARXIV_API_ACCEPT
+            transport.calls[0]["headers"]["Accept"], _arxiv_atom.ARXIV_API_ACCEPT
         )
         self.assertIn("User-Agent", transport.calls[0]["headers"])
 
@@ -303,8 +314,8 @@ class ArxivProviderTests(unittest.TestCase):
         arxiv_id = "2605.06663v1"
         transport = RecordingTransport(
             {
-                ("GET", arxiv_provider.ARXIV_API_URL): _response(
-                    arxiv_provider.ARXIV_API_URL,
+                ("GET", _arxiv_atom.ARXIV_API_URL): _response(
+                    _arxiv_atom.ARXIV_API_URL,
                     b'<feed xmlns="http://www.w3.org/2005/Atom"></feed>',
                     "application/atom+xml",
                 )
@@ -370,19 +381,19 @@ class ArxivProviderTests(unittest.TestCase):
 
     def test_arxiv_ar5iv_chrome_selectors_share_base_script_style_rules(self) -> None:
         self.assertEqual(
-            arxiv_provider._ARXIV_BASE_CHROME_SELECTORS, ("script", "style")
+            _arxiv_html._ARXIV_BASE_CHROME_SELECTORS, ("script", "style")
         )
         for key in ("frontmatter_noise", "reference_noise", "article_chrome"):
             with self.subTest(key=key):
-                selectors = arxiv_provider._ARXIV_AR5IV_SELECTORS[key]
+                selectors = _arxiv_html._ARXIV_AR5IV_SELECTORS[key]
                 self.assertEqual(
-                    selectors[:2], arxiv_provider._ARXIV_BASE_CHROME_SELECTORS
+                    selectors[:2], _arxiv_html._ARXIV_BASE_CHROME_SELECTORS
                 )
 
     def test_author_boundary_splits_affiliations_without_rejecting_country_name_authors(
         self,
     ) -> None:
-        soup = arxiv_provider.BeautifulSoup(
+        soup = _arxiv_html.BeautifulSoup(
             """
             <article>
               <span class="ltx_personname">Anatole France</span>
@@ -394,24 +405,24 @@ class ArxivProviderTests(unittest.TestCase):
         )
         names = soup.select(".ltx_personname")
 
-        self.assertTrue(arxiv_provider._looks_like_arxiv_author_name("Anatole France"))
-        candidate = arxiv_provider._candidate_arxiv_author_text_from_person_node(
+        self.assertTrue(_arxiv_authors._looks_like_arxiv_author_name("Anatole France"))
+        candidate = _arxiv_authors._candidate_arxiv_author_text_from_person_node(
             names[1]
         )
         self.assertNotIn("Department", candidate)
         self.assertEqual(
-            arxiv_provider._split_arxiv_author_text(candidate), ["Ada Lovelace"]
+            _arxiv_authors._split_arxiv_author_text(candidate), ["Ada Lovelace"]
         )
         data_file_candidate = (
-            arxiv_provider._candidate_arxiv_author_text_from_person_node(names[2])
+            _arxiv_authors._candidate_arxiv_author_text_from_person_node(names[2])
         )
         self.assertNotIn("Portugal", data_file_candidate)
         self.assertEqual(
-            arxiv_provider._split_arxiv_author_text(data_file_candidate),
+            _arxiv_authors._split_arxiv_author_text(data_file_candidate),
             ["Grace Hopper"],
         )
         self.assertEqual(
-            arxiv_provider._trim_arxiv_author_text_at_boundary(
+            _arxiv_authors._trim_arxiv_author_text_at_boundary(
                 "Katherine Johnson, 10115 Berlin"
             ),
             "Katherine Johnson",
@@ -420,25 +431,25 @@ class ArxivProviderTests(unittest.TestCase):
     def test_author_boundary_resource_loading_fails_closed(self) -> None:
         self.assertIn(
             "Portugal",
-            arxiv_provider._load_arxiv_author_boundary_tokens(
+            _arxiv_authors._load_arxiv_author_boundary_tokens(
                 "country_boundary_patterns"
             ),
         )
         self.assertEqual(
-            arxiv_provider._load_arxiv_author_boundary_tokens(
+            _arxiv_authors._load_arxiv_author_boundary_tokens(
                 "country_boundary_patterns", resource_name="missing.json"
             ),
             (),
         )
         empty_country_pattern = (
-            arxiv_provider._compile_arxiv_author_country_boundary_pattern(())
+            _arxiv_authors._compile_arxiv_author_country_boundary_pattern(())
         )
         self.assertIsNone(empty_country_pattern.search("Ada Lovelace, Portugal"))
 
     def test_generic_html_frontmatter_and_references_fallback_without_ltx_selectors(
         self,
     ) -> None:
-        soup = arxiv_provider.BeautifulSoup(
+        soup = _arxiv_html.BeautifulSoup(
             """
             <html><body><article>
               <h1>Generic HTML arXiv Article</h1>
@@ -453,13 +464,13 @@ class ArxivProviderTests(unittest.TestCase):
         )
         article = soup.find("article")
 
-        frontmatter = arxiv_provider._extract_arxiv_html_frontmatter(
+        frontmatter = _arxiv_metadata._extract_arxiv_html_frontmatter(
             soup,
             article,
             "https://arxiv.org/html/2605.00001v1",
             metadata={"doi": "10.48550/arxiv.2605.00001v1"},
         )
-        references = arxiv_provider._extract_arxiv_html_references(article)
+        references = _arxiv_references._extract_arxiv_html_references(article)
 
         self.assertEqual(frontmatter["title"], "Generic HTML arXiv Article")
         self.assertEqual(frontmatter["abstract"], "Fallback abstract text.")
@@ -721,14 +732,14 @@ class ArxivProviderTests(unittest.TestCase):
         transport = _html_transport(
             arxiv_id,
             extra_responses={
-                ("GET", arxiv_provider.ARXIV_API_URL): _response(
-                    arxiv_provider.ARXIV_API_URL,
+                ("GET", _arxiv_atom.ARXIV_API_URL): _response(
+                    _arxiv_atom.ARXIV_API_URL,
                     b"<feed",
                     "application/atom+xml",
                 )
             },
         )
-        api_client = arxiv_provider.InternalArxivApiClient(
+        api_client = _arxiv_atom.InternalArxivApiClient(
             transport, "paper-fetch-test"
         )
         client = ArxivClient(transport, {}, api_client=api_client)
@@ -745,7 +756,7 @@ class ArxivProviderTests(unittest.TestCase):
         )
         self.assertEqual(
             [call["url"] for call in transport.calls],
-            [canonical_arxiv_html_url(arxiv_id), arxiv_provider.ARXIV_API_URL],
+            [canonical_arxiv_html_url(arxiv_id), _arxiv_atom.ARXIV_API_URL],
         )
 
     def test_html_route_extracts_sections_abstract_formulas_and_citations_from_fixture(
@@ -812,7 +823,7 @@ class ArxivProviderTests(unittest.TestCase):
         }
         for arxiv_id, expected_fragments in table_cases.items():
             with self.subTest(arxiv_id=arxiv_id):
-                extraction = arxiv_provider._extract_arxiv_html_markdown(
+                extraction = _arxiv_html._extract_arxiv_html_markdown(
                     _fixture_html(arxiv_id).decode("utf-8"),
                     canonical_arxiv_html_url(arxiv_id),
                     metadata=_metadata(arxiv_id),
@@ -824,7 +835,7 @@ class ArxivProviderTests(unittest.TestCase):
                 self.assertGreaterEqual(diagnostics["table_block_rendered_count"], 1)
                 self.assertEqual(diagnostics["semantic_block_loss_count"], 0)
 
-        error_extraction = arxiv_provider._extract_arxiv_html_markdown(
+        error_extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html("2605.06653v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06653v1"),
             metadata=_metadata("2605.06653v1"),
@@ -840,7 +851,7 @@ class ArxivProviderTests(unittest.TestCase):
     def test_html_route_normalizes_math_without_duplicate_fallback_text(self) -> None:
         for arxiv_id in HTML_ROUTE_IDS:
             with self.subTest(arxiv_id=arxiv_id):
-                extraction = arxiv_provider._extract_arxiv_html_markdown(
+                extraction = _arxiv_html._extract_arxiv_html_markdown(
                     _fixture_html(arxiv_id).decode("utf-8"),
                     canonical_arxiv_html_url(arxiv_id),
                     metadata=_metadata(arxiv_id),
@@ -850,7 +861,7 @@ class ArxivProviderTests(unittest.TestCase):
                     extraction.diagnostics["extraction"]["math_nodes_normalized"], 0
                 )
 
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html("2605.06667v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06667v1"),
             metadata=_metadata("2605.06667v1"),
@@ -866,7 +877,7 @@ class ArxivProviderTests(unittest.TestCase):
     def test_html_route_sanitizes_nested_tex_dollars_in_latexml_annotations(
         self,
     ) -> None:
-        soup = arxiv_provider.BeautifulSoup(
+        soup = _arxiv_html.BeautifulSoup(
             r"""
 <math class="ltx_Math" alttext="P(A(1,x,y)\text{ is a quota violation for $x&gt;x_{\tau}$})">
   <semantics>
@@ -878,7 +889,7 @@ class ArxivProviderTests(unittest.TestCase):
             "html.parser",
         )
 
-        markdown = arxiv_provider._arxiv_math_markdown(soup.math)
+        markdown = _arxiv_authors._arxiv_math_markdown(soup.math)
 
         self.assertEqual(markdown.count("$"), 2)
         self.assertNotIn(r"for $x>x_{\tau}$", markdown)
@@ -887,7 +898,7 @@ class ArxivProviderTests(unittest.TestCase):
 
     def test_html_route_renders_ordered_lists_as_markdown_numbers(self) -> None:
         """rule: rule-html-list-marker-rendering"""
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html("2605.06556v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06556v1"),
             metadata=_metadata("2605.06556v1"),
@@ -903,14 +914,14 @@ class ArxivProviderTests(unittest.TestCase):
     def test_html_route_strips_visible_unordered_list_markers_once(self) -> None:
         for arxiv_id in ("2605.06556v1", "2605.06665v1", "2605.06667v1"):
             with self.subTest(arxiv_id=arxiv_id):
-                extraction = arxiv_provider._extract_arxiv_html_markdown(
+                extraction = _arxiv_html._extract_arxiv_html_markdown(
                     _fixture_html(arxiv_id).decode("utf-8"),
                     canonical_arxiv_html_url(arxiv_id),
                     metadata=_metadata(arxiv_id),
                 )
                 self.assertNotIn("- •", extraction.markdown_text)
 
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html("2605.06667v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06667v1"),
             metadata=_metadata("2605.06667v1"),
@@ -984,7 +995,7 @@ class ArxivProviderTests(unittest.TestCase):
     def test_html_route_extracts_multi_image_multi_caption_figures(self) -> None:
         """rule: rule-arxiv-multi-image-figure-captions"""
         arxiv_id = "2605.06667v1"
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html(arxiv_id).decode("utf-8"),
             canonical_arxiv_html_url(arxiv_id),
             metadata=_metadata(arxiv_id),
@@ -1014,7 +1025,7 @@ class ArxivProviderTests(unittest.TestCase):
 
     def test_html_route_keeps_all_images_from_shared_caption_figures(self) -> None:
         arxiv_id = "2605.06665v1"
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html(arxiv_id).decode("utf-8"),
             canonical_arxiv_html_url(arxiv_id),
             metadata=_metadata(arxiv_id),
@@ -1071,7 +1082,7 @@ class ArxivProviderTests(unittest.TestCase):
     def test_html_route_unmatched_figure_asset_stays_caption_only_and_can_append_fallback(
         self,
     ) -> None:
-        soup = arxiv_provider.BeautifulSoup(
+        soup = _arxiv_html.BeautifulSoup(
             """
             <article class="ltx_document">
               <figure id="S1.F1" class="ltx_figure">
@@ -1095,17 +1106,17 @@ class ArxivProviderTests(unittest.TestCase):
             "section": "body",
         }
 
-        diagnostics = arxiv_provider._annotate_arxiv_inline_figure_images(
+        diagnostics = _arxiv_assets._annotate_arxiv_inline_figure_images(
             article_node,
             [asset],
             canonical_arxiv_html_url("2605.06663v1"),
         )
         lines: list[str] = []
-        arxiv_provider.render_container_markdown(
+        render_container_markdown(
             article_node, lines, level=2, section_content_selectors=()
         )
         markdown = "\n".join(lines)
-        rendered = arxiv_provider.article_from_markdown(
+        rendered = article_from_markdown(
             source="arxiv_html",
             metadata=_metadata("2605.06663v1"),
             doi=_doi("2605.06663v1"),
@@ -1161,7 +1172,7 @@ class ArxivProviderTests(unittest.TestCase):
         self.assertNotIn("Refer to caption", markdown)
 
     def test_html_route_omits_bare_table_heading_for_unnumbered_tables(self) -> None:
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html("2605.06556v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06556v1"),
             metadata=_metadata("2605.06556v1"),
@@ -1177,7 +1188,7 @@ class ArxivProviderTests(unittest.TestCase):
     def test_html_route_lifts_cross_column_table_titles_and_keeps_pipe_tables_valid(
         self,
     ) -> None:
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html("2605.06556v1").decode("utf-8"),
             canonical_arxiv_html_url("2605.06556v1"),
             metadata=_metadata("2605.06556v1"),
@@ -1205,7 +1216,7 @@ class ArxivProviderTests(unittest.TestCase):
     ) -> None:
         for arxiv_id in ("2605.06598v1", "2605.06653v1", "2605.06659v1"):
             with self.subTest(arxiv_id=arxiv_id):
-                extraction = arxiv_provider._extract_arxiv_html_markdown(
+                extraction = _arxiv_html._extract_arxiv_html_markdown(
                     _fixture_html(arxiv_id).decode("utf-8"),
                     canonical_arxiv_html_url(arxiv_id),
                     metadata=_metadata(arxiv_id),
@@ -1248,7 +1259,7 @@ class ArxivProviderTests(unittest.TestCase):
 
     def test_html_route_preserves_algorithm_listing_from_fixture(self) -> None:
         arxiv_id = "2605.06665v1"
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             _fixture_html(arxiv_id).decode("utf-8"),
             canonical_arxiv_html_url(arxiv_id),
             metadata=_metadata(arxiv_id),
@@ -1343,7 +1354,7 @@ class ArxivProviderTests(unittest.TestCase):
         """
         metadata = {**_metadata("2605.06667v1"), "title": "Synthetic arXiv DOM Rule"}
 
-        extraction = arxiv_provider._extract_arxiv_html_markdown(
+        extraction = _arxiv_html._extract_arxiv_html_markdown(
             html,
             canonical_arxiv_html_url("2605.06667v1"),
             metadata=metadata,
@@ -1364,7 +1375,7 @@ class ArxivProviderTests(unittest.TestCase):
     def test_arxiv_complex_table_falls_back_to_key_value_without_semantic_loss(
         self,
     ) -> None:
-        soup = arxiv_provider.BeautifulSoup(
+        soup = _arxiv_html.BeautifulSoup(
             """
             <figure class="ltx_table" id="S1.T9">
               <figcaption><span class="ltx_tag ltx_tag_table">Table 9. </span>Grouped scores.</figcaption>
@@ -1378,7 +1389,7 @@ class ArxivProviderTests(unittest.TestCase):
             "html.parser",
         )
         markdown, rendered, key_value_fallback = (
-            arxiv_provider._render_arxiv_table_block(soup.figure)
+            _arxiv_references._render_arxiv_table_block(soup.figure)
         )
 
         self.assertTrue(rendered)
@@ -1417,7 +1428,7 @@ class ArxivProviderTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory() as tmpdir,
             mock.patch.object(
-                arxiv_provider.html_assets,
+                html_assets,
                 "_build_cookie_seeded_opener",
                 return_value=None,
             ) as cookie_opener,
@@ -1444,7 +1455,7 @@ class ArxivProviderTests(unittest.TestCase):
             self.assertGreater(len(asset_calls), 0)
             self.assertTrue(
                 all(
-                    call["headers"]["Accept"] == arxiv_provider.ARXIV_IMAGE_ACCEPT
+                    call["headers"]["Accept"] == _arxiv_assets.ARXIV_IMAGE_ACCEPT
                     for call in asset_calls
                 )
             )
@@ -1476,7 +1487,7 @@ class ArxivProviderTests(unittest.TestCase):
             "caption": retried_asset.get("caption", ""),
             "source_url": retried_asset.get("url", ""),
             "reason": "transport failed before a response",
-            "error_category": arxiv_provider.RequestErrorCategory.TLS_ERROR.value,
+            "error_category": RequestErrorCategory.TLS_ERROR.value,
             "section": "body",
         }
         non_retryable_failure = {
@@ -1518,7 +1529,7 @@ class ArxivProviderTests(unittest.TestCase):
             with (
                 tempfile.TemporaryDirectory() as tmpdir,
                 mock.patch.object(
-                    arxiv_provider.html_assets,
+                    html_assets,
                     "download_figure_assets",
                     side_effect=[
                         {
@@ -1558,7 +1569,7 @@ class ArxivProviderTests(unittest.TestCase):
         for call in downloader.call_args_list:
             self.assertNotIn("seed_urls", call.kwargs)
             self.assertEqual(
-                call.kwargs["headers"]["Accept"], arxiv_provider.ARXIV_IMAGE_ACCEPT
+                call.kwargs["headers"]["Accept"], _arxiv_assets.ARXIV_IMAGE_ACCEPT
             )
             self.assertNotIn("text/html", call.kwargs["headers"]["Accept"])
 

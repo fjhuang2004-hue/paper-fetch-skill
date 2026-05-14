@@ -387,6 +387,8 @@ workflow 会尽可能拿到两类元数据：
 
 provider-owned author 抽取统一通过 `paper_fetch.providers._html_authors.AuthorExtractionPipeline` 表达；每个 provider 只能注册命名 `AuthorStep`，由 pipeline 执行 jsonld / metadata / DOM / data-layer 等 fallback 并在首个非空去重结果处停止。arXiv 和 IEEE 的 provider-specific 作者边界、metadata 字段优先级仍保留在各自 provider step 内，但不再手写独立多步 fallback 链。
 
+`paper_fetch.providers.arxiv` 和 `paper_fetch.providers.ieee` 只保留 provider client orchestration。arXiv 的 Atom API、official HTML、作者边界、reference、asset retry 和 metadata helper 分别位于 `_arxiv_atom`、`_arxiv_html`、`_arxiv_authors`、`_arxiv_references`、`_arxiv_assets`、`_arxiv_metadata`；IEEE 的 HTML extraction、metadata/reference merge、supplementary detection、URL helper、block-page detection 和 browser HTML fallback 分别位于 `_ieee_html`、`_ieee_metadata`、`_ieee_supplementary`、`_ieee_url`、`_ieee_block_page`、`_ieee_browser_html`。
+
 `paper_fetch.providers._atypon_browser_workflow_profiles` 是 Atypon-only candidate routing/profile dispatch helper。它支持 provider catalog 中的 `science` / `pnas` / `wiley` / `ams`；候选 URL 模板来自 `ProviderSpec`，provider-owned callback 模块按 `ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES` 动态导入。`paper_fetch.providers.atypon_browser_workflow` 承载 Atypon browser HTML markdown、asset scopes、normalization 和 postprocess entrypoint，publisher 差异通过 profile callback 分派。
 
 browser workflow 内部不再通过包级 facade 反射查找 patch 点；`BrowserWorkflowClient`、bootstrap、PDF fallback 和 asset retry helper 统一接收 `shared.BrowserWorkflowDeps`。生产默认依赖由 `default_browser_workflow_deps()` 装配，测试需要替换 runtime、FlareSolverr、Playwright 或 asset downloader 时通过构造定制 deps 注入。

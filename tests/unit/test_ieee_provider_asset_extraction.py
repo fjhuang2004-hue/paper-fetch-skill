@@ -1,17 +1,19 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
+from paper_fetch.providers import _ieee_html, _ieee_metadata, _ieee_supplementary
+
 from ._ieee_provider_support import *
 
 
 class IeeeProviderAssetExtractionTests(unittest.TestCase):
     def test_ieee_supplementary_suffixes_reuse_generic_source_with_ieee_extras(self) -> None:
-        self.assertTrue(ieee_provider._has_ieee_supplementary_file_suffix("https://example.test/supplement.csv"))
+        self.assertTrue(_ieee_supplementary._has_ieee_supplementary_file_suffix("https://example.test/supplement.csv"))
         self.assertTrue(
-            ieee_provider._has_ieee_supplementary_file_suffix("https://example.test/supplement.docx")
+            _ieee_supplementary._has_ieee_supplementary_file_suffix("https://example.test/supplement.docx")
         )
         self.assertTrue(
-            ieee_provider._has_ieee_supplementary_file_suffix("https://example.test/archive.tar.gz")
+            _ieee_supplementary._has_ieee_supplementary_file_suffix("https://example.test/archive.tar.gz")
         )
 
     def test_ieee_figure_full_media_assets_are_body_assets(self) -> None:
@@ -21,7 +23,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
         article_number = "10388355"
         rest_url = f"https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true"
 
-        extraction = ieee_provider._extract_ieee_html(
+        extraction = _ieee_html._extract_ieee_html(
             _dynamic_html_with_ieee_media_assets(article_number).decode("utf-8"),
             rest_url,
             metadata={"title": "IEEE Dynamic Article"},
@@ -90,7 +92,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
             "</div></div></response>"
         )
 
-        extraction = ieee_provider._extract_ieee_html(
+        extraction = _ieee_html._extract_ieee_html(
             html,
             rest_url,
             metadata={"title": "IEEE Dynamic Article"},
@@ -119,7 +121,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
             "</div></div></response>"
         )
 
-        extraction = ieee_provider._extract_ieee_html(html, rest_url, metadata={"title": "IEEE Dynamic Article"})
+        extraction = _ieee_html._extract_ieee_html(html, rest_url, metadata={"title": "IEEE Dynamic Article"})
 
         self.assertNotIn("Section 1", extraction.markdown_text)
         self.assertNotIn("icon.support-new.gif", json.dumps(extraction.extracted_assets))
@@ -134,7 +136,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
         document_url = f"https://ieeexplore.ieee.org/document/{article_number}/"
         multimedia_url = f"https://ieeexplore.ieee.org/rest/document/{article_number}/multimedia"
         landing_html = (fixture_root / "landing.html").read_text(encoding="utf-8")
-        landing_metadata = ieee_provider._parse_landing_metadata(landing_html)
+        landing_metadata = _ieee_metadata._parse_landing_metadata(landing_html)
         multimedia_body = (fixture_root / "multimedia.json").read_bytes()
         transport = RecordingTransport(
             {
@@ -147,7 +149,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
             }
         )
         client = IeeeClient(transport, {})
-        attempt = ieee_provider.IeeeLandingAttempt(
+        attempt = _ieee_metadata.IeeeLandingAttempt(
             normalized_doi=doi,
             landing_url=document_url,
             response_url=document_url,
@@ -157,7 +159,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
             landing_metadata=landing_metadata,
         )
 
-        self.assertTrue(ieee_provider._landing_metadata_has_multimedia_scope(landing_metadata))
+        self.assertTrue(_ieee_metadata._landing_metadata_has_multimedia_scope(landing_metadata))
         self.assertEqual(landing_metadata["sections"]["multimedia"], "true")
 
         supplementary_assets = client._fetch_multimedia_assets(attempt)
@@ -235,7 +237,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
         article_number = "10388355"
         rest_url = f"https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true"
 
-        extraction = ieee_provider._extract_ieee_html(
+        extraction = _ieee_html._extract_ieee_html(
             _dynamic_html_with_ieee_equation_alt_table_asset(article_number).decode("utf-8"),
             rest_url,
             metadata={"title": "IEEE Dynamic Article"},
@@ -314,7 +316,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
             },
         ]
 
-        merged = ieee_provider._merge_ieee_assets(extracted_assets, downloaded_assets)
+        merged = _ieee_html._merge_ieee_assets(extracted_assets, downloaded_assets)
 
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["kind"], "table")
@@ -365,7 +367,7 @@ class IeeeProviderAssetExtractionTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.object(
-                ieee_provider,
+                _ieee_supplementary,
                 "download_figure_assets",
                 return_value={"assets": [], "asset_failures": []},
             ) as mocked_download:

@@ -224,7 +224,7 @@ PROVIDER_CATALOG: dict[str, ProviderSpec] = {
         provider_managed_abstract_only=False,
         client_factory_path="paper_fetch.providers.arxiv:ArxivClient",
         status_order=7,
-        metadata_probe_short_circuit="paper_fetch.providers.arxiv:arxiv_metadata_probe_short_circuit",
+        metadata_probe_short_circuit="paper_fetch.providers._arxiv_metadata:arxiv_metadata_probe_short_circuit",
         persist_provider_html=True,
     ),
     "copernicus": ProviderSpec(

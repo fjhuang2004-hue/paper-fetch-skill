@@ -9,10 +9,12 @@ from unittest import mock
 
 from paper_fetch.extraction.html import assets as html_assets
 from paper_fetch.http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, RequestFailure
-from paper_fetch.providers import ieee as ieee_provider
+from paper_fetch.providers import _ieee_html, _ieee_metadata, ieee as ieee_provider
 from paper_fetch.providers._pdf_common import PdfFetchFailure, PdfFetchResult
+from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
 from paper_fetch.providers.ieee import IeeeClient
 from paper_fetch.runtime import RuntimeContext
+from paper_fetch.tracing import trace_from_markers
 from paper_fetch.workflow.types import FetchStrategy
 from tests.golden_criteria import golden_criteria_manifest
 from tests.paths import REPO_ROOT
@@ -73,7 +75,7 @@ def _raw_ieee_html_payload(
     html_text: str,
     source_url: str,
     trace_markers: list[str] | None = None,
-) -> ieee_provider.RawFulltextPayload:
+) -> RawFulltextPayload:
     metadata = {
         "doi": doi,
         "title": "IEEE Dynamic Article",
@@ -83,14 +85,14 @@ def _raw_ieee_html_payload(
         "articleNumber": article_number,
         "landing_page_url": f"https://ieeexplore.ieee.org/document/{article_number}/",
     }
-    extraction = ieee_provider._extract_ieee_html(html_text, source_url, metadata=metadata)
+    extraction = _ieee_html._extract_ieee_html(html_text, source_url, metadata=metadata)
     body = extraction.html_text.encode("utf-8")
-    return ieee_provider.RawFulltextPayload(
+    return RawFulltextPayload(
         provider="ieee",
         source_url=source_url,
         content_type="text/html",
         body=body,
-        content=ieee_provider.ProviderContent(
+        content=ProviderContent(
             route_kind="html",
             source_url=source_url,
             content_type="text/html",
@@ -108,7 +110,7 @@ def _raw_ieee_html_payload(
             fetcher="playwright_html",
             extracted_assets=extraction.extracted_assets,
         ),
-        trace=ieee_provider.trace_from_markers(trace_markers or ["fulltext:ieee_html_ok"]),
+        trace=trace_from_markers(trace_markers or ["fulltext:ieee_html_ok"]),
         merged_metadata=metadata,
     )
 
@@ -196,16 +198,16 @@ IEEE_REAL_HTML_SAMPLES = {
 
 def _real_ieee_fixture_metadata(*, doi: str, fixture_dir: str, article_number: str) -> dict[str, object]:
     fixture_root = REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / fixture_dir
-    landing_metadata = ieee_provider._parse_landing_metadata(
+    landing_metadata = _ieee_metadata._parse_landing_metadata(
         (fixture_root / "landing.html").read_text(encoding="utf-8")
     )
-    metadata = ieee_provider._merge_ieee_metadata(
+    metadata = _ieee_metadata._merge_ieee_metadata(
         {"doi": doi},
         landing_metadata,
         f"https://ieeexplore.ieee.org/document/{article_number}/",
     )
     references_payload = json.loads((fixture_root / "references.json").read_text(encoding="utf-8"))
-    references = ieee_provider._references_from_ieee_reference_payload(references_payload)
+    references = _ieee_metadata._references_from_ieee_reference_payload(references_payload)
     if references:
         metadata["references"] = references
     return metadata
@@ -221,7 +223,7 @@ def _real_ieee_fixture_article(
     fixture_root = REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / fixture_dir
     source_url = f"https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true"
     metadata = _real_ieee_fixture_metadata(doi=doi, fixture_dir=fixture_dir, article_number=article_number)
-    extraction = ieee_provider._extract_ieee_html(
+    extraction = _ieee_html._extract_ieee_html(
         (fixture_root / "original.html").read_text(encoding="utf-8"),
         source_url,
         metadata=metadata,
@@ -248,12 +250,12 @@ def _real_ieee_fixture_article(
         downloaded_assets.append(downloaded)
 
     body = extraction.html_text.encode("utf-8")
-    raw_payload = ieee_provider.RawFulltextPayload(
+    raw_payload = RawFulltextPayload(
         provider="ieee",
         source_url=source_url,
         content_type="text/html",
         body=body,
-        content=ieee_provider.ProviderContent(
+        content=ProviderContent(
             route_kind="html",
             source_url=source_url,
             content_type="text/html",
@@ -270,7 +272,7 @@ def _real_ieee_fixture_article(
             reason="Loaded IEEE real HTML fixture.",
             extracted_assets=extraction.extracted_assets,
         ),
-        trace=ieee_provider.trace_from_markers(["fulltext:ieee_html_ok"]),
+        trace=trace_from_markers(["fulltext:ieee_html_ok"]),
         merged_metadata=metadata,
     )
     client = IeeeClient(RecordingTransport({}), {})

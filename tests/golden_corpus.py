@@ -16,10 +16,11 @@ from paper_fetch.providers import (
     _science_html,
     _ams_html,
     _atypon_browser_workflow_profiles as atypon_browser_workflow_profiles,
+    _ieee_html,
+    _ieee_metadata,
     _wiley_html,
     copernicus as copernicus_provider,
     elsevier as elsevier_provider,
-    ieee as ieee_provider,
     pnas as pnas_provider,
     science as science_provider,
     ams as ams_provider,
@@ -27,6 +28,7 @@ from paper_fetch.providers import (
     _springer_html as springer_html,
     wiley as wiley_provider,
 )
+from paper_fetch.providers.ieee import IeeeClient
 from paper_fetch.quality.html_availability import assess_html_fulltext_availability
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
 from paper_fetch.providers._pdf_common import pdf_fetch_result_from_bytes
@@ -285,10 +287,10 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
 
 def _ieee_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     article_number = str(fixture.sample.get("article_number") or "")
-    landing_metadata = ieee_provider._parse_landing_metadata(
+    landing_metadata = _ieee_metadata._parse_landing_metadata(
         golden_criteria_asset(fixture.doi, "landing.html").read_text(encoding="utf-8", errors="ignore")
     )
-    metadata = ieee_provider._merge_ieee_metadata(
+    metadata = _ieee_metadata._merge_ieee_metadata(
         _base_metadata(fixture),
         landing_metadata,
         fixture.landing_url,
@@ -296,7 +298,7 @@ def _ieee_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     references_path = golden_criteria_asset(fixture.doi, "references.json")
     if references_path.exists():
         references_payload = json.loads(references_path.read_text(encoding="utf-8"))
-        references = ieee_provider._references_from_ieee_reference_payload(references_payload)
+        references = _ieee_metadata._references_from_ieee_reference_payload(references_payload)
         if references:
             metadata["references"] = references
     if not metadata.get("doi"):
@@ -337,7 +339,7 @@ def _ieee_downloaded_body_assets(
 def _build_ieee_article(fixture: GoldenCorpusFixture):
     metadata = _ieee_fixture_metadata(fixture)
     html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
-    extraction = ieee_provider._extract_ieee_html(
+    extraction = _ieee_html._extract_ieee_html(
         html_text,
         fixture.source_url,
         metadata=metadata,
@@ -368,7 +370,7 @@ def _build_ieee_article(fixture: GoldenCorpusFixture):
         trace=trace_from_markers(["fulltext:ieee_html_ok"]),
         merged_metadata=metadata,
     )
-    client = ieee_provider.IeeeClient(HttpTransport(), {})
+    client = IeeeClient(HttpTransport(), {})
     with tempfile.TemporaryDirectory() as tmpdir:
         downloaded_assets = _ieee_downloaded_body_assets(extraction.extracted_assets, Path(tmpdir))
         return client.to_article_model({"doi": fixture.doi}, raw_payload, downloaded_assets=downloaded_assets)
@@ -565,7 +567,7 @@ def lightweight_positive_summary_from_fixture(fixture: GoldenCorpusFixture) -> d
     if fixture.provider == "ieee":
         metadata = _ieee_fixture_metadata(fixture)
         html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
-        extraction = ieee_provider._extract_ieee_html(
+        extraction = _ieee_html._extract_ieee_html(
             html_text,
             fixture.source_url,
             metadata=metadata,

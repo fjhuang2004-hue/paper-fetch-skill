@@ -1,6 +1,8 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
+from paper_fetch.providers import _ieee_html, _ieee_metadata, _ieee_url
+
 from ._ieee_provider_support import *
 
 
@@ -79,8 +81,8 @@ class IeeeProviderPdfGoldenTests(unittest.TestCase):
                 html = (REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / fixture_dir / "landing.html").read_text(
                     encoding="utf-8"
                 )
-                landing_metadata = ieee_provider._parse_landing_metadata(html)
-                attempt = ieee_provider.IeeeLandingAttempt(
+                landing_metadata = _ieee_metadata._parse_landing_metadata(html)
+                attempt = _ieee_metadata.IeeeLandingAttempt(
                     normalized_doi=doi,
                     landing_url=landing_url,
                     response_url=landing_url,
@@ -94,7 +96,7 @@ class IeeeProviderPdfGoldenTests(unittest.TestCase):
                 )
 
                 self.assertEqual(
-                    ieee_provider._pdf_candidates(attempt),
+                    _ieee_url._pdf_candidates(attempt),
                     [
                         f"https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber={article_number}",
                         f"https://ieeexplore.ieee.org/iel7/{article_number}.pdf",
@@ -321,7 +323,7 @@ class IeeeProviderPdfGoldenTests(unittest.TestCase):
         fixture = REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / "10.1109_TIM.2024.3509573" / "original.html"
         source_url = "https://ieeexplore.ieee.org/rest/document/10772041/?logAccess=true"
 
-        extraction = ieee_provider._extract_ieee_html(
+        extraction = _ieee_html._extract_ieee_html(
             fixture.read_text(encoding="utf-8"),
             source_url,
             metadata={"title": "IEEE TIM Article"},

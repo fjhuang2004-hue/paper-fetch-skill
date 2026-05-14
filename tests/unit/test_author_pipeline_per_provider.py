@@ -6,13 +6,14 @@ from collections.abc import Callable
 import pytest
 
 from paper_fetch.providers import (
+    _arxiv_authors,
+    _arxiv_html,
     _ams_html,
+    _ieee_metadata,
     _pnas_html,
     _science_html,
     _springer_html,
     _wiley_html,
-    arxiv as arxiv_provider,
-    ieee as ieee_provider,
 )
 
 
@@ -32,10 +33,10 @@ def _jsonld(payload: object) -> str:
         (_wiley_html._AUTHOR_PIPELINE, ["meta", "jsonld", "dom"]),
         (_ams_html._AUTHOR_PIPELINE, ["meta", "property", "selector"]),
         (_springer_html._AUTHOR_PIPELINE, ["meta", "jsonld", "dom"]),
-        (arxiv_provider._AUTHOR_PIPELINE, ["creators", "person-names"]),
-        (ieee_provider._AUTHOR_PIPELINE, ["authors", "authorsList"]),
+        (_arxiv_authors._AUTHOR_PIPELINE, ["creators", "person-names"]),
+        (_ieee_metadata._AUTHOR_PIPELINE, ["authors", "authorsList"]),
         (
-            ieee_provider._AUTHOR_NAME_PIPELINE,
+            _ieee_metadata._AUTHOR_NAME_PIPELINE,
             ["name-field", "first-last", "scalar"],
         ),
     ),
@@ -216,7 +217,7 @@ def test_provider_author_pipelines_fall_back_by_step(
 
 
 def test_arxiv_author_pipeline_prefers_multiple_creator_nodes() -> None:
-    soup = arxiv_provider.BeautifulSoup(
+    soup = _arxiv_html.BeautifulSoup(
         """
         <article>
           <div class="ltx_creator ltx_role_author">
@@ -231,14 +232,14 @@ def test_arxiv_author_pipeline_prefers_multiple_creator_nodes() -> None:
         "html.parser",
     )
 
-    assert arxiv_provider._AUTHOR_PIPELINE(str(soup.article)) == [
+    assert _arxiv_authors._AUTHOR_PIPELINE(str(soup.article)) == [
         "Ada Lovelace",
         "Grace Hopper",
     ]
 
 
 def test_arxiv_author_pipeline_falls_back_to_person_boundary_split() -> None:
-    soup = arxiv_provider.BeautifulSoup(
+    soup = _arxiv_html.BeautifulSoup(
         """
         <article>
           <span class="ltx_personname">
@@ -251,7 +252,7 @@ def test_arxiv_author_pipeline_falls_back_to_person_boundary_split() -> None:
         "html.parser",
     )
 
-    assert arxiv_provider._AUTHOR_PIPELINE(str(soup.article)) == [
+    assert _arxiv_authors._AUTHOR_PIPELINE(str(soup.article)) == [
         "Katherine Johnson",
         "Alan Turing",
         "Alonzo Church",
@@ -269,7 +270,7 @@ def test_ieee_author_pipeline_handles_metadata_author_shapes() -> None:
         ]
     }
 
-    assert ieee_provider._AUTHOR_PIPELINE(json.dumps(metadata)) == [
+    assert _ieee_metadata._AUTHOR_PIPELINE(json.dumps(metadata)) == [
         "Ada Preferred",
         "Grace Hopper",
         "Alan Turing",
@@ -283,7 +284,7 @@ def test_ieee_author_pipeline_uses_authors_before_authors_list() -> None:
         "authorsList": [{"name": "Fallback Author"}],
     }
 
-    assert ieee_provider._AUTHOR_PIPELINE(json.dumps(metadata)) == ["Primary Author"]
+    assert _ieee_metadata._AUTHOR_PIPELINE(json.dumps(metadata)) == ["Primary Author"]
 
 
 def test_ieee_author_pipeline_falls_back_to_authors_list_container() -> None:
@@ -296,7 +297,7 @@ def test_ieee_author_pipeline_falls_back_to_authors_list_container() -> None:
         }
     }
 
-    assert ieee_provider._AUTHOR_PIPELINE(json.dumps(metadata)) == [
+    assert _ieee_metadata._AUTHOR_PIPELINE(json.dumps(metadata)) == [
         "List Author",
         "Second Author",
     ]

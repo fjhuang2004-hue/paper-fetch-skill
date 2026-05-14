@@ -1,6 +1,8 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
+from paper_fetch.providers import _ieee_supplementary
+
 from ._ieee_provider_support import *
 
 
@@ -32,12 +34,12 @@ class IeeeProviderAssetDownloadTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.object(
-                ieee_provider,
+                _ieee_supplementary,
                 "download_figure_assets",
                 return_value={"assets": [], "asset_failures": []},
             ) as mocked_download:
                 with mock.patch.object(
-                    ieee_provider,
+                    _ieee_supplementary,
                     "download_supplementary_assets",
                     return_value={"assets": [], "asset_failures": []},
                 ) as mocked_supplementary:
