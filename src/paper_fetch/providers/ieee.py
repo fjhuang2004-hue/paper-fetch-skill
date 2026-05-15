@@ -380,6 +380,8 @@ class IeeeClient(ProviderClient):
         artifact_dir = (
             context.download_dir / IEEE_PDF_FALLBACK_ARTIFACT_DIR_NAME
             if context.download_dir is not None
+            and context.artifact_store is not None
+            and context.artifact_store.allows_auxiliary_artifacts
             else None
         )
         direct_failure: PdfFetchFailure | None = None

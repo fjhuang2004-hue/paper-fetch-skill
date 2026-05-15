@@ -113,6 +113,18 @@ class HttpTransportCacheTests(unittest.TestCase):
         self.assertEqual(overridden_context.transport.disk_cache_max_bytes, 3456)
         self.assertEqual(overridden_context.transport.disk_cache_max_age_seconds, 2 * 24 * 60 * 60)
 
+    def test_runtime_markdown_assets_artifact_mode_disables_download_dir_http_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            all_context = RuntimeContext(env={}, download_dir=Path(tmpdir), artifact_mode="all")
+            markdown_assets_context = RuntimeContext(
+                env={},
+                download_dir=Path(tmpdir),
+                artifact_mode="markdown-assets",
+            )
+
+        self.assertEqual(all_context.transport.disk_cache_dir, Path(tmpdir) / ".paper-fetch-http-cache")
+        self.assertIsNone(markdown_assets_context.transport.disk_cache_dir)
+
     def test_disk_cache_key_redacts_crossref_mailto_query_param(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             first_transport = http_module.HttpTransport(

@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from ..artifacts import DEFAULT_ARTIFACT_MODE, ArtifactMode
 from ..http import HttpTransport
 from ..models import OutputMode, RenderOptions
 from ..runtime import RuntimeContext
@@ -21,6 +22,7 @@ def build_fetch_pipeline_request(
     render: RenderOptions,
     env: Mapping[str, str] | None = None,
     download_dir: Path | None = None,
+    artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE,
     no_download: bool = False,
     transport: HttpTransport | None = None,
     clients: Mapping[str, object] | None = None,
@@ -38,6 +40,7 @@ def build_fetch_pipeline_request(
         render=render,
         env=runtime_env,
         download_dir=download_dir,
+        artifact_mode="none" if no_download else artifact_mode,
         no_download=no_download,
         transport=context.transport if context is not None else transport,
         clients=context.clients if context is not None else clients,

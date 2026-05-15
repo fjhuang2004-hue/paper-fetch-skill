@@ -75,7 +75,28 @@ class FetchPipelineTests(unittest.TestCase):
 
         context = captured["context"]
         self.assertIsNone(context.download_dir)
+        self.assertEqual(context.artifact_mode, "none")
         self.assertIs(context.fetch_cache, fetch_cache)
+
+    def test_run_passes_artifact_mode_to_context(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_fetch_paper(query, **kwargs):
+            captured.update(kwargs)
+            return build_envelope(sample_article())
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            FetchPipeline(fake_fetch_paper).run(
+                _request(
+                    download_dir=Path(tmpdir),
+                    artifact_mode="markdown-assets",
+                )
+            )
+
+        context = captured["context"]
+        self.assertEqual(context.download_dir, Path(tmpdir))
+        self.assertEqual(context.artifact_mode, "markdown-assets")
+        self.assertIsNone(context.transport.disk_cache_dir)
 
     def test_cache_hit_short_circuits_service_and_write_hook(self) -> None:
         cached = build_envelope(sample_article())
@@ -196,6 +217,7 @@ class FetchPipelineTests(unittest.TestCase):
         self.assertIs(request.clients, clients)
         self.assertIs(request.cancel_check, cancel_check)
         self.assertEqual(request.download_dir, Path("/tmp/request-downloads"))
+        self.assertEqual(request.artifact_mode, "all")
         self.assertEqual(request.modes, {"markdown"})
 
 

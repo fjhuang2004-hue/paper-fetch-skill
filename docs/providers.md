@@ -143,7 +143,7 @@ resolve DOI / landing URL
 - 动态 HTML 成功时公开 `source="ieee_html"`；PDF fallback 成功时公开 `source="ieee_pdf"`。
 - PDF fallback 先保留 direct HTTP 尝试；如果 IEEE `stamp.jsp` / `pdfPath` 返回 HTML/JS wrapper、502、redirect loop 或 access page，会再用 document landing page 作为 seed 进入 Playwright PDF fallback。
 - seeded-browser PDF fallback 只复用操作者当前运行环境可合法取得的页面上下文和 cookies；不会处理 CAPTCHA、登录自动化或权限绕过。
-- PDF fallback 只接受真实 PDF payload；如果 browser route 仍返回 access gate、challenge、APM/temporary unavailable 页面或非 PDF wrapper，会被拒绝并继续降级。失败诊断会记录 candidate URL、final URL、status、content-type、title/body 摘要；配置了 `download_dir` 时会在 `ieee_pdf_fallback/pdf.failure.html` 留下最后的非 PDF HTML 产物。
+- PDF fallback 只接受真实 PDF payload；如果 browser route 仍返回 access gate、challenge、APM/temporary unavailable 页面或非 PDF wrapper，会被拒绝并继续降级。失败诊断会记录 candidate URL、final URL、status、content-type、title/body 摘要；配置了 `download_dir` 且 artifact mode 为 `all` 时会在 `ieee_pdf_fallback/pdf.failure.html` 留下最后的非 PDF HTML 产物。
 - 动态 HTML 的正文清洗会删除裸露 `SECTION I.` 这类 Xplore section marker；`div.section` / `div.section_2` 按嵌套层级输出 Markdown heading，主节为 `##`，`A.` / `B.` 子节为 `###`，`1)` 子节为 `####`。
 - IEEE HTML cleanup 只声明 Xplore REST fragment 或站点专属增量，例如 `accesstype`、`select` / `textarea`、`.zoom-container`、`.document-actions`、`button[data-docId]` 和 `javascript:` action 链接；`script` / `style` / `noscript` / `iframe` / `button` / `input` 等通用 chrome 继续由默认站点规则和 browser workflow 负责。
 - IEEE `tex-math` / `disp-formula` 会复用共享公式规则输出 LaTeX，不应退化成 `[Formula unavailable]`；如果仍然缺公式，`article.quality.semantic_losses.formula_missing_count` 会反映 Markdown 中的缺失占位数量。
@@ -565,14 +565,20 @@ CLI、Python API、MCP 当前统一采用这些默认值：
 <a id="mcp-download-and-markdown-save"></a>
 ### 下载行为
 
-- 对 provider artifact 来说，`--no-download` 或 `download_dir=None` 优先级最高
+- CLI `--artifact-mode` 控制 artifact 保留范围，`--asset-profile` 只控制内容资产范围。
+- `--artifact-mode markdown-assets` 是 CLI 默认值：保存 Markdown 和 `--asset-profile` 允许的本地资产，不保存 provider 原始 HTML/XML、fetch-envelope/cache-index JSON、格式化 JSON 副本或 `<download_dir>/.paper-fetch-http-cache/` textual cache。
+- 当正文来自 `pdf_fallback` 时，`markdown-assets` 仍会保存 PDF 源文件；PDF fallback 的 Markdown 转换质量通常低于 XML/provider HTML，需要保留来源便于溯源和排查。
+- `--artifact-mode all` 保留旧行为：provider HTML/PDF、辅助 artifact、HTTP textual cache、MCP fetch-envelope sidecar/cache-index，以及显式 `--format` + `--output-dir` 产生的同格式副本都可落盘。
+- `--artifact-mode none` 不保存 provider artifact 或资产；显式 `--output <path>` / `--save-markdown` 仍可写 Markdown。
+- `--no-download` 已弃用但保留兼容，等价于 `--artifact-mode none`。
+- 对 provider artifact 来说，`download_dir=None` 优先级最高
 - CLI/MCP 通过 `workflow.request_builder.build_fetch_pipeline_request()` 统一装配 `FetchPipelineRequest`。
 - `FetchPipeline` 负责创建 `RuntimeContext`。
 - Provider payload、Springer HTML local copy、Markdown 保存和 asset 诊断仍由 `ArtifactStore` 应用。
-- CLI 的 `--output-dir` 仍是 provider HTML/PDF/图片等 artifact 目录；额外地，当用户显式传入 `--format`、保留 `--output -` 且指定 `--output-dir` 时，CLI 会把同格式主输出副本写入该目录，文件名为 `<doi>.md`、`<doi>.json` 或 `<doi>.both.json`。
+- CLI 的 `--output-dir` 是 Markdown、PDF fallback 来源文件和本地资产目录；在 `--artifact-mode all` 下也会接收 provider HTML/PDF/图片等旧 artifact。额外地，当用户显式传入 `--format`、保留 `--output -`、指定 `--output-dir` 且 artifact mode 允许时，CLI 会把同格式主输出副本写入该目录，文件名为 `<doi>.md`、`<doi>.json` 或 `<doi>.both.json`。
 - 既有 warning 与 `download:*` source trail marker 保持不变。
 - MCP fetch-envelope sidecar/cache-index 的 JSON 写入也复用 `ArtifactStore` 的原子 writer。
-- 即使 `asset_profile` 是 `body` / `all`，也不会落盘
+- 当 artifact mode 或 MCP `no_download=true` 禁止资产落盘时，即使 `asset_profile` 是 `body` / `all`，资产也不会落盘。
 - 没有本地文件时，Markdown 会自动退回 captions-only 或不展示本地资源链接
 - MCP `no_download=true` 会让 service/provider 阶段使用 `RuntimeContext(download_dir=None)`，因此不会写 provider payload、PDF、HTML、资产或 fetch-envelope sidecar；`prefer_cache=true` 仍可显式读取已存在的 fetch-envelope sidecar。
 - MCP `save_markdown=true` 是独立的 Markdown 保存步骤：成功时写 `.md` 并返回 `saved_markdown_path`，追加 `download:markdown_saved`；没有 fulltext Markdown 时不写文件，追加 `download:markdown_skipped_no_fulltext`。

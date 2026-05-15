@@ -413,7 +413,7 @@ class ProviderClient:
     ) -> ProviderFetchResult:
         context = self._runtime_context(context, output_dir=output_dir)
         active_artifact_store = artifact_store or ArtifactStore.from_download_dir(output_dir)
-        asset_output_dir = active_artifact_store.download_dir
+        asset_output_dir = active_artifact_store.asset_download_dir
         prepared = self.prepare_fetch_result_payload(doi, metadata, asset_profile=asset_profile, context=context)
         prepared.raw_payload = self._sync_fetch_result_content_local_copy(prepared.raw_payload)
         prepared = self.maybe_recover_fetch_result_payload(

@@ -238,21 +238,26 @@ paper-fetch-mcp
 
 ### CLI 行为速查
 
-`paper-fetch` 的三个输出相关参数分工如下：
+`paper-fetch` 的输出与本地 artifact 参数分工如下：
 
 - `--format markdown|json|both` 指定 stdout 或 `--output` 的序列化格式，默认是 `markdown`。
 - `--output <path>` 把这份格式化结果写到指定文件；默认 `--output -` 表示打印到终端。
-- `--output-dir <dir>` 是 provider HTML、PDF、图片等本地资源的保存目录。当用户显式传入 `--format` 且没有把 `--output` 改成文件路径时，CLI 也会在 `--output-dir` 下额外写一份同格式文档：`markdown` 写 `<doi>.md`，`json` 写 `<doi>.json`，`both` 写 `<doi>.both.json`。
+- `--output-dir <dir>` 是 Markdown、PDF fallback 来源文件和本地资产的保存目录，默认使用 `PAPER_FETCH_DOWNLOAD_DIR` 或用户数据目录下的 `downloads/`。
+- `--artifact-mode markdown-assets|all|none` 控制中间产物保留，CLI 默认是 `markdown-assets`：保存 Markdown、按 `--asset-profile` 保存资产，不保留 provider 原始 HTML/XML、fetch-envelope/cache JSON 或 HTTP textual cache；如果正文来自 PDF fallback，仍会保存 PDF 源文件便于溯源。
+- `--artifact-mode all` 保留旧行为：provider HTML/PDF、辅助 artifact、HTTP textual cache 和显式格式副本都可落盘。当用户显式传入 `--format`、保留 `--output -` 且指定 `--output-dir` 时，CLI 会在 `--output-dir` 下额外写一份同格式文档：`markdown` 写 `<doi>.md`，`json` 写 `<doi>.json`，`both` 写 `<doi>.both.json`。
+- `--artifact-mode none` 不保存 provider artifact 或资产；显式 `--output <path>` / `--save-markdown` 仍可写 Markdown。`--no-download` 保留兼容，但已弃用，等价于 `--artifact-mode none`。
+- `--asset-profile none|body|all` 只控制内容资产范围，CLI 默认是 `body`：`none` 只要文本，`body` 保存正文图片/图表/公式图片，`all` 额外保存补充材料。
 
 例如：
 
 ```bash
 paper-fetch --query "https://www.nature.com/articles/s41559-026-03039-9" \
-  --format markdown \
   --output-dir ./papers
 ```
 
-这会继续把 Markdown 打印到终端，同时在 `./papers` 保存一份 Markdown，并把 provider HTML / 图片资源也放到 `./papers`。如果只想控制格式化结果的文件路径，显式使用 `--output`：
+这会继续把 Markdown 打印到终端，同时在 `./papers` 保存一份 Markdown，并按默认 `--asset-profile body` 保存正文图片等资产；默认不会保存 provider 原始 HTML/XML 或 JSON/cache sidecar。需要完整调试 artifact 时显式使用 `--artifact-mode all`。
+
+如果只想控制格式化结果的文件路径，显式使用 `--output`：
 
 ```bash
 paper-fetch --query "10.1186/1471-2105-11-421" \
@@ -378,7 +383,7 @@ WSL 下给 Codex 挂 MCP 时，推荐使用仓库包装脚本：
 
 ### 常用抓取参数
 
-MCP 默认模式、`prefer_cache`、`no_download` 和 `save_markdown` 的完整语义见 [`docs/providers.md`](docs/providers.md#mcp-download-and-markdown-save)。`strategy.asset_profile` 支持 `none`、`body`、`all`，默认由 provider 决定。
+MCP 默认模式、`prefer_cache`、`no_download` 和 `save_markdown` 的完整语义见 [`docs/providers.md`](docs/providers.md#mcp-download-and-markdown-save)。`strategy.asset_profile` 支持 `none`、`body`、`all`；CLI 默认是 `body`，MCP/Python API 未显式设置时默认由 provider 决定。
 
 ### 更新
 

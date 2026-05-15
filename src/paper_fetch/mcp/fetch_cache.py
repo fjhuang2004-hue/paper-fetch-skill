@@ -359,7 +359,7 @@ class FetchCache:
         return mark_envelope_cached_with_current_revision(envelope_from_payload(payload))
 
     def write_fetch_envelope(self, envelope: FetchEnvelope, request: FetchPaperRequest) -> None:
-        if self.download_dir is None:
+        if self.download_dir is None or not self._artifact_store.allows_structured_sidecars:
             return
         doi = normalize_text(envelope.doi)
         if not doi:

@@ -246,7 +246,7 @@ Crossref 的 provider adapter 位于 `paper_fetch.providers.crossref.CrossrefCli
 - `RuntimeContext` 显式承载 env、transport、clients、download_dir、cancel_check 等运行时依赖。
 - `RuntimeContext.parse_cache` 是进程内、单 context 生命周期的解析 memo：key 包含 provider、role、source、body sha256、parser 和配置指纹；dict/list 读取时返回拷贝，XML root 仅作为只读对象复用。
 - MCP `fetch_paper` 和 batch 工具必须复用同一个 `RuntimeContext` 派生出的 env、transport、provider clients、download_dir 与 cancel_check；调用 service 时只传入完整 context，不再向 service 传旧 `transport` / `env` / `clients` / `download_dir` 回退参数。
-- `ArtifactStore` / `DownloadPolicy` 管理 provider PDF/binary local copy、Springer HTML `original.html` copy、Markdown 保存、provider asset warning/source-trail 诊断，以及 fetch-envelope/cache-index JSON 的原子写入。
+- `ArtifactStore` / `DownloadPolicy` 管理 artifact mode：provider PDF/binary local copy、PDF fallback 来源文件、provider 原始 HTML、Markdown 保存、provider asset warning/source-trail 诊断、HTTP textual cache 开关，以及 fetch-envelope/cache-index JSON 的原子写入。
 - `FetchCache` 管理 MCP fetch-envelope sidecar reuse/write 语义和 cache index refresh；sidecar version、`EXTRACTION_REVISION` 校验、resource URI 与 scoped cache resource 语义保持稳定，实际 JSON materialization 委托给 `ArtifactStore`。
 
 ### 9. Transport 层

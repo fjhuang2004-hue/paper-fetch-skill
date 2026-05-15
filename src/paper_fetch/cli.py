@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .artifacts import ArtifactStore
+from .artifacts import ArtifactMode, ArtifactStore
 from .config import build_runtime_env, resolve_cli_download_dir
 from .models import FetchEnvelope, RenderOptions
 from .providers.base import ProviderFailure
@@ -55,8 +55,31 @@ def _has_explicit_option(argv: list[str], option: str) -> bool:
     return any(value == option or value.startswith(f"{option}=") for value in argv)
 
 
-def _should_save_formatted_output_copy(args: argparse.Namespace, *, explicit_format: bool) -> bool:
-    return bool(explicit_format and args.output == "-" and args.output_dir)
+def _should_save_formatted_output_copy(
+    args: argparse.Namespace,
+    *,
+    explicit_format: bool,
+    artifact_mode: ArtifactMode,
+) -> bool:
+    if not (explicit_format and args.output == "-" and args.output_dir):
+        return False
+    if artifact_mode == "all":
+        return True
+    return artifact_mode == "markdown-assets" and args.format == "markdown"
+
+
+def _should_save_markdown_via_pipeline(
+    args: argparse.Namespace,
+    *,
+    artifact_mode: ArtifactMode,
+) -> bool:
+    if args.save_markdown:
+        return True
+    if artifact_mode != "markdown-assets":
+        return False
+    if args.output != "-":
+        return False
+    return not (args.format == "markdown" and getattr(args, "save_output_copy", False))
 
 
 def _formatted_output_filename(envelope: FetchEnvelope, *, output_format: str) -> str:
@@ -111,17 +134,28 @@ def parse_max_tokens(value: str) -> int | str:
 
 def _compute_modes(args: argparse.Namespace) -> set[str]:
     modes = {"markdown"} if args.format == "markdown" else {"article"}
+    save_markdown_to_disk = getattr(
+        args,
+        "save_markdown_to_disk",
+        getattr(args, "save_markdown", False),
+    )
 
     # Writing Markdown to a file or saving an extra Markdown copy needs the
     # structured article payload so we can rewrite local asset links relative
     # to the target path and decide whether full text was actually usable.
     if args.format == "markdown" and (args.output != "-" or getattr(args, "save_output_copy", False)):
         modes.add("article")
-    if args.format == "both" or args.save_markdown:
+    if args.format == "both" or save_markdown_to_disk:
         modes.add("markdown")
-    if args.save_markdown:
+    if save_markdown_to_disk:
         modes.add("article")
     return modes
+
+
+def _effective_artifact_mode(args: argparse.Namespace) -> ArtifactMode:
+    if args.no_download:
+        return "none"
+    return args.artifact_mode
 
 
 def exit_code_for_error(error: Exception) -> int:
@@ -162,7 +196,24 @@ def build_parser() -> argparse.ArgumentParser:
             "PAPER_FETCH_DOWNLOAD_DIR or the user data downloads directory."
         ),
     )
-    parser.add_argument("--no-download", action="store_true", help="Do not write provider PDF/binary payloads to disk.")
+    parser.add_argument(
+        "--artifact-mode",
+        choices=("markdown-assets", "all", "none"),
+        default="markdown-assets",
+        help=(
+            "Controls local artifact retention. markdown-assets saves Markdown plus assets from "
+            "--asset-profile and keeps PDF fallback sources; all preserves raw provider/cache "
+            "artifacts; none disables provider artifacts and assets."
+        ),
+    )
+    parser.add_argument(
+        "--no-download",
+        action="store_true",
+        help=(
+            "Deprecated alias for --artifact-mode none; disables provider artifacts and assets. "
+            "Explicit --output or --save-markdown can still write Markdown."
+        ),
+    )
     parser.add_argument(
         "--save-markdown",
         action="store_true",
@@ -175,7 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--include-refs", choices=("none", "top10", "all"), default=None)
-    parser.add_argument("--asset-profile", choices=("none", "body", "all"), default=None)
+    parser.add_argument("--asset-profile", choices=("none", "body", "all"), default="body")
     parser.add_argument("--max-tokens", type=parse_max_tokens, default="full_text")
     return parser
 
@@ -184,9 +235,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     raw_args = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(raw_args)
+    artifact_mode = _effective_artifact_mode(args)
     args.save_output_copy = _should_save_formatted_output_copy(
         args,
         explicit_format=_has_explicit_option(raw_args, "--format"),
+        artifact_mode=artifact_mode,
+    )
+    args.save_markdown_to_disk = _should_save_markdown_via_pipeline(
+        args,
+        artifact_mode=artifact_mode,
     )
 
     try:
@@ -210,13 +267,14 @@ def main(argv: list[str] | None = None) -> int:
                 env=runtime_env,
                 download_dir=output_dir,
                 no_download=args.no_download,
+                artifact_mode=artifact_mode,
                 markdown_save=(
                     MarkdownSaveSpec(
                         output_dir=output_dir,
                         render=render_options,
                         request_label="--save-markdown",
                     )
-                    if args.save_markdown
+                    if args.save_markdown_to_disk
                     else None
                 ),
             )

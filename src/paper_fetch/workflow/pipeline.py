@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..artifacts import DEFAULT_ARTIFACT_MODE, ArtifactMode
 from ..http import HttpTransport
 from ..models import FetchEnvelope, OutputMode, RenderOptions
 from ..runtime import RuntimeContext
@@ -43,6 +44,7 @@ class FetchPipelineRequest:
     render: RenderOptions
     env: Mapping[str, str] | None = None
     download_dir: Path | None = None
+    artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE
     no_download: bool = False
     transport: HttpTransport | None = None
     clients: Mapping[str, object] | None = None
@@ -64,11 +66,13 @@ class FetchPipeline:
     fetch_paper_fn: FetchPaperFn
 
     def runtime_context(self, request: FetchPipelineRequest) -> RuntimeContext:
+        artifact_mode: ArtifactMode = "none" if request.no_download else request.artifact_mode
         return RuntimeContext(
             env=request.env,
             transport=request.transport,
             clients=request.clients,
             download_dir=None if request.no_download else request.download_dir,
+            artifact_mode=artifact_mode,
             cancel_check=request.cancel_check,
             fetch_cache=request.fetch_cache,
         )

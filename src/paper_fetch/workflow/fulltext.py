@@ -116,7 +116,7 @@ def _provider_fetch_result(
     asset_profile: AssetProfile,
     context: RuntimeContext,
 ) -> ProviderFetchResult:
-    download_dir = artifact_store.download_dir
+    download_dir = artifact_store.asset_download_dir
     if isinstance(provider_client, FulltextProvider):
         return provider_client.fetch_result(
             doi,

@@ -119,6 +119,7 @@
 - `none`：不下载资产。
 - `body`：正文 figure、正文表格原图和可识别的公式图片。
 - `all`：当前 provider 可识别的全部相关资产。
+- CLI 默认是 `body`；Python API / MCP 未显式指定时仍按 provider 默认策略解析。
 
 ### `render_state`
 
@@ -157,10 +158,11 @@
 
 - 抓取时的落盘目录。
 - 可覆盖默认下载目录，也会影响 MCP scoped cache resources。
-- Provider PDF/binary、Springer `original.html`、Markdown 保存和 asset 诊断由 `RuntimeContext` / `ArtifactStore` 应用；CLI/MCP fetch 入口通过 `FetchPipeline` 创建运行时并调用 service，MCP 的 fetch-envelope sidecar 和 cache index 仍由 `FetchCache` 管理语义，但原子 JSON 写入复用 `ArtifactStore`。
+- `RuntimeContext` / `ArtifactStore` 通过 `artifact_mode` 控制 provider payload、原始 HTML、Markdown 保存、资产诊断、HTTP textual cache 与 structured sidecar 的落盘范围；CLI 默认 `markdown-assets`，API/MCP 默认保持旧式 `all`。
+- CLI/MCP fetch 入口通过 `FetchPipeline` 创建运行时并调用 service，MCP 的 fetch-envelope sidecar 和 cache index 仍由 `FetchCache` 管理语义，但原子 JSON 写入复用 `ArtifactStore`。
 - Python service API 不再接收 `download_dir` / `env` / `transport` / `clients` keyword；外层调用方需要先构造 `RuntimeContext(...)`，再传 `context=`。
 - 未显式设置时，CLI / MCP 优先使用用户数据目录下的 `paper-fetch/downloads`；CLI 创建失败才退回 `live-downloads`。
-- `download_dir` 派生的 HTTP textual disk cache 默认按 `4096` 条、`512 MiB`、`30` 天清理；详见 provider 文档中的 HTTP 缓存环境变量。
+- `download_dir` 派生的 HTTP textual disk cache 只在 artifact mode 为 `all` 时启用，默认按 `4096` 条、`512 MiB`、`30` 天清理；详见 provider 文档中的 HTTP 缓存环境变量。
 
 ### MCP 下载和 Markdown 保存
 

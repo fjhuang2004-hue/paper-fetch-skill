@@ -285,7 +285,7 @@ scripts/clean-local-artifacts.sh --days 7
 
 - `wiley` / `science` / `pnas` / `ams` 还需要 Playwright Chromium，因为 PNAS direct HTML preflight、HTML 正文图片资产下载和 seeded-browser PDF/ePDF fallback 都会使用 browser context
 - `elsevier` 只需要 `ELSEVIER_API_KEY`
-- `ieee` 不需要额外 env；普通 fetch 在无授权或 REST/browser/PDF route 返回非全文时会降级到 provider abstract-only / metadata-only；golden criteria live review 面向具备合法 IEEE Xplore 授权上下文的机器，IEEE 样本预期为 fulltext，降级会作为 blocked live fetch 暴露；配置了 `download_dir` 时 PDF fallback 的最后一个非 PDF HTML 会保存在 `ieee_pdf_fallback/pdf.failure.html`
+- `ieee` 不需要额外 env；普通 fetch 在无授权或 REST/browser/PDF route 返回非全文时会降级到 provider abstract-only / metadata-only；golden criteria live review 面向具备合法 IEEE Xplore 授权上下文的机器，IEEE 样本预期为 fulltext，降级会作为 blocked live fetch 暴露；配置了 `download_dir` 且 artifact mode 为 `all` 时 PDF fallback 的最后一个非 PDF HTML 会保存在 `ieee_pdf_fallback/pdf.failure.html`
 - `arxiv` 不需要额外 env；路径细节见 [`providers.md` 的 arXiv 小节](providers.md#arxiv)。
 - 如果只想启用 `wiley` 的官方 TDM API PDF lane，可以只配置 `WILEY_TDM_CLIENT_TOKEN`；这不会启用 HTML 资产下载或 seeded-browser PDF/ePDF fallback
 - `wiley` / `science` / `pnas` / `ams` 的 browser workflow 顺序见 [`providers.md`](providers.md#wiley-science-pnas-browser-workflow)。
@@ -435,7 +435,7 @@ python3 -m pip install .
 paper-fetch --query "10.1186/1471-2105-11-421"
 ```
 
-CLI 输出参数的语义是：`--format` 控制 stdout / `--output` 的序列化格式，`--output` 控制格式化结果的文件路径，`--output-dir` 控制 provider HTML/PDF/图片等本地资源目录。为避免 `--format markdown --output-dir ./papers` 只打印 Markdown 而不保存 Markdown 的误解，当用户显式传入 `--format`、保留默认 `--output -` 且指定 `--output-dir` 时，CLI 会额外在该目录保存同格式文档。
+CLI 输出参数的语义是：`--format` 控制 stdout / `--output` 的序列化格式，`--output` 控制格式化结果的文件路径，`--output-dir` 控制 Markdown、PDF fallback 来源文件和本地资产目录。CLI 默认 `--artifact-mode markdown-assets --asset-profile body`，会保存 Markdown 和正文资产，但不保留 provider 原始 HTML/XML、JSON sidecar 或 HTTP textual cache；需要旧式完整调试 artifact 时使用 `--artifact-mode all`。为避免 `--format markdown --output-dir ./papers` 只打印 Markdown 而不保存 Markdown 的误解，当用户显式传入 `--format markdown`、保留默认 `--output -` 且指定 `--output-dir` 时，CLI 会额外在该目录保存 Markdown 文档；JSON/`both` 的同格式副本只在 `--artifact-mode all` 下保留。
 
 如果你在仓库源码目录里做 repo-local 验证，先安装测试依赖，并推荐显式带上 `PYTHONPATH=src`。默认 `pytest` 覆盖 `tests/unit` + `tests/integration` + `tests/devtools` 并启用多进程并行；`tests/live` 需要显式指定路径并串行运行：
 

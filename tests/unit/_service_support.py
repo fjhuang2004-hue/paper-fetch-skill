@@ -13,7 +13,13 @@ from paper_fetch.runtime import RuntimeContext
 from paper_fetch.http import HttpTransport, RequestFailure
 from paper_fetch.providers import _springer_html as springer_html_helper
 from paper_fetch.providers import pnas as pnas_provider, science as science_provider
-from paper_fetch.providers.base import ProviderClient, ProviderContent, ProviderFetchResult, RawFulltextPayload
+from paper_fetch.providers.base import (
+    ProviderArtifacts,
+    ProviderClient,
+    ProviderContent,
+    ProviderFetchResult,
+    RawFulltextPayload,
+)
 from paper_fetch.providers.wiley import WileyClient
 from paper_fetch.tracing import trace_from_markers
 from paper_fetch.utils import choose_public_landing_page_url

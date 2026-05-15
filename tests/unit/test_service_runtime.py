@@ -475,3 +475,77 @@ class ServiceRuntimeTests(unittest.TestCase):
         self.assertEqual(wiley_html_trail, [])
         self.assertTrue(any(path.name.endswith(".pdf") for path in saved_paths))
         self.assertTrue(any(path.name.endswith("_original.html") for path in saved_paths))
+
+    def test_artifact_store_markdown_assets_keeps_pdf_fallback_but_skips_raw_html(self) -> None:
+        pdf_content = ProviderContent(
+            route_kind="pdf_fallback",
+            source_url="https://example.test/article.pdf",
+            content_type="application/pdf",
+            body=fulltext_pdf_bytes(),
+            needs_local_copy=True,
+        )
+        html_content = ProviderContent(
+            route_kind="html",
+            source_url="https://www.nature.com/articles/example",
+            content_type="text/html; charset=utf-8",
+            body=b"<html><body>Springer article</body></html>",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = ArtifactStore.from_download_dir(Path(tmpdir), artifact_mode="markdown-assets")
+            saved_warnings, saved_trail = store.save_provider_payload(
+                "wiley",
+                content=pdf_content,
+                doi="10.1111/example",
+                metadata={"title": "Example Article"},
+            )
+            html_warnings, html_trail = store.save_provider_html_payload(
+                "springer",
+                content=html_content,
+                doi="10.1007/example",
+                metadata={"title": "Springer Example"},
+            )
+            saved_paths = list(Path(tmpdir).glob("*"))
+
+        self.assertEqual(saved_trail, ["download:wiley_saved"])
+        self.assertTrue(any("Wiley official full text was downloaded as PDF/binary to" in item for item in saved_warnings))
+        self.assertEqual(html_warnings, [])
+        self.assertEqual(html_trail, [])
+        self.assertTrue(any(path.name.endswith(".pdf") for path in saved_paths))
+        self.assertFalse(any(path.name.endswith("_original.html") for path in saved_paths))
+
+    def test_artifact_store_none_skips_provider_payload_and_assets(self) -> None:
+        pdf_content = ProviderContent(
+            route_kind="pdf_fallback",
+            source_url="https://example.test/article.pdf",
+            content_type="application/pdf",
+            body=fulltext_pdf_bytes(),
+            needs_local_copy=True,
+        )
+        warnings: list[str] = []
+        source_trail: list[str] = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = ArtifactStore.from_download_dir(Path(tmpdir), artifact_mode="none")
+            saved_warnings, saved_trail = store.save_provider_payload(
+                "wiley",
+                content=pdf_content,
+                doi="10.1111/example",
+                metadata={"title": "Example Article"},
+            )
+            store.apply_provider_artifacts(
+                provider_name="wiley",
+                artifacts=ProviderArtifacts(
+                    assets=[{"path": str(Path(tmpdir) / "asset.png"), "download_tier": "full_size"}]
+                ),
+                asset_profile="body",
+                warnings=warnings,
+                source_trail=source_trail,
+            )
+            saved_paths = list(Path(tmpdir).glob("*"))
+
+        self.assertEqual(saved_warnings, [])
+        self.assertEqual(saved_trail, [])
+        self.assertEqual(warnings, [])
+        self.assertEqual(source_trail, [])
+        self.assertEqual(saved_paths, [])

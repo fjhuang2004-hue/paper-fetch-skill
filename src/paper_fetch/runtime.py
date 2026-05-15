@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Hashable, Mapping
 
-from .artifacts import ArtifactStore
+from .artifacts import DEFAULT_ARTIFACT_MODE, ArtifactMode, ArtifactStore
 from .config import (
     HTTP_DISK_CACHE_DIR_ENV_VAR,
     HTTP_DISK_CACHE_ENV_VAR,
@@ -45,7 +45,14 @@ _PARSE_CACHE_MISSING = object()
 _SESSION_CACHE_MISSING = object()
 
 
-def _transport_disk_cache_dir(env: Mapping[str, str], download_dir: Path | None) -> Path | None:
+def _transport_disk_cache_dir(
+    env: Mapping[str, str],
+    download_dir: Path | None,
+    *,
+    artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE,
+) -> Path | None:
+    if artifact_mode != "all":
+        return None
     configured = str(env.get(HTTP_DISK_CACHE_DIR_ENV_VAR, "")).strip()
     if configured:
         return Path(configured).expanduser()
@@ -61,6 +68,7 @@ def build_http_transport_for_context(
     *,
     download_dir: Path | None,
     cancel_check: Callable[[], bool] | None,
+    artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE,
 ) -> HttpTransport:
     metadata_cache_ttl = parse_nonnegative_int_env(
         env,
@@ -81,7 +89,11 @@ def build_http_transport_for_context(
             default=DEFAULT_PER_HOST_CONCURRENCY,
         ),
         metadata_cache_ttl=metadata_cache_ttl,
-        disk_cache_dir=_transport_disk_cache_dir(env, download_dir),
+        disk_cache_dir=_transport_disk_cache_dir(
+            env,
+            download_dir,
+            artifact_mode=artifact_mode,
+        ),
         disk_cache_max_entries=parse_nonnegative_int_env(
             env,
             HTTP_DISK_CACHE_MAX_ENTRIES_ENV_VAR,
@@ -105,6 +117,7 @@ class RuntimeContext:
     transport: HttpTransport | None = None
     clients: Mapping[str, object] | None = None
     download_dir: Path | None = None
+    artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE
     cancel_check: Callable[[], bool] | None = None
     artifact_store: ArtifactStore | None = None
     fetch_cache: Any | None = None
@@ -118,16 +131,22 @@ class RuntimeContext:
 
     def __post_init__(self) -> None:
         self.env = build_runtime_env() if self.env is None else dict(self.env)
+        if self.artifact_store is None:
+            self.artifact_store = ArtifactStore.from_download_dir(
+                self.download_dir,
+                artifact_mode=self.artifact_mode,
+            )
+        else:
+            self.artifact_mode = self.artifact_store.artifact_mode
+            if self.download_dir is None:
+                self.download_dir = self.artifact_store.download_dir
         if self.transport is None:
             self.transport = build_http_transport_for_context(
                 self.env,
                 download_dir=self.download_dir,
                 cancel_check=self.cancel_check,
+                artifact_mode=self.artifact_mode,
             )
-        if self.artifact_store is None:
-            self.artifact_store = ArtifactStore.from_download_dir(self.download_dir)
-        elif self.download_dir is None:
-            self.download_dir = self.artifact_store.download_dir
         self.stage_timings.setdefault("asset_seconds", 0.0)
         self.stage_timings.setdefault("formula_seconds", 0.0)
 
@@ -326,6 +345,7 @@ def resolve_runtime_context(
     download_dir: Path | None | object = RUNTIME_UNSET,
     cancel_check: Callable[[], bool] | None | object = RUNTIME_UNSET,
     artifact_store: ArtifactStore | None | object = RUNTIME_UNSET,
+    artifact_mode: ArtifactMode | object = RUNTIME_UNSET,
     fetch_cache: Any | object = RUNTIME_UNSET,
     parse_cache: dict[tuple[Hashable, ...], Any] | object = RUNTIME_UNSET,
     session_cache: dict[tuple[Hashable, ...], Any] | object = RUNTIME_UNSET,
@@ -340,6 +360,7 @@ def resolve_runtime_context(
         "download_dir": download_dir,
         "cancel_check": cancel_check,
         "artifact_store": artifact_store,
+        "artifact_mode": artifact_mode,
         "fetch_cache": fetch_cache,
         "parse_cache": parse_cache,
         "session_cache": session_cache,
@@ -359,6 +380,7 @@ def resolve_runtime_context(
         download_dir=None if download_dir is RUNTIME_UNSET else download_dir,
         cancel_check=None if cancel_check is RUNTIME_UNSET else cancel_check,
         artifact_store=None if artifact_store is RUNTIME_UNSET else artifact_store,
+        artifact_mode=DEFAULT_ARTIFACT_MODE if artifact_mode is RUNTIME_UNSET else artifact_mode,
         fetch_cache=None if fetch_cache is RUNTIME_UNSET else fetch_cache,
         parse_cache={} if parse_cache is RUNTIME_UNSET else parse_cache,
         session_cache={} if session_cache is RUNTIME_UNSET else session_cache,

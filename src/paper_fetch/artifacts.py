@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 
 from .extraction.html.assets.dom import preview_dimensions_are_acceptable
 from .models import AssetProfile
 from .provider_catalog import provider_persists_provider_html
+from .reason_codes import PDF_FALLBACK
 from .tracing import download_marker
 from .utils import (
     build_output_path,
@@ -21,11 +22,52 @@ from .utils import (
     sanitize_filename,
 )
 
+
+ArtifactMode = Literal["markdown-assets", "all", "none"]
+DEFAULT_ARTIFACT_MODE: ArtifactMode = "all"
+
+
 @dataclass(frozen=True)
 class DownloadPolicy:
     """Controls whether provider artifacts are materialized locally."""
 
     download_dir: Path | None = None
+    artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE
+
+    def __post_init__(self) -> None:
+        if self.artifact_mode not in {"markdown-assets", "all", "none"}:
+            raise ValueError(
+                "artifact_mode must be one of: markdown-assets, all, none."
+            )
+
+    @property
+    def asset_download_dir(self) -> Path | None:
+        if self.artifact_mode in {"markdown-assets", "all"}:
+            return self.download_dir
+        return None
+
+    @property
+    def allows_auxiliary_artifacts(self) -> bool:
+        return self.artifact_mode == "all" and self.download_dir is not None
+
+    @property
+    def allows_http_disk_cache(self) -> bool:
+        return self.artifact_mode == "all"
+
+    @property
+    def allows_structured_sidecars(self) -> bool:
+        return self.artifact_mode == "all"
+
+    @property
+    def allows_provider_html(self) -> bool:
+        return self.artifact_mode == "all" and self.download_dir is not None
+
+    def allows_provider_payload(self, content: Any) -> bool:
+        if self.download_dir is None or self.artifact_mode == "none":
+            return False
+        if self.artifact_mode == "all":
+            return True
+        return _is_pdf_fallback_content(content)
 
 
 @dataclass
@@ -35,12 +77,37 @@ class ArtifactStore:
     policy: DownloadPolicy = field(default_factory=DownloadPolicy)
 
     @classmethod
-    def from_download_dir(cls, download_dir: Path | None) -> "ArtifactStore":
-        return cls(DownloadPolicy(download_dir=download_dir))
+    def from_download_dir(
+        cls,
+        download_dir: Path | None,
+        *,
+        artifact_mode: ArtifactMode = DEFAULT_ARTIFACT_MODE,
+    ) -> "ArtifactStore":
+        return cls(DownloadPolicy(download_dir=download_dir, artifact_mode=artifact_mode))
 
     @property
     def download_dir(self) -> Path | None:
         return self.policy.download_dir
+
+    @property
+    def artifact_mode(self) -> ArtifactMode:
+        return self.policy.artifact_mode
+
+    @property
+    def asset_download_dir(self) -> Path | None:
+        return self.policy.asset_download_dir
+
+    @property
+    def allows_auxiliary_artifacts(self) -> bool:
+        return self.policy.allows_auxiliary_artifacts
+
+    @property
+    def allows_http_disk_cache(self) -> bool:
+        return self.policy.allows_http_disk_cache
+
+    @property
+    def allows_structured_sidecars(self) -> bool:
+        return self.policy.allows_structured_sidecars
 
     def write_text_file(self, path: Path, text: str, *, encoding: str = "utf-8") -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -93,6 +160,8 @@ class ArtifactStore:
             return [f"{provider_label} official PDF/binary was not written to disk because --no-download was set."], [
                 download_marker(provider_slug, "skipped")
             ]
+        if not self.policy.allows_provider_payload(content):
+            return [], []
         output_path = build_output_path(
             self.download_dir,
             doi,
@@ -117,7 +186,7 @@ class ArtifactStore:
         doi: str | None,
         metadata: Mapping[str, Any],
     ) -> Path | None:
-        if content is None or self.download_dir is None:
+        if content is None or not self.policy.allows_provider_html:
             return None
         if not provider_persists_provider_html(provider_name):
             return None
@@ -161,7 +230,7 @@ class ArtifactStore:
         warnings: list[str],
         source_trail: list[str],
     ) -> None:
-        if self.download_dir is None:
+        if self.asset_download_dir is None:
             return
         if asset_profile == "none":
             extend_unique(source_trail, [download_marker(f"{provider_name}_assets_skipped_profile_none")])
@@ -214,3 +283,15 @@ def _preview_asset_accepted(asset: Mapping[str, Any]) -> bool:
     except (TypeError, ValueError):
         return False
     return preview_dimensions_are_acceptable(width, height)
+
+
+def _is_pdf_fallback_content(content: Any) -> bool:
+    return normalize_text(getattr(content, "route_kind", "")).lower() == PDF_FALLBACK
+
+
+__all__ = [
+    "ArtifactMode",
+    "DEFAULT_ARTIFACT_MODE",
+    "DownloadPolicy",
+    "ArtifactStore",
+]
