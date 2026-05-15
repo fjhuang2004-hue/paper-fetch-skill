@@ -71,6 +71,7 @@ Provider-local acceptance commands must come from the generated task brief. Hard
 | File | Authority |
 |---|---|
 | [`agent-task-brief.md`](./agent-task-brief.md) | Required fields for discovery and implementation worker briefs |
+| [`operator-prompts.md`](./operator-prompts.md) | Operator-facing prompt templates for coordinator session and worker dispatch |
 | [`coordinator-spec.md`](./coordinator-spec.md) | Coordinator invocation, DAG, state machine, retry and worker isolation |
 | [`failure-recovery.md`](./failure-recovery.md) | Structured JSON error `code` to deterministic recovery action |
 | [`hard-constraints.md`](./hard-constraints.md) | Worker scope, provider logic boundary, pytest and grep acceptance |
