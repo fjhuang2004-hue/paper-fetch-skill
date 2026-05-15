@@ -139,6 +139,15 @@ docs/adding-a-provider.md、README、audit 文件或聊天记录推断 provider 
 让 brief 中 acceptance.pytest 全部通过，并使 acceptance.grep_must_be_empty 中每条命令的
 匹配数为 0。
 
+# 强制 Markdown Review Loop
+1. 先对 manifest 中每个 non-null `fixtures.doi_samples.<purpose>` 生成 baseline Markdown。
+2. 逐个 fixture 阅读 Markdown，记录 `fixture/purpose -> issue -> assertion -> fix`。
+3. 每个发现的问题必须先转成 `tests/unit/test_<NAME>_provider.py` 里的 provider-local 断言。
+4. 主成功路径必须同时有 Markdown 正断言和站点 chrome / access noise / boilerplate 负断言。
+5. 优先复用已有 provider 测试断言模式；不要保留 scaffold skipped placeholder 或 review-loop placeholder。
+6. 修复只能写 brief 允许的 provider-owned 文件；不要把清洗规则写到中心模块。
+7. 重复生成 / 阅读 / 写断言 / 修 provider，直到所有 non-null fixture Markdown 干净。
+
 # 实现约束 (hard-constraints.md §Provider Logic)
 - Provider routing / asset profile / probe / fixture purpose / docs source name
   必须从 manifest 字段读取；禁止硬编码到中心模块。
@@ -170,7 +179,8 @@ brief 中 failure_recovery.max_retries = 3。
 1. 改动文件清单（带 +/- 行数）。
 2. acceptance.pytest 最后几行（含 passed 计数）。
 3. 每条 acceptance.grep_must_be_empty 的命令与实际命中数（必须为 0）。
-4. 未解决的失败（如有）与对应 error code。
+4. `reviewed_fixtures` 摘要：每个 non-null purpose 的 fixture、发现的问题、对应断言和修复。
+5. 未解决的失败（如有）与对应 error code。
 不要 commit；改动留在工作区。
 ```
 
@@ -179,6 +189,7 @@ Coordinator 收回后必须跑（按 brief 中 acceptance 段定义）：
 ```bash
 PYTHONPATH=src python3 -m pytest \
   tests/unit/test_<NAME>_provider.py \
+  tests/unit/test_provider_markdown_review_contract.py \
   tests/unit/test_provider_bundle_completeness.py \
   tests/unit/test_provider_owner_reuse.py -q
 python3 scripts/onboard_from_manifests.py advance --provider <NAME> --task implement-provider

@@ -297,9 +297,28 @@ def build_implementation_brief(
             "scaffold_summary": f"docs/ai-onboarding/scaffold/{provider_name}.json",
         },
         "hard_constraints": HARD_CONSTRAINTS_PATH,
+        "markdown_review_loop": {
+            "required": True,
+            "fixture_source": "provider_manifest.fixtures.doi_samples",
+            "require_each_non_null_purpose_asserted": True,
+            "require_positive_and_negative_markdown_assertions": True,
+            "forbid_skipped_scaffold_placeholder": True,
+        },
+        "output_requirements": {
+            "reviewed_fixtures": "one entry per non-null provider_manifest.fixtures.doi_samples purpose",
+            "reviewed_fixture_fields": [
+                "fixture",
+                "purpose",
+                "issue",
+                "assertion",
+                "fix",
+            ],
+        },
         "acceptance": {
             "pytest": [
                 f"PYTHONPATH=src python3 -m pytest tests/unit/test_{provider_name}_provider.py -q",
+                "PYTHONPATH=src python3 -m pytest "
+                "tests/unit/test_provider_markdown_review_contract.py -q",
                 "PYTHONPATH=src python3 -m pytest "
                 "tests/unit/test_provider_bundle_completeness.py "
                 "tests/unit/test_provider_owner_reuse.py -q",
@@ -567,6 +586,14 @@ def _verify_commands(provider: str, task: str) -> list[list[str]]:
                 "-q",
             ],
             [
+                "PYTHONPATH=src",
+                "python3",
+                "-m",
+                "pytest",
+                "tests/unit/test_provider_markdown_review_contract.py",
+                "-q",
+            ],
+            [
                 "git",
                 "grep",
                 "-n",
@@ -595,6 +622,14 @@ def _verify_commands(provider: str, task: str) -> list[list[str]]:
                 "-m",
                 "pytest",
                 f"tests/unit/test_{provider_name}_provider.py",
+                "-q",
+            ],
+            [
+                "PYTHONPATH=src",
+                "python3",
+                "-m",
+                "pytest",
+                "tests/unit/test_provider_markdown_review_contract.py",
                 "-q",
             ],
             [

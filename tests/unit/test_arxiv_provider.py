@@ -45,6 +45,14 @@ HTML_ROUTE_IDS = (
     "2605.06666v1",
     "2605.06667v1",
 )
+MARKDOWN_REVIEWED_FIXTURES = {
+    "structure": "10.48550_arxiv.2605.06663v1",
+    "table": "10.48550_arxiv.2605.06663v1",
+    "formula": "10.48550_arxiv.2605.06653v1",
+    "figure": "10.48550_arxiv.2605.06667v1",
+    "references": "10.48550_arxiv.2605.06663v1",
+    "pdf_fallback": "10.48550_arxiv.1406.2661v1",
+}
 GOLDEN_ROOT = FIXTURE_DIR / "golden_criteria"
 PNG_1X1 = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"

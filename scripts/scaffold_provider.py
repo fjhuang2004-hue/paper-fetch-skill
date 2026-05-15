@@ -555,8 +555,6 @@ def _test_module_content(name: str, doi: str, *, html_capable: bool) -> str:
         [
             "from __future__ import annotations",
             "",
-            "import pytest",
-            "",
             "from paper_fetch.provider_catalog import PROVIDER_CATALOG",
             "from paper_fetch.providers._registry import provider_bundle",
             f"import paper_fetch.providers._{name}_html  # noqa: F401",
@@ -572,9 +570,13 @@ def _test_module_content(name: str, doi: str, *, html_capable: bool) -> str:
             f'    assert PROVIDER_CATALOG["{name}"].name == "{name}"',
             "",
             "",
-            "@pytest.mark.skip(reason=\"TODO: add recorded golden fixture assets before enabling replay\")",
-            "def test_provider_golden_replay_placeholder() -> None:",
-            f'    assert "{slug}"',
+            "def test_markdown_review_loop_contract_placeholder() -> None:",
+            "    assert False, (",
+            '        "Replace this scaffold placeholder with real fixture Markdown review "',
+            '        "assertions for every non-null manifest purpose, including positive "',
+            '        "Markdown assertions and negative site chrome assertions. "',
+            f'        "First fixture slug: {slug}"',
+            "    )",
             "",
         ]
     )
@@ -839,7 +841,11 @@ def _print_checklist(paths: list[Path], root: Path, *, docs_paths: list[Path]) -
     print("PR-checklist TODO:")
     print("- Fill ProviderSpec domains, aliases, routing templates, and status_order.")
     print("- Replace placeholder HTML rules with provider-owned cleanup and availability signals.")
-    print("- Add recorded golden fixture assets and enable the generated replay test.")
+    print("- Generate baseline Markdown for every non-null manifest fixture purpose.")
+    print("- Replace the failing Markdown review-loop placeholder test with provider-local assertions.")
+    print("- Add positive Markdown assertions for expected article content.")
+    print("- Add negative Markdown assertions for site chrome, access noise, and duplicate boilerplate.")
+    print("- Ensure each non-null fixture purpose is named or asserted in the provider test.")
     print("- Add the provider entry module to provider discovery in the same PR.")
     print("- Run python3 scripts/validate_extraction_rules.py and targeted pytest.")
     print("Generated files:")

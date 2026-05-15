@@ -17,6 +17,12 @@ DOI = "10.5194/acp-24-1-2024"
 LANDING_URL = "https://acp.copernicus.org/articles/24/1/2024/"
 XML_URL = "https://acp.copernicus.org/articles/24/1/2024/acp-24-1-2024.xml"
 PDF_URL = "https://acp.copernicus.org/articles/24/1/2024/acp-24-1-2024.pdf"
+MARKDOWN_REVIEWED_FIXTURES = {
+    "structure": "10.5194_acp-24-1-2024",
+    "figure": "10.5194_acp-24-1-2024",
+    "references": "10.5194_acp-24-1-2024",
+    "pdf_fallback": "10.5194_acp-1-1-2001",
+}
 
 
 def _landing_html(*, xml_url: str = XML_URL, pdf_url: str = PDF_URL, body: str = "") -> bytes:
@@ -420,6 +426,7 @@ class CopernicusProviderTests(unittest.TestCase):
         self.assertIn("Introduction", extraction.markdown_text)
         self.assertIn("$$", extraction.markdown_text)
         self.assertIn("| Season | Value |", extraction.markdown_text)
+        self.assertNotIn("<article", extraction.markdown_text)
         self.assertTrue([asset for asset in extraction.assets if asset["kind"] == "figure"])
         self.assertTrue([asset for asset in extraction.assets if asset["kind"] == "supplementary"])
         self.assertEqual(extraction.references[0]["doi"], "10.1000/example")

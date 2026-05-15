@@ -16,6 +16,10 @@ Worker 和 coordinator 必须满足下列机器可判约束。
 
 - Provider-specific implementation belongs under `src/paper_fetch/providers/`.
 - Provider-specific tests belong under `tests/unit/test_<provider>_provider.py`.
+- Provider tests must not keep scaffold skipped placeholders or Markdown review-loop placeholders.
+- Every non-null `fixtures.doi_samples.<purpose>` from the provider manifest must be named or asserted in `tests/unit/test_<provider>_provider.py`.
+- The main success path must include both positive Markdown assertions and negative assertions for site chrome, access noise, or duplicate boilerplate.
+- Markdown cleanup fixes discovered during review must land only in provider-owned implementation files and provider-local tests.
 - Provider-specific functions must not be added to `src/paper_fetch/extraction/html/provider_rules.py`.
 - Provider-specific functions must not be added to `src/paper_fetch/quality/html_signals.py`.
 - Provider-specific functions must not be added to `src/paper_fetch/quality/html_availability.py`.
@@ -25,6 +29,7 @@ Worker 和 coordinator 必须满足下列机器可判约束。
 ## Acceptance
 
 - Provider-local pytest listed in the task brief must pass.
+- `PYTHONPATH=src python3 -m pytest tests/unit/test_provider_markdown_review_contract.py -q` must pass.
 - `python3 scripts/validate_extraction_rules.py` must pass before merge-ready.
 - `PYTHONPATH=src python3 -m pytest tests/unit/test_manifest_bundle_sync.py -q` must pass before merge-ready.
 - `PYTHONPATH=src python3 -m pytest tests/unit/test_provider_bundle_completeness.py tests/unit/test_provider_owner_reuse.py -q` must pass before merge-ready.

@@ -96,7 +96,7 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 
 ---
 
-## Step 3：实现 extraction 与客户端（2-5 天）
+## Step 3：实现 extraction 与客户端，并跑 Markdown Review Loop（2-5 天）
 
 ### 3.1 填 `ProviderBundle`
 
@@ -126,6 +126,18 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 
 写代码前先看 [`provider-development.md` §5 owner 复用规则](provider-development.md#5-extraction-owner-复用规则)。HTTP header、access gate 文案、table 渲染、markdown IR 全部有 canonical 实现。**不要重写**——重写会被打回。
 
+### 3.5 Markdown Review Loop
+
+对 manifest 中每个 non-null `fixtures.doi_samples.<purpose>` 固定执行：
+
+1. 生成 baseline Markdown。
+2. 逐篇阅读，记录 `fixture/purpose -> issue -> assertion -> fix`。
+3. 先把 issue 写成 `tests/unit/test_mdpi_provider.py` 里的断言，再修 `_mdpi_html.py` / `mdpi.py`。
+4. 主成功路径至少保留一个 Markdown 正断言和一个站点 chrome / access noise / boilerplate 负断言。
+5. 重复到所有 fixture Markdown 干净。
+
+不要保留 scaffold skipped placeholder 或 review-loop placeholder。
+
 ---
 
 ## Step 4：Prototype 通过（Commit A，约 1 天）
@@ -136,19 +148,20 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 PYTHONPATH=src python3 -m pytest tests/unit -q
 ```
 
-直到 `test_mdpi_provider.py` 全绿。然后**第一次为每篇 fixture 写 `expected.json`**：
+直到 `test_mdpi_provider.py` 全绿，并且每个 non-null fixture purpose 都已经在 provider-local 测试中点名覆盖。然后**第一次为每篇 fixture 写 `expected.json`**：
 
 ```bash
 PYTHONPATH=src python3 scripts/snapshot_expected.py --doi 10.3390/membranes15030093 --review
 PYTHONPATH=src python3 scripts/snapshot_expected.py --doi 10.3390/membranes15030093
 ```
 
-之后每次改 extraction 都用 `pytest` diff 来审，**不再手动每次重看 markdown**。
+之后每次改 extraction 都用 provider-local 断言和 `pytest` diff 来审；新增 correction 时继续先写断言再修 provider。
 
 跑完整性 lint：
 
 ```bash
 PYTHONPATH=src python3 -m pytest tests/unit/test_provider_bundle_completeness.py -q
+PYTHONPATH=src python3 -m pytest tests/unit/test_provider_markdown_review_contract.py -q
 ```
 
 全过即 Commit A。这一步固化「跑通」的状态。
@@ -234,7 +247,7 @@ git commit -m "docs(mdpi): add provider documentation"
 ## 5 个最容易踩的坑
 
 1. **跳过 Step 0 直接收 fixture**：fixtures 全是 open-access HTML，后期发现没覆盖 paywall 或 abstract-only，要回炉。
-2. **手动每次重审 markdown**：第一次跑通就写 `expected.json`，后续靠 `pytest` diff。
+2. **只写 expected.json，不写 Markdown review 断言**：每个 correction 先落 provider-local 断言，再写 / 更新 `expected.json`。
 3. **在 `_X_html.py` 内重写 canonical owner 已有的能力**（table 渲染、header 查找、access gate 文案）：项目反模式，PR 会被打回。
 4. **prototype 和重构混在一个 commit**：重构发现要改 fixtures 时丢失 prototype 进度。
 5. **改了 `provider_catalog.py` / `provider_rules.py` / `quality/html_signals.py`**：这些现在是禁区，CI lint 会失败。所有 provider 数据走 `ProviderBundle` 自注册。

@@ -61,6 +61,10 @@ def test_scaffold_provider_generates_repo_like_structure(tmp_path: Path) -> None
     assert manifest_path.is_file()
     assert "PR-checklist TODO:" in result.stdout
     assert "src/paper_fetch/providers/_newpub_html.py" in result.stdout
+    assert "Generate baseline Markdown for every non-null manifest fixture purpose." in result.stdout
+    assert "positive Markdown assertions" in result.stdout
+    assert "negative Markdown assertions" in result.stdout
+    assert "Ensure each non-null fixture purpose is named or asserted" in result.stdout
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["samples"]["10.1234_sample"] == {
@@ -85,6 +89,11 @@ def test_scaffold_provider_generates_repo_like_structure(tmp_path: Path) -> None
 
     html_text = html_module.read_text(encoding="utf-8")
     assert "def newpub_fetch_html_step(client" in html_text
+
+    test_text = test_module.read_text(encoding="utf-8")
+    assert "test_markdown_review_loop_contract_placeholder" in test_text
+    assert "pytest.mark.skip" not in test_text
+    assert "test_provider_golden_replay_placeholder" not in test_text
 
 
 def test_scaffold_provider_places_bundle_registration_after_imports(
@@ -186,6 +195,9 @@ def test_scaffold_provider_non_html_bundle_satisfies_s4_shape(
     assert "AvailabilityPolicy" not in module_text
     assert "assert bundle.html_rules is None" in test_text
     assert "assert bundle.catalog.html_capable is False" in test_text
+    assert "test_markdown_review_loop_contract_placeholder" in test_text
+    assert "pytest.mark.skip" not in test_text
+    assert "test_provider_golden_replay_placeholder" not in test_text
     assert manifest["samples"]["10.1234_sample"]["route_kind"] == "official"
 
 

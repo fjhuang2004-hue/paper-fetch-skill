@@ -93,11 +93,35 @@ def test_start_provider_dry_run_writes_dag_and_worker_briefs(tmp_path: Path) -> 
     )
     assert HARD_CONSTRAINTS_PATH.is_file()
     assert implement_brief["no_commit"] is True
+    assert implement_brief["markdown_review_loop"] == {
+        "required": True,
+        "fixture_source": "provider_manifest.fixtures.doi_samples",
+        "require_each_non_null_purpose_asserted": True,
+        "require_positive_and_negative_markdown_assertions": True,
+        "forbid_skipped_scaffold_placeholder": True,
+    }
+    assert implement_brief["output_requirements"] == {
+        "reviewed_fixtures": (
+            "one entry per non-null "
+            "provider_manifest.fixtures.doi_samples purpose"
+        ),
+        "reviewed_fixture_fields": [
+            "fixture",
+            "purpose",
+            "issue",
+            "assertion",
+            "fix",
+        ],
+    }
     assert implement_brief["failure_recovery"]["policy"] == (
         "docs/ai-onboarding/failure-recovery.md"
     )
     assert FAILURE_RECOVERY_PATH.is_file()
     assert "acceptance" in implement_brief
+    assert (
+        "PYTHONPATH=src python3 -m pytest "
+        "tests/unit/test_provider_markdown_review_contract.py -q"
+    ) in implement_brief["acceptance"]["pytest"]
     assert "files_allowed_to_modify" in implement_brief
     assert "files_must_not_modify" in implement_brief
     grep_paths = set(implement_brief["acceptance"]["grep_must_be_empty"][0]["paths"])
@@ -232,6 +256,38 @@ def test_verify_plan_uses_existing_tool_interfaces(tmp_path: Path) -> None:
     )
     snapshot_commands = json.loads(snapshot.stdout)["commands"]
     assert ["python3", "scripts/snapshot_expected.py", "--help"] in snapshot_commands
+
+    implement = run_cli(
+        "verify",
+        "--provider",
+        "mdpi",
+        "--task",
+        "implement-provider",
+        "--state",
+        str(state_path),
+    )
+    implement_commands = json.loads(implement.stdout)["commands"]
+    markdown_contract_command = [
+        "PYTHONPATH=src",
+        "python3",
+        "-m",
+        "pytest",
+        "tests/unit/test_provider_markdown_review_contract.py",
+        "-q",
+    ]
+    assert markdown_contract_command in implement_commands
+
+    local_acceptance = run_cli(
+        "verify",
+        "--provider",
+        "mdpi",
+        "--task",
+        "provider-local-acceptance",
+        "--state",
+        str(state_path),
+    )
+    local_acceptance_commands = json.loads(local_acceptance.stdout)["commands"]
+    assert markdown_contract_command in local_acceptance_commands
 
 
 def test_written_state_matches_schema(tmp_path: Path) -> None:

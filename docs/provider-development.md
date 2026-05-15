@@ -15,8 +15,8 @@
 | 0 | 写设计：routing 信号、主路径顺序、asset_profile 语义、probe 边界、abstract-only 策略 | §1 | 30 min |
 | 1 | 按正交能力清单收 fixtures：≥9 篇 HTML/XML + 1-2 篇 PDF fallback + 1-2 篇 block | §8 + 附录 A | 1-3 天 |
 | 2 | Scaffold 起步：跑生成脚本生成 provider bundle / fixture / manifest / starter test 骨架 | §1.5 | 10 min |
-| 3 | 实现 extraction 与客户端：填 `ProviderBundle`、走 `ProviderClient.fetch_result()` template、复用 canonical owner | §2–§7 | 2-5 天 |
-| 4 | Prototype 通过（Commit A）：9 篇 fixture 全 round-trip，第一次写 `expected.json`，`test_provider_bundle_completeness` 通过 | §8 | 1 天 |
+| 3 | 实现 extraction 与客户端，并执行 Markdown Review Loop：baseline Markdown → 阅读审查 → correction 写断言 → 修 provider | §2–§8 | 2-5 天 |
+| 4 | Prototype 通过（Commit A）：所有 non-null fixture purpose 的 Markdown 干净、provider-local 断言覆盖、第一次写 `expected.json` | §8 | 1 天 |
 | 5 | 重构对齐 canonical owner（Commit B）：grep 自己代码删 local helper | §5 + 附录 B | 半天 |
 | 6 | 端到端收尾：实现 `probe_status()` + 同步 `docs/providers.md` / `extraction-rules.md` / `CHANGELOG.md` | §9 | 半天 |
 
@@ -26,7 +26,7 @@
 
 - **先设计后写代码**（Step 0 不可省）：决定 fixture 选择策略与主链顺序，跳过会导致 Step 1 收偏「快乐路径」、Step 3 重写客户端。
 - **fixtures 用真实 DOI 文献，不接受脑补 DOM**（Step 1）：项目把真实文献 replay 当作行为契约的"源"，不是「跑通了再说」的辅助。
-- **质量审核机械化**（Step 4）：Step 1 完成后**立刻为每篇 fixture 写 `expected.json`**，后续循环靠 `pytest` diff，不再手动每次重看 markdown。
+- **Markdown Review Loop 强制执行**（Step 3/4）：每篇 non-null fixture 先生成 baseline Markdown，人工阅读审查，把每个 correction 写成 provider-local 断言，再修 provider 清洗 / 转换并重复到全部 fixture 干净；之后才写 `expected.json`。
 - **Prototype 和重构分两次 commit**（Step 4 / Step 5）：先固化「跑通」状态，再做 canonical owner 对齐，避免重构发现要回退 fixtures 时连带丢失 prototype 进度。
 - **中心模块零编辑**（S1-S6 落地后）：新 provider PR 不应触动 `provider_catalog.py` / `provider_rules.py` / `quality/html_signals.py` / `quality/html_availability.py`——全部走 `ProviderBundle` 自注册。详见附录 D。
 
@@ -125,7 +125,7 @@ register_provider_bundle(
 
 不要手写新的 provider 常量列表，也不要修改中心模块的 provider 字典或规则表。`preferred_providers`、MCP provider status、registry clients、默认 asset profile 和 provider identity 都应该继续从 bundle discovery 派生。新增后至少补 provider 相关 unit test 的 DOI、domain、publisher 推断样例，并让 `tests/unit/test_provider_bundle_completeness.py` 通过。
 
-## 3. Client Contract
+## 3. Client Contract + Markdown Review Loop
 
 优先继承 `paper_fetch.providers.base.ProviderClient`。新 provider 的全文主链默认声明为 class-level `waterfall_steps`，只在确有特殊模板流程时覆盖必要 hook：
 
@@ -183,6 +183,14 @@ step 函数放在 provider-owned 模块中，签名使用 `def newpub_fetch_html
 - 合并 warnings、trace 和 artifacts
 
 新 provider 不应绕开这条 template method 自己拼最终结果。旧 provider 已有复杂 `fetch_raw_fulltext()` 覆盖实现时可以保留；新增 scaffold 默认使用 `waterfall_steps`。
+
+实现过程中必须把 Markdown Review Loop 当作主循环：
+
+1. 对 manifest 中每个 non-null `fixtures.doi_samples.<purpose>` 生成 baseline Markdown。
+2. 逐篇阅读 Markdown，记录 `fixture/purpose -> issue -> assertion -> fix`。
+3. 每个 issue 先落到 `tests/unit/test_<provider>_provider.py` 的 provider-local 断言，再修改 provider-owned 清洗 / 转换代码。
+4. 主成功路径至少保留一个正向 Markdown 内容断言和一个负向站点 chrome / access noise / boilerplate 断言。
+5. 禁止保留 scaffold skipped placeholder 或 review-loop placeholder；所有 non-null purpose 都必须在 provider test 中点名覆盖。
 
 ## 4. Fulltext Waterfall
 
@@ -325,7 +333,7 @@ Fixtures 规则：
 - 新 fixture 必须同步 `tests/fixtures/golden_criteria/manifest.json` 和 fixture catalog。
 - 不从 `live-downloads/`、临时目录或散落 top-level 文件读取测试样本。
 - Step 1 录制真实 DOI replay 时优先使用 `python3 scripts/capture_fixture.py --doi <doi> --purpose <purpose>`，脚本会写 canonical fixture 路径并把 manifest 条目置为 `expected_outcome="pending"`；需要先看写入计划时加 `--dry-run`。
-- Step 4 第一次固化预期时使用 `python3 scripts/snapshot_expected.py --doi <doi> --review` 审核用户可见摘要，再运行不带 `--review` 的命令写入兼容 golden corpus 的 `expected.json`（`has` / `counts` / `expected_content_kind`）并同步 manifest outcome。
+- Step 4 第一次固化预期前，必须完成 Markdown Review Loop：所有 non-null fixture purpose 都已有 provider-local 断言，主成功路径同时有 Markdown 正断言和站点 chrome 负断言；随后使用 `python3 scripts/snapshot_expected.py --doi <doi> --review` 审核用户可见摘要，再运行不带 `--review` 的命令写入兼容 golden corpus 的 `expected.json`（`has` / `counts` / `expected_content_kind`）并同步 manifest outcome。
 
 Golden corpus 规则：
 
@@ -403,6 +411,8 @@ python3 scripts/validate_extraction_rules.py
 - [ ] 入口模块顶部 `register_provider_bundle` 已填充完整 `ProviderBundle`
 - [ ] `ProviderHtmlRules.availability` 含 `signal_set` 或显式 `no_signals=True`
 - [ ] `golden_criteria/<doi>/` 至少有一篇真实文献 fixture
+- [ ] 每个 non-null manifest fixture purpose 已完成 Markdown Review Loop 并写入 provider-local 断言
+- [ ] 主成功路径同时包含 Markdown 正断言和站点 chrome / access noise / boilerplate 负断言
 - [ ] `manifest.json` 条目已填充（`expected_outcome` 不再是 `pending`）
 - [ ] `tests/unit/test_newpub_provider.py` 覆盖 fulltext / abstract-only / blocked
 - [ ] `tests/unit/test_provider_bundle_completeness.py` 通过
@@ -507,6 +517,7 @@ git grep -nE "raw_payload\.metadata\[" -- src/paper_fetch/providers/X.py
 Fixtures（按附录 A 11 维清单）
 - [ ] golden_criteria/<doi>/ 至少有一篇真实文献 fixture
 - [ ] structure / table / formula / figure / supplementary / refs：各 1 篇真实 DOI HTML 或 XML
+- [ ] 每个 non-null fixture purpose 已执行 Markdown Review Loop，记录 issue → assertion → fix
 - [ ] abstract-only / access-gate / 空壳：各 1 篇 block fixture
 - [ ] PDF fallback：1-2 篇
 - [ ] manifest.json 条目已填充（expected_outcome 不再是 pending）
@@ -521,6 +532,7 @@ Fixtures（按附录 A 11 维清单）
 测试
 - [ ] provider unit test 已覆盖 domain / publisher / DOI 推断
 - [ ] tests/unit/test_newpub_provider.py 覆盖 fulltext / abstract-only / blocked
+- [ ] tests/unit/test_newpub_provider.py 覆盖每个 non-null fixture purpose，且包含 Markdown 正断言和站点 chrome 负断言
 - [ ] tests/unit/test_provider_bundle_completeness.py 通过
 - [ ] tests/integration/test_golden_corpus.py 跑通（PAPER_FETCH_RUN_FULL_GOLDEN=1）
 

@@ -73,6 +73,12 @@ def test_from_manifest_generates_scaffold_and_json_summary(tmp_path: Path) -> No
     assert (tmp_path / "src/paper_fetch/providers/_arxiv_html.py").is_file()
     assert (tmp_path / "src/paper_fetch/providers/arxiv.py").is_file()
     assert (tmp_path / "tests/unit/test_arxiv_provider.py").is_file()
+    generated_test = (tmp_path / "tests/unit/test_arxiv_provider.py").read_text(
+        encoding="utf-8"
+    )
+    assert "test_markdown_review_loop_contract_placeholder" in generated_test
+    assert "pytest.mark.skip" not in generated_test
+    assert "test_provider_golden_replay_placeholder" not in generated_test
     for doi in non_null_dois:
         assert (
             tmp_path

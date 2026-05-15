@@ -19,9 +19,17 @@ This file defines machine-verifiable merge-ready gates for AI/coordinator provid
 ## Implementation Gates
 
 - Provider-local pytest from `briefs/implement-provider.yml` passes.
+- `PYTHONPATH=src python3 -m pytest tests/unit/test_provider_markdown_review_contract.py -q`
 - `PYTHONPATH=src python3 -m pytest tests/unit/test_provider_bundle_completeness.py tests/unit/test_provider_owner_reuse.py -q`
 - `python3 scripts/validate_extraction_rules.py`
 - `manifest_sync_back.py` is the only writer for `extraction_hints` and `success_criteria` sync-back fields.
+
+## Markdown Review Gates
+
+- Every non-null `fixtures.doi_samples.<purpose>` is represented in `tests/unit/test_<provider>_provider.py` by purpose name or DOI slug.
+- Provider-local tests do not contain scaffold skipped placeholders or Markdown review-loop placeholders.
+- Provider-local tests include at least one positive Markdown assertion and at least one negative site-chrome / access-noise / boilerplate assertion.
+- Worker completion summary includes `reviewed_fixtures` entries for every non-null purpose.
 
 ## Drift Gates
 

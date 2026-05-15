@@ -91,9 +91,24 @@ upstream_artifacts:
   capture_commands: docs/ai-onboarding/capture-commands/mdpi.txt
   scaffold_summary: docs/ai-onboarding/scaffold/mdpi.json
 hard_constraints: docs/ai-onboarding/hard-constraints.md
+markdown_review_loop:
+  required: true
+  fixture_source: provider_manifest.fixtures.doi_samples
+  require_each_non_null_purpose_asserted: true
+  require_positive_and_negative_markdown_assertions: true
+  forbid_skipped_scaffold_placeholder: true
+output_requirements:
+  reviewed_fixtures: one entry per non-null provider_manifest.fixtures.doi_samples purpose
+  reviewed_fixture_fields:
+    - fixture
+    - purpose
+    - issue
+    - assertion
+    - fix
 acceptance:
   pytest:
     - PYTHONPATH=src python3 -m pytest tests/unit/test_mdpi_provider.py -q
+    - PYTHONPATH=src python3 -m pytest tests/unit/test_provider_markdown_review_contract.py -q
     - PYTHONPATH=src python3 -m pytest tests/unit/test_provider_bundle_completeness.py tests/unit/test_provider_owner_reuse.py -q
   grep_must_be_empty:
     - pattern: mdpi
@@ -132,7 +147,15 @@ no_commit: true
 - `runtime` must be `coding-agent-subagent`.
 - `upstream_artifacts` must include `task_dag`, `capture_commands`, and `scaffold_summary`.
 - `hard_constraints` must be `docs/ai-onboarding/hard-constraints.md`.
+- `markdown_review_loop.required` must be `true`.
+- `markdown_review_loop.fixture_source` must be `provider_manifest.fixtures.doi_samples`.
+- `markdown_review_loop.require_each_non_null_purpose_asserted` must be `true`.
+- `markdown_review_loop.require_positive_and_negative_markdown_assertions` must be `true`.
+- `markdown_review_loop.forbid_skipped_scaffold_placeholder` must be `true`.
+- `output_requirements.reviewed_fixtures` must require one entry per non-null manifest fixture purpose.
+- `output_requirements.reviewed_fixture_fields` must contain `fixture`, `purpose`, `issue`, `assertion`, and `fix`.
 - `acceptance.pytest` must contain provider-local pytest.
+- `acceptance.pytest` must contain `tests/unit/test_provider_markdown_review_contract.py`.
 - `acceptance.grep_must_be_empty` must contain central provider-logic grep checks.
 - `files_allowed_to_modify` must only contain provider-specific implementation and provider-specific tests.
 - `files_must_not_modify` must include manifest, shared docs, known provider index, and central provider logic files.
@@ -150,6 +173,7 @@ Coordinator must inline these inputs when dispatching the worker through the sel
 - current provider manifest YAML
 
 The worker must return a structured summary containing changed files, tests run, grep checks run, and unresolved failures.
+It must also return `reviewed_fixtures`: one entry per non-null `fixtures.doi_samples.<purpose>`, with `fixture`, `purpose`, `issue`, `assertion`, and `fix` fields for every Markdown review finding. If a fixture has no finding, the entry must still name the fixture and purpose and state that baseline Markdown was reviewed.
 
 ## coordinator-only scaffold/from-manifest
 
