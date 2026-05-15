@@ -4,7 +4,9 @@ from unittest import mock
 
 import pytest
 
-from paper_fetch.providers import _cloakbrowser
+from paper_fetch.providers import _cloakbrowser, _flaresolverr, browser_runtime
+from paper_fetch.providers.browser_workflow.html_extraction import _fetch_browser_html_payload
+from paper_fetch.runtime import RuntimeContext
 
 
 class _FakeResponse:
@@ -119,6 +121,15 @@ def _runtime_config(tmp_path):
     )
 
 
+class _FakeWorkflowClient:
+    name = "science"
+
+    def extract_markdown(self, _html_text, _final_url, *, metadata):
+        return "# Example Article\n\n## Results\n\n" + ("Readable body. " * 80), {
+            "title": metadata.get("title") or "Example Article",
+        }
+
+
 def test_fetch_html_with_cloakbrowser_returns_existing_html_contract(tmp_path) -> None:
     fake_module = _FakeCloakBrowserModule()
     config = _runtime_config(tmp_path)
@@ -146,6 +157,24 @@ def test_fetch_html_with_cloakbrowser_returns_existing_html_contract(tmp_path) -
     assert fake_module.browser.closed is True
 
 
+def test_fetch_html_with_browser_marks_diagnostic(tmp_path) -> None:
+    fake_module = _FakeCloakBrowserModule()
+    config = _runtime_config(tmp_path)
+
+    with mock.patch.object(_cloakbrowser, "_import_cloakbrowser", return_value=fake_module):
+        _html_result, payload = _fetch_browser_html_payload(
+            _FakeWorkflowClient(),
+            ["https://www.science.org/doi/full/10.1126/science.example"],
+            runtime=config,
+            metadata={"doi": "10.1126/science.example", "title": "Example Article"},
+            context=RuntimeContext(env={}),
+            wait_seconds=0,
+        )
+
+    assert payload.content is not None
+    assert payload.content.diagnostics["html_fetcher"] == "cloakbrowser"
+
+
 def test_fetch_html_with_cloakbrowser_reports_unsupported_image_payload(tmp_path) -> None:
     with pytest.raises(_cloakbrowser.CloakBrowserFailure) as exc_info:
         _cloakbrowser.fetch_html_with_cloakbrowser(
@@ -169,3 +198,16 @@ def test_probe_runtime_status_reports_missing_cloakbrowser_dependency() -> None:
     assert result.status == "not_configured"
     assert checks["runtime_env"].status == "not_configured"
     assert checks["cloakbrowser_dependency"].status == "not_configured"
+
+
+def test_browser_runtime_module_imports() -> None:
+    assert browser_runtime.BrowserRuntimeConfig is _cloakbrowser.CloakBrowserRuntimeConfig
+    assert browser_runtime.BrowserRuntimeFailure is _cloakbrowser.CloakBrowserFailure
+    assert issubclass(browser_runtime.BrowserRuntimeFailure, _flaresolverr.FlareSolverrFailure)
+    assert browser_runtime.BrowserFetchedHtml is _flaresolverr.FetchedPublisherHtml
+    assert hasattr(browser_runtime, "BrowserImagePayload")
+    assert browser_runtime.fetch_html_with_browser.paper_fetch_html_fetcher_name == "cloakbrowser"
+    assert callable(browser_runtime.warm_browser_context)
+    assert callable(browser_runtime.load_runtime_config)
+    assert callable(browser_runtime.ensure_runtime_ready)
+    assert callable(browser_runtime.probe_runtime_status)

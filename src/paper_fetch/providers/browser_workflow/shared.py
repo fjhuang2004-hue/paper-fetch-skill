@@ -19,28 +19,118 @@ looks_like_abstract_redirect = _html_profiles.looks_like_abstract_redirect
 BROWSER_HTML_BLOCKED_RESOURCE_TYPES = {"image", "font", "stylesheet", "media"}
 
 
-@dataclass(frozen=True)
+_BROWSER_WORKFLOW_DEP_FIELDS = (
+    "load_runtime_config",
+    "ensure_runtime_ready",
+    "probe_runtime_status",
+    "fetch_html_with_browser",
+    "warm_browser_context",
+    "fetch_seeded_browser_pdf_payload",
+    "fetch_pdf_with_browser",
+    "download_assets",
+    "split_body_and_supplementary_assets",
+    "bootstrap_browser_workflow",
+    "_build_shared_browser_file_fetcher",
+    "_build_shared_browser_image_fetcher",
+    "extract_atypon_browser_workflow_markdown",
+    "pdf_browser_context_seed",
+    "refresh_browser_context_seed",
+    "fetch_html_with_fast_browser",
+    "_cached_browser_workflow_markdown",
+    "_cached_browser_workflow_assets",
+    "_assets_matching_download_failures",
+    "_browser_workflow_image_download_candidates",
+)
+
+_LEGACY_DEP_ALIASES = {
+    "fetch_html_with_flaresolverr": "fetch_html_with_browser",  # legacy alias
+    "warm_browser_context_with_flaresolverr": "warm_browser_context",  # legacy alias
+    "fetch_pdf_with_playwright": "fetch_pdf_with_browser",
+    "fetch_html_with_direct_playwright": "fetch_html_with_fast_browser",
+    "_build_shared_playwright_file_fetcher": "_build_shared_browser_file_fetcher",
+    "_build_shared_playwright_image_fetcher": "_build_shared_browser_image_fetcher",
+}
+
+
+def _mark_legacy_html_fetcher(fetcher: Any) -> None:
+    marker = getattr(fetcher, "paper_fetch_html_fetcher_name", None)
+    if isinstance(marker, str):
+        return
+    try:
+        setattr(fetcher, "paper_fetch_html_fetcher_name", "flaresolverr")
+    except Exception:
+        pass
+
+
+@dataclass(frozen=True, init=False)
 class BrowserWorkflowDeps:
     load_runtime_config: Callable[..., Any]
     ensure_runtime_ready: Callable[..., Any]
     probe_runtime_status: Callable[..., Any]
-    fetch_html_with_flaresolverr: Callable[..., Any]
-    warm_browser_context_with_flaresolverr: Callable[..., Any]
+    fetch_html_with_browser: Callable[..., Any]
+    warm_browser_context: Callable[..., Any]
     fetch_seeded_browser_pdf_payload: Callable[..., Any]
-    fetch_pdf_with_playwright: Callable[..., Any]
+    fetch_pdf_with_browser: Callable[..., Any]
     download_assets: Callable[..., Any]
     split_body_and_supplementary_assets: Callable[..., Any]
     bootstrap_browser_workflow: Callable[..., Any]
-    _build_shared_playwright_file_fetcher: Callable[..., Any]
-    _build_shared_playwright_image_fetcher: Callable[..., Any]
+    _build_shared_browser_file_fetcher: Callable[..., Any]
+    _build_shared_browser_image_fetcher: Callable[..., Any]
     extract_atypon_browser_workflow_markdown: Callable[..., Any]
     pdf_browser_context_seed: Callable[..., Any]
     refresh_browser_context_seed: Callable[..., Any]
-    fetch_html_with_direct_playwright: Callable[..., Any]
+    fetch_html_with_fast_browser: Callable[..., Any]
     _cached_browser_workflow_markdown: Callable[..., Any]
     _cached_browser_workflow_assets: Callable[..., Any]
     _assets_matching_download_failures: Callable[..., Any]
     _browser_workflow_image_download_candidates: Callable[..., Any]
+
+    def __init__(self, **values: Any) -> None:
+        values = dict(values)
+        for alias, target in _LEGACY_DEP_ALIASES.items():
+            if alias not in values:
+                continue
+            alias_value = values.pop(alias)
+            if alias == "fetch_html_with_flaresolverr":  # legacy alias
+                _mark_legacy_html_fetcher(alias_value)
+            values[target] = alias_value
+
+        unknown = sorted(set(values) - set(_BROWSER_WORKFLOW_DEP_FIELDS))
+        if unknown:
+            unknown_display = ", ".join(unknown)
+            raise TypeError(f"Unexpected BrowserWorkflowDeps field(s): {unknown_display}")
+
+        missing = [name for name in _BROWSER_WORKFLOW_DEP_FIELDS if name not in values]
+        if missing:
+            missing_display = ", ".join(missing)
+            raise TypeError(f"Missing BrowserWorkflowDeps field(s): {missing_display}")
+
+        for name in _BROWSER_WORKFLOW_DEP_FIELDS:
+            object.__setattr__(self, name, values[name])
+
+    @property
+    def fetch_html_with_flaresolverr(self) -> Callable[..., Any]:  # legacy alias
+        return self.fetch_html_with_browser
+
+    @property
+    def warm_browser_context_with_flaresolverr(self) -> Callable[..., Any]:  # legacy alias
+        return self.warm_browser_context
+
+    @property
+    def fetch_pdf_with_playwright(self) -> Callable[..., Any]:
+        return self.fetch_pdf_with_browser
+
+    @property
+    def fetch_html_with_direct_playwright(self) -> Callable[..., Any]:
+        return self.fetch_html_with_fast_browser
+
+    @property
+    def _build_shared_playwright_file_fetcher(self) -> Callable[..., Any]:
+        return self._build_shared_browser_file_fetcher
+
+    @property
+    def _build_shared_playwright_image_fetcher(self) -> Callable[..., Any]:
+        return self._build_shared_browser_image_fetcher
 
 
 def default_browser_workflow_deps() -> BrowserWorkflowDeps:
@@ -49,12 +139,12 @@ def default_browser_workflow_deps() -> BrowserWorkflowDeps:
         download_assets,
         split_body_and_supplementary_assets,
     )
-    from .._cloakbrowser import (
+    from ..browser_runtime import (
         ensure_runtime_ready,
-        fetch_html_with_cloakbrowser,
+        fetch_html_with_browser,
         load_runtime_config,
         probe_runtime_status,
-        warm_browser_context_with_cloakbrowser,
+        warm_browser_context,
     )
     from .._pdf_fallback import fetch_pdf_with_playwright
     from ..atypon_browser_workflow import extract_atypon_browser_workflow_markdown
@@ -78,24 +168,29 @@ def default_browser_workflow_deps() -> BrowserWorkflowDeps:
         load_runtime_config=load_runtime_config,
         ensure_runtime_ready=ensure_runtime_ready,
         probe_runtime_status=probe_runtime_status,
-        fetch_html_with_flaresolverr=fetch_html_with_cloakbrowser,
-        warm_browser_context_with_flaresolverr=warm_browser_context_with_cloakbrowser,
+        fetch_html_with_browser=fetch_html_with_browser,
+        warm_browser_context=warm_browser_context,
         fetch_seeded_browser_pdf_payload=fetch_seeded_browser_pdf_payload,
-        fetch_pdf_with_playwright=fetch_pdf_with_playwright,
+        fetch_pdf_with_browser=fetch_pdf_with_playwright,
         download_assets=download_assets,
         split_body_and_supplementary_assets=split_body_and_supplementary_assets,
         bootstrap_browser_workflow=bootstrap_browser_workflow,
-        _build_shared_playwright_file_fetcher=_build_shared_playwright_file_fetcher,
-        _build_shared_playwright_image_fetcher=_build_shared_playwright_image_fetcher,
+        _build_shared_browser_file_fetcher=_build_shared_playwright_file_fetcher,
+        _build_shared_browser_image_fetcher=_build_shared_playwright_image_fetcher,
         extract_atypon_browser_workflow_markdown=extract_atypon_browser_workflow_markdown,
-        pdf_browser_context_seed=warm_browser_context_with_cloakbrowser,
-        refresh_browser_context_seed=warm_browser_context_with_cloakbrowser,
-        fetch_html_with_direct_playwright=fetch_html_with_direct_playwright,
+        pdf_browser_context_seed=warm_browser_context,
+        refresh_browser_context_seed=warm_browser_context,
+        fetch_html_with_fast_browser=fetch_html_with_direct_playwright,
         _cached_browser_workflow_markdown=_cached_browser_workflow_markdown,
         _cached_browser_workflow_assets=_cached_browser_workflow_assets,
         _assets_matching_download_failures=_assets_matching_download_failures,
         _browser_workflow_image_download_candidates=_browser_workflow_image_download_candidates,
     )
+
+
+def default_browser_workflow_deps_with_legacy_aliases() -> BrowserWorkflowDeps:
+    """返回带旧属性别名的默认依赖，仅供迁移期旧测试使用。"""
+    return default_browser_workflow_deps()
 
 
 def preferred_html_candidate_from_landing_page(

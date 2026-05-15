@@ -6,6 +6,7 @@ from typing import Any, Callable, Mapping
 
 from ....config import build_user_agent
 from ....runtime import RuntimeContext
+from ....runtime_playwright import launch_playwright_chromium
 from ....utils import normalize_text
 from ..._pdf_candidates import BROWSER_WORKFLOW_PDF_URL_TOKENS
 from ....reason_codes import ERROR
@@ -60,12 +61,10 @@ def _new_playwright_context(
             runtime_context.new_playwright_context(headless=headless, **context_kwargs),
         )
 
-    from playwright.sync_api import sync_playwright
-
-    manager = sync_playwright().start()
+    manager = None
     browser = None
     try:
-        browser = manager.chromium.launch(headless=headless)
+        manager, browser = launch_playwright_chromium(headless=headless)
         return manager, browser, browser.new_context(**context_kwargs)
     except Exception:
         if browser is not None:

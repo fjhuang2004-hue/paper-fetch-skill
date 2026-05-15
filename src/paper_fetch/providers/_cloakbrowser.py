@@ -26,9 +26,6 @@ from ..quality.reason_codes import REDIRECTED_TO_ABSTRACT
 from ..reason_codes import ERROR, NOT_CONFIGURED, OK, READY
 from ..utils import normalize_text, provider_display_name, sanitize_filename
 from ._flaresolverr import (
-    DEFAULT_FLARESOLVERR_MAX_TIMEOUT_MS,
-    DEFAULT_FLARESOLVERR_WAIT_SECONDS,
-    DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS,
     FetchedPublisherHtml,
     FlareSolverrFailure,
     merge_browser_context_seeds,
@@ -46,7 +43,10 @@ from .browser_workflow.shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
 
 logger = logging.getLogger("paper_fetch.providers.cloakbrowser")
 
-DEFAULT_CLOAKBROWSER_TIMEOUT_MS = DEFAULT_FLARESOLVERR_MAX_TIMEOUT_MS
+DEFAULT_BROWSER_RUNTIME_MAX_TIMEOUT_MS = 120000
+DEFAULT_BROWSER_RUNTIME_WAIT_SECONDS = 8
+DEFAULT_BROWSER_RUNTIME_WARM_WAIT_SECONDS = 1
+DEFAULT_CLOAKBROWSER_TIMEOUT_MS = DEFAULT_BROWSER_RUNTIME_MAX_TIMEOUT_MS
 CLOAKBROWSER_STATUS_PROBE_ID = "probe://cloakbrowser/status"
 _BROWSER_WORKFLOW_PROVIDERS = ("wiley", "science", "pnas", "ams")
 
@@ -269,8 +269,8 @@ def fetch_html_with_cloakbrowser(
     *,
     publisher: str,
     config: CloakBrowserRuntimeConfig,
-    wait_seconds: int = DEFAULT_FLARESOLVERR_WAIT_SECONDS,
-    warm_wait_seconds: int = DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS,
+    wait_seconds: int = DEFAULT_BROWSER_RUNTIME_WAIT_SECONDS,
+    warm_wait_seconds: int = DEFAULT_BROWSER_RUNTIME_WARM_WAIT_SECONDS,
     max_timeout_ms: int | None = None,
     return_image_payload: bool = False,
     return_screenshot: bool = False,
@@ -435,6 +435,13 @@ def fetch_html_with_cloakbrowser(
 
 
 fetch_html_with_cloakbrowser.paper_fetch_html_fetcher_name = "cloakbrowser"  # type: ignore[attr-defined]
+
+
+def fetch_html_with_cloakbrowser_fast(*args: Any, **kwargs: Any) -> FetchedPublisherHtml:
+    return fetch_html_with_cloakbrowser(*args, **kwargs)
+
+
+fetch_html_with_cloakbrowser_fast.paper_fetch_html_fetcher_name = "cloakbrowser_fast"  # type: ignore[attr-defined]
 
 
 def warm_browser_context_with_cloakbrowser(

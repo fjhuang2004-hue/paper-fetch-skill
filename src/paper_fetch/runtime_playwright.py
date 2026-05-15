@@ -7,6 +7,29 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+class PlaywrightUnavailableError(RuntimeError):
+    """Raised when the legacy Playwright runtime cannot be imported."""
+
+
+def launch_playwright_chromium(*, headless: bool = True) -> tuple[Any, Any]:
+    """Start the legacy stock Playwright Chromium browser."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:
+        raise PlaywrightUnavailableError("playwright is not installed.") from exc
+
+    manager = sync_playwright().start()
+    try:
+        browser = manager.chromium.launch(headless=bool(headless))
+    except Exception:
+        try:
+            manager.stop()
+        finally:
+            pass
+        raise
+    return manager, browser
+
+
 @dataclass
 class PlaywrightContextManager:
     """Owns a shared Playwright Chromium browser for one fetch runtime."""
@@ -24,17 +47,7 @@ class PlaywrightContextManager:
             if self._browser is not None or self._playwright_manager is not None:
                 self.close()
 
-            from playwright.sync_api import sync_playwright
-
-            manager = sync_playwright().start()
-            try:
-                browser = manager.chromium.launch(headless=active_headless)
-            except Exception:
-                try:
-                    manager.stop()
-                finally:
-                    pass
-                raise
+            manager, browser = launch_playwright_chromium(headless=active_headless)
             self._playwright_manager = manager
             self._browser = browser
             self._headless = active_headless
@@ -69,4 +82,4 @@ class PlaywrightContextManager:
             pass
 
 
-__all__ = ["PlaywrightContextManager"]
+__all__ = ["PlaywrightContextManager", "PlaywrightUnavailableError", "launch_playwright_chromium"]

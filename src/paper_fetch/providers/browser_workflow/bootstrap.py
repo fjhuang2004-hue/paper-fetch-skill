@@ -33,16 +33,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger("paper_fetch.providers.browser_workflow")
 
 
-def _fetch_flaresolverr_html_payload(*args, deps: BrowserWorkflowDeps | None = None, **kwargs):
+def _fetch_browser_html_payload(*args, deps: BrowserWorkflowDeps | None = None, **kwargs):
     deps = deps or default_browser_workflow_deps()
     kwargs.setdefault(
         "html_fetcher",
-        deps.fetch_html_with_flaresolverr,
+        deps.fetch_html_with_browser,
     )
-    return _html_extraction._fetch_flaresolverr_html_payload(*args, **kwargs)
+    return _html_extraction._fetch_browser_html_payload(*args, **kwargs)
 
 
-def _fetch_flaresolverr_html_payload_with_fast_path(
+def _fetch_browser_html_payload_with_fast_path(
     *args,
     deps: BrowserWorkflowDeps | None = None,
     **kwargs,
@@ -50,11 +50,15 @@ def _fetch_flaresolverr_html_payload_with_fast_path(
     deps = deps or default_browser_workflow_deps()
     kwargs.setdefault(
         "html_fetcher",
-        deps.fetch_html_with_flaresolverr,
+        deps.fetch_html_with_browser,
     )
-    return _html_extraction._fetch_flaresolverr_html_payload_with_fast_path(
+    return _html_extraction._fetch_browser_html_payload_with_fast_path(
         *args, **kwargs
     )
+
+
+_fetch_flaresolverr_html_payload = _fetch_browser_html_payload  # legacy alias
+_fetch_flaresolverr_html_payload_with_fast_path = _fetch_browser_html_payload_with_fast_path  # legacy alias
 
 
 def bootstrap_browser_workflow(
@@ -106,7 +110,7 @@ def bootstrap_browser_workflow(
 
     if profile.direct_playwright_html_preflight:
         try:
-            html_result = deps.fetch_html_with_direct_playwright(
+            html_result = deps.fetch_html_with_fast_browser(
                 html_candidates,
                 publisher=client.name,
                 user_agent=client.user_agent,
@@ -161,7 +165,7 @@ def bootstrap_browser_workflow(
         return result
 
     try:
-        html_result, html_payload = _fetch_flaresolverr_html_payload_with_fast_path(
+        html_result, html_payload = _fetch_browser_html_payload_with_fast_path(
             client,
             html_candidates,
             runtime=result.runtime,

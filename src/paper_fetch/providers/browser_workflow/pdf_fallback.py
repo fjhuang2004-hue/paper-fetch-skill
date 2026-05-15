@@ -44,7 +44,7 @@ def fetch_seeded_browser_pdf_payload(
         landing_page_url,
         pdf_browser_context_seed.get("browser_final_url"),
     )
-    pdf_result = deps.fetch_pdf_with_playwright(
+    pdf_result = deps.fetch_pdf_with_browser(
         pdf_candidates,
         artifact_dir=runtime.artifact_dir / artifact_subdir,
         browser_cookies=list(pdf_browser_context_seed.get("browser_cookies") or []),

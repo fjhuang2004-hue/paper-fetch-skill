@@ -21,16 +21,17 @@ from ...quality.reason_codes import (
     STRUCTURED_MISSING_BODY_SECTIONS,
 )
 from ...runtime import RuntimeContext
+from ...runtime_playwright import PlaywrightUnavailableError, launch_playwright_chromium
 from ...tracing import fulltext_marker, trace_from_markers
 from ...utils import normalize_text
 from .fetchers import _normalized_response_headers
 from .shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
+from ..browser_runtime import fetch_html_with_browser
 from .._flaresolverr import (
     DEFAULT_FLARESOLVERR_WAIT_SECONDS,
     DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS,
     FetchedPublisherHtml,
     FlareSolverrFailure,
-    fetch_html_with_flaresolverr,
 )
 from ..atypon_browser_workflow import (
     extract_browser_workflow_asset_html_scopes,
@@ -66,6 +67,8 @@ __all__ = [
     "_browser_workflow_html_payload",
     "_cached_browser_workflow_assets",
     "_cached_browser_workflow_markdown",
+    "_fetch_browser_html_payload",
+    "_fetch_browser_html_payload_with_fast_path",
     "_fetch_flaresolverr_html_payload",
     "_fetch_flaresolverr_html_payload_with_fast_path",
     "extract_browser_workflow_asset_html_scopes",
@@ -181,13 +184,6 @@ def fetch_html_with_direct_playwright(
 ) -> FetchedPublisherHtml:
     if not candidate_urls:
         raise HtmlExtractionFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception as exc:
-        raise HtmlExtractionFailure(
-            "playwright_unavailable",
-            f"Playwright is not available for direct {publisher} HTML preflight: {exc}",
-        ) from exc
 
     last_failure: HtmlExtractionFailure | None = None
     manager = None
@@ -203,8 +199,13 @@ def fetch_html_with_direct_playwright(
         if context is not None:
             browser_context = context.new_playwright_context(headless=headless, **context_kwargs)
         else:
-            manager = sync_playwright().start()
-            browser = manager.chromium.launch(headless=headless)
+            try:
+                manager, browser = launch_playwright_chromium(headless=headless)
+            except PlaywrightUnavailableError as exc:
+                raise HtmlExtractionFailure(
+                    "playwright_unavailable",
+                    f"Playwright is not available for direct {publisher} HTML preflight: {exc}",
+                ) from exc
             browser_context = browser.new_context(**context_kwargs)
         page = browser_context.new_page()
 
@@ -323,7 +324,7 @@ def _browser_workflow_html_payload(
     )
 
 
-def _fetch_flaresolverr_html_payload(
+def _fetch_browser_html_payload(
     client: "BrowserWorkflowClient",
     html_candidates: list[str],
     *,
@@ -331,7 +332,7 @@ def _fetch_flaresolverr_html_payload(
     metadata: ProviderMetadata,
     context: RuntimeContext,
     warnings: list[str] | None = None,
-    html_fetcher: Callable[..., FetchedPublisherHtml] = fetch_html_with_flaresolverr,
+    html_fetcher: Callable[..., FetchedPublisherHtml] = fetch_html_with_browser,
     disable_media: bool = False,
     wait_seconds: int = DEFAULT_FLARESOLVERR_WAIT_SECONDS,
     warm_wait_seconds: int = DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS,
@@ -359,7 +360,7 @@ def _fetch_flaresolverr_html_payload(
     fetcher_name = (
         normalize_text(fetcher_attr)
         if isinstance(fetcher_attr, str)
-        else "flaresolverr"
+        else "cloakbrowser"
     )
     return html_result, _browser_workflow_html_payload(
         client,
@@ -371,6 +372,9 @@ def _fetch_flaresolverr_html_payload(
     )
 
 
+_fetch_flaresolverr_html_payload = _fetch_browser_html_payload  # legacy alias
+
+
 def _should_retry_fast_flaresolverr_failure(exc: Exception) -> bool:
     if isinstance(exc, FlareSolverrFailure):
         return exc.kind in _FAST_FLARESOLVERR_RETRY_KINDS
@@ -379,7 +383,7 @@ def _should_retry_fast_flaresolverr_failure(exc: Exception) -> bool:
     return False
 
 
-def _fetch_flaresolverr_html_payload_with_fast_path(
+def _fetch_browser_html_payload_with_fast_path(
     client: "BrowserWorkflowClient",
     html_candidates: list[str],
     *,
@@ -387,10 +391,10 @@ def _fetch_flaresolverr_html_payload_with_fast_path(
     metadata: ProviderMetadata,
     context: RuntimeContext,
     warnings: list[str] | None = None,
-    html_fetcher: Callable[..., FetchedPublisherHtml] = fetch_html_with_flaresolverr,
+    html_fetcher: Callable[..., FetchedPublisherHtml] = fetch_html_with_browser,
 ) -> tuple[FetchedPublisherHtml, RawFulltextPayload]:
     try:
-        return _fetch_flaresolverr_html_payload(
+        return _fetch_browser_html_payload(
             client,
             html_candidates,
             runtime=runtime,
@@ -412,7 +416,7 @@ def _fetch_flaresolverr_html_payload_with_fast_path(
             getattr(exc, "message", None) or normalize_text(str(exc)),
         )
 
-    return _fetch_flaresolverr_html_payload(
+    return _fetch_browser_html_payload(
         client,
         html_candidates,
         runtime=runtime,
@@ -424,3 +428,6 @@ def _fetch_flaresolverr_html_payload_with_fast_path(
         wait_seconds=DEFAULT_FLARESOLVERR_WAIT_SECONDS,
         warm_wait_seconds=DEFAULT_FLARESOLVERR_WARM_WAIT_SECONDS,
     )
+
+
+_fetch_flaresolverr_html_payload_with_fast_path = _fetch_browser_html_payload_with_fast_path  # legacy alias

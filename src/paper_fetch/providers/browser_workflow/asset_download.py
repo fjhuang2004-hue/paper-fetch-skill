@@ -222,7 +222,7 @@ def _run_browser_asset_download_attempt(
 
     def raw_figure_page_fetcher(figure_page_url: str) -> tuple[str, str] | None:
         try:
-            html_result = deps.fetch_html_with_flaresolverr(
+            html_result = deps.fetch_html_with_browser(
                 [figure_page_url],
                 publisher=recovery.provider,
                 config=recovery.runtime,
@@ -404,7 +404,7 @@ def _asset_challenge_recovery_for(
         attempts: list[dict[str, Any]] = []
         for recovery_url in _asset_recovery_urls(image_url, asset):
             try:
-                html_result = deps.fetch_html_with_flaresolverr(
+                html_result = deps.fetch_html_with_browser(
                     [recovery_url],
                     publisher=recovery.provider,
                     config=recovery.runtime,
@@ -479,7 +479,7 @@ def _supplementary_challenge_recovery_for(
         attempts: list[dict[str, Any]] = []
         for recovery_url in _supplementary_recovery_urls(recovery, file_url, asset):
             try:
-                html_result = deps.fetch_html_with_flaresolverr(
+                html_result = deps.fetch_html_with_browser(
                     [recovery_url],
                     publisher=recovery.provider,
                     config=recovery.runtime,

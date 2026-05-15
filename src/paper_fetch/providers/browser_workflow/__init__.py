@@ -1,4 +1,8 @@
-"""Shared browser-workflow runtime helpers for Wiley/Science/PNAS/AMS."""
+"""Shared browser-workflow runtime helpers for Wiley/Science/PNAS/AMS.
+
+Migration aliases may resolve old and browser-neutral names to the same target;
+``__getattr__`` caches each public name independently in module globals.
+"""
 
 from __future__ import annotations
 
@@ -37,6 +41,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "_cached_browser_workflow_markdown": (".html_extraction", "_cached_browser_workflow_markdown"),
     "_choose_playwright_seed_url": (".fetchers", "_choose_playwright_seed_url"),
     "_compact_failure_diagnostic": (".fetchers", "_compact_failure_diagnostic"),
+    "_fetch_browser_html_payload": (".bootstrap", "_fetch_browser_html_payload"),
+    "_fetch_browser_html_payload_with_fast_path": (".bootstrap", "_fetch_browser_html_payload_with_fast_path"),
     "_fetch_flaresolverr_html_payload": (".bootstrap", "_fetch_flaresolverr_html_payload"),
     "_fetch_flaresolverr_html_payload_with_fast_path": (
         ".bootstrap",
@@ -55,8 +61,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "extract_pdf_url_from_crossref": (".shared", "extract_pdf_url_from_crossref"),
     "extract_atypon_browser_workflow_markdown": (".html_extraction", "extract_atypon_browser_workflow_markdown"),
     "fetch_html_with_direct_playwright": (".html_extraction", "fetch_html_with_direct_playwright"),
+    "fetch_html_with_fast_browser": (".html_extraction", "fetch_html_with_direct_playwright"),
+    "fetch_html_with_browser": ("paper_fetch.providers.browser_runtime", "fetch_html_with_browser"),
     "fetch_html_with_flaresolverr": ("paper_fetch.providers._cloakbrowser", "fetch_html_with_cloakbrowser"),
     "fetch_image_document_with_playwright": (".fetchers", "fetch_image_document_with_playwright"),
+    "fetch_pdf_with_browser": ("paper_fetch.providers._pdf_fallback", "fetch_pdf_with_playwright"),
     "fetch_pdf_with_playwright": ("paper_fetch.providers._pdf_fallback", "fetch_pdf_with_playwright"),
     "fetch_seeded_browser_pdf_payload": (".pdf_fallback", "fetch_seeded_browser_pdf_payload"),
     "load_runtime_config": ("paper_fetch.providers._cloakbrowser", "load_runtime_config"),
@@ -64,6 +73,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "merge_provider_owned_authors": (".article", "merge_provider_owned_authors"),
     "probe_runtime_status": ("paper_fetch.providers._cloakbrowser", "probe_runtime_status"),
     "rewrite_inline_figure_links": (".html_extraction", "rewrite_inline_figure_links"),
+    "warm_browser_context": ("paper_fetch.providers.browser_runtime", "warm_browser_context"),
     "warm_browser_context_with_flaresolverr": (
         "paper_fetch.providers._cloakbrowser",
         "warm_browser_context_with_cloakbrowser",

@@ -15,6 +15,7 @@ from ..http.headers import header_value
 from ..extraction.html.shared import html_text_snippet, html_title_snippet
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..runtime import RuntimeContext
+from ..runtime_playwright import launch_playwright_chromium
 from ..utils import normalize_text
 from ._pdf_candidates import extract_pdf_candidate_urls_from_html
 from ._pdf_common import (
@@ -270,7 +271,6 @@ def fetch_pdf_with_playwright(
     try:
         from playwright.sync_api import Error as PlaywrightError
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-        from playwright.sync_api import sync_playwright
     except Exception as exc:  # pragma: no cover - exercised by missing dependency integration tests
         raise PdfFallbackFailure("missing_playwright", "playwright is not installed; cannot use PDF fallback.") from exc
 
@@ -309,8 +309,7 @@ def fetch_pdf_with_playwright(
         if context is not None:
             browser_context = context.new_playwright_context(headless=headless, **context_kwargs)
         else:
-            manager = sync_playwright().start()
-            browser = manager.chromium.launch(headless=headless)
+            manager, browser = launch_playwright_chromium(headless=headless)
             browser_context = browser.new_context(**context_kwargs)
 
         if browser_cookies:
