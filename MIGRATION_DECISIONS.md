@@ -116,3 +116,28 @@
 - 为同步 `asset_download.py` 的 browser-neutral image payload 命名，补充 `_browser_image_payload_failure_reason` 并保留 `_flaresolverr_image_payload_failure_reason` alias；未新增 backend fallback。
 - 未修改 Phase 5 输入文件清单外的 `src/paper_fetch/providers/browser_workflow/__init__.py`，因此 `_BasePlaywrightDocumentFetcher` 验收 grep 仅命中既有 lazy re-export alias 行。
 - fixup #1: 根因是包级 lazy re-export 继续显式暴露旧基类名且真实 alias 行被拆分隐藏；已移除该额外 re-export，并将旧基类 alias 改为直接定义行。
+
+## Phase 6
+
+### 命名决定
+- `_safe_int`
+- `_normalized_content_type`
+- `_response_body`
+- `_browser_image_payload_from_bytes`
+- `_capture_expected_response`
+- `_image_element_has_loaded_natural_size`
+- `_payload_from_canvas_export`
+- `_clear_image_payload_failure`
+- `_record_image_payload_failure`
+- `_capture_image_payload`
+- `_IMAGE_PAYLOAD_MIN_IMAGE_DIMENSION`
+- `_IMAGE_RESPONSE_BLOCKED_BY_HTML_WRAPPER`
+- `_IMAGE_PAYLOAD_RESPONSE_ATTR`
+- `_IMAGE_PAYLOAD_TIMEOUT_ATTR`
+- `_IMAGE_PAYLOAD_FAILURE_ATTR`
+
+### 签名决定
+- 无
+
+### 判断性偏差
+- 无

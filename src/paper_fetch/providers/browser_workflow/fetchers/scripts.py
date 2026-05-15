@@ -104,6 +104,7 @@ _LOADED_IMAGE_CANVAS_EXPORT_SCRIPT = """
       status: 200,
       url: chosenUrl,
       contentType: 'image/png',
+      dataURL: dataUrl,
       bodyB64,
       width: image.naturalWidth || canvas.width,
       height: image.naturalHeight || canvas.height,

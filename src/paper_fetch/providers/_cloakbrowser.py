@@ -8,7 +8,7 @@ from importlib import metadata as importlib_metadata
 from importlib import util as importlib_util
 import logging
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from bs4 import BeautifulSoup
 
@@ -18,6 +18,10 @@ from ..config import (
     build_user_agent,
     parse_positive_int_env,
     resolve_user_data_dir,
+)
+from ..extraction.image_payloads import (
+    image_dimensions_from_bytes,
+    image_mime_type_from_bytes,
 )
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..quality.html_availability import choose_parser, extract_page_title
@@ -39,7 +43,11 @@ from .base import (
     provider_status_check_from_failure,
 )
 from .browser_workflow.fetchers import _normalized_response_headers
+from .browser_workflow.fetchers.scripts import _LOADED_IMAGE_CANVAS_EXPORT_SCRIPT
 from .browser_workflow.shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
+
+if TYPE_CHECKING:
+    from .browser_runtime import BrowserImagePayload
 
 logger = logging.getLogger("paper_fetch.providers.cloakbrowser")
 
@@ -49,6 +57,11 @@ DEFAULT_BROWSER_RUNTIME_WARM_WAIT_SECONDS = 1
 DEFAULT_CLOAKBROWSER_TIMEOUT_MS = DEFAULT_BROWSER_RUNTIME_MAX_TIMEOUT_MS
 CLOAKBROWSER_STATUS_PROBE_ID = "probe://cloakbrowser/status"
 _BROWSER_WORKFLOW_PROVIDERS = ("wiley", "science", "pnas", "ams")
+_IMAGE_PAYLOAD_MIN_IMAGE_DIMENSION = 1
+_IMAGE_RESPONSE_BLOCKED_BY_HTML_WRAPPER = "image_response_blocked_by_html_wrapper"
+_IMAGE_PAYLOAD_RESPONSE_ATTR = "_paper_fetch_top_level_response"
+_IMAGE_PAYLOAD_TIMEOUT_ATTR = "_paper_fetch_image_payload_timeout_ms"
+_IMAGE_PAYLOAD_FAILURE_ATTR = "_paper_fetch_image_payload_failure"
 
 
 @dataclass(frozen=True)
@@ -240,6 +253,258 @@ def _response_status(response: Any) -> int | None:
         return None
 
 
+def _safe_int(value: Any, *, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _normalized_content_type(value: str | None) -> str:
+    return normalize_text(str(value or "")).split(";", 1)[0].lower()
+
+
+def _response_body(response: Any) -> bytes | None:
+    if response is None:
+        return None
+    try:
+        body = response.body()
+    except Exception:
+        return None
+    if not isinstance(body, (bytes, bytearray)) or not body:
+        return None
+    return bytes(body)
+
+
+def _browser_image_payload_from_bytes(
+    body: bytes | bytearray | None,
+    *,
+    content_type: str | None,
+    url: str,
+    status: int | None,
+    width: int = 0,
+    height: int = 0,
+) -> BrowserImagePayload | None:
+    if not isinstance(body, (bytes, bytearray)) or not body:
+        return None
+    payload_body = bytes(body)
+    detected_type = image_mime_type_from_bytes(payload_body)
+    if not detected_type:
+        return None
+    normalized_content_type = _normalized_content_type(content_type) or detected_type
+    if not normalized_content_type.startswith("image/"):
+        normalized_content_type = detected_type
+    dimensions = image_dimensions_from_bytes(payload_body)
+    if dimensions is not None:
+        width = width or dimensions[0]
+        height = height or dimensions[1]
+    return {
+        "bodyB64": base64.b64encode(payload_body).decode("ascii"),
+        "contentType": normalized_content_type,
+        "url": normalize_text(url),
+        "status": status or 200,
+        "width": max(0, _safe_int(width)),
+        "height": max(0, _safe_int(height)),
+    }
+
+
+def _capture_expected_response(page: Any, request_url: str) -> Any:
+    response = getattr(page, _IMAGE_PAYLOAD_RESPONSE_ATTR, None)
+    if response is not None:
+        return response
+    timeout_ms = (
+        _safe_int(getattr(page, _IMAGE_PAYLOAD_TIMEOUT_ATTR, None))
+        or DEFAULT_CLOAKBROWSER_TIMEOUT_MS
+    )
+    try:
+        expected_response = page.expect_response(
+            lambda response: normalize_text(str(getattr(response, "url", "") or ""))
+            == request_url,
+            timeout=timeout_ms,
+        )
+    except Exception:
+        return None
+    if not hasattr(expected_response, "__enter__"):
+        return getattr(expected_response, "value", expected_response)
+    try:
+        with expected_response as response_info:
+            pass
+        return getattr(response_info, "value", None)
+    except Exception:
+        return None
+
+
+def _image_element_has_loaded_natural_size(image_element: Any) -> bool | None:
+    try:
+        image_info = image_element.evaluate(
+            """
+            (image) => ({
+              width: image.naturalWidth || 0,
+              height: image.naturalHeight || 0,
+              complete: !!image.complete,
+            })
+            """
+        )
+    except Exception:
+        return None
+    if not isinstance(image_info, Mapping):
+        return None
+    return (
+        bool(image_info.get("complete", True))
+        and _safe_int(image_info.get("width")) > 0
+        and _safe_int(image_info.get("height")) > 0
+    )
+
+
+def _payload_from_canvas_export(
+    rendered: Any,
+    *,
+    fallback_url: str,
+    status: int | None,
+) -> BrowserImagePayload | None:
+    if not isinstance(rendered, Mapping) or not rendered.get("ok"):
+        return None
+    body_b64 = normalize_text(str(rendered.get("bodyB64") or ""))
+    content_type = (
+        _normalized_content_type(str(rendered.get("contentType") or ""))
+        or "image/png"
+    )
+    data_url = normalize_text(
+        str(rendered.get("dataURL") or rendered.get("dataUrl") or "")
+    )
+    if data_url.startswith("data:") and "," in data_url:
+        metadata, body_b64 = data_url.split(",", 1)
+        content_type = (
+            _normalized_content_type(metadata.removeprefix("data:").split(";", 1)[0])
+            or content_type
+        )
+    try:
+        body = base64.b64decode(body_b64, validate=True)
+    except Exception:
+        return None
+    return _browser_image_payload_from_bytes(
+        body,
+        content_type=content_type,
+        url=fallback_url,
+        status=status,
+        width=_safe_int(rendered.get("width")),
+        height=_safe_int(rendered.get("height")),
+    )
+
+
+def _clear_image_payload_failure(page: Any) -> None:
+    try:
+        delattr(page, _IMAGE_PAYLOAD_FAILURE_ATTR)
+    except Exception:
+        pass
+
+
+def _record_image_payload_failure(page: Any, values: Mapping[str, Any]) -> None:
+    try:
+        setattr(page, _IMAGE_PAYLOAD_FAILURE_ATTR, dict(values))
+    except Exception:
+        pass
+
+
+def _capture_image_payload(
+    page: Any,
+    *,
+    request_url: str,
+    final_url: str,
+) -> BrowserImagePayload | None:
+    _clear_image_payload_failure(page)
+    normalized_request_url = normalize_text(request_url)
+    normalized_final_url = normalize_text(final_url) or normalized_request_url
+    response = _capture_expected_response(page, normalized_request_url)
+    status = _response_status(response) or 200
+    headers = _response_headers(response)
+    content_type = _normalized_content_type(headers.get("content-type"))
+
+    if content_type.startswith("image/"):
+        payload = _browser_image_payload_from_bytes(
+            _response_body(response),
+            content_type=content_type,
+            url=normalized_final_url,
+            status=status,
+        )
+        if payload is not None:
+            return payload
+
+    html = ""
+    try:
+        html = str(page.content() or "")
+    except Exception:
+        html = ""
+    if (
+        _normalized_content_type(content_type) in {"image/svg+xml", ""}
+        or normalize_text(html).startswith("<")
+    ):
+        svg_payload = _browser_image_payload_from_bytes(
+            html.encode("utf-8"),
+            content_type="image/svg+xml",
+            url=normalized_final_url,
+            status=status,
+        )
+        if svg_payload is not None and svg_payload["contentType"] == "image/svg+xml":
+            return svg_payload
+
+    image_element = None
+    try:
+        image_element = page.query_selector("img")
+    except Exception:
+        image_element = None
+    if image_element is not None:
+        loaded = _image_element_has_loaded_natural_size(image_element)
+        if loaded is not False:
+            try:
+                rendered = page.evaluate(
+                    _LOADED_IMAGE_CANVAS_EXPORT_SCRIPT,
+                    [
+                        normalized_request_url,
+                        _IMAGE_PAYLOAD_MIN_IMAGE_DIMENSION,
+                        _IMAGE_PAYLOAD_MIN_IMAGE_DIMENSION,
+                    ],
+                )
+            except Exception:
+                rendered = None
+            payload = _payload_from_canvas_export(
+                rendered,
+                fallback_url=normalized_final_url,
+                status=status,
+            )
+            if payload is not None:
+                return payload
+
+    try:
+        title = normalize_text(str(page.title() or ""))
+    except Exception:
+        title = ""
+    if not title and html:
+        try:
+            title = extract_page_title(BeautifulSoup(html, choose_parser()))
+        except Exception:
+            title = ""
+    summary = summarize_html(html) if normalize_text(html) else ""
+    detected = detect_html_block(title or "", summary, status)
+    reason = (
+        detected.reason
+        if detected is not None
+        else _IMAGE_RESPONSE_BLOCKED_BY_HTML_WRAPPER
+    )
+    _record_image_payload_failure(
+        page,
+        {
+            "reason": reason,
+            "url": normalized_final_url,
+            "status": status,
+            "content_type": content_type,
+            "title": title,
+            "summary": summary,
+        },
+    )
+    return None
+
+
 def _context_seed(context: Any, *, final_url: str, user_agent: str) -> dict[str, Any]:
     try:
         cookies = context.cookies()
@@ -280,10 +545,7 @@ def fetch_html_with_cloakbrowser(
     if not candidate_urls:
         raise CloakBrowserFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
     if return_image_payload:
-        raise CloakBrowserFailure(
-            "cloakbrowser_image_payload_unsupported",
-            "CloakBrowser imagePayload recovery is not implemented in the minimal browser workflow backend.",
-        )
+        disable_media = False
 
     try:
         cloakbrowser = _import_cloakbrowser()
@@ -344,7 +606,47 @@ def fetch_html_with_cloakbrowser(
                     wait_seconds,
                     normalized_url,
                 )
-                response = page.goto(normalized_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                response = None
+                top_level_response = None
+                if return_image_payload:
+                    try:
+                        setattr(page, _IMAGE_PAYLOAD_TIMEOUT_ATTR, timeout_ms)
+                    except Exception:
+                        pass
+                    try:
+                        with page.expect_response(
+                            lambda candidate_response: normalize_text(
+                                str(getattr(candidate_response, "url", "") or "")
+                            )
+                            == normalized_url,
+                            timeout=timeout_ms,
+                        ) as response_info:
+                            response = page.goto(
+                                normalized_url,
+                                wait_until="domcontentloaded",
+                                timeout=timeout_ms,
+                            )
+                        try:
+                            top_level_response = response_info.value
+                        except Exception:
+                            top_level_response = response
+                    except Exception:
+                        if response is None:
+                            raise
+                        top_level_response = response
+                else:
+                    response = page.goto(
+                        normalized_url,
+                        wait_until="domcontentloaded",
+                        timeout=timeout_ms,
+                    )
+                if top_level_response is None:
+                    top_level_response = response
+                if return_image_payload:
+                    try:
+                        setattr(page, _IMAGE_PAYLOAD_RESPONSE_ATTR, top_level_response)
+                    except Exception:
+                        pass
                 if wait_seconds > 0:
                     page.wait_for_timeout(max(0, int(wait_seconds)) * 1000)
                 final_url = normalize_text(str(getattr(page, "url", "") or "")) or normalized_url
@@ -358,6 +660,22 @@ def fetch_html_with_cloakbrowser(
                 browser_context_seed = _context_seed(browser_context, final_url=final_url, user_agent=user_agent)
                 if browser_context_seed.get("browser_cookies") or browser_context_seed.get("browser_user_agent"):
                     latest_browser_context_seed = browser_context_seed
+                image_payload = None
+                if return_image_payload:
+                    try:
+                        image_payload = _capture_image_payload(
+                            page,
+                            request_url=normalized_url,
+                            final_url=final_url,
+                        )
+                    except Exception:
+                        image_payload = None
+                    image_failure = getattr(page, _IMAGE_PAYLOAD_FAILURE_ATTR, None)
+                    if isinstance(image_failure, Mapping):
+                        headers = dict(headers)
+                        headers[
+                            "x-paper-fetch-image-payload-failure-reason"
+                        ] = normalize_text(str(image_failure.get("reason") or ""))
             except Exception as exc:
                 if isinstance(exc, CloakBrowserFailure):
                     last_failure = exc
@@ -377,14 +695,14 @@ def fetch_html_with_cloakbrowser(
                 continue
 
             detected = detect_html_block(title or "", summary, status)
-            if detected is not None:
+            if detected is not None and not return_image_payload:
                 last_failure = CloakBrowserFailure(
                     detected.reason,
                     detected.message,
                     browser_context_seed=browser_context_seed,
                 )
                 continue
-            if not normalize_text(html):
+            if not normalize_text(html) and image_payload is None:
                 last_failure = CloakBrowserFailure(
                     "empty_html_response",
                     "CloakBrowser returned empty publisher HTML.",
@@ -412,6 +730,7 @@ def fetch_html_with_cloakbrowser(
                 summary=summary,
                 browser_context_seed=browser_context_seed,
                 screenshot_b64=screenshot_b64,
+                image_payload=image_payload,
             )
     finally:
         _safe_close(page)
