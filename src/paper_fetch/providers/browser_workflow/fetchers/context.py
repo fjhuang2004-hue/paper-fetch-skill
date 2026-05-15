@@ -1,4 +1,4 @@
-"""Playwright context helpers for browser workflow fetchers."""
+"""Browser context helpers for browser workflow fetchers."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ from typing import Any, Callable, Mapping
 
 from ....config import build_user_agent
 from ....runtime import RuntimeContext
-from ....runtime_playwright import launch_playwright_chromium
 from ....utils import normalize_text
 from ..._pdf_candidates import BROWSER_WORKFLOW_PDF_URL_TOKENS
 from ....reason_codes import ERROR
-from .diagnostics import _compact_failure_diagnostic
+from .diagnostics import (
+    _compact_failure_diagnostic,
+    _context_failure_diagnostic as _build_context_failure_diagnostic,
+)
 
 
 def _looks_like_pdf_navigation_url(url: str | None) -> bool:
@@ -42,7 +44,7 @@ def _normalized_response_headers(headers: Mapping[str, Any] | None) -> dict[str,
     }
 
 
-def _new_playwright_context(
+def _new_browser_context(
     *,
     runtime_context: RuntimeContext | None,
     headless: bool,
@@ -58,28 +60,20 @@ def _new_playwright_context(
         return (
             None,
             None,
-            runtime_context.new_playwright_context(headless=headless, **context_kwargs),
+            runtime_context.new_browser_context(headless=headless, **context_kwargs),
         )
 
-    manager = None
-    browser = None
+    from ....runtime_browser import BrowserContextManager
+
+    manager = BrowserContextManager()
     try:
-        manager, browser = launch_playwright_chromium(headless=headless)
-        return manager, browser, browser.new_context(**context_kwargs)
+        browser_context = manager.new_context(headless=headless, **context_kwargs)
     except Exception:
-        if browser is not None:
-            try:
-                browser.close()
-            except Exception:
-                pass
-        try:
-            manager.stop()
-        except Exception:
-            pass
+        manager.close()
         raise
+    return manager, None, browser_context
 
-
-class _BasePlaywrightDocumentFetcher:
+class _BaseBrowserDocumentFetcher:
     def __init__(
         self,
         *,
@@ -101,8 +95,7 @@ class _BasePlaywrightDocumentFetcher:
         self._challenge_recovery = challenge_recovery
         self._runtime_context = runtime_context
         self._use_runtime_shared_browser = use_runtime_shared_browser
-        self._playwright_manager = None
-        self._browser = None
+        self._browser_manager = None
         self._context = None
         self._page = None
         self._warmed_seed_urls: set[str] = set()
@@ -127,18 +120,12 @@ class _BasePlaywrightDocumentFetcher:
             except Exception:
                 pass
             self._context = None
-        if self._browser is not None:
+        if self._browser_manager is not None:
             try:
-                self._browser.close()
+                self._browser_manager.close()
             except Exception:
                 pass
-            self._browser = None
-        if self._playwright_manager is not None:
-            try:
-                self._playwright_manager.stop()
-            except Exception:
-                pass
-            self._playwright_manager = None
+            self._browser_manager = None
 
     def _current_seed(self) -> Mapping[str, Any]:
         seed = self._browser_context_seed_getter()
@@ -154,13 +141,11 @@ class _BasePlaywrightDocumentFetcher:
             or build_user_agent({})
         )
         try:
-            self._playwright_manager, self._browser, self._context = (
-                _new_playwright_context(
-                    runtime_context=self._runtime_context,
-                    headless=self._headless,
-                    user_agent=active_user_agent,
-                    use_runtime_shared_browser=self._use_runtime_shared_browser,
-                )
+            self._browser_manager, _unused_browser, self._context = _new_browser_context(
+                runtime_context=self._runtime_context,
+                headless=self._headless,
+                user_agent=active_user_agent,
+                use_runtime_shared_browser=self._use_runtime_shared_browser,
             )
             self._sync_context_cookies()
             self._page = self._context.new_page()
@@ -228,14 +213,7 @@ class _BasePlaywrightDocumentFetcher:
             self._last_failure_by_url[normalized_url] = diagnostic
 
     def _context_failure_diagnostic(self, exc: Exception) -> dict[str, Any]:
-        message = normalize_text(str(exc))
-        return _compact_failure_diagnostic(
-            {
-                "reason": "playwright_context_error",
-                "error_type": exc.__class__.__name__,
-                "error_message": message[:240] if message else exc.__class__.__name__,
-            }
-        )
+        return _build_context_failure_diagnostic(exc)
 
     def _record_recovery_payload(
         self, source_url: str, recovery: Mapping[str, Any]
@@ -277,3 +255,7 @@ class _BasePlaywrightDocumentFetcher:
         self._sync_context_cookies()
         self._warm_seed_urls(force=True)
         return True
+
+
+_BasePlaywrightDocumentFetcher = _BaseBrowserDocumentFetcher
+_new_playwright_context = _new_browser_context

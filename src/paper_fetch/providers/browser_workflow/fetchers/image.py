@@ -21,7 +21,7 @@ from ....quality.reason_codes import CLOUDFLARE_CHALLENGE
 from ....runtime import RuntimeContext
 from ....utils import normalize_text
 from ..._flaresolverr import FetchedPublisherHtml
-from .context import _BasePlaywrightDocumentFetcher, _normalized_response_headers
+from .context import _BaseBrowserDocumentFetcher, _normalized_response_headers
 from .diagnostics import (
     _compact_failure_diagnostic,
     _copy_failure_diagnostic,
@@ -100,10 +100,10 @@ def _copy_image_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     return copied
 
 
-def _flaresolverr_image_document_payload(
+def _browser_image_document_payload(
     result: FetchedPublisherHtml,
 ) -> dict[str, Any] | None:
-    direct_payload = _payload_from_flaresolverr_image_payload(
+    direct_payload = _payload_from_browser_image_payload(
         result.image_payload,
         fallback_url=result.final_url or result.source_url,
     )
@@ -112,7 +112,7 @@ def _flaresolverr_image_document_payload(
     return None
 
 
-def _payload_from_flaresolverr_image_payload(
+def _payload_from_browser_image_payload(
     payload: Mapping[str, Any] | None,
     *,
     fallback_url: str,
@@ -140,7 +140,7 @@ def _payload_from_flaresolverr_image_payload(
     }
 
 
-class _SharedPlaywrightImageDocumentFetcher(_BasePlaywrightDocumentFetcher):
+class _SharedBrowserImageDocumentFetcher(_BaseBrowserDocumentFetcher):
     def __init__(
         self,
         *,
@@ -635,7 +635,7 @@ class _SharedPlaywrightImageDocumentFetcher(_BasePlaywrightDocumentFetcher):
         }
 
 
-class _ThreadLocalSharedPlaywrightImageDocumentFetcher:
+class _ThreadLocalSharedBrowserImageDocumentFetcher:
     def __init__(
         self,
         *,
@@ -663,14 +663,14 @@ class _ThreadLocalSharedPlaywrightImageDocumentFetcher:
         self._use_runtime_shared_browser = use_runtime_shared_browser
         self._thread_local = threading.local()
         self._lock = threading.Lock()
-        self._fetchers: list[_SharedPlaywrightImageDocumentFetcher] = []
+        self._fetchers: list[_SharedBrowserImageDocumentFetcher] = []
         self._failure_by_url: dict[str, dict[str, Any]] = {}
 
-    def _get_fetcher(self) -> _SharedPlaywrightImageDocumentFetcher:
+    def _get_fetcher(self) -> _SharedBrowserImageDocumentFetcher:
         fetcher = getattr(self._thread_local, "fetcher", None)
-        if isinstance(fetcher, _SharedPlaywrightImageDocumentFetcher):
+        if isinstance(fetcher, _SharedBrowserImageDocumentFetcher):
             return fetcher
-        fetcher = _SharedPlaywrightImageDocumentFetcher(
+        fetcher = _SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=self._browser_context_seed_getter,
             seed_urls_getter=self._seed_urls_getter,
             browser_user_agent=self._browser_user_agent,
@@ -710,14 +710,14 @@ class _ThreadLocalSharedPlaywrightImageDocumentFetcher:
                         self._failure_by_url.pop(normalized_url, None)
             return payload
         finally:
-            # Playwright sync objects must be closed from their owning worker
+            # Browser sync objects must be closed from their owning worker
             # thread. Closing these thread-local fetchers later from the caller
             # thread can leave Chromium subprocesses behind.
             self._close_fetcher_for_current_thread(fetcher)
 
     def failure_for(self, image_url: str) -> dict[str, Any] | None:
         fetcher = getattr(self._thread_local, "fetcher", None)
-        if not isinstance(fetcher, _SharedPlaywrightImageDocumentFetcher):
+        if not isinstance(fetcher, _SharedBrowserImageDocumentFetcher):
             normalized_url = normalize_text(image_url)
             with self._lock:
                 cached_failure = self._failure_by_url.get(normalized_url)
@@ -725,7 +725,7 @@ class _ThreadLocalSharedPlaywrightImageDocumentFetcher:
         failure = fetcher.failure_for(image_url)
         return _copy_failure_diagnostic(failure) if isinstance(failure, Mapping) else None
 
-    def _close_fetcher_for_current_thread(self, fetcher: _SharedPlaywrightImageDocumentFetcher) -> None:
+    def _close_fetcher_for_current_thread(self, fetcher: _SharedBrowserImageDocumentFetcher) -> None:
         try:
             fetcher.close()
         finally:
@@ -745,7 +745,7 @@ class _ThreadLocalSharedPlaywrightImageDocumentFetcher:
             fetcher.close()
 
 
-def _build_shared_playwright_image_fetcher(
+def _build_shared_browser_image_fetcher(
     *,
     browser_context_seed_getter: Callable[[], Mapping[str, Any] | None],
     seed_urls_getter: Callable[[], list[str]],
@@ -759,8 +759,8 @@ def _build_shared_playwright_image_fetcher(
     | None = None,
     runtime_context: RuntimeContext | None = None,
     use_runtime_shared_browser: bool = True,
-) -> _ThreadLocalSharedPlaywrightImageDocumentFetcher:
-    return _ThreadLocalSharedPlaywrightImageDocumentFetcher(
+) -> _ThreadLocalSharedBrowserImageDocumentFetcher:
+    return _ThreadLocalSharedBrowserImageDocumentFetcher(
         browser_context_seed_getter=browser_context_seed_getter,
         seed_urls_getter=seed_urls_getter,
         browser_user_agent=browser_user_agent,
@@ -786,7 +786,7 @@ def fetch_image_document_with_playwright(
     normalized_url = normalize_text(image_url)
     if not normalized_url:
         return None
-    fetcher = _build_shared_playwright_image_fetcher(
+    fetcher = _build_shared_browser_image_fetcher(
         browser_context_seed_getter=lambda: {
             "browser_cookies": list(browser_cookies or []),
             "browser_user_agent": browser_user_agent,
@@ -813,3 +813,12 @@ def fetch_image_document_with_playwright(
         return None
     finally:
         fetcher.close()
+
+
+_flaresolverr_image_document_payload = _browser_image_document_payload
+_payload_from_flaresolverr_image_payload = _payload_from_browser_image_payload
+_SharedPlaywrightImageDocumentFetcher = _SharedBrowserImageDocumentFetcher
+_ThreadLocalSharedPlaywrightImageDocumentFetcher = (
+    _ThreadLocalSharedBrowserImageDocumentFetcher
+)
+_build_shared_playwright_image_fetcher = _build_shared_browser_image_fetcher

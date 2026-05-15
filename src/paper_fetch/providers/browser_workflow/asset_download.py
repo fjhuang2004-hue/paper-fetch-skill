@@ -22,9 +22,9 @@ from .assets import (
     _merge_download_attempt_results,
 )
 from .fetchers import (
+    _browser_image_document_payload,
+    _browser_image_payload_failure_reason,
     _compact_failure_diagnostic,
-    _flaresolverr_image_document_payload,
-    _flaresolverr_image_payload_failure_reason,
 )
 from .shared import BrowserWorkflowDeps
 
@@ -435,11 +435,11 @@ def _asset_challenge_recovery_for(
                         attempt_seed, html_result.browser_context_seed
                     )
                 )
-            image_payload = _flaresolverr_image_document_payload(html_result)
+            image_payload = _browser_image_document_payload(html_result)
             recovery_reason = (
                 ""
                 if image_payload is not None
-                else _flaresolverr_image_payload_failure_reason(html_result)
+                else _browser_image_payload_failure_reason(html_result)
             )
             return _compact_failure_diagnostic(
                 {

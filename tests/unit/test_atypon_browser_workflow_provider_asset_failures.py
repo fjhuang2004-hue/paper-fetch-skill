@@ -1,6 +1,8 @@
 # ruff: noqa: F403,F405
 from __future__ import annotations
 
+from paper_fetch.providers.browser_workflow import fetchers as browser_fetchers
+
 from ._atypon_browser_workflow_provider_support import *
 
 
@@ -55,7 +57,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
             self.assertEqual(Path(downloaded["path"]).suffix, ".svg")
             self.assertEqual(Path(downloaded["path"]).read_bytes(), svg_body)
         self.assertEqual(fetcher.call_args.args[0], svg_url)
-    def test_science_provider_records_asset_failure_when_shared_playwright_preview_fails(self) -> None:
+    def test_science_provider_records_asset_failure_when_shared_browser_preview_fails(self) -> None:
         preview_url = "https://www.science.org/images/preview/figure1.png"
         html = f"""
 <article>
@@ -123,7 +125,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 refresh_browser_context_seed=mocked_warm,
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,
@@ -149,7 +151,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
         self.assertEqual(result["asset_failures"][0]["title_snippet"], "Just a moment...")
         self.assertEqual(result["asset_failures"][0]["reason"], "cloudflare_challenge")
         self.assertEqual(result["asset_failures"][0]["recovery_attempts"][0]["status"], "failed")
-    def test_shared_playwright_image_fetcher_recovers_after_cloudflare_challenge(self) -> None:
+    def test_shared_browser_image_fetcher_recovers_after_cloudflare_challenge(self) -> None:
         image_url = "https://onlinelibrary.wiley.com/cms/asset/full/figure1.jpg"
         figure_page_url = "https://onlinelibrary.wiley.com/doi/figure/10.1111/example"
         challenge_recovery = mock.Mock(
@@ -159,7 +161,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
                 "title_snippet": "Figure page",
             }
         )
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {
                 "browser_cookies": [{"name": "cf_clearance", "value": "seed", "domain": ".wiley.com", "path": "/"}],
                 "browser_user_agent": "Mozilla/5.0",
@@ -206,7 +208,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
         self.assertEqual(fetcher._warm_seed_urls.call_args_list[0].kwargs["force"], False)
         self.assertEqual(fetcher._warm_seed_urls.call_args_list[1].kwargs["force"], True)
         self.assertEqual(result["url"], image_url)
-    def test_pnas_provider_downloads_preview_through_shared_playwright_when_no_full_size_candidate(self) -> None:
+    def test_pnas_provider_downloads_preview_through_shared_browser_when_no_full_size_candidate(self) -> None:
         figure_page_url = "https://www.pnas.org/figures/figure-1"
         preview_url = "https://www.pnas.org/images/preview/figure1.png"
         html = f"""
@@ -262,7 +264,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
                         browser_context_seed=seed,
                     )
                 ),
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,

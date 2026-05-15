@@ -14,13 +14,13 @@ from ....extraction.html.shared import (
 from ....logging_utils import emit_structured_log
 from ....runtime import RuntimeContext
 from ....utils import normalize_text
-from .context import _BasePlaywrightDocumentFetcher, _normalized_response_headers
+from .context import _BaseBrowserDocumentFetcher, _normalized_response_headers
 from .diagnostics import _copy_failure_diagnostic, _looks_like_cloudflare_challenge_failure
 
 logger = logging.getLogger("paper_fetch.providers.browser_workflow")
 
 
-class _SharedPlaywrightFileDocumentFetcher(_BasePlaywrightDocumentFetcher):
+class _SharedBrowserFileDocumentFetcher(_BaseBrowserDocumentFetcher):
     def __init__(
         self,
         *,
@@ -155,7 +155,7 @@ class _SharedPlaywrightFileDocumentFetcher(_BasePlaywrightDocumentFetcher):
         }
 
 
-class _ThreadLocalSharedPlaywrightFileDocumentFetcher:
+class _ThreadLocalSharedBrowserFileDocumentFetcher:
     def __init__(
         self,
         *,
@@ -179,14 +179,14 @@ class _ThreadLocalSharedPlaywrightFileDocumentFetcher:
         self._use_runtime_shared_browser = use_runtime_shared_browser
         self._thread_local = threading.local()
         self._lock = threading.Lock()
-        self._fetchers: list[_SharedPlaywrightFileDocumentFetcher] = []
+        self._fetchers: list[_SharedBrowserFileDocumentFetcher] = []
         self._failure_by_url: dict[str, dict[str, Any]] = {}
 
-    def _get_fetcher(self) -> _SharedPlaywrightFileDocumentFetcher:
+    def _get_fetcher(self) -> _SharedBrowserFileDocumentFetcher:
         fetcher = getattr(self._thread_local, "fetcher", None)
-        if isinstance(fetcher, _SharedPlaywrightFileDocumentFetcher):
+        if isinstance(fetcher, _SharedBrowserFileDocumentFetcher):
             return fetcher
-        fetcher = _SharedPlaywrightFileDocumentFetcher(
+        fetcher = _SharedBrowserFileDocumentFetcher(
             browser_context_seed_getter=self._browser_context_seed_getter,
             seed_urls_getter=self._seed_urls_getter,
             browser_user_agent=self._browser_user_agent,
@@ -224,14 +224,14 @@ class _ThreadLocalSharedPlaywrightFileDocumentFetcher:
                         self._failure_by_url.pop(normalized_url, None)
             return payload
         finally:
-            # Playwright sync objects must be closed from their owning worker
+            # Browser sync objects must be closed from their owning worker
             # thread. Closing these thread-local fetchers later from the caller
             # thread can leave Chromium subprocesses behind.
             self._close_fetcher_for_current_thread(fetcher)
 
     def failure_for(self, file_url: str) -> dict[str, Any] | None:
         fetcher = getattr(self._thread_local, "fetcher", None)
-        if not isinstance(fetcher, _SharedPlaywrightFileDocumentFetcher):
+        if not isinstance(fetcher, _SharedBrowserFileDocumentFetcher):
             normalized_url = normalize_text(file_url)
             with self._lock:
                 cached_failure = self._failure_by_url.get(normalized_url)
@@ -239,7 +239,7 @@ class _ThreadLocalSharedPlaywrightFileDocumentFetcher:
         failure = fetcher.failure_for(file_url)
         return _copy_failure_diagnostic(failure) if isinstance(failure, Mapping) else None
 
-    def _close_fetcher_for_current_thread(self, fetcher: _SharedPlaywrightFileDocumentFetcher) -> None:
+    def _close_fetcher_for_current_thread(self, fetcher: _SharedBrowserFileDocumentFetcher) -> None:
         try:
             fetcher.close()
         finally:
@@ -259,7 +259,7 @@ class _ThreadLocalSharedPlaywrightFileDocumentFetcher:
             fetcher.close()
 
 
-def _build_shared_playwright_file_fetcher(
+def _build_shared_browser_file_fetcher(
     *,
     browser_context_seed_getter: Callable[[], Mapping[str, Any] | None],
     seed_urls_getter: Callable[[], list[str]],
@@ -273,17 +273,17 @@ def _build_shared_playwright_file_fetcher(
     use_runtime_shared_browser: bool = True,
     thread_local: bool = False,
 ) -> (
-    _ThreadLocalSharedPlaywrightFileDocumentFetcher
-    | _SharedPlaywrightFileDocumentFetcher
+    _ThreadLocalSharedBrowserFileDocumentFetcher
+    | _SharedBrowserFileDocumentFetcher
 ):
     fetcher_cls: (
-        type[_ThreadLocalSharedPlaywrightFileDocumentFetcher]
-        | type[_SharedPlaywrightFileDocumentFetcher]
+        type[_ThreadLocalSharedBrowserFileDocumentFetcher]
+        | type[_SharedBrowserFileDocumentFetcher]
     )
     fetcher_cls = (
-        _ThreadLocalSharedPlaywrightFileDocumentFetcher
+        _ThreadLocalSharedBrowserFileDocumentFetcher
         if thread_local
-        else _SharedPlaywrightFileDocumentFetcher
+        else _SharedBrowserFileDocumentFetcher
     )
     return fetcher_cls(
         browser_context_seed_getter=browser_context_seed_getter,
@@ -294,3 +294,10 @@ def _build_shared_playwright_file_fetcher(
         runtime_context=runtime_context,
         use_runtime_shared_browser=use_runtime_shared_browser,
     )
+
+
+_SharedPlaywrightFileDocumentFetcher = _SharedBrowserFileDocumentFetcher
+_ThreadLocalSharedPlaywrightFileDocumentFetcher = (
+    _ThreadLocalSharedBrowserFileDocumentFetcher
+)
+_build_shared_playwright_file_fetcher = _build_shared_browser_file_fetcher

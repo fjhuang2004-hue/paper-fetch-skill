@@ -47,7 +47,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_flaresolverr=mocked_fetch,
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,
@@ -135,8 +135,8 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                _build_shared_playwright_image_fetcher=mocked_image_builder,
-                _build_shared_playwright_file_fetcher=mocked_file_builder,
+                _build_shared_browser_image_fetcher=mocked_image_builder,
+                _build_shared_browser_file_fetcher=mocked_file_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener", return_value=object()) as mocked_opener,
@@ -234,7 +234,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_flaresolverr=mocked_fetch,
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,
@@ -261,7 +261,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
         self.assertEqual(result["asset_failures"], [])
         self.assertEqual(result["assets"][0]["download_tier"], "preview")
         self.assertEqual(saved_bytes, png_header(320, 240))
-    def test_pnas_provider_download_related_assets_uses_shared_playwright_primary_path_before_preview(self) -> None:
+    def test_pnas_provider_download_related_assets_uses_shared_browser_primary_path_before_preview(self) -> None:
         """rule: rule-browser-primary-image-download-path"""
         figure_page_url = "https://www.pnas.org/figures/figure-1"
         preview_url = "https://www.pnas.org/images/preview/figure1.png"
@@ -323,11 +323,11 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                         browser_context_seed=initial_seed,
                     )
                 ),
-                _build_shared_playwright_image_fetcher=mock.Mock(
+                _build_shared_browser_image_fetcher=mock.Mock(
                     return_value=shared_fetcher
                 ),
             )
-            mocked_builder = client.deps._build_shared_playwright_image_fetcher
+            mocked_builder = client.deps._build_shared_browser_image_fetcher
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,
                 mock.patch.object(html_assets, "_request_with_opener") as mocked_request,
@@ -419,7 +419,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_flaresolverr=mocked_fetch,
-                _build_shared_playwright_image_fetcher=mock.Mock(
+                _build_shared_browser_image_fetcher=mock.Mock(
                     return_value=shared_fetcher
                 ),
             )
@@ -468,7 +468,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_flaresolverr=mocked_fetch,
-                _build_shared_playwright_image_fetcher=mock.Mock(
+                _build_shared_browser_image_fetcher=mock.Mock(
                     return_value=shared_fetcher
                 ),
             )
@@ -551,7 +551,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_flaresolverr=mocked_fetch,
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,

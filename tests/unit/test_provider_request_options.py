@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import inspect
 import json
 import tempfile
 import threading
@@ -13,6 +14,8 @@ from paper_fetch.http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_S
 from paper_fetch.extraction.html import assets as html_assets
 from paper_fetch.extraction.html.assets import _core as asset_impl
 from paper_fetch.providers import _flaresolverr, browser_workflow
+from paper_fetch.providers.browser_workflow import fetchers as browser_fetchers
+from paper_fetch.providers.browser_workflow.fetchers import context as fetcher_context
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
 from paper_fetch.providers.crossref import CrossrefClient
 from paper_fetch.providers.elsevier import (
@@ -831,9 +834,9 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(result["asset_failures"], [])
         self.assertEqual([asset["download_url"] for asset in result["assets"]], [urls[1], urls[3], urls[0], urls[2]])
 
-    def test_playwright_image_page_fetch_is_abortable_and_does_not_cache_challenge_pages(self) -> None:
+    def test_browser_image_page_fetch_is_abortable_and_does_not_cache_challenge_pages(self) -> None:
         page = _FakeImagePage({"ok": False, "error": "AbortError", "timedOut": True})
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
         )
@@ -853,7 +856,41 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             "image_fetch_timeout",
         )
 
-    def test_playwright_image_wait_stops_immediately_on_cloudflare_challenge_title(self) -> None:
+    def test_no_direct_sync_playwright_in_fetchers(self) -> None:
+        self.assertNotIn("sync_playwright(", inspect.getsource(fetcher_context))
+
+    def test_failure_diagnostic_uses_browser_reason(self) -> None:
+        image_url = "https://example.test/context-error.png"
+        fetcher = browser_fetchers._build_shared_browser_image_fetcher(
+            browser_context_seed_getter=lambda: {"browser_user_agent": "UnitTestAgent/1.0"},
+            seed_urls_getter=lambda: [],
+            browser_user_agent="UnitTestAgent/1.0",
+            use_runtime_shared_browser=False,
+        )
+
+        try:
+            with mock.patch.object(
+                fetcher_context,
+                "_new_browser_context",
+                side_effect=RuntimeError("sync Playwright context already active"),
+            ):
+                result = fetcher(image_url, {"kind": "figure"})
+        finally:
+            fetcher.close()
+
+        failure = fetcher.failure_for(image_url)
+        self.assertIsNone(result)
+        self.assertIsNotNone(failure)
+        assert failure is not None
+        self.assertEqual(failure["reason"], browser_fetchers.BROWSER_CONTEXT_ERROR)
+        self.assertEqual(
+            failure[browser_fetchers.PLAYWRIGHT_CONTEXT_ERROR],
+            browser_fetchers.PLAYWRIGHT_CONTEXT_ERROR,
+        )
+        self.assertEqual(failure["error_type"], "RuntimeError")
+        self.assertEqual(failure["error_message"], "sync Playwright context already active")
+
+    def test_browser_image_wait_stops_immediately_on_cloudflare_challenge_title(self) -> None:
         page = _FakeImagePage(
             {
                 "ready": False,
@@ -862,7 +899,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                 "contentType": "text/html",
             }
         )
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
         )
@@ -872,7 +909,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(page.wait_for_timeout_calls, [])
 
-    def test_playwright_image_wait_timeout_records_no_loaded_image(self) -> None:
+    def test_browser_image_wait_timeout_records_no_loaded_image(self) -> None:
         page = _FakeImagePage(
             {
                 "ready": False,
@@ -881,7 +918,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                 "contentType": "text/html",
             }
         )
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
         )
@@ -895,7 +932,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             "no_loaded_image",
         )
 
-    def test_playwright_image_page_fetch_records_non_image_response_reason(self) -> None:
+    def test_browser_image_page_fetch_records_non_image_response_reason(self) -> None:
         image_url = "https://example.test/cdn/figure.png"
         page = _FakeImagePage(
             {
@@ -908,7 +945,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                 "bodySnippet": "<html><body>Institutional login required</body></html>",
             }
         )
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
         )
@@ -918,7 +955,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertIsNone(result)
         self.assertEqual(fetcher.failure_for(image_url)["reason"], "non_image_response")
 
-    def test_playwright_image_payload_uses_loaded_image_when_fetch_is_challenged(self) -> None:
+    def test_browser_image_payload_uses_loaded_image_when_fetch_is_challenged(self) -> None:
         image_body = b"\x89PNG\r\n\x1a\nloaded-image"
         image_url = "https://example.test/cdn/figure.png"
         page = _FakeQueuedImagePage(
@@ -943,7 +980,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                 },
             ]
         )
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
         )
@@ -957,7 +994,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(result["dimensions"], {"width": 500, "height": 198})
         self.assertEqual(len(page.evaluate_calls), 2)
 
-    def test_playwright_loaded_image_canvas_failure_reasons_are_preserved(self) -> None:
+    def test_browser_loaded_image_canvas_failure_reasons_are_preserved(self) -> None:
         image_url = "https://example.test/cdn/figure.png"
         for reason, error in (
             ("missing_canvas_context", ""),
@@ -974,7 +1011,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                     "contentType": "image/png",
                 }
             )
-            fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+            fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
                 browser_context_seed_getter=lambda: {},
                 seed_urls_getter=lambda: [],
             )
@@ -984,7 +1021,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             self.assertIsNone(result)
             self.assertEqual(fetcher.failure_for(image_url)["reason"], reason)
 
-    def test_flaresolverr_image_document_payload_requires_image_payload(self) -> None:
+    def test_browser_image_document_payload_requires_image_payload(self) -> None:
         result = _flaresolverr.FetchedPublisherHtml(
             source_url="https://example.test/figure.png",
             final_url="https://example.test/figure.png",
@@ -997,11 +1034,11 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             screenshot_b64=base64.b64encode(b"fake-screenshot").decode("ascii"),
         )
 
-        payload = browser_workflow._flaresolverr_image_document_payload(result)
+        payload = browser_fetchers._browser_image_document_payload(result)
 
         self.assertIsNone(payload)
 
-    def test_flaresolverr_image_document_payload_prefers_browser_exported_pixels(self) -> None:
+    def test_browser_image_document_payload_prefers_browser_exported_pixels(self) -> None:
         image_body = b"\x89PNG\r\n\x1a\ncanvas-export"
         result = _flaresolverr.FetchedPublisherHtml(
             source_url="https://example.test/figure.png",
@@ -1023,14 +1060,14 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             },
         )
 
-        payload = browser_workflow._flaresolverr_image_document_payload(result)
+        payload = browser_fetchers._browser_image_document_payload(result)
 
         self.assertIsNotNone(payload)
         assert payload is not None
         self.assertEqual(payload["body"], image_body)
         self.assertEqual(payload["dimensions"], {"width": 40, "height": 30})
 
-    def test_flaresolverr_image_document_payload_rejects_invalid_payload(self) -> None:
+    def test_browser_image_document_payload_rejects_invalid_payload(self) -> None:
         result = _flaresolverr.FetchedPublisherHtml(
             source_url="https://example.test/figure.png",
             final_url="https://example.test/figure.png",
@@ -1051,11 +1088,11 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             },
         )
 
-        payload = browser_workflow._flaresolverr_image_document_payload(result)
+        payload = browser_fetchers._browser_image_document_payload(result)
 
         self.assertIsNone(payload)
 
-    def test_flaresolverr_image_document_payload_accepts_svg_payload(self) -> None:
+    def test_browser_image_document_payload_accepts_svg_payload(self) -> None:
         svg_body = b"\xef\xbb\xbf\n<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg'></svg>"
         result = _flaresolverr.FetchedPublisherHtml(
             source_url="https://example.test/figure.svg",
@@ -1077,14 +1114,14 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             },
         )
 
-        payload = browser_workflow._flaresolverr_image_document_payload(result)
+        payload = browser_fetchers._browser_image_document_payload(result)
 
         self.assertIsNotNone(payload)
         assert payload is not None
         self.assertEqual(payload["headers"]["content-type"], "image/svg+xml")
         self.assertEqual(payload["body"], svg_body)
 
-    def test_flaresolverr_image_document_payload_rejects_svg_content_type_with_html_body(self) -> None:
+    def test_browser_image_document_payload_rejects_svg_content_type_with_html_body(self) -> None:
         result = _flaresolverr.FetchedPublisherHtml(
             source_url="https://example.test/figure.svg",
             final_url="https://example.test/figure.svg",
@@ -1103,14 +1140,14 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             },
         )
 
-        payload = browser_workflow._flaresolverr_image_document_payload(result)
+        payload = browser_fetchers._browser_image_document_payload(result)
 
         self.assertIsNone(payload)
 
     def test_challenge_recovery_payload_is_not_recorded_in_failure_diagnostics(self) -> None:
         image_body = b"\x89PNG\r\n\x1a\nloaded-image"
         image_url = "https://example.test/cdn/figure.png"
-        fetcher = browser_workflow._SharedPlaywrightImageDocumentFetcher(
+        fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
             challenge_recovery=lambda *_args: {
@@ -1254,7 +1291,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertNotEqual(thread_ids[0], main_thread_id)
 
     def test_download_assets_figure_kind_with_image_document_fetcher_single_asset_survives_main_thread_conflict(self) -> None:
-        image_url = "https://example.test/playwright-conflict.png"
+        image_url = "https://example.test/browser-conflict.png"
 
         class MainThreadFailingFetcher:
             def __init__(self) -> None:
@@ -1279,7 +1316,8 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                 if not self.failed_on_main_thread:
                     return None
                 return {
-                    "reason": "playwright_context_error",
+                    "reason": "browser_context_error",
+                    "playwright_context_error": "playwright_context_error",
                     "error_type": "RuntimeError",
                     "error_message": "sync Playwright context already active",
                 }
@@ -1324,7 +1362,8 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
             def failure_for(self, _image_url: str) -> dict[str, object]:
                 return {
-                    "reason": "playwright_context_error",
+                    "reason": "browser_context_error",
+                    "playwright_context_error": "playwright_context_error",
                     "error_type": "RuntimeError",
                     "error_message": "sync Playwright context already active",
                 }
@@ -1355,7 +1394,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
         self.assertEqual(len(result["asset_failures"]), 1)
         failure = result["asset_failures"][0]
-        self.assertEqual(failure["reason"], "playwright_context_error")
+        self.assertEqual(failure["reason"], "browser_context_error")
         self.assertEqual(failure["error_type"], "RuntimeError")
         self.assertEqual(failure["error_message"], "sync Playwright context already active")
 
@@ -1473,7 +1512,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             [html_assets.FIGURE_KIND, html_assets.SUPPLEMENTARY_KIND],
         )
 
-    def test_shared_playwright_file_fetcher_recovers_after_cloudflare_challenge(self) -> None:
+    def test_shared_browser_file_fetcher_recovers_after_cloudflare_challenge(self) -> None:
         file_url = "https://example.test/supplement.pdf"
         article_url = "https://example.test/article"
         challenge_recovery = mock.Mock(
@@ -1483,7 +1522,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                 "title_snippet": "Article page",
             }
         )
-        fetcher = browser_workflow._build_shared_playwright_file_fetcher(
+        fetcher = browser_fetchers._build_shared_browser_file_fetcher(
             browser_context_seed_getter=lambda: {
                 "browser_cookies": [{"name": "cf_clearance", "value": "seed", "domain": ".example.test", "path": "/"}],
                 "browser_user_agent": "Mozilla/5.0",

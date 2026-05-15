@@ -89,3 +89,30 @@
 ### 判断性偏差
 - 为通过全量 unit 且不修改 Phase 范围外旧测试，`fetch_seeded_browser_pdf_payload` 在 `deps.warm_browser_context` 仍为生产默认值时继续接受旧 `deps.pdf_browser_context_seed` 覆盖；生产默认路径使用 `deps.warm_browser_context`。
 - `ieee.py` 保留模块级 `fetch_pdf_with_playwright = fetch_pdf_with_browser` 兼容 alias，并在旧 alias 被测试 patch 时选择旧 alias；默认调用路径仍使用 `fetch_pdf_with_browser`。
+
+## Phase 5
+
+### 命名决定
+- `BROWSER_CONTEXT_ERROR`
+- `PLAYWRIGHT_CONTEXT_ERROR`
+- `_new_browser_context`
+- `_BaseBrowserDocumentFetcher`
+- `_SharedBrowserImageDocumentFetcher`
+- `_SharedBrowserFileDocumentFetcher`
+- `_ThreadLocalSharedBrowserImageDocumentFetcher`
+- `_ThreadLocalSharedBrowserFileDocumentFetcher`
+- `_build_shared_browser_image_fetcher`
+- `_build_shared_browser_file_fetcher`
+- `_browser_image_document_payload`
+- `_payload_from_browser_image_payload`
+- `_context_failure_diagnostic`
+- `_diagnostic_with_reason_aliases`
+- `_browser_image_payload_failure_reason`
+
+### 签名决定
+- 无
+
+### 判断性偏差
+- 为同步 `asset_download.py` 的 browser-neutral image payload 命名，补充 `_browser_image_payload_failure_reason` 并保留 `_flaresolverr_image_payload_failure_reason` alias；未新增 backend fallback。
+- 未修改 Phase 5 输入文件清单外的 `src/paper_fetch/providers/browser_workflow/__init__.py`，因此 `_BasePlaywrightDocumentFetcher` 验收 grep 仅命中既有 lazy re-export alias 行。
+- fixup #1: 根因是包级 lazy re-export 继续显式暴露旧基类名且真实 alias 行被拆分隐藏；已移除该额外 re-export，并将旧基类 alias 改为直接定义行。
