@@ -15,7 +15,6 @@ from ..http.headers import header_value
 from ..extraction.html.shared import html_text_snippet, html_title_snippet
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..runtime import RuntimeContext
-from ..runtime_playwright import launch_playwright_chromium
 from ..utils import normalize_text
 from ._pdf_candidates import extract_pdf_candidate_urls_from_html
 from ._pdf_common import (
@@ -253,7 +252,7 @@ def _download_to_pdf_result(
     )
 
 
-def fetch_pdf_with_playwright(
+def fetch_pdf_with_browser(
     candidate_urls: list[str],
     *,
     artifact_dir: Path,
@@ -272,7 +271,10 @@ def fetch_pdf_with_playwright(
         from playwright.sync_api import Error as PlaywrightError
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
     except Exception as exc:  # pragma: no cover - exercised by missing dependency integration tests
-        raise PdfFallbackFailure("missing_playwright", "playwright is not installed; cannot use PDF fallback.") from exc
+        raise PdfFallbackFailure(
+            "missing_browser_runtime",
+            "browser runtime is not installed; cannot use PDF fallback.",
+        ) from exc
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
     last_failure: PdfFallbackFailure | None = None
@@ -303,14 +305,15 @@ def fetch_pdf_with_playwright(
         context_kwargs["storage_state"] = str(sanitized_storage_state_path)
 
     manager = None
-    browser = None
     browser_context = None
     try:
         if context is not None:
-            browser_context = context.new_playwright_context(headless=headless, **context_kwargs)
+            browser_context = context.new_browser_context(headless=headless, **context_kwargs)
         else:
-            manager, browser = launch_playwright_chromium(headless=headless)
-            browser_context = browser.new_context(**context_kwargs)
+            from ..runtime_browser import BrowserContextManager
+
+            manager = BrowserContextManager()
+            browser_context = manager.new_context(headless=headless, **context_kwargs)
 
         if browser_cookies:
             try:
@@ -449,14 +452,9 @@ def fetch_pdf_with_playwright(
                 browser_context.close()
             except Exception:
                 pass
-        if browser is not None:
-            try:
-                browser.close()
-            except Exception:
-                pass
         if manager is not None:
             try:
-                manager.stop()
+                manager.close()
             except Exception:
                 pass
         if sanitized_storage_state_path is not None:
@@ -465,6 +463,9 @@ def fetch_pdf_with_playwright(
     if last_failure is None:
         last_failure = PdfFallbackFailure("empty_pdf_attempts", "No PDF fallback candidates were attempted.")
     raise last_failure
+
+
+fetch_pdf_with_playwright = fetch_pdf_with_browser
 
 
 def fetch_pdf_over_http(

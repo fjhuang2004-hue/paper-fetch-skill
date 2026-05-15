@@ -37,7 +37,7 @@ from . import _ieee_html as ieee_html
 from . import _ieee_metadata as ieee_metadata
 from . import _ieee_supplementary as ieee_supplementary
 from . import _ieee_url as ieee_url
-from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http, fetch_pdf_with_playwright
+from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http, fetch_pdf_with_browser
 from ._payloads import build_provider_payload
 from ._registry import ProviderBundle, register_provider_bundle
 from ._waterfall import DEFAULT_WATERFALL_CONTINUE_CODES, ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
@@ -85,6 +85,8 @@ register_provider_bundle(
 
 IEEE_PDF_FALLBACK_ARTIFACT_DIR_NAME = "ieee_pdf_fallback"
 MAX_IEEE_LANDING_REDIRECTS = 8
+_FETCH_PDF_WITH_BROWSER = fetch_pdf_with_browser
+fetch_pdf_with_playwright = fetch_pdf_with_browser
 
 
 def _pdf_failure_diagnostics(failure: PdfFetchFailure | None) -> dict[str, Any] | None:
@@ -400,7 +402,7 @@ class IeeeClient(ProviderClient):
             browser_seed_urls = ieee_url._dedupe_urls([landing_attempt.response_url, document_url])
 
             def run_browser_pdf(active_artifact_dir: Path):
-                return fetch_pdf_with_playwright(
+                return (fetch_pdf_with_playwright if fetch_pdf_with_playwright is not _FETCH_PDF_WITH_BROWSER else fetch_pdf_with_browser)(
                     candidates,
                     artifact_dir=active_artifact_dir,
                     browser_user_agent=self.user_agent,

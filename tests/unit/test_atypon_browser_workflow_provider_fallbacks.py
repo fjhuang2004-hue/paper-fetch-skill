@@ -47,8 +47,8 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
                         browser_context_seed=seed,
                     )
                 ),
-                pdf_browser_context_seed=mocked_warm,
-                fetch_pdf_with_playwright=mocked_pdf,
+                warm_browser_context=mocked_warm,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(
                 SCIENCE_SAMPLE.doi,
@@ -110,7 +110,7 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
                         {"title": PNAS_SAMPLE.title},
                     )
                 ),
-                fetch_pdf_with_playwright=mocked_pdf,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(
                 PNAS_SAMPLE.doi,
@@ -655,8 +655,8 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
                         browser_context_seed=seed,
                     )
                 ),
-                pdf_browser_context_seed=mocked_warm,
-                fetch_pdf_with_playwright=mocked_pdf,
+                warm_browser_context=mocked_warm,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(
                 PNAS_SAMPLE.doi,

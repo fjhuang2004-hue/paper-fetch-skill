@@ -74,3 +74,18 @@
 
 ### 判断性偏差
 - Phase 3 输入文件清单遗漏了 `src/paper_fetch/providers/browser_workflow/shared.py`，但验收要求 `fetch_html_with_direct_playwright` 在 `src/paper_fetch/` 中仅出现在 alias 行和 `__init__` 重导出；因此将 `shared.py` 的默认依赖改为新名，并通过动态别名保留旧依赖字段兼容。
+
+## Phase 4
+
+### 命名决定
+- `fetch_pdf_with_browser`
+- `fetch_pdf_with_playwright = fetch_pdf_with_browser`
+- `_FETCH_PDF_WITH_BROWSER`
+- `missing_browser_runtime`
+
+### 签名决定
+- `fetch_pdf_with_browser(candidate_urls: list[str], *, artifact_dir: Path, browser_cookies: list[dict[str, Any]] | None = None, browser_user_agent: str | None = None, headless: bool = True, referer: str | None = None, storage_state_path: Path | None = None, seed_urls: list[str] | None = None, context: RuntimeContext | None = None) -> PdfFallbackResult`
+
+### 判断性偏差
+- 为通过全量 unit 且不修改 Phase 范围外旧测试，`fetch_seeded_browser_pdf_payload` 在 `deps.warm_browser_context` 仍为生产默认值时继续接受旧 `deps.pdf_browser_context_seed` 覆盖；生产默认路径使用 `deps.warm_browser_context`。
+- `ieee.py` 保留模块级 `fetch_pdf_with_playwright = fetch_pdf_with_browser` 兼容 alias，并在旧 alias 被测试 patch 时选择旧 alias；默认调用路径仍使用 `fetch_pdf_with_browser`。

@@ -92,6 +92,97 @@ class PdfFallbackHelperTests(unittest.TestCase):
         self.assertEqual(calls[0]["seed_urls"], ["https://example.org/article"])
         self.assertEqual(calls[0]["browser_cookies"], [{"name": "token", "value": "abc", "domain": ".example.org"}])
 
+    def test_pdf_fallback_uses_cloakbrowser(self) -> None:
+        pdf_url = "https://example.org/article.pdf"
+        final_url = "https://example.org/downloaded/article.pdf"
+
+        class FakeDownload:
+            suggested_filename = "article.pdf"
+
+            def save_as(self, path: str) -> None:
+                Path(path).write_bytes(b"%PDF-1.7 cloakbrowser")
+
+        class FakeDownloadInfo:
+            value = FakeDownload()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:
+                return None
+
+        class FakePage:
+            def __init__(self) -> None:
+                self.url = ""
+                self.goto_calls: list[dict[str, object]] = []
+                self.expect_download_calls: list[int] = []
+
+            def expect_download(self, *, timeout: int):
+                self.expect_download_calls.append(timeout)
+                return FakeDownloadInfo()
+
+            def goto(self, url: str, **kwargs):
+                self.url = final_url
+                self.goto_calls.append({"url": url, **kwargs})
+                return mock.Mock()
+
+        class FakeBrowserContext:
+            def __init__(self) -> None:
+                self.page = FakePage()
+                self.close_count = 0
+
+            def new_page(self) -> FakePage:
+                return self.page
+
+            def close(self) -> None:
+                self.close_count += 1
+
+        fake_context = FakeBrowserContext()
+        pdf_results: list[dict[str, object]] = []
+
+        def fake_pdf_result_from_bytes(**kwargs):
+            pdf_results.append(dict(kwargs))
+            return _pdf_common.PdfFetchResult(
+                source_url=str(kwargs["source_url"]),
+                final_url=str(kwargs["final_url"]),
+                pdf_bytes=bytes(kwargs["pdf_bytes"]),
+                markdown_text="# Example\n\n## Results\n\nBody text",
+                suggested_filename=str(kwargs["suggested_filename"]),
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with (
+                mock.patch(
+                    "paper_fetch.runtime_browser.BrowserContextManager.new_context",
+                    return_value=fake_context,
+                ) as mocked_new_context,
+                mock.patch(
+                    "playwright.sync_api.sync_playwright",
+                    side_effect=AssertionError("stock Playwright should not be used"),
+                ) as mocked_sync_playwright,
+                mock.patch.object(
+                    _pdf_fallback,
+                    "pdf_fetch_result_from_bytes",
+                    side_effect=fake_pdf_result_from_bytes,
+                ),
+            ):
+                result = _pdf_fallback.fetch_pdf_with_browser(
+                    [pdf_url],
+                    artifact_dir=Path(tmpdir),
+                    browser_user_agent="UnitTest/1.0",
+                    headless=False,
+                )
+
+        mocked_new_context.assert_called_once()
+        self.assertFalse(mocked_new_context.call_args.kwargs["headless"])
+        self.assertEqual(mocked_new_context.call_args.kwargs["user_agent"], "UnitTest/1.0")
+        mocked_sync_playwright.assert_not_called()
+        self.assertEqual(fake_context.page.goto_calls[0]["url"], pdf_url)
+        self.assertEqual(fake_context.page.expect_download_calls, [30000])
+        self.assertEqual(result.final_url, final_url)
+        self.assertEqual(pdf_results[0]["final_url"], final_url)
+        self.assertEqual(fake_context.close_count, 1)
+
     def test_extract_pdf_candidate_urls_from_html_finds_meta_and_download_links(self) -> None:
         html = """
         <html><head>

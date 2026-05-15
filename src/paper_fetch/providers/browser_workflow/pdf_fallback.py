@@ -32,7 +32,13 @@ def fetch_seeded_browser_pdf_payload(
     deps: BrowserWorkflowDeps | None = None,
 ) -> RawFulltextPayload:
     deps = deps or default_browser_workflow_deps()
-    pdf_browser_context_seed = deps.pdf_browser_context_seed(
+    context_warmer = deps.warm_browser_context
+    if deps.pdf_browser_context_seed is not deps.warm_browser_context:
+        from ..browser_runtime import warm_browser_context as default_warm_browser_context
+
+        if deps.warm_browser_context is default_warm_browser_context:
+            context_warmer = deps.pdf_browser_context_seed
+    pdf_context_seed = context_warmer(
         pdf_candidates,
         publisher=provider,
         config=runtime,
@@ -42,13 +48,13 @@ def fetch_seeded_browser_pdf_payload(
         (browser_context_seed or {}).get("browser_final_url"),
         html_candidates[0] if html_candidates else None,
         landing_page_url,
-        pdf_browser_context_seed.get("browser_final_url"),
+        pdf_context_seed.get("browser_final_url"),
     )
     pdf_result = deps.fetch_pdf_with_browser(
         pdf_candidates,
         artifact_dir=runtime.artifact_dir / artifact_subdir,
-        browser_cookies=list(pdf_browser_context_seed.get("browser_cookies") or []),
-        browser_user_agent=pdf_browser_context_seed.get("browser_user_agent")
+        browser_cookies=list(pdf_context_seed.get("browser_cookies") or []),
+        browser_user_agent=pdf_context_seed.get("browser_user_agent")
         or user_agent,
         headless=runtime.headless,
         seed_urls=[seed_url] if seed_url else None,
