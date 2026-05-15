@@ -25,10 +25,7 @@ $McpEnvKeys = @(
     "PAPER_FETCH_MCP_PYTHON_BIN",
     "PAPER_FETCH_DOWNLOAD_DIR",
     "PAPER_FETCH_FORMULA_TOOLS_DIR",
-    "PLAYWRIGHT_BROWSERS_PATH",
-    "FLARESOLVERR_URL",
-    "FLARESOLVERR_ENV_FILE",
-    "FLARESOLVERR_SOURCE_DIR"
+    "CLOAKBROWSER_HEADLESS"
 )
 
 function Write-Log {
@@ -51,6 +48,7 @@ function Import-InstallerManifest {
     $script:SkillName = [string]$manifest.skill.name
     $script:McpName = [string]$manifest.mcp.name
     $script:McpEnvKeys = @($manifest.mcp.env_keys | ForEach-Object { [string]$_ })
+    Normalize-McpEnvKeys
 
     if ([string]::IsNullOrWhiteSpace($script:ManagedBegin) -or
         [string]::IsNullOrWhiteSpace($script:ManagedEnd) -or
@@ -59,6 +57,24 @@ function Import-InstallerManifest {
         $script:McpEnvKeys.Count -eq 0) {
         Fail "installer manifest is missing required installer constants."
     }
+}
+
+function Normalize-McpEnvKeys {
+    $filtered = New-Object System.Collections.Generic.List[string]
+    $seenHeadless = $false
+    foreach ($key in $script:McpEnvKeys) {
+        if ($key -in @("PLAYWRIGHT_BROWSERS_PATH", "FLARESOLVERR_URL", "FLARESOLVERR_ENV_FILE", "FLARESOLVERR_SOURCE_DIR")) {
+            continue
+        }
+        if ($key -eq "CLOAKBROWSER_HEADLESS") {
+            $seenHeadless = $true
+        }
+        $filtered.Add($key)
+    }
+    if (-not $seenHeadless) {
+        $filtered.Add("CLOAKBROWSER_HEADLESS")
+    }
+    $script:McpEnvKeys = $filtered.ToArray()
 }
 
 function Require-File {
@@ -203,20 +219,11 @@ function Find-ProjectWheel {
 
 function Check-BundleAssets {
     Require-Dir (Join-Path $BundleRoot "wheelhouse")
-    Require-Dir (Join-Path $BundleRoot "ms-playwright")
     Require-File (Join-Path $BundleRoot "formula-tools/bin/texmath.exe")
-
-    $flaresolverrDir = Join-Path $BundleRoot "vendor/flaresolverr"
-    Require-Dir $flaresolverrDir
-    Require-File (Join-Path $flaresolverrDir ".env.flaresolverr-source-windows")
-    Require-File (Join-Path $flaresolverrDir "flaresolverr_source_common.ps1")
-    Require-File (Join-Path $flaresolverrDir "start_flaresolverr_source.ps1")
-    Require-File (Join-Path $flaresolverrDir "stop_flaresolverr_source.ps1")
-    Require-File (Join-Path $BundleRoot "scripts/flaresolverr-up.ps1")
-    Require-File (Join-Path $BundleRoot "scripts/flaresolverr-down.ps1")
-    Require-File (Join-Path $BundleRoot "scripts/flaresolverr-status.ps1")
-    Require-File (Join-Path $flaresolverrDir ".flaresolverr/v3.4.6/flaresolverr/flaresolverr.exe")
-    Require-File (Join-Path $flaresolverrDir ".flaresolverr/v3.4.6/flaresolverr/_internal/chrome/chrome.exe")
+    $cloakbrowserWheels = @(Get-ChildItem -Path (Join-Path $BundleRoot "wheelhouse") -Filter "cloakbrowser-*.whl" -ErrorAction SilentlyContinue)
+    if ($cloakbrowserWheels.Count -eq 0) {
+        Fail "Bundled wheelhouse is missing cloakbrowser-*.whl."
+    }
 }
 
 function Install-ProjectVenv {
@@ -237,12 +244,6 @@ function Install-ProjectVenv {
     $env:PIP_DISABLE_PIP_VERSION_CHECK = "1"
     $env:PIP_NO_BUILD_ISOLATION = "1"
     $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
-    $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $BundleRoot "ms-playwright"
-
-    $userCache = Join-Path $env:USERPROFILE ".cache/ms-playwright"
-    if ($env:PLAYWRIGHT_BROWSERS_PATH.StartsWith($userCache, [System.StringComparison]::OrdinalIgnoreCase)) {
-        Fail "PLAYWRIGHT_BROWSERS_PATH must not point at the user cache: $($env:PLAYWRIGHT_BROWSERS_PATH)"
-    }
 
     Write-Log "Installing paper-fetch-skill from bundled wheelhouse"
     & $venvPython -m pip install --no-index --find-links (Join-Path $BundleRoot "wheelhouse") --only-binary=:all: $ProjectWheel
@@ -252,20 +253,15 @@ function Install-ProjectVenv {
 }
 
 function New-ManagedEnvLines {
-    $flaresolverrEnv = Join-Path $BundleRoot "vendor/flaresolverr/.env.flaresolverr-source-windows"
     $downloadDir = Join-Path $BundleRoot "downloads"
     $formulaToolsDir = Join-Path $BundleRoot "formula-tools"
-    $playwrightDir = Join-Path $BundleRoot "ms-playwright"
-    $flaresolverrDir = Join-Path $BundleRoot "vendor/flaresolverr"
     return @(
         "",
         $ManagedBegin,
         "PAPER_FETCH_DOWNLOAD_DIR=$(Quote-DotenvValue $downloadDir)",
         "PAPER_FETCH_FORMULA_TOOLS_DIR=$(Quote-DotenvValue $formulaToolsDir)",
-        "PLAYWRIGHT_BROWSERS_PATH=$(Quote-DotenvValue $playwrightDir)",
-        "FLARESOLVERR_URL='http://127.0.0.1:8191/v1'",
-        "FLARESOLVERR_ENV_FILE=$(Quote-DotenvValue $flaresolverrEnv)",
-        "FLARESOLVERR_SOURCE_DIR=$(Quote-DotenvValue $flaresolverrDir)",
+        "CLOAKBROWSER_HEADLESS='true'",
+        "# CLOAKBROWSER_BINARY_PATH='C:/path/to/preinstalled/browser.exe'",
         $ManagedEnd
     )
 }
@@ -349,37 +345,46 @@ $env:PATH = "$venvScripts;$formulaBin;$env:PATH"
 if ([string]::IsNullOrWhiteSpace($env:PAPER_FETCH_FORMULA_TOOLS_DIR)) {
     $env:PAPER_FETCH_FORMULA_TOOLS_DIR = Join-Path $InstallRoot "formula-tools"
 }
-if ([string]::IsNullOrWhiteSpace($env:PLAYWRIGHT_BROWSERS_PATH)) {
-    $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $InstallRoot "ms-playwright"
-}
-if ([string]::IsNullOrWhiteSpace($env:FLARESOLVERR_SOURCE_DIR)) {
-    $env:FLARESOLVERR_SOURCE_DIR = Join-Path $InstallRoot "vendor/flaresolverr"
+if ([string]::IsNullOrWhiteSpace($env:CLOAKBROWSER_HEADLESS)) {
+    $env:CLOAKBROWSER_HEADLESS = "true"
 }
 '@
     [System.IO.File]::WriteAllText($target, $content, [System.Text.UTF8Encoding]::new($false))
 }
 
-function Check-PlaywrightBrowser {
+function Test-CloakBrowserPackage {
     $venvPython = Join-Path $BundleRoot ".venv/Scripts/python.exe"
-    $root = Join-Path $BundleRoot "ms-playwright"
     $code = @'
+import os
 from pathlib import Path
-import sys
-from playwright.sync_api import sync_playwright
 
-root = Path(sys.argv[1]).resolve()
-manager = sync_playwright().start()
-try:
-    executable = Path(manager.chromium.executable_path).resolve()
-finally:
-    manager.stop()
+import cloakbrowser
 
-assert executable.is_file(), executable
-assert root in executable.parents, (root, executable)
+assert hasattr(cloakbrowser, "launch")
+binary_path = os.environ.get("CLOAKBROWSER_BINARY_PATH")
+if binary_path:
+    path = Path(binary_path)
+    assert path.is_file(), binary_path
 '@
-    & $venvPython -c $code $root
+    & $venvPython -c $code
     if ($LASTEXITCODE -ne 0) {
-        Fail "Playwright resolved Chromium outside the offline bundle."
+        Fail "CloakBrowser package smoke check failed."
+    }
+}
+
+function Invoke-CloakBrowserRuntimeWarmup {
+    $venvPython = Join-Path $BundleRoot ".venv/Scripts/python.exe"
+    if (-not [string]::IsNullOrWhiteSpace($env:CLOAKBROWSER_BINARY_PATH)) {
+        if (-not (Test-Path -LiteralPath $env:CLOAKBROWSER_BINARY_PATH -PathType Leaf)) {
+            Fail "CLOAKBROWSER_BINARY_PATH is set but is missing: $($env:CLOAKBROWSER_BINARY_PATH)"
+        }
+        Write-Log "Using preconfigured CLOAKBROWSER_BINARY_PATH; skipping CloakBrowser runtime download"
+        return
+    }
+    Write-Log "Checking CloakBrowser runtime availability"
+    & $venvPython -c "import cloakbrowser; cloakbrowser.ensure_runtime()"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "CloakBrowser runtime warmup failed; first use may download it, or set CLOAKBROWSER_BINARY_PATH to a preinstalled binary."
     }
 }
 
@@ -397,10 +402,10 @@ function Run-SmokeChecks {
     if ($LASTEXITCODE -ne 0) {
         Fail "texmath.exe --help failed."
     }
-    Check-PlaywrightBrowser
+    Test-CloakBrowserPackage
 
     $env:PAPER_FETCH_ENV_FILE = Join-Path $BundleRoot "offline.env"
-    $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $BundleRoot "ms-playwright"
+    $env:CLOAKBROWSER_HEADLESS = "true"
     & (Join-Path $BundleRoot ".venv/Scripts/python.exe") -c "from paper_fetch.mcp.fetch_tool import provider_status_payload; payload = provider_status_payload(); assert 'providers' in payload"
     if ($LASTEXITCODE -ne 0) {
         Fail "provider_status_payload smoke check failed."
@@ -426,6 +431,7 @@ Verify-Checksums
 Check-BundleAssets
 $projectWheel = Find-ProjectWheel
 Install-ProjectVenv $projectWheel
+Invoke-CloakBrowserRuntimeWarmup
 
 Write-Log "Writing repo-local offline.env"
 Write-ManagedEnvFile (Join-Path $BundleRoot "offline.env")
@@ -442,8 +448,8 @@ Run-SmokeChecks
 Write-Host ""
 Write-Host "Offline installation complete."
 $activateScript = Join-Path $BundleRoot "Activate-Offline.ps1"
-$flaresolverrEnv = Join-Path $BundleRoot "vendor/flaresolverr/.env.flaresolverr-source-windows"
 $offlineEnv = Join-Path $BundleRoot "offline.env"
 Write-Host "Activate it with: . $activateScript"
-Write-Host "FlareSolverr env: $flaresolverrEnv"
+Write-Host "CloakBrowser headless: true"
+Write-Host "Optional runtime override: set CLOAKBROWSER_BINARY_PATH in $offlineEnv before first browser fetch."
 Write-Host "Elsevier setup: request a key at https://dev.elsevier.com/, then add ELSEVIER_API_KEY=`"...`" to $offlineEnv before fetching Elsevier papers."

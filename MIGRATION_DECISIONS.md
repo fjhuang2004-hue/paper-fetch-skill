@@ -173,3 +173,25 @@
 ### 判断性偏差
 - Phase 7 输入文件未包含 provider entry modules，因此在 `ProviderSpec.__post_init__` 中集中将 Wiley/Science/PNAS/AMS 以及旧 `requires_playwright=True` 声明提升为 `requires_browser_runtime=True`，避免改动输入范围外文件。
 - Phase 7 验收命令引用现有 `registry.py` 未提供的 `build_provider_registry().get(...).status(env)` 形态；为不修改输入范围外的 `registry.py`，在 `providers/base.py` 内安装兼容入口并新增 `ProviderClient.status` 适配。
+
+## Phase 8
+
+### 命名决定
+- `normalize_mcp_env_keys`
+- `cloakbrowser_headless_value`
+- `check_cloakbrowser_package`
+- `warm_cloakbrowser_runtime`
+- `Normalize-McpEnvKeys`
+- `Test-CloakBrowserPackage`
+- `Invoke-CloakBrowserRuntimeWarmup`
+- `Write-OfflineReadme`
+- `ProbeLaunch`
+- `test_flaresolverr_setup_scripts_legacy.py`
+
+### 签名决定
+- `scripts/windows-installer-helper.ps1 param([ValidateSet("Install", "Uninstall", "Smoke")] [string]$Action = "Install", [string]$InstallRoot, [switch]$SkipSmoke, [switch]$ProbeLaunch)`
+
+### 判断性偏差
+- `.github/workflows/release.yml` 在仓库中不存在；`.github/workflows/ci.yml` 未列入 Phase 8 输入文件清单，因此未修改 CI workflow，只将 `tests/unit/test_ci_release_workflow.py` 改为验证该输入缺失状态。
+- `installer/manifest.json` 未列入 Phase 8 输入文件清单，仍含旧 MCP env key；安装器在运行时过滤 `PLAYWRIGHT_BROWSERS_PATH` 与 `FLARESOLVERR_*`，并补入 `CLOAKBROWSER_HEADLESS`，避免改动输入范围外 manifest。
+- 未找到可用 built offline archive；`dist/paper_fetch_skill-1.0.0.tar.gz` 是源码包而非离线包。按 Phase 8 验收替代要求实际运行：`if bash scripts/verify-offline-package.sh >/tmp/paper-fetch-verify-usage.out 2>/tmp/paper-fetch-verify-usage.err; then echo 'unexpected success' >&2; exit 1; fi; grep -F 'Usage: scripts/verify-offline-package.sh <offline-package.tar.gz>' /tmp/paper-fetch-verify-usage.err`。

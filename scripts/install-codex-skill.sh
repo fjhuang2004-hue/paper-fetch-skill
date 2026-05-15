@@ -49,7 +49,7 @@ pf_host_unregister_mcp() {
 
 pf_host_print_registered_note() {
     echo "  2. Codex MCP server '$PF_MCP_NAME' is registered and will launch via the current python3 environment."
-    echo "     On WSL it now uses the repo launcher, which prefers the WSLg FlareSolverr preset and falls back to headless."
+    echo "     Browser-backed providers use CloakBrowser; set CLOAKBROWSER_HEADLESS or CLOAKBROWSER_BINARY_PATH in the MCP env file when needed."
 }
 
 pf_skill_main "$@"

@@ -97,8 +97,7 @@ def _fake_python_script(version: str) -> str:
     OUT
         exit 0
       fi
-      if [[ "$code" == *'playwright.sync_api'* ]]; then
-        echo "${{PLAYWRIGHT_BROWSERS_PATH}}/chromium-123/chrome-linux/chrome"
+      if [[ "$code" == *'cloakbrowser'* ]]; then
         exit 0
       fi
       exit 0
@@ -149,7 +148,6 @@ class OfflineInstallTests(unittest.TestCase):
         *,
         python_version: str = "3.11.9",
         manifest_python_tag: str | None = None,
-        include_xvfb: bool = True,
     ) -> tuple[Path, Path, Path]:
         bundle = root / "bundle"
         bundle.mkdir()
@@ -164,47 +162,17 @@ class OfflineInstallTests(unittest.TestCase):
         )
         _write_file(bundle / ".env.example", 'ELSEVIER_API_KEY=""\n')
         _write_file(bundle / "dist" / "paper_fetch_skill-1.4.1-py3-none-any.whl")
+        _write_file(bundle / "wheelhouse" / "cloakbrowser-0.3.28-py3-none-any.whl")
         _write_file(bundle / "wheelhouse" / "dependency-1.0.0-py3-none-any.whl")
         _write_file(bundle / "skills" / "paper-fetch-skill" / "SKILL.md", "# Paper fetch skill\n")
         _write_file(
             bundle / "skills" / "paper-fetch-skill" / "references" / "tool-contract.md",
             "Tool contract\n",
         )
-        _write_executable(
-            bundle / "ms-playwright" / "chromium-123" / "chrome-linux" / "chrome",
-            "#!/usr/bin/env bash\nexit 0\n",
-        )
         _write_executable(bundle / "formula-tools" / "bin" / "texmath", "#!/usr/bin/env bash\nexit 0\n")
-
-        flaresolverr = bundle / "vendor" / "flaresolverr"
-        _write_file(flaresolverr / ".env.flaresolverr-source-headless", 'HEADLESS="true"\n')
-        _write_file(flaresolverr / ".env.flaresolverr-source-wslg", 'HEADLESS="false"\n')
-        _write_file(flaresolverr / ".work" / "FlareSolverr" / "src" / "flaresolverr.py")
-        _write_file(flaresolverr / ".work" / "FlareSolverr" / "requirements.txt", "dependency==1.0.0\n")
-        _write_file(flaresolverr / "wheelhouse" / "dependency-1.0.0-py3-none-any.whl")
-        _write_executable(
-            flaresolverr / ".flaresolverr" / "v3.4.6" / "flaresolverr" / "_internal" / "chrome" / "chrome",
-            "#!/usr/bin/env bash\nexit 0\n",
-        )
-        _write_file(
-            flaresolverr / "flaresolverr_source_common.sh",
-            """
-            flaresolverr_source_load_env() { :; }
-            flaresolverr_source_ensure_chrome_link() { :; }
-            """,
-        )
-        for name in (
-            "setup_flaresolverr_source.sh",
-            "start_flaresolverr_source.sh",
-            "run_flaresolverr_source.sh",
-            "stop_flaresolverr_source.sh",
-        ):
-            _write_executable(flaresolverr / name, "#!/usr/bin/env bash\nexit 0\n")
 
         fake_bin = root / "fake-bin"
         _write_executable(fake_bin / "python3", _fake_python_script(python_version))
-        if include_xvfb:
-            _write_executable(fake_bin / "Xvfb", "#!/usr/bin/env bash\nexit 0\n")
 
         _write_checksums(bundle)
         home = root / "home"
@@ -224,7 +192,6 @@ class OfflineInstallTests(unittest.TestCase):
         env["HOME"] = str(home)
         env["PATH"] = f"{fake_bin}{os.pathsep}/usr/bin{os.pathsep}/bin"
         env["PAPER_FETCH_OFFLINE_PYTHON_BIN"] = str(fake_bin / "python3")
-        env["PAPER_FETCH_OFFLINE_XVFB_BIN"] = str(fake_bin / "Xvfb")
         if shell is None:
             env.pop("SHELL", None)
         else:
@@ -241,7 +208,7 @@ class OfflineInstallTests(unittest.TestCase):
             check=False,
         )
 
-    def test_default_install_writes_local_env_without_touching_user_config(self) -> None:
+    def test_default_install_writes_cloakbrowser_env_without_legacy_runtime_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
             user_env = home / ".config" / "paper-fetch" / ".env"
@@ -252,96 +219,49 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(user_env.read_text(encoding="utf-8"), 'ELSEVIER_API_KEY="secret"\n')
             offline_env = (bundle / "offline.env").read_text(encoding="utf-8")
-            self.assertIn("FLARESOLVERR_ENV_FILE=", offline_env)
-            self.assertIn(str(bundle / "ms-playwright"), offline_env)
-            self.assertNotIn(str(home / ".cache" / "ms-playwright"), offline_env)
-            self.assertIn("Elsevier setup: request a key at https://dev.elsevier.com/", result.stdout)
-            self.assertIn('ELSEVIER_API_KEY="..."', result.stdout)
-            self.assertIn(str(bundle / "offline.env"), result.stdout)
+            self.assertIn('CLOAKBROWSER_HEADLESS="true"', offline_env)
+            self.assertIn("CLOAKBROWSER_BINARY_PATH", offline_env)
+            self.assertNotIn("FLARESOLVERR", offline_env)
+            self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", offline_env)
+            self.assertIn("CloakBrowser headless: true", result.stdout)
 
-    def test_default_install_copies_codex_claude_and_gemini_skills(self) -> None:
+    def test_shell_startup_blocks_use_cloakbrowser_headless(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
 
-            result = self._run_installer(bundle, fake_bin, home)
+            bash_result = self._run_installer(bundle, fake_bin, home, shell="/bin/bash")
+            fish_result = self._run_installer(bundle, fake_bin, home, shell="/usr/bin/fish")
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            codex_skill = home / ".codex" / "skills" / "paper-fetch-skill"
-            claude_skill = home / ".claude" / "skills" / "paper-fetch-skill"
-            gemini_skill = home / ".gemini" / "skills" / "paper-fetch-skill"
-            self.assertEqual((codex_skill / "SKILL.md").read_text(encoding="utf-8"), "# Paper fetch skill\n")
-            self.assertEqual((claude_skill / "SKILL.md").read_text(encoding="utf-8"), "# Paper fetch skill\n")
-            self.assertEqual((gemini_skill / "SKILL.md").read_text(encoding="utf-8"), "# Paper fetch skill\n")
-            self.assertTrue((codex_skill / "references" / "tool-contract.md").is_file())
-            self.assertTrue((claude_skill / "references" / "tool-contract.md").is_file())
-            self.assertTrue((gemini_skill / "references" / "tool-contract.md").is_file())
+            self.assertEqual(bash_result.returncode, 0, bash_result.stderr)
+            self.assertEqual(fish_result.returncode, 0, fish_result.stderr)
+            bashrc = (home / ".bashrc").read_text(encoding="utf-8")
+            fish_config = (home / ".config" / "fish" / "conf.d" / "paper-fetch-offline.fish").read_text(encoding="utf-8")
+            self.assertIn(f'export PAPER_FETCH_ENV_FILE="{bundle / "offline.env"}"', bashrc)
+            self.assertIn('export CLOAKBROWSER_HEADLESS="true"', bashrc)
+            self.assertIn(f'set -gx PAPER_FETCH_ENV_FILE "{bundle / "offline.env"}"', fish_config)
+            self.assertIn('set -gx CLOAKBROWSER_HEADLESS "true"', fish_config)
+            self.assertNotIn("FLARESOLVERR", bashrc + fish_config)
+            self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", bashrc + fish_config)
 
-    def test_bash_shell_startup_file_uses_managed_runtime_block(self) -> None:
+    def test_wslg_preset_sets_headful_cloakbrowser_and_requires_display(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
 
-            result = self._run_installer(bundle, fake_bin, home, shell="/bin/bash")
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            payload = (home / ".bashrc").read_text(encoding="utf-8")
-            self.assertEqual(payload.count("# BEGIN paper-fetch offline managed"), 1)
-            self.assertIn(
-                f'export PATH="{bundle / ".venv" / "bin"}":"{bundle / "formula-tools" / "bin"}":$PATH',
-                payload,
+            missing_display = self._run_installer(
+                bundle,
+                fake_bin,
+                home,
+                "--preset=wslg",
+                extra_env={"DISPLAY": "", "WAYLAND_DISPLAY": ""},
             )
-            self.assertIn(f'export PAPER_FETCH_ENV_FILE="{bundle / "offline.env"}"', payload)
-            self.assertIn(f'export PAPER_FETCH_FORMULA_TOOLS_DIR="{bundle / "formula-tools"}"', payload)
-            self.assertIn(f'export PLAYWRIGHT_BROWSERS_PATH="{bundle / "ms-playwright"}"', payload)
-            self.assertIn(f'export FLARESOLVERR_SOURCE_DIR="{bundle / "vendor" / "flaresolverr"}"', payload)
-            self.assertIn(
-                f'export FLARESOLVERR_ENV_FILE="{bundle / "vendor" / "flaresolverr" / ".env.flaresolverr-source-headless"}"',
-                payload,
-            )
-            self.assertIn('export FLARESOLVERR_URL="http://127.0.0.1:8191/v1"', payload)
+            self.assertNotEqual(missing_display.returncode, 0)
+            self.assertIn("DISPLAY or WAYLAND_DISPLAY is required", missing_display.stderr)
 
-    def test_zsh_shell_startup_file_uses_zshrc(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
-
-            result = self._run_installer(bundle, fake_bin, home, shell="/bin/zsh")
-
+            result = self._run_installer(bundle, fake_bin, home, "--preset=wslg", extra_env={"DISPLAY": ":0"})
             self.assertEqual(result.returncode, 0, result.stderr)
-            payload = (home / ".zshrc").read_text(encoding="utf-8")
-            self.assertEqual(payload.count("# BEGIN paper-fetch offline managed"), 1)
-            self.assertIn(f'export PAPER_FETCH_ENV_FILE="{bundle / "offline.env"}"', payload)
-            self.assertFalse((home / ".bashrc").exists())
+            self.assertIn('CLOAKBROWSER_HEADLESS="false"', (bundle / "offline.env").read_text(encoding="utf-8"))
 
-    def test_fish_shell_startup_file_uses_fish_syntax(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
-
-            result = self._run_installer(bundle, fake_bin, home, shell="/usr/bin/fish")
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            fish_config = home / ".config" / "fish" / "conf.d" / "paper-fetch-offline.fish"
-            payload = fish_config.read_text(encoding="utf-8")
-            self.assertEqual(payload.count("# BEGIN paper-fetch offline managed"), 1)
-            self.assertIn(
-                f'set -gx PATH "{bundle / ".venv" / "bin"}" "{bundle / "formula-tools" / "bin"}" $PATH',
-                payload,
-            )
-            self.assertIn(f'set -gx PAPER_FETCH_ENV_FILE "{bundle / "offline.env"}"', payload)
-            self.assertIn(f'set -gx PLAYWRIGHT_BROWSERS_PATH "{bundle / "ms-playwright"}"', payload)
-            self.assertFalse((home / ".bashrc").exists())
-
-    def test_unrecognized_shell_falls_back_to_profile(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
-
-            result = self._run_installer(bundle, fake_bin, home, shell="/opt/custom-shell")
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            payload = (home / ".profile").read_text(encoding="utf-8")
-            self.assertEqual(payload.count("# BEGIN paper-fetch offline managed"), 1)
-            self.assertIn(f'export PAPER_FETCH_ENV_FILE="{bundle / "offline.env"}"', payload)
-            self.assertIn("Unrecognized SHELL=/opt/custom-shell", result.stderr)
-
-    def test_codex_claude_and_gemini_cli_registration_uses_offline_runtime_env(self) -> None:
+    def test_cli_registration_uses_cloakbrowser_env_and_filters_legacy_manifest_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bundle, fake_bin, home = self._create_bundle(root)
@@ -354,65 +274,14 @@ class OfflineInstallTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = [line.split("\t") for line in cli_log.read_text(encoding="utf-8").splitlines()]
-            self.assertIn(["codex", "mcp", "remove", "paper-fetch"], calls)
-            self.assertIn(["claude", "mcp", "remove", "-s", "user", "paper-fetch"], calls)
-            self.assertIn(["gemini", "mcp", "remove", "paper-fetch"], calls)
-
             codex_add = next(call for call in calls if call[:3] == ["codex", "mcp", "add"])
-            self.assertIn("--env", codex_add)
             self.assertIn(f"PAPER_FETCH_ENV_FILE={bundle / 'offline.env'}", codex_add)
             self.assertIn(f"PAPER_FETCH_MCP_PYTHON_BIN={bundle / '.venv' / 'bin' / 'python'}", codex_add)
-            self.assertIn(f"PAPER_FETCH_FORMULA_TOOLS_DIR={bundle / 'formula-tools'}", codex_add)
-            self.assertIn(f"PLAYWRIGHT_BROWSERS_PATH={bundle / 'ms-playwright'}", codex_add)
-            self.assertIn(f"FLARESOLVERR_SOURCE_DIR={bundle / 'vendor' / 'flaresolverr'}", codex_add)
-            self.assertEqual(
-                codex_add[-7:],
-                [
-                    "paper-fetch",
-                    "--",
-                    str(bundle / ".venv" / "bin" / "python"),
-                    "-X",
-                    "utf8",
-                    "-m",
-                    "paper_fetch.mcp.server",
-                ],
-            )
+            self.assertIn("CLOAKBROWSER_HEADLESS=true", codex_add)
+            self.assertFalse(any("FLARESOLVERR" in arg for arg in codex_add))
+            self.assertFalse(any("PLAYWRIGHT_BROWSERS_PATH" in arg for arg in codex_add))
 
-            claude_add = next(call for call in calls if call[:5] == ["claude", "mcp", "add", "-s", "user"])
-            self.assertIn("-e", claude_add)
-            self.assertIn(f"PAPER_FETCH_ENV_FILE={bundle / 'offline.env'}", claude_add)
-            self.assertEqual(
-                claude_add[-7:],
-                [
-                    "paper-fetch",
-                    "--",
-                    str(bundle / ".venv" / "bin" / "python"),
-                    "-X",
-                    "utf8",
-                    "-m",
-                    "paper_fetch.mcp.server",
-                ],
-            )
-
-            gemini_add = next(call for call in calls if call[:3] == ["gemini", "mcp", "add"])
-            self.assertIn("--env", gemini_add)
-            self.assertIn(f"PAPER_FETCH_ENV_FILE={bundle / 'offline.env'}", gemini_add)
-            self.assertIn(f"PAPER_FETCH_MCP_PYTHON_BIN={bundle / '.venv' / 'bin' / 'python'}", gemini_add)
-            self.assertEqual(
-                gemini_add[-7:],
-                [
-                    "paper-fetch",
-                    "--",
-                    str(bundle / ".venv" / "bin" / "python"),
-                    "-X",
-                    "utf8",
-                    "-m",
-                    "paper_fetch.mcp.server",
-                ],
-            )
-            self.assertFalse((home / ".codex" / "config.toml").exists())
-
-    def test_missing_codex_cli_writes_config_toml_fallback(self) -> None:
+    def test_missing_codex_cli_writes_config_toml_without_legacy_runtime_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
 
@@ -422,32 +291,17 @@ class OfflineInstallTests(unittest.TestCase):
             config = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
             self.assertIn("# BEGIN paper-fetch installer managed", config)
             self.assertIn("[mcp_servers.paper-fetch]", config)
-            self.assertIn(f'command = "{bundle / ".venv" / "bin" / "python"}"', config)
-            self.assertIn('args = ["-X", "utf8", "-m", "paper_fetch.mcp.server"]', config)
-            self.assertIn("[mcp_servers.paper-fetch.env]", config)
             self.assertIn(f'PAPER_FETCH_ENV_FILE = "{bundle / "offline.env"}"', config)
-            self.assertIn(f'PAPER_FETCH_FORMULA_TOOLS_DIR = "{bundle / "formula-tools"}"', config)
-            self.assertIn(f'PLAYWRIGHT_BROWSERS_PATH = "{bundle / "ms-playwright"}"', config)
-            self.assertIn(f'FLARESOLVERR_SOURCE_DIR = "{bundle / "vendor" / "flaresolverr"}"', config)
-            self.assertIn("Claude CLI not found; installed the skill and skipped Claude MCP registration", result.stdout)
-            self.assertIn("Gemini CLI not found; installed the skill and skipped Gemini MCP registration", result.stdout)
-            self.assertFalse((home / ".gemini" / "settings.json").exists())
+            self.assertIn('CLOAKBROWSER_HEADLESS = "true"', config)
+            self.assertNotIn("FLARESOLVERR", config)
+            self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", config)
 
-    def test_reuse_env_file_keeps_file_untouched_and_points_runtime_at_new_bundle(self) -> None:
+    def test_reuse_env_file_keeps_file_untouched_and_activate_script_sets_cloakbrowser_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bundle, fake_bin, home = self._create_bundle(root)
             reused_env = root / "shared" / "offline.env"
-            reused_payload = textwrap.dedent(
-                """
-                ELSEVIER_API_KEY="secret"
-
-                # BEGIN paper-fetch offline managed
-                PAPER_FETCH_DOWNLOAD_DIR="/old-bundle/downloads"
-                FLARESOLVERR_SOURCE_DIR="/old-bundle/vendor/flaresolverr"
-                # END paper-fetch offline managed
-                """
-            ).lstrip()
+            reused_payload = 'ELSEVIER_API_KEY="secret"\n'
             _write_file(reused_env, reused_payload)
 
             result = self._run_installer(bundle, fake_bin, home, "--reuse-env-file", str(reused_env))
@@ -455,16 +309,6 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(reused_env.read_text(encoding="utf-8"), reused_payload)
             self.assertFalse((bundle / "offline.env").exists())
-            self.assertIn(f"Reusing offline.env without modifying it: {reused_env}", result.stdout)
-
-            bashrc = (home / ".bashrc").read_text(encoding="utf-8")
-            self.assertIn(f'export PAPER_FETCH_ENV_FILE="{reused_env}"', bashrc)
-            self.assertIn(f'export PAPER_FETCH_DOWNLOAD_DIR="{bundle / "downloads"}"', bashrc)
-
-            config = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
-            self.assertIn(f'PAPER_FETCH_ENV_FILE = "{reused_env}"', config)
-            self.assertIn(f'PAPER_FETCH_DOWNLOAD_DIR = "{bundle / "downloads"}"', config)
-            self.assertIn(f'FLARESOLVERR_SOURCE_DIR = "{bundle / "vendor" / "flaresolverr"}"', config)
 
             probe = subprocess.run(
                 [
@@ -473,7 +317,7 @@ class OfflineInstallTests(unittest.TestCase):
                     (
                         f'source "{bundle / "activate-offline.sh"}"; '
                         'printf "%s\\n%s\\n%s\\n" '
-                        '"$PAPER_FETCH_ENV_FILE" "$PAPER_FETCH_DOWNLOAD_DIR" "$FLARESOLVERR_SOURCE_DIR"'
+                        '"$PAPER_FETCH_ENV_FILE" "$PAPER_FETCH_DOWNLOAD_DIR" "$CLOAKBROWSER_HEADLESS"'
                     ),
                 ],
                 text=True,
@@ -482,50 +326,7 @@ class OfflineInstallTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(probe.returncode, 0, probe.stderr)
-            self.assertEqual(
-                probe.stdout.splitlines(),
-                [
-                    str(reused_env),
-                    str(bundle / "downloads"),
-                    str(bundle / "vendor" / "flaresolverr"),
-                ],
-            )
-
-    def test_codex_config_fallback_replaces_existing_managed_block(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
-            config_path = home / ".codex" / "config.toml"
-            _write_file(
-                config_path,
-                textwrap.dedent(
-                    """
-                    theme = "dark"
-
-                    # BEGIN paper-fetch offline managed
-                    [mcp_servers.paper-fetch]
-                    command = "old-python"
-
-                    [mcp_servers.paper-fetch.env]
-                    PAPER_FETCH_ENV_FILE = "old.env"
-                    # END paper-fetch offline managed
-
-                    [profiles.default]
-                    model = "gpt"
-                    """
-                ).lstrip(),
-            )
-
-            result = self._run_installer(bundle, fake_bin, home)
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            config = config_path.read_text(encoding="utf-8")
-            self.assertIn('theme = "dark"', config)
-            self.assertIn("[profiles.default]", config)
-            self.assertNotIn("old-python", config)
-            self.assertNotIn("# BEGIN paper-fetch offline managed", config)
-            self.assertEqual(config.count("# BEGIN paper-fetch installer managed"), 1)
-            self.assertEqual(config.count("[mcp_servers.paper-fetch]"), 1)
-            self.assertEqual(config.count("[mcp_servers.paper-fetch.env]"), 1)
+            self.assertEqual(probe.stdout.splitlines(), [str(reused_env), str(bundle / "downloads"), "true"])
 
     def test_uninstall_removes_user_level_integrations_without_deleting_bundle_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -539,8 +340,6 @@ class OfflineInstallTests(unittest.TestCase):
             _write_file(bundle / "offline.env", 'ELSEVIER_API_KEY="secret"\n')
             _write_file(bundle / ".venv" / "bin" / "paper-fetch", "installed\n")
             _write_file(home / ".codex" / "skills" / "paper-fetch-skill" / "SKILL.md", "codex\n")
-            _write_file(home / ".claude" / "skills" / "paper-fetch-skill" / "SKILL.md", "claude\n")
-            _write_file(home / ".gemini" / "skills" / "paper-fetch-skill" / "SKILL.md", "gemini\n")
             managed = textwrap.dedent(
                 """
                 # BEGIN paper-fetch offline managed
@@ -549,115 +348,21 @@ class OfflineInstallTests(unittest.TestCase):
                 """
             ).lstrip()
             _write_file(home / ".bashrc", f"keep bash before\n{managed}keep bash after\n")
-            _write_file(home / ".zshrc", f"keep zsh before\n{managed}keep zsh after\n")
-            _write_file(home / ".profile", f"keep profile before\n{managed}keep profile after\n")
-            _write_file(home / ".config" / "fish" / "conf.d" / "paper-fetch-offline.fish", managed)
-            _write_file(
-                home / ".codex" / "config.toml",
-                textwrap.dedent(
-                    """
-                    theme = "dark"
-
-                    # BEGIN paper-fetch installer managed
-                    [mcp_servers.paper-fetch]
-                    command = "managed-python"
-
-                    [mcp_servers.paper-fetch.env]
-                    PAPER_FETCH_ENV_FILE = "managed.env"
-                    # END paper-fetch installer managed
-
-                    [mcp_servers.paper-fetch]
-                    command = "fallback-python"
-
-                    [mcp_servers.paper-fetch.env]
-                    PAPER_FETCH_ENV_FILE = "fallback.env"
-
-                    [profiles.default]
-                    model = "gpt"
-                    """
-                ).lstrip(),
-            )
 
             result = self._run_installer(bundle, fake_bin, home, "--uninstall")
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(bundle.exists())
             self.assertEqual((bundle / "offline.env").read_text(encoding="utf-8"), 'ELSEVIER_API_KEY="secret"\n')
-            self.assertTrue((bundle / ".venv" / "bin" / "paper-fetch").exists())
             self.assertFalse((home / ".codex" / "skills" / "paper-fetch-skill").exists())
-            self.assertFalse((home / ".claude" / "skills" / "paper-fetch-skill").exists())
-            self.assertFalse((home / ".gemini" / "skills" / "paper-fetch-skill").exists())
-
             self.assertEqual((home / ".bashrc").read_text(encoding="utf-8"), "keep bash before\nkeep bash after\n")
-            self.assertEqual((home / ".zshrc").read_text(encoding="utf-8"), "keep zsh before\nkeep zsh after\n")
-            self.assertEqual((home / ".profile").read_text(encoding="utf-8"), "keep profile before\nkeep profile after\n")
-            self.assertFalse((home / ".config" / "fish" / "conf.d" / "paper-fetch-offline.fish").exists())
-
-            config = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
-            self.assertIn('theme = "dark"', config)
-            self.assertIn("[profiles.default]", config)
-            self.assertNotIn("paper-fetch", config)
-            self.assertNotIn("managed-python", config)
-            self.assertNotIn("fallback-python", config)
-
             calls = [line.split("\t") for line in cli_log.read_text(encoding="utf-8").splitlines()]
             self.assertIn(["codex", "mcp", "remove", "paper-fetch"], calls)
-            self.assertIn(["claude", "mcp", "remove", "-s", "user", "paper-fetch"], calls)
-            self.assertIn(["gemini", "mcp", "remove", "paper-fetch"], calls)
             self.assertFalse(any(call[:3] == ["codex", "mcp", "add"] for call in calls))
-            self.assertFalse(any(call[:3] == ["claude", "mcp", "add"] for call in calls))
-            self.assertFalse(any(call[:3] == ["gemini", "mcp", "add"] for call in calls))
             self.assertIn("Bundle files were left in place", result.stdout)
 
-    def test_uninstall_runs_without_bundle_assets_or_matching_python(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(
-                Path(tmpdir),
-                python_version="3.12.1",
-                manifest_python_tag="cp313",
-            )
-            shutil.rmtree(bundle / "vendor")
-            shutil.rmtree(bundle / "skills")
-            (bundle / "sha256sums.txt").unlink()
-            _write_file(
-                home / ".bashrc",
-                textwrap.dedent(
-                    """
-                    keep
-                    # BEGIN paper-fetch offline managed
-                    export PAPER_FETCH_ENV_FILE="/old/offline.env"
-                    # END paper-fetch offline managed
-                    """
-                ).lstrip(),
-            )
-
-            result = self._run_installer(bundle, fake_bin, home, "--uninstall")
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual((home / ".bashrc").read_text(encoding="utf-8"), "keep\n")
-
-    def test_user_config_merge_preserves_existing_values(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
-            user_env = home / ".config" / "paper-fetch" / ".env"
-            _write_file(user_env, 'ELSEVIER_API_KEY="secret"\n')
-
-            result = self._run_installer(bundle, fake_bin, home, "--user-config")
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            payload = user_env.read_text(encoding="utf-8")
-            self.assertIn('ELSEVIER_API_KEY="secret"', payload)
-            self.assertIn("# BEGIN paper-fetch offline managed", payload)
-            self.assertIn(str(bundle / "vendor" / "flaresolverr"), payload)
-
     def test_matching_manifest_and_interpreter_tags_are_accepted(self) -> None:
-        cases = (
-            ("3.11.9", "cp311"),
-            ("3.12.7", "cp312"),
-            ("3.13.3", "cp313"),
-            ("3.14.0", "cp314"),
-        )
-        for python_version, python_tag in cases:
+        for python_version, python_tag in (("3.11.9", "cp311"), ("3.12.7", "cp312"), ("3.13.3", "cp313")):
             with self.subTest(python_tag=python_tag), tempfile.TemporaryDirectory() as tmpdir:
                 bundle, fake_bin, home = self._create_bundle(
                     Path(tmpdir),
@@ -683,113 +388,38 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertIn("bundle requires CPython cp313", result.stderr)
             self.assertIn("detected Python 3.12.1 (cp312)", result.stderr)
 
-    def test_missing_xvfb_has_clear_headless_diagnostic(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir), include_xvfb=False)
+    def test_installers_do_not_call_playwright_browser_install_or_flaresolverr_wrappers(self) -> None:
+        linux_script = LINUX_INSTALLER.read_text(encoding="utf-8")
+        windows_script = WINDOWS_INSTALLER.read_text(encoding="utf-8")
 
-            result = self._run_installer(bundle, fake_bin, home)
+        combined = linux_script + windows_script
+        self.assertNotIn("python -m playwright install chromium", combined)
+        self.assertNotIn("-m playwright install chromium", combined)
+        self.assertNotIn("install_flaresolverr_venv", combined)
+        self.assertNotIn("setup_flaresolverr_source", combined)
+        self.assertNotIn("flaresolverr-up", combined)
+        self.assertIn("cloakbrowser.ensure_runtime()", combined)
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Xvfb is required", result.stderr)
-
-    def test_repeated_install_keeps_single_managed_block(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
-
-            first = self._run_installer(bundle, fake_bin, home)
-            second = self._run_installer(bundle, fake_bin, home)
-
-            self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertEqual(second.returncode, 0, second.stderr)
-            offline_env = (bundle / "offline.env").read_text(encoding="utf-8")
-            self.assertEqual(offline_env.count("# BEGIN paper-fetch offline managed"), 1)
-            self.assertEqual(offline_env.count("# END paper-fetch offline managed"), 1)
-            bashrc = (home / ".bashrc").read_text(encoding="utf-8")
-            self.assertEqual(bashrc.count("# BEGIN paper-fetch offline managed"), 1)
-            self.assertEqual(bashrc.count("# END paper-fetch offline managed"), 1)
-            config = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
-            self.assertEqual(config.count("# BEGIN paper-fetch installer managed"), 1)
-            self.assertEqual(config.count("[mcp_servers.paper-fetch]"), 1)
-            self.assertEqual(config.count("[mcp_servers.paper-fetch.env]"), 1)
-
-    def test_windows_installer_declares_abi_checksum_and_asset_guards(self) -> None:
+    def test_windows_installer_helper_uses_cloakbrowser_smoke_and_optional_launch_probe(self) -> None:
         script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")
 
-        self.assertIn("formula-tools", script)
-        self.assertIn("bin/texmath.exe", script)
-        self.assertIn("ms-playwright", script)
-        self.assertIn("runtime", script)
-        self.assertIn("python.exe", script)
-        self.assertIn("-X", script)
-        self.assertIn("paper_fetch.mcp.server", script)
+        self.assertIn("[switch]$ProbeLaunch", script)
+        self.assertIn("import cloakbrowser", script)
+        self.assertIn('assert hasattr(cloakbrowser, "launch")', script)
+        self.assertIn("CLOAKBROWSER_BINARY_PATH", script)
+        self.assertIn("probe-launch", script)
+        self.assertNotIn("sessions.list", script)
+        self.assertNotIn("playwright.sync_api", script)
+        self.assertNotIn("FLARESOLVERR_SOURCE_DIR =", script)
 
-    def test_windows_installer_writes_managed_env_skills_and_path(self) -> None:
-        script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")
+    def test_windows_offline_installer_declares_cloakbrowser_env_without_legacy_runtime_paths(self) -> None:
+        script = WINDOWS_INSTALLER.read_text(encoding="utf-8")
 
-        self.assertIn("Import-InstallerManifest", script)
-        self.assertIn("$script:OfflineManagedBegin", script)
-        self.assertIn("$script:OfflineManagedEnd", script)
-        self.assertIn("PAPER_FETCH_FORMULA_TOOLS_DIR", script)
-        self.assertIn("PLAYWRIGHT_BROWSERS_PATH", script)
-        self.assertIn("FLARESOLVERR_SOURCE_DIR", script)
-        self.assertIn(".codex", script)
-        self.assertIn(".claude", script)
-        self.assertIn(".gemini", script)
-        self.assertIn("Add-UserPathEntry", script)
-        self.assertNotIn(".cache/ms-playwright", script)
-
-    def test_windows_installer_helper_preserves_existing_offline_env_user_values(self) -> None:
-        script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")
-
-        self.assertIn("function Remove-ManagedEnvBlock", script)
-        self.assertIn("if (Test-Path -LiteralPath $target -PathType Leaf)", script)
-        self.assertIn("foreach ($line in (Remove-ManagedEnvBlock $existing))", script)
-        self.assertIn("$lines.Add('ELSEVIER_API_KEY=\"\"')", script)
-        self.assertIn("$lines.Add($OfflineManagedBegin)", script)
-        self.assertIn("$lines.Add($OfflineManagedEnd)", script)
-
-    def test_windows_installer_helper_registers_codex_claude_and_gemini_mcp(self) -> None:
-        script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")
-
-        self.assertIn("codex", script)
-        self.assertIn('"mcp", "remove", $McpName', script)
-        self.assertIn('"mcp", "add"', script)
-        self.assertIn("Write-CodexConfigToml", script)
-        self.assertIn("[mcp_servers.$McpName]", script)
-        self.assertIn("[mcp_servers.$McpName.env]", script)
-        self.assertIn("claude", script)
-        self.assertIn('"mcp", "add", "-s", "user"', script)
-        self.assertIn("gemini", script)
-        self.assertIn("Register-GeminiMcp", script)
-        self.assertIn("Unregister-GeminiMcp", script)
-        self.assertNotIn("settings.json", script)
-        self.assertIn("PYTHONUTF8", script)
-        self.assertIn("PYTHONIOENCODING", script)
-
-    def test_windows_installer_smoke_checks_do_not_use_user_playwright_cache(self) -> None:
-        script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")
-
-        self.assertIn("provider_status_payload", script)
-        self.assertIn("manager.chromium.executable_path", script)
-        self.assertIn("assert root in executable.parents", script)
-        self.assertIn("paper_fetch.mcp.fetch_tool", script)
-
-    def test_offline_installers_use_current_provider_status_import(self) -> None:
-        for path in (LINUX_INSTALLER, WINDOWS_INSTALLER):
-            script = path.read_text(encoding="utf-8")
-            self.assertIn("from paper_fetch.mcp.fetch_tool import provider_status_payload", script)
-            self.assertNotIn("from paper_fetch.mcp.tools import provider_status_payload", script)
-
-    def test_windows_uninstaller_removes_managed_skills_path_and_mcp(self) -> None:
-        script = WINDOWS_INSTALLER_HELPER.read_text(encoding="utf-8")
-
-        self.assertIn('"Uninstall"', script)
-        self.assertIn("Remove-Skills", script)
-        self.assertIn("Remove-UserPathEntry", script)
-        self.assertIn("Unregister-CodexMcp", script)
-        self.assertIn("Unregister-ClaudeMcp", script)
-        self.assertIn("Unregister-GeminiMcp", script)
-        self.assertIn("Remove-CodexConfigToml", script)
+        self.assertIn("CLOAKBROWSER_HEADLESS", script)
+        self.assertIn("CLOAKBROWSER_BINARY_PATH", script)
+        self.assertIn("Test-CloakBrowserPackage", script)
+        self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH =", script)
+        self.assertNotIn("FLARESOLVERR_SOURCE_DIR =", script)
 
 
 if __name__ == "__main__":

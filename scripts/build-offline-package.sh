@@ -21,9 +21,8 @@ Usage:
 Builds a Linux x86_64 CPython 3.11-3.14 tar.gz bundle containing:
   - source snapshot
   - project wheel and Python dependency wheelhouse
-  - Playwright Chromium under ms-playwright/
   - texmath under formula-tools/
-  - patched FlareSolverr source snapshot, Chrome bundle, and wheelhouse
+  - cloakbrowser Python wheel; the CloakBrowser browser binary is not bundled
 EOF
 }
 
@@ -116,11 +115,7 @@ copy_source_snapshot() {
     --exclude='./live-downloads' \
     --exclude='./**/__pycache__' \
     --exclude='./*.egg-info' \
-    --exclude='./vendor/flaresolverr/.work' \
-    --exclude='./vendor/flaresolverr/.venv-flaresolverr' \
-    --exclude='./vendor/flaresolverr/.flaresolverr' \
-    --exclude='./vendor/flaresolverr/run_logs' \
-    --exclude='./vendor/flaresolverr/probe_outputs' \
+    --exclude='./vendor/flaresolverr' \
     -C "$REPO_DIR" -cf - . | tar -C "$staging" -xf -
 }
 
@@ -145,6 +140,11 @@ build_project_wheelhouse() {
     --dest "$wheelhouse" \
     --only-binary=:all: \
     "${wheels[0]}"
+
+  shopt -s nullglob
+  local cloakbrowser_wheels=("$wheelhouse"/cloakbrowser-*.whl)
+  shopt -u nullglob
+  [ "${#cloakbrowser_wheels[@]}" -gt 0 ] || die "Dependency wheelhouse is missing cloakbrowser-*.whl."
 }
 
 create_build_venv() {
@@ -176,64 +176,18 @@ stage_bundled_node_workspace(Path(sys.argv[1]))
 PY
 }
 
-bundle_playwright() {
+write_offline_readme() {
   local staging="$1"
-  local build_python="$2"
-  log "Bundling Playwright Chromium"
-  PLAYWRIGHT_BROWSERS_PATH="$staging/ms-playwright" "$build_python" -m playwright install chromium
-}
+  cat > "$staging/README.offline.md" <<'EOF'
+# Paper Fetch Offline Package
 
-prepare_flaresolverr() {
-  local staging="$1"
-  local build_python="$2"
-  local flaresolverr_build="$BUILD_DIR/flaresolverr-build"
-  local flare_env="$BUILD_DIR/flaresolverr-build.env"
-  local flare_repo="$flaresolverr_build/FlareSolverr"
-  local flare_downloads="$flaresolverr_build/downloads"
-  local flare_version="v3.4.6"
+This package includes Python wheels, including `cloakbrowser`, and formula tools.
+It does not redistribute the CloakBrowser browser binary.
 
-  rm -rf "$flaresolverr_build"
-  mkdir -p "$flaresolverr_build"
-  cat > "$flare_env" <<EOF
-FLARESOLVERR_REPO_DIR="$flare_repo"
-FLARESOLVERR_VENV_DIR="$flaresolverr_build/.venv-flaresolverr"
-FLARESOLVERR_DOWNLOAD_DIR="$flare_downloads"
-FLARESOLVERR_RELEASE_VERSION="$flare_version"
-FLARESOLVERR_HOST="127.0.0.1"
-FLARESOLVERR_PORT="8191"
-LOG_LEVEL="info"
-HEADLESS="true"
-TZ="Asia/Shanghai"
-STARTUP_WAIT_SECONDS="30"
-FLARESOLVERR_LOG_FILE="$flaresolverr_build/flaresolverr-source.log"
-FLARESOLVERR_PID_FILE="$flaresolverr_build/flaresolverr-source.pid"
-PROBE_OUTPUT_ROOT="$flaresolverr_build/probe_outputs"
+The first browser-backed fetch may need network access so CloakBrowser can download its runtime. In restricted environments, preinstall a compatible browser runtime and set `CLOAKBROWSER_BINARY_PATH` before using browser-backed providers.
+
+Set `CLOAKBROWSER_HEADLESS=false` only when running with a display-capable session.
 EOF
-
-  log "Preparing patched FlareSolverr source"
-  PYTHON_BIN="$build_python" bash "$REPO_DIR/vendor/flaresolverr/setup_flaresolverr_source.sh" "$flare_env"
-
-  git -C "$flare_repo" diff --check HEAD~1..HEAD
-  grep -q "returnImagePayload" "$flare_repo/src/dtos.py"
-  grep -q "imagePayload" "$flare_repo/src/flaresolverr_service.py"
-
-  log "Bundling FlareSolverr dependency wheelhouse"
-  mkdir -p "$staging/vendor/flaresolverr/wheelhouse"
-  "$PYTHON_BIN" -m pip wheel \
-    --wheel-dir "$staging/vendor/flaresolverr/wheelhouse" \
-    -r "$flare_repo/requirements.txt"
-
-  log "Copying patched FlareSolverr source snapshot"
-  rm -rf "$staging/vendor/flaresolverr/.work" "$staging/vendor/flaresolverr/.flaresolverr"
-  mkdir -p "$staging/vendor/flaresolverr/.work/FlareSolverr"
-  tar --exclude='./.git' -C "$flare_repo" -cf - . \
-    | tar -C "$staging/vendor/flaresolverr/.work/FlareSolverr" -xf -
-
-  mkdir -p "$staging/vendor/flaresolverr/.flaresolverr/$flare_version"
-  [ -d "$flare_downloads/$flare_version/flaresolverr" ] \
-    || die "Missing extracted FlareSolverr bundle: $flare_downloads/$flare_version/flaresolverr"
-  tar -C "$flare_downloads/$flare_version" -cf - flaresolverr \
-    | tar -C "$staging/vendor/flaresolverr/.flaresolverr/$flare_version" -xf -
 }
 
 write_manifest_and_checksums() {
@@ -261,7 +215,7 @@ installer_manifest = json.loads(Path(sys.argv[5]).read_text(encoding="utf-8"))
 
 project_wheels = sorted(path.name for path in (staging / "dist").glob("paper_fetch_skill-*.whl"))
 wheelhouse = sorted(path.name for path in (staging / "wheelhouse").glob("*.whl"))
-flaresolverr_wheelhouse = sorted(path.name for path in (staging / "vendor/flaresolverr/wheelhouse").glob("*.whl"))
+cloakbrowser_wheels = sorted(path.name for path in (staging / "wheelhouse").glob("cloakbrowser-*.whl"))
 
 payload = {
     "schema_version": 1,
@@ -281,14 +235,10 @@ payload = {
         "installer_manifest": "installer/manifest.json",
         "project_wheels": [f"dist/{name}" for name in project_wheels],
         "wheelhouse_count": len(wheelhouse),
-        "playwright_browsers": "ms-playwright",
         "formula_tools": "formula-tools",
-        "flaresolverr": {
-            "source_snapshot": "vendor/flaresolverr/.work/FlareSolverr",
-            "release_version": "v3.4.6",
-            "browser_bundle": "vendor/flaresolverr/.flaresolverr/v3.4.6/flaresolverr/_internal/chrome",
-            "wheelhouse_count": len(flaresolverr_wheelhouse),
-            "patch": "return-image-payload",
+        "cloakbrowser": {
+            "wheels": [f"wheelhouse/{name}" for name in cloakbrowser_wheels],
+            "browser_binary": "not_bundled",
         },
     },
 }
@@ -333,8 +283,7 @@ main() {
   build_project_wheelhouse "$staging"
   build_python="$(create_build_venv "$staging")"
   bundle_formula_tools "$staging" "$build_python"
-  bundle_playwright "$staging" "$build_python"
-  prepare_flaresolverr "$staging" "$build_python"
+  write_offline_readme "$staging"
   write_manifest_and_checksums "$staging" "$version" "$python_tag"
   create_archive "$BUILD_DIR" "$package_name" "$OUTPUT_DIR"
 }

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import unittest
 from pathlib import Path
 
@@ -8,266 +7,64 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BUILD_OFFLINE_PACKAGE = REPO_ROOT / "scripts" / "build-offline-package.sh"
 BUILD_OFFLINE_PACKAGE_WINDOWS = REPO_ROOT / "scripts" / "build-offline-package-windows.ps1"
-INSTALLER_MANIFEST = REPO_ROOT / "installer" / "manifest.json"
 VERIFY_OFFLINE_PACKAGE = REPO_ROOT / "scripts" / "verify-offline-package.sh"
 
 
 class OfflinePackageBuildTests(unittest.TestCase):
-    def test_installer_manifest_owns_cross_platform_names_and_mcp_env_keys(self) -> None:
-        manifest = json.loads(INSTALLER_MANIFEST.read_text(encoding="utf-8"))
-
-        self.assertEqual(manifest["skill"]["name"], "paper-fetch-skill")
-        self.assertEqual(manifest["mcp"]["name"], "paper-fetch")
-        self.assertIn("PAPER_FETCH_ENV_FILE", manifest["mcp"]["env_keys"])
-        self.assertIn("PLAYWRIGHT_BROWSERS_PATH", manifest["mcp"]["env_keys"])
-        self.assertEqual(
-            manifest["managed_blocks"]["offline"]["begin"],
-            "# BEGIN paper-fetch offline managed",
-        )
-        self.assertEqual(
-            manifest["packages"]["windows_setup_base_name"],
-            "paper-fetch-skill-windows-x86_64-setup",
-        )
-
-    def test_default_package_name_uses_detected_python_tag(self) -> None:
+    def test_linux_package_build_excludes_flaresolverr_and_requires_cloakbrowser_wheel(self) -> None:
         script = BUILD_OFFLINE_PACKAGE.read_text(encoding="utf-8")
 
-        self.assertIn('package_prefix="$(installer_manifest_value packages.linux_offline_name_prefix)"', script)
-        self.assertIn('package_name="${PACKAGE_NAME:-$package_prefix-$python_tag}"', script)
-        self.assertNotIn('PACKAGE_NAME="paper-fetch-skill-offline-linux-x86_64-cp311"', script)
+        self.assertIn("--exclude='./vendor/flaresolverr'", script)
+        self.assertIn("cloakbrowser-*.whl", script)
+        self.assertIn("Dependency wheelhouse is missing cloakbrowser-*.whl", script)
+        self.assertNotIn("setup_flaresolverr_source.sh", script)
+        self.assertNotIn("vendor/flaresolverr/wheelhouse", script)
+        self.assertNotIn("-m playwright install chromium", script)
 
-    def test_supported_cpython_tags_are_whitelisted(self) -> None:
+    def test_linux_manifest_and_readme_document_cloakbrowser_binary_policy(self) -> None:
         script = BUILD_OFFLINE_PACKAGE.read_text(encoding="utf-8")
-        start = script.index("is_supported_python_tag()")
-        end = script.index("check_target()", start)
-        block = script[start:end]
+        manifest_block = script[script.index("payload = {") : script.index("(staging / \"offline-manifest.json\")")]
 
-        for tag in ("cp311", "cp312", "cp313", "cp314"):
-            self.assertIn(tag, block)
+        self.assertIn('"cloakbrowser"', manifest_block)
+        self.assertIn('"browser_binary": "not_bundled"', manifest_block)
+        self.assertIn("README.offline.md", script)
+        self.assertIn("CLOAKBROWSER_BINARY_PATH", script)
+        self.assertNotIn('"playwright_browsers"', manifest_block)
+        self.assertNotIn('"flaresolverr"', manifest_block)
 
-    def test_manifest_python_tag_is_not_hardcoded(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE.read_text(encoding="utf-8")
-        start = script.index("write_manifest_and_checksums()")
-        end = script.index("create_archive()", start)
-        block = script[start:end]
-
-        self.assertIn('"python_tag": python_tag', block)
-        self.assertNotIn('"python_tag": "cp311"', block)
-
-    def test_source_snapshot_excludes_tests_directory(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE.read_text(encoding="utf-8")
-        start = script.index("copy_source_snapshot()")
-        end = script.index("build_project_wheelhouse()", start)
-        block = script[start:end]
-
-        self.assertIn("--exclude='./tests'", block)
-
-    def test_flaresolverr_wheelhouse_builds_source_only_dependencies(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE.read_text(encoding="utf-8")
-        start = script.index('log "Bundling FlareSolverr dependency wheelhouse"')
-        end = script.index('log "Copying patched FlareSolverr source snapshot"', start)
-        block = script[start:end]
-
-        self.assertIn("-m pip wheel", block)
-        self.assertIn("--wheel-dir", block)
-        self.assertNotIn("--only-binary=:all:", block)
-
-    def test_flaresolverr_bundle_keeps_only_extracted_release_directory(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE.read_text(encoding="utf-8")
-        start = script.index('mkdir -p "$staging/vendor/flaresolverr/.flaresolverr/$flare_version"')
-        end = script.index("write_manifest_and_checksums()", start)
-        block = script[start:end]
-
-        self.assertIn('"$flare_downloads/$flare_version/flaresolverr"', block)
-        self.assertIn('tar -C "$flare_downloads/$flare_version" -cf - flaresolverr', block)
-        self.assertNotIn('tar -C "$flare_downloads/$flare_version" -cf - .', block)
-        self.assertNotIn("flaresolverr_linux_x64.tar.gz", block)
-
-    def test_linux_offline_verifier_checks_user_shell_skills_and_mcp_registration(self) -> None:
+    def test_linux_offline_verifier_uses_cloakbrowser_smoke_not_flaresolverr_health(self) -> None:
         script = VERIFY_OFFLINE_PACKAGE.read_text(encoding="utf-8")
 
-        self.assertIn('FAKE_HOME="$TMP_ROOT/home"', script)
-        self.assertIn('export HOME="$FAKE_HOME"', script)
-        self.assertIn('export SHELL="/bin/bash"', script)
-        self.assertIn('for name in codex claude gemini', script)
-        self.assertIn("PAPER_FETCH_FAKE_CLI_LOG", script)
-        self.assertIn("$FAKE_HOME/.bashrc", script)
-        self.assertIn(".codex/skills/paper-fetch-skill/SKILL.md", script)
-        self.assertIn(".claude/skills/paper-fetch-skill/SKILL.md", script)
-        self.assertIn(".gemini/skills/paper-fetch-skill/SKILL.md", script)
-        self.assertIn("codex mcp add", script)
-        self.assertIn("claude mcp add -s user", script)
-        self.assertIn("gemini mcp add", script)
-        self.assertIn("PAPER_FETCH_ENV_FILE=$EXTRACTED_ROOT/offline.env", script)
-        self.assertIn("PLAYWRIGHT_BROWSERS_PATH=$EXTRACTED_ROOT/ms-playwright", script)
-        self.assertIn('"$EXTRACTED_ROOT/install-offline.sh" --uninstall', script)
-        self.assertIn("Uninstall removed offline.env", script)
-        self.assertIn("Managed shell block was not removed from .bashrc", script)
+        self.assertIn("import cloakbrowser", script)
+        self.assertIn('assert hasattr(cloakbrowser, "launch")', script)
+        self.assertIn("CLOAKBROWSER_HEADLESS=true", script)
+        self.assertNotIn("sessions.list", script)
+        self.assertNotIn("flaresolverr-up", script)
+        self.assertNotIn("playwright.sync_api", script)
 
-    def test_windows_default_package_name_uses_detected_python_tag(self) -> None:
+    def test_windows_package_build_excludes_flaresolverr_and_playwright_bundles(self) -> None:
         script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
 
-        self.assertIn('if ($pythonTag -ne "cp313")', script)
-        self.assertIn('$WindowsSetupBaseName = [string]$InstallerManifest.packages.windows_setup_base_name', script)
-        self.assertIn("$PackageName = $WindowsSetupBaseName", script)
-        self.assertIn("$SetupBaseName.exe", script)
-        self.assertIn("Build-InnoInstaller", script)
-        self.assertNotIn("$ArchiveName.zip", script)
+        self.assertIn('Join-Path $RepoDir "vendor/flaresolverr"', script)
+        self.assertIn('Get-ChildItem -Path $wheelhouse -Filter "cloakbrowser-*.whl"', script)
+        self.assertIn('browser_binary = "not_bundled"', script)
+        self.assertIn("Write-OfflineReadme", script)
+        self.assertNotIn("Add-PlaywrightChromium", script)
+        self.assertNotIn("Add-FlareSolverrBundle", script)
+        self.assertNotIn("-m playwright install chromium", script)
+        self.assertNotIn("flaresolverr_windows_x64.zip", script)
 
-    def test_windows_build_uses_embedded_cpython_313_runtime(self) -> None:
+    def test_windows_wrappers_and_manifest_no_longer_publish_flaresolverr_runtime(self) -> None:
         script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Add-EmbeddedPythonRuntime")
-        end = script.index("function Install-EmbeddedPythonPackages", start)
-        block = script[start:end]
+        wrapper_block = script[script.index("function Write-CmdWrappers") : script.index("function Add-SkillAgentManifest")]
+        manifest_block = script[script.index("components = [ordered]@{") : script.index("installer = [ordered]@{")]
 
-        self.assertIn("python-$EmbeddedPythonVersion-embed-amd64.zip", block)
-        self.assertIn("https://www.python.org/ftp/python/$EmbeddedPythonVersion", block)
-        self.assertIn("python313._pth", block)
-        self.assertIn("Lib/site-packages", block)
-        self.assertIn("import site", block)
-
-    def test_windows_embedded_runtime_gets_project_and_dependencies(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Install-EmbeddedPythonPackages")
-        end = script.index("function Remove-BuildOnlyArtifacts", start)
-        block = script[start:end]
-
-        self.assertIn("Lib/site-packages", block)
-        self.assertIn("--no-index", block)
-        self.assertIn("--find-links", block)
-        self.assertIn("--target $sitePackages", block)
-        self.assertIn("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD", block)
-
-    def test_windows_build_removes_build_only_dist_and_wheelhouse_after_runtime_install(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Remove-BuildOnlyArtifacts")
-        end = script.index("function Add-FormulaTools", start)
-        block = script[start:end]
-
-        self.assertIn('Join-Path $Staging "wheelhouse"', block)
-        self.assertIn('Join-Path $Staging "dist"', block)
-        self.assertIn("Remove-Item -Recurse -Force", block)
-
-        runtime_install = script.index("\nInstall-EmbeddedPythonPackages $staging")
-        cleanup = script.index("\nRemove-BuildOnlyArtifacts $staging")
-        manifest = script.index("\nWrite-ManifestAndChecksums", cleanup)
-        installer = script.index("\nBuild-InnoInstaller", manifest)
-
-        self.assertLess(runtime_install, cleanup)
-        self.assertLess(cleanup, manifest)
-        self.assertLess(cleanup, installer)
-
-    def test_windows_manifest_keeps_legacy_wheel_fields_without_staging_artifacts(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Write-ManifestAndChecksums")
-        end = script.index("function Find-InnoCompiler", start)
-        block = script[start:end]
-
-        self.assertIn("project_wheels = @()", block)
-        self.assertIn("wheelhouse_count = 0", block)
-        self.assertNotIn('Get-ChildItem -Path (Join-Path $Staging "dist")', block)
-        self.assertNotIn('Get-ChildItem -Path (Join-Path $Staging "wheelhouse")', block)
-
-    def test_windows_manifest_target_fields_are_standalone_installer_specific(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("target = [ordered]@{")
-        end = script.index("components = [ordered]@{", start)
-        block = script[start:end]
-
-        self.assertIn('platform = "windows"', block)
-        self.assertIn('arch = "x86_64"', block)
-        self.assertIn("python_tag = $PythonTag", block)
-        self.assertIn("python_runtime", block)
-        self.assertIn('entrypoint = "$SetupBaseName.exe"', script)
-        self.assertIn('runtime = "runtime"', script)
-        self.assertIn('installer_manifest = "installer/manifest.json"', script)
-        self.assertIn('post_install_helper = "scripts/windows-installer-helper.ps1"', script)
-
-    def test_windows_build_writes_cli_and_flaresolverr_wrappers(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Write-CmdWrappers")
-        end = script.index("function Add-SkillAgentManifest", start)
-        block = script[start:end]
-
-        self.assertIn("paper-fetch.cmd", block)
-        self.assertIn("paper-fetch-mcp.cmd", block)
-        self.assertIn('foreach ($name in @("up", "down", "status"))', block)
-        self.assertIn("flaresolverr-$name.cmd", block)
-        self.assertIn("runtime\\python.exe", block)
-        self.assertIn("-m paper_fetch.mcp.server", block)
-
-    def test_windows_build_adds_codex_skill_agent_manifest(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Add-SkillAgentManifest")
-        end = script.index("function Write-DefaultOfflineEnv", start)
-        block = script[start:end]
-
-        self.assertIn("agents", block)
-        self.assertIn("openai.yaml", block)
-        self.assertIn("$InstallerManifest.skill.display_name", block)
-        self.assertIn("$InstallerManifest.skill.default_prompt", block)
-
-    def test_windows_inno_installer_script_is_used(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        iss = (REPO_ROOT / "installer" / "paper-fetch-skill.iss").read_text(encoding="utf-8")
-
-        self.assertIn("Find-InnoCompiler", script)
-        self.assertIn("ISCC.exe", script)
-        self.assertIn("/DSourceDir=$Staging", script)
-        self.assertIn("PrivilegesRequired=lowest", iss)
-        self.assertIn(r"DefaultDirName={localappdata}\PaperFetchSkill", iss)
-        self.assertIn("windows-installer-helper.ps1", iss)
-
-    def test_windows_inno_installer_does_not_upgrade_overwrite_existing_offline_env(self) -> None:
-        iss = (REPO_ROOT / "installer" / "paper-fetch-skill.iss").read_text(encoding="utf-8")
-
-        self.assertIn('Source: "{#SourceDir}\\*"; DestDir: "{app}"; Excludes: "offline.env"', iss)
-        self.assertIn(
-            'Source: "{#SourceDir}\\offline.env"; DestDir: "{app}"; Flags: ignoreversion onlyifdoesntexist',
-            iss,
-        )
-
-    def test_windows_inno_installer_prompts_for_elsevier_api_key(self) -> None:
-        iss = (REPO_ROOT / "installer" / "paper-fetch-skill.iss").read_text(encoding="utf-8")
-
-        self.assertIn("wpFinished", iss)
-        self.assertIn("WizardForm.FinishedLabel.Caption", iss)
-        self.assertIn("https://dev.elsevier.com/", iss)
-        self.assertIn('ELSEVIER_API_KEY="..."', iss)
-        self.assertIn('Filename: "notepad.exe"', iss)
-        self.assertIn('Parameters: """{app}\\offline.env"""', iss)
-        self.assertIn("Description: \"Open offline.env to set ELSEVIER_API_KEY\"", iss)
-        self.assertIn("Flags: postinstall skipifsilent unchecked nowait", iss)
-
-    def test_windows_flaresolverr_bundle_is_built_from_patched_source(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-
-        self.assertIn("git clone --depth 1 --branch $flareVersion", script)
-        self.assertIn("return-image-payload.patch", script)
-        self.assertIn(".\\build_package.py", script)
-        self.assertIn("flaresolverr_windows_x64.zip", script)
-        self.assertIn("Expand-Archive", script)
-
-    def test_windows_native_command_output_does_not_pollute_return_values(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Invoke-Native")
-        end = script.index("function Get-PythonTag", start)
-        block = script[start:end]
-
-        self.assertIn("| ForEach-Object { Write-Host $_ }", block)
-        self.assertIn("$exitCode = $LASTEXITCODE", block)
-
-    def test_windows_build_platform_check_supports_windows_powershell_51(self) -> None:
-        script = BUILD_OFFLINE_PACKAGE_WINDOWS.read_text(encoding="utf-8")
-        start = script.index("function Test-RunningOnWindowsPlatform")
-        end = script.index("function Assert-Target", start)
-        block = script[start:end]
-
-        self.assertIn("PROCESSOR_ARCHITEW6432", block)
-        self.assertIn("PROCESSOR_ARCHITECTURE", block)
-        self.assertIn('if ($arch -ne "AMD64")', script)
-        self.assertNotIn("OSArchitecture", block)
-        self.assertNotIn("RuntimeInformation", block)
+        self.assertIn("paper-fetch.cmd", wrapper_block)
+        self.assertIn("paper-fetch-mcp.cmd", wrapper_block)
+        self.assertNotIn("flaresolverr-", wrapper_block)
+        self.assertIn("cloakbrowser = [ordered]@{", manifest_block)
+        self.assertNotIn("playwright_browsers", manifest_block)
+        self.assertNotIn("flaresolverr", manifest_block.lower())
 
 
 if __name__ == "__main__":

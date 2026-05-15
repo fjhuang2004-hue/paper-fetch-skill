@@ -117,11 +117,7 @@ function Copy-SourceSnapshot {
         "tests",
         "live-downloads",
         "__pycache__",
-        (Join-Path $RepoDir "vendor/flaresolverr/.work"),
-        (Join-Path $RepoDir "vendor/flaresolverr/.venv-flaresolverr"),
-        (Join-Path $RepoDir "vendor/flaresolverr/.flaresolverr"),
-        (Join-Path $RepoDir "vendor/flaresolverr/run_logs"),
-        (Join-Path $RepoDir "vendor/flaresolverr/probe_outputs")
+        (Join-Path $RepoDir "vendor/flaresolverr")
     )
     & robocopy $RepoDir $Staging /E /XD @excludeDirs /NFL /NDL /NJH /NJS /NC /NS | Out-Null
     if ($LASTEXITCODE -ge 8) {
@@ -150,6 +146,10 @@ function Build-ProjectWheelhouse {
 
     Write-Log "Downloading Windows dependency wheelhouse"
     Invoke-Native $PythonBin -m pip download --dest $wheelhouse --only-binary=:all: $projectWheelPath
+    $cloakbrowserWheels = @(Get-ChildItem -Path $wheelhouse -Filter "cloakbrowser-*.whl" -ErrorAction SilentlyContinue)
+    if ($cloakbrowserWheels.Count -eq 0) {
+        throw "Dependency wheelhouse is missing cloakbrowser-*.whl."
+    }
 }
 
 function New-BuildVenv {
@@ -265,75 +265,6 @@ stage_bundled_node_workspace(Path(sys.argv[1]))
     Invoke-Native $BuildPython -c $stageNodeWorkspace $target
 }
 
-function Add-PlaywrightChromium {
-    param(
-        [string]$Staging,
-        [string]$BuildPython
-    )
-
-    Write-Log "Bundling Playwright Chromium"
-    $previous = $env:PLAYWRIGHT_BROWSERS_PATH
-    try {
-        $env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $Staging "ms-playwright"
-        Invoke-Native $BuildPython -m playwright install chromium
-    } finally {
-        $env:PLAYWRIGHT_BROWSERS_PATH = $previous
-    }
-}
-
-function Add-FlareSolverrBundle {
-    param([string]$Staging)
-
-    $flareVersion = "v3.4.6"
-    $flareBuild = Join-Path $BuildDir "flaresolverr-windows-build"
-    $flareRepo = Join-Path $flareBuild "FlareSolverr"
-    $flareVenv = Join-Path $flareBuild ".venv-flaresolverr-build"
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $flareBuild
-    New-Item -ItemType Directory -Force -Path $flareBuild | Out-Null
-
-    Write-Log "Preparing patched FlareSolverr source"
-    Invoke-Native git clone --depth 1 --branch $flareVersion https://github.com/FlareSolverr/FlareSolverr.git $flareRepo
-    $patchPath = Join-Path $RepoDir "vendor/flaresolverr/patches/return-image-payload.patch"
-    Invoke-Native git -C $flareRepo apply $patchPath
-    if (-not (Select-String -Path (Join-Path $flareRepo "src/dtos.py") -Pattern "returnImagePayload" -Quiet)) {
-        throw "Patched FlareSolverr source is missing returnImagePayload."
-    }
-    if (-not (Select-String -Path (Join-Path $flareRepo "src/flaresolverr_service.py") -Pattern "imagePayload" -Quiet)) {
-        throw "Patched FlareSolverr source is missing imagePayload."
-    }
-
-    Write-Log "Building flaresolverr_windows_x64.zip from patched source"
-    Invoke-Native $PythonBin -m venv $flareVenv
-    $flarePython = Join-Path $flareVenv "Scripts/python.exe"
-    Invoke-Native $flarePython -m pip install --upgrade pip setuptools wheel pyinstaller
-    Invoke-Native $flarePython -m pip install -r (Join-Path $flareRepo "requirements.txt")
-    Push-Location (Join-Path $flareRepo "src")
-    try {
-        Invoke-Native $flarePython ".\build_package.py"
-    } finally {
-        Pop-Location
-    }
-
-    $zipPath = Join-Path $flareRepo "dist/flaresolverr_windows_x64.zip"
-    if (-not (Test-Path -LiteralPath $zipPath)) {
-        throw "Missing built FlareSolverr Windows zip: $zipPath"
-    }
-
-    $releaseDir = Join-Path $Staging "vendor/flaresolverr/.flaresolverr/$flareVersion"
-    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $releaseDir
-    New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-    Expand-Archive -LiteralPath $zipPath -DestinationPath $releaseDir -Force
-
-    $exe = Join-Path $releaseDir "flaresolverr/flaresolverr.exe"
-    $chrome = Join-Path $releaseDir "flaresolverr/_internal/chrome/chrome.exe"
-    if (-not (Test-Path -LiteralPath $exe)) {
-        throw "Missing extracted FlareSolverr executable: $exe"
-    }
-    if (-not (Test-Path -LiteralPath $chrome)) {
-        throw "Missing extracted FlareSolverr Chromium executable: $chrome"
-    }
-}
-
 function Write-CmdWrappers {
     param([string]$Staging)
 
@@ -362,20 +293,8 @@ set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
 "%PAPER_FETCH_ROOT%\runtime\python.exe" -X utf8 -m paper_fetch.mcp.server %*
 exit /b %ERRORLEVEL%
-'@
+    '@
     Set-Content -LiteralPath (Join-Path $bin "paper-fetch-mcp.cmd") -Value $mcp -Encoding ASCII
-
-    foreach ($name in @("up", "down", "status")) {
-        $scriptName = "flaresolverr-$name.ps1"
-        $wrapper = @"
-@echo off
-setlocal
-set "PAPER_FETCH_ROOT=%~dp0.."
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PAPER_FETCH_ROOT%\scripts\$scriptName" "%PAPER_FETCH_ROOT%\vendor\flaresolverr\.env.flaresolverr-source-windows" %*
-exit /b %ERRORLEVEL%
-"@
-        Set-Content -LiteralPath (Join-Path $bin "flaresolverr-$name.cmd") -Value $wrapper -Encoding ASCII
-    }
 }
 
 function Add-SkillAgentManifest {
@@ -401,15 +320,29 @@ ELSEVIER_API_KEY=""
 $OfflineManagedBegin
 PAPER_FETCH_DOWNLOAD_DIR='$($Staging.Replace("\", "/"))/downloads'
 PAPER_FETCH_FORMULA_TOOLS_DIR='$($Staging.Replace("\", "/"))/formula-tools'
-PLAYWRIGHT_BROWSERS_PATH='$($Staging.Replace("\", "/"))/ms-playwright'
-FLARESOLVERR_URL='http://127.0.0.1:8191/v1'
-FLARESOLVERR_ENV_FILE='$($Staging.Replace("\", "/"))/vendor/flaresolverr/.env.flaresolverr-source-windows'
-FLARESOLVERR_SOURCE_DIR='$($Staging.Replace("\", "/"))/vendor/flaresolverr'
+CLOAKBROWSER_HEADLESS='true'
+# CLOAKBROWSER_BINARY_PATH='C:/path/to/preinstalled/browser.exe'
 PYTHONUTF8='1'
 PYTHONIOENCODING='utf-8'
 $OfflineManagedEnd
 "@
     [System.IO.File]::WriteAllText((Join-Path $Staging "offline.env"), $content, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Write-OfflineReadme {
+    param([string]$Staging)
+
+    $content = @'
+# Paper Fetch Windows Offline Installer
+
+This installer includes the embedded Python runtime, installed Python packages, and formula tools.
+It includes the `cloakbrowser` Python package but does not redistribute the CloakBrowser browser binary.
+
+The first browser-backed fetch may need network access so CloakBrowser can download its runtime. In restricted environments, preinstall a compatible browser runtime and set `CLOAKBROWSER_BINARY_PATH` before using browser-backed providers.
+
+Set `CLOAKBROWSER_HEADLESS=false` only when running with a display-capable session.
+'@
+    [System.IO.File]::WriteAllText((Join-Path $Staging "README.offline.md"), $content, [System.Text.UTF8Encoding]::new($false))
 }
 
 function Write-ManifestAndChecksums {
@@ -449,13 +382,10 @@ function Write-ManifestAndChecksums {
             installer_manifest = "installer/manifest.json"
             project_wheels = @()
             wheelhouse_count = 0
-            playwright_browsers = "ms-playwright"
             formula_tools = "formula-tools"
-            flaresolverr = [ordered]@{
-                release_version = "v3.4.6"
-                runtime_bundle = "vendor/flaresolverr/.flaresolverr/v3.4.6/flaresolverr"
-                executable = "vendor/flaresolverr/.flaresolverr/v3.4.6/flaresolverr/flaresolverr.exe"
-                patch = "return-image-payload"
+            cloakbrowser = [ordered]@{
+                python_package = "runtime/Lib/site-packages"
+                browser_binary = "not_bundled"
             }
             installer = [ordered]@{
                 inno_setup = "installer/paper-fetch-skill.iss"
@@ -541,10 +471,9 @@ Add-EmbeddedPythonRuntime $staging
 Install-EmbeddedPythonPackages $staging
 Remove-BuildOnlyArtifacts $staging
 Add-FormulaTools -Staging $staging -BuildPython $buildPython
-Add-PlaywrightChromium -Staging $staging -BuildPython $buildPython
-Add-FlareSolverrBundle $staging
 Write-CmdWrappers $staging
 Add-SkillAgentManifest $staging
 Write-DefaultOfflineEnv $staging
+Write-OfflineReadme $staging
 Write-ManifestAndChecksums -Staging $staging -Version $version -PythonTag $pythonTag -SetupBaseName $PackageName
 Build-InnoInstaller -Staging $staging -Version $version -SetupBaseName $PackageName

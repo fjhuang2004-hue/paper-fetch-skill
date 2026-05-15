@@ -8,9 +8,12 @@ import tempfile
 import textwrap
 import unittest
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FLARESOLVERR_VENDOR_DIR = REPO_ROOT / "vendor" / "flaresolverr"
+pytestmark = pytest.mark.legacy
 
 
 def _write_file(path: Path, content: str = "") -> None:

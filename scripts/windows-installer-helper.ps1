@@ -2,7 +2,8 @@ param(
     [ValidateSet("Install", "Uninstall", "Smoke")]
     [string]$Action = "Install",
     [string]$InstallRoot,
-    [switch]$SkipSmoke
+    [switch]$SkipSmoke,
+    [switch]$ProbeLaunch
 )
 
 Set-StrictMode -Version Latest
@@ -21,10 +22,7 @@ $McpEnvKeys = @(
     "PAPER_FETCH_MCP_PYTHON_BIN",
     "PAPER_FETCH_DOWNLOAD_DIR",
     "PAPER_FETCH_FORMULA_TOOLS_DIR",
-    "PLAYWRIGHT_BROWSERS_PATH",
-    "FLARESOLVERR_URL",
-    "FLARESOLVERR_ENV_FILE",
-    "FLARESOLVERR_SOURCE_DIR"
+    "CLOAKBROWSER_HEADLESS"
 )
 
 if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
@@ -46,6 +44,7 @@ function Import-InstallerManifest {
     $script:CodexManagedBegin = [string]$manifest.managed_blocks.codex.begin
     $script:CodexManagedEnd = [string]$manifest.managed_blocks.codex.end
     $script:McpEnvKeys = @($manifest.mcp.env_keys | ForEach-Object { [string]$_ })
+    Normalize-McpEnvKeys
 
     if ([string]::IsNullOrWhiteSpace($script:SkillName) -or
         [string]::IsNullOrWhiteSpace($script:McpName) -or
@@ -56,6 +55,24 @@ function Import-InstallerManifest {
         $script:McpEnvKeys.Count -eq 0) {
         throw "installer manifest is missing required installer constants."
     }
+}
+
+function Normalize-McpEnvKeys {
+    $filtered = New-Object System.Collections.Generic.List[string]
+    $seenHeadless = $false
+    foreach ($key in $script:McpEnvKeys) {
+        if ($key -in @("PLAYWRIGHT_BROWSERS_PATH", "FLARESOLVERR_URL", "FLARESOLVERR_ENV_FILE", "FLARESOLVERR_SOURCE_DIR")) {
+            continue
+        }
+        if ($key -eq "CLOAKBROWSER_HEADLESS") {
+            $seenHeadless = $true
+        }
+        $filtered.Add($key)
+    }
+    if (-not $seenHeadless) {
+        $filtered.Add("CLOAKBROWSER_HEADLESS")
+    }
+    $script:McpEnvKeys = $filtered.ToArray()
 }
 
 Import-InstallerManifest
@@ -109,9 +126,6 @@ function Get-McpEnv {
     $offlineEnv = Join-Path $InstallRoot "offline.env"
     $downloads = Join-Path $InstallRoot "downloads"
     $formulaTools = Join-Path $InstallRoot "formula-tools"
-    $playwright = Join-Path $InstallRoot "ms-playwright"
-    $flaresolverrSource = Join-Path (Join-Path $InstallRoot "vendor") "flaresolverr"
-    $flaresolverrEnv = Join-Path $flaresolverrSource ".env.flaresolverr-source-windows"
 
     $values = @{
         PYTHONUTF8 = "1"
@@ -120,10 +134,7 @@ function Get-McpEnv {
         PAPER_FETCH_MCP_PYTHON_BIN = (ConvertTo-FullPath (Get-RuntimePython))
         PAPER_FETCH_DOWNLOAD_DIR = (ConvertTo-FullPath $downloads)
         PAPER_FETCH_FORMULA_TOOLS_DIR = (ConvertTo-FullPath $formulaTools)
-        PLAYWRIGHT_BROWSERS_PATH = (ConvertTo-FullPath $playwright)
-        FLARESOLVERR_URL = "http://127.0.0.1:8191/v1"
-        FLARESOLVERR_ENV_FILE = (ConvertTo-FullPath $flaresolverrEnv)
-        FLARESOLVERR_SOURCE_DIR = (ConvertTo-FullPath $flaresolverrSource)
+        CLOAKBROWSER_HEADLESS = "true"
     }
     $ordered = [ordered]@{}
     foreach ($key in $McpEnvKeys) {
@@ -183,20 +194,18 @@ function Write-ManagedEnvFile {
     foreach ($name in @(
         "PAPER_FETCH_DOWNLOAD_DIR",
         "PAPER_FETCH_FORMULA_TOOLS_DIR",
-        "PLAYWRIGHT_BROWSERS_PATH",
-        "FLARESOLVERR_URL",
-        "FLARESOLVERR_ENV_FILE",
-        "FLARESOLVERR_SOURCE_DIR",
+        "CLOAKBROWSER_HEADLESS",
         "PYTHONUTF8",
         "PYTHONIOENCODING"
     )) {
         $value = [string]$envMap[$name]
-        if ($name -in @("PYTHONUTF8", "PYTHONIOENCODING", "FLARESOLVERR_URL")) {
+        if ($name -in @("PYTHONUTF8", "PYTHONIOENCODING", "CLOAKBROWSER_HEADLESS")) {
             $lines.Add("$name='$value'")
         } else {
             $lines.Add("$name=$(Quote-DotenvValue $value)")
         }
     }
+    $lines.Add("# CLOAKBROWSER_BINARY_PATH='C:/path/to/preinstalled/browser.exe'")
     $lines.Add($OfflineManagedEnd)
     [System.IO.File]::WriteAllLines($target, $lines, [System.Text.UTF8Encoding]::new($false))
 }
@@ -454,7 +463,6 @@ function Unregister-GeminiMcp {
 function Invoke-SmokeChecks {
     $python = ConvertTo-FullPath (Get-RuntimePython)
     $texmath = ConvertTo-FullPath (Join-Path (Join-Path $InstallRoot "formula-tools") "bin/texmath.exe")
-    $playwright = ConvertTo-FullPath (Join-Path $InstallRoot "ms-playwright")
 
     Set-ProcessRuntimeEnv
     Write-Log "Running bundled Python smoke checks"
@@ -463,22 +471,29 @@ function Invoke-SmokeChecks {
         "import paper_fetch; from paper_fetch.mcp.fetch_tool import provider_status_payload; payload = provider_status_payload(); assert 'providers' in payload"
     )
 
-    $playwrightCheck = @'
+    $cloakbrowserCheck = @'
 from pathlib import Path
+import os
 import sys
-from playwright.sync_api import sync_playwright
 
-root = Path(sys.argv[1]).resolve()
-manager = sync_playwright().start()
-try:
-    executable = Path(manager.chromium.executable_path).resolve()
-finally:
-    manager.stop()
+import cloakbrowser
 
-assert executable.is_file(), executable
-assert root in executable.parents, (root, executable)
+assert hasattr(cloakbrowser, "launch")
+binary_path = os.environ.get("CLOAKBROWSER_BINARY_PATH")
+if binary_path:
+    path = Path(binary_path)
+    assert path.is_file(), binary_path
+
+if len(sys.argv) > 1 and sys.argv[1] == "probe-launch":
+    headless = os.environ.get("CLOAKBROWSER_HEADLESS", "true").strip().lower() not in {"0", "false", "no", "off"}
+    browser = cloakbrowser.launch(headless=headless)
+    browser.close()
 '@
-    Invoke-Checked -FilePath $python -Arguments @("-X", "utf8", "-c", $playwrightCheck, $playwright)
+    $args = @("-X", "utf8", "-c", $cloakbrowserCheck)
+    if ($ProbeLaunch) {
+        $args += "probe-launch"
+    }
+    Invoke-Checked -FilePath $python -Arguments $args
     Invoke-Checked -FilePath $texmath -Arguments @("--help")
 }
 

@@ -18,9 +18,6 @@ PACKAGE_PATH="$(cd "$(dirname "$PACKAGE_PATH")" && pwd)/$(basename "$PACKAGE_PAT
 
 TMP_ROOT="$(mktemp -d)"
 cleanup() {
-  if [ -n "${EXTRACTED_ROOT:-}" ] && [ -x "$EXTRACTED_ROOT/scripts/flaresolverr-down" ]; then
-    bash "$EXTRACTED_ROOT/scripts/flaresolverr-down" "$EXTRACTED_ROOT/vendor/flaresolverr/.env.flaresolverr-source-headless" >/dev/null 2>&1 || true
-  fi
   rm -rf "$TMP_ROOT"
 }
 trap cleanup EXIT
@@ -78,21 +75,28 @@ grep -F -q "gemini mcp remove paper-fetch" "$FAKE_CLI_LOG"
 grep -F -q "gemini mcp add" "$FAKE_CLI_LOG"
 grep -F -q "PAPER_FETCH_ENV_FILE=$EXTRACTED_ROOT/offline.env" "$FAKE_CLI_LOG"
 grep -F -q "PAPER_FETCH_FORMULA_TOOLS_DIR=$EXTRACTED_ROOT/formula-tools" "$FAKE_CLI_LOG"
-grep -F -q "PLAYWRIGHT_BROWSERS_PATH=$EXTRACTED_ROOT/ms-playwright" "$FAKE_CLI_LOG"
-grep -F -q "FLARESOLVERR_SOURCE_DIR=$EXTRACTED_ROOT/vendor/flaresolverr" "$FAKE_CLI_LOG"
+grep -F -q "CLOAKBROWSER_HEADLESS=true" "$FAKE_CLI_LOG"
 
 # shellcheck disable=SC1091
 source "$EXTRACTED_ROOT/activate-offline.sh"
 
-case "$PLAYWRIGHT_BROWSERS_PATH" in
-  "$HOME"/.cache/ms-playwright|"$HOME"/.cache/ms-playwright/*)
-    die "PLAYWRIGHT_BROWSERS_PATH points at user cache: $PLAYWRIGHT_BROWSERS_PATH"
-    ;;
-esac
-
 log "Verifying command entrypoints"
 paper-fetch --help >/dev/null
 texmath --help >/dev/null
+
+log "Verifying CloakBrowser package entrypoint"
+python - <<'PY'
+import os
+from pathlib import Path
+
+import cloakbrowser
+
+assert hasattr(cloakbrowser, "launch")
+binary_path = os.environ.get("CLOAKBROWSER_BINARY_PATH")
+if binary_path:
+    path = Path(binary_path)
+    assert path.is_file(), binary_path
+PY
 
 log "Verifying provider_status payload entrypoint"
 python - <<'PY'
@@ -102,30 +106,6 @@ payload = provider_status_payload()
 assert "providers" in payload, payload
 assert payload["providers"], payload
 PY
-
-log "Verifying bundled Playwright executable"
-python - <<'PY'
-import os
-from pathlib import Path
-from playwright.sync_api import sync_playwright
-
-root = Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"]).resolve()
-manager = sync_playwright().start()
-try:
-    executable = Path(manager.chromium.executable_path).resolve()
-finally:
-    manager.stop()
-
-assert executable.is_file(), executable
-assert root in executable.parents, (root, executable)
-PY
-
-log "Starting FlareSolverr from bundled snapshot"
-bash "$EXTRACTED_ROOT/scripts/flaresolverr-up" "$EXTRACTED_ROOT/vendor/flaresolverr/.env.flaresolverr-source-headless"
-
-log "Verifying FlareSolverr sessions.list"
-status_payload="$(bash "$EXTRACTED_ROOT/scripts/flaresolverr-status" "$EXTRACTED_ROOT/vendor/flaresolverr/.env.flaresolverr-source-headless")"
-printf '%s\n' "$status_payload" | python -c 'import json, sys; payload=json.load(sys.stdin); assert payload.get("status") == "ok", payload'
 
 if [ "$SKIP_FETCH_SMOKE" != "1" ]; then
   log "Running paper-fetch DOI smoke"

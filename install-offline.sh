@@ -5,7 +5,6 @@ set -euo pipefail
 
 BUNDLE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="${PAPER_FETCH_OFFLINE_PYTHON_BIN:-python3}"
-XVFB_BIN="${PAPER_FETCH_OFFLINE_XVFB_BIN:-Xvfb}"
 PRESET="headless"
 MERGE_USER_CONFIG=0
 RUN_SMOKE=1
@@ -27,10 +26,7 @@ MCP_ENV_KEYS=(
   PAPER_FETCH_MCP_PYTHON_BIN
   PAPER_FETCH_DOWNLOAD_DIR
   PAPER_FETCH_FORMULA_TOOLS_DIR
-  PLAYWRIGHT_BROWSERS_PATH
-  FLARESOLVERR_URL
-  FLARESOLVERR_ENV_FILE
-  FLARESOLVERR_SOURCE_DIR
+  CLOAKBROWSER_HEADLESS
 )
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -72,6 +68,7 @@ for key in manifest["mcp"]["env_keys"]:
   SKILL_NAME="${values[5]:-}"
   MCP_NAME="${values[6]:-}"
   MCP_ENV_KEYS=("${values[@]:7}")
+  normalize_mcp_env_keys
 
   [ -n "$MANAGED_BEGIN" ] || die "installer manifest is missing managed_blocks.offline.begin"
   [ -n "$MANAGED_END" ] || die "installer manifest is missing managed_blocks.offline.end"
@@ -89,14 +86,39 @@ Usage:
   ./install-offline.sh --uninstall
 
 Options:
-  --preset=headless|wslg  Select the bundled FlareSolverr preset. Default: headless.
+  --preset=headless|wslg  Select CloakBrowser headless/headful runtime env. Default: headless.
   --user-config           Also merge the offline runtime block into ~/.config/paper-fetch/.env.
   --no-user-config        Do not touch ~/.config/paper-fetch/.env. This is the default.
   --reuse-env-file <path> Use an existing offline.env without modifying it.
   --skip-smoke            Skip local command smoke checks after installation.
   --uninstall             Remove user-level shell, skill, and MCP integration without deleting this bundle.
   -h, --help              Show this help.
+
+Environment:
+  CLOAKBROWSER_HEADLESS     Set to false for a headful CloakBrowser runtime.
+  CLOAKBROWSER_BINARY_PATH  Optional path to a preinstalled browser binary; when set,
+                            CloakBrowser runtime download is skipped.
 EOF
+}
+
+normalize_mcp_env_keys() {
+  local key seen_headless=0
+  local filtered=()
+  for key in "${MCP_ENV_KEYS[@]}"; do
+    case "$key" in
+      PLAYWRIGHT_BROWSERS_PATH|FLARESOLVERR_URL|FLARESOLVERR_ENV_FILE|FLARESOLVERR_SOURCE_DIR)
+        continue
+        ;;
+      CLOAKBROWSER_HEADLESS)
+        seen_headless=1
+        ;;
+    esac
+    filtered+=("$key")
+  done
+  if [ "$seen_headless" != "1" ]; then
+    filtered+=(CLOAKBROWSER_HEADLESS)
+  fi
+  MCP_ENV_KEYS=("${filtered[@]}")
 }
 
 normalize_path() {
@@ -242,38 +264,28 @@ find_project_wheel() {
 }
 
 check_preset_requirements() {
-  if [ "$PRESET" = "headless" ]; then
-    command -v "$XVFB_BIN" >/dev/null 2>&1 || die "Xvfb is required for --preset=headless. Install the system xvfb package or use --preset=wslg when DISPLAY/WAYLAND_DISPLAY is available."
-    return
-  fi
-
-  if [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+  if [ "$PRESET" = "wslg" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
     die "DISPLAY or WAYLAND_DISPLAY is required for --preset=wslg."
+  fi
+}
+
+cloakbrowser_headless_value() {
+  if [ "$PRESET" = "wslg" ]; then
+    printf 'false\n'
+  else
+    printf 'true\n'
   fi
 }
 
 check_bundle_assets() {
   require_dir "$BUNDLE_ROOT/wheelhouse"
-  require_dir "$BUNDLE_ROOT/ms-playwright"
   require_file "$BUNDLE_ROOT/formula-tools/bin/texmath"
   [ -x "$BUNDLE_ROOT/formula-tools/bin/texmath" ] || die "Bundled texmath is not executable: $BUNDLE_ROOT/formula-tools/bin/texmath"
 
-  local flaresolverr_dir="$BUNDLE_ROOT/vendor/flaresolverr"
-  require_dir "$flaresolverr_dir"
-  require_dir "$flaresolverr_dir/wheelhouse"
-  require_file "$flaresolverr_dir/.env.flaresolverr-source-$PRESET"
-  require_file "$flaresolverr_dir/.work/FlareSolverr/src/flaresolverr.py"
-  require_file "$flaresolverr_dir/.work/FlareSolverr/requirements.txt"
-  require_file "$flaresolverr_dir/.flaresolverr/v3.4.6/flaresolverr/_internal/chrome/chrome"
-
-  for name in \
-    setup_flaresolverr_source.sh \
-    start_flaresolverr_source.sh \
-    run_flaresolverr_source.sh \
-    stop_flaresolverr_source.sh \
-    flaresolverr_source_common.sh; do
-    require_file "$flaresolverr_dir/$name"
-  done
+  shopt -s nullglob
+  local cloakbrowser_wheels=("$BUNDLE_ROOT"/wheelhouse/cloakbrowser-*.whl)
+  shopt -u nullglob
+  [ "${#cloakbrowser_wheels[@]}" -gt 0 ] || die "Bundled wheelhouse is missing cloakbrowser-*.whl."
 
   require_file "$BUNDLE_ROOT/skills/$SKILL_NAME/SKILL.md"
 }
@@ -292,13 +304,6 @@ install_project_venv() {
   export PIP_DISABLE_PIP_VERSION_CHECK=1
   export PIP_NO_BUILD_ISOLATION=1
   export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-  export PLAYWRIGHT_BROWSERS_PATH="$BUNDLE_ROOT/ms-playwright"
-
-  case "$PLAYWRIGHT_BROWSERS_PATH" in
-    "$HOME"/.cache/ms-playwright|"$HOME"/.cache/ms-playwright/*)
-      die "PLAYWRIGHT_BROWSERS_PATH must not point at the user cache: $PLAYWRIGHT_BROWSERS_PATH"
-      ;;
-  esac
 
   log "Installing paper-fetch-skill from bundled wheelhouse"
   "$venv_dir/bin/python" -m pip install \
@@ -309,33 +314,6 @@ install_project_venv() {
 
   [ -x "$venv_dir/bin/paper-fetch" ] || die "Installed CLI is missing or not executable: $venv_dir/bin/paper-fetch"
   [ -x "$venv_dir/bin/paper-fetch-mcp" ] || die "Installed MCP CLI is missing or not executable: $venv_dir/bin/paper-fetch-mcp"
-}
-
-install_flaresolverr_venv() {
-  local flaresolverr_dir="$BUNDLE_ROOT/vendor/flaresolverr"
-  local source_dir="$flaresolverr_dir/.work/FlareSolverr"
-  local venv_dir="$flaresolverr_dir/.venv-flaresolverr"
-  local preset_file="$flaresolverr_dir/.env.flaresolverr-source-$PRESET"
-
-  if [ ! -x "$venv_dir/bin/python" ]; then
-    log "Creating FlareSolverr virtual environment at $venv_dir"
-    "$PYTHON_BIN" -m venv "$venv_dir"
-  fi
-
-  log "Installing FlareSolverr Python dependencies from bundled wheelhouse"
-  PIP_NO_INDEX=1 \
-  PIP_FIND_LINKS="$flaresolverr_dir/wheelhouse" \
-  PIP_DISABLE_PIP_VERSION_CHECK=1 \
-  "$venv_dir/bin/python" -m pip install \
-    --no-index \
-    --find-links "$flaresolverr_dir/wheelhouse" \
-    --only-binary=:all: \
-    -r "$source_dir/requirements.txt"
-
-  # shellcheck disable=SC1091
-  source "$flaresolverr_dir/flaresolverr_source_common.sh"
-  flaresolverr_source_load_env "$preset_file"
-  flaresolverr_source_ensure_chrome_link
 }
 
 mcp_python_bin() {
@@ -351,10 +329,7 @@ mcp_env_value() {
     PAPER_FETCH_MCP_PYTHON_BIN) mcp_python_bin ;;
     PAPER_FETCH_DOWNLOAD_DIR) printf '%s\n' "$BUNDLE_ROOT/downloads" ;;
     PAPER_FETCH_FORMULA_TOOLS_DIR) printf '%s\n' "$BUNDLE_ROOT/formula-tools" ;;
-    PLAYWRIGHT_BROWSERS_PATH) printf '%s\n' "$BUNDLE_ROOT/ms-playwright" ;;
-    FLARESOLVERR_URL) printf 'http://127.0.0.1:8191/v1\n' ;;
-    FLARESOLVERR_ENV_FILE) printf '%s\n' "$BUNDLE_ROOT/vendor/flaresolverr/.env.flaresolverr-source-$PRESET" ;;
-    FLARESOLVERR_SOURCE_DIR) printf '%s\n' "$BUNDLE_ROOT/vendor/flaresolverr" ;;
+    CLOAKBROWSER_HEADLESS) cloakbrowser_headless_value ;;
     *) die "Unknown MCP env key: $key" ;;
   esac
 }
@@ -412,10 +387,7 @@ write_posix_shell_block() {
   printf 'export PAPER_FETCH_ENV_FILE=%s\n' "$(quote_env_value "$OFFLINE_ENV_FILE")"
   printf 'export PAPER_FETCH_DOWNLOAD_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/downloads")"
   printf 'export PAPER_FETCH_FORMULA_TOOLS_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/formula-tools")"
-  printf 'export PLAYWRIGHT_BROWSERS_PATH=%s\n' "$(quote_env_value "$BUNDLE_ROOT/ms-playwright")"
-  printf 'export FLARESOLVERR_SOURCE_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/vendor/flaresolverr")"
-  printf 'export FLARESOLVERR_ENV_FILE=%s\n' "$(quote_env_value "$BUNDLE_ROOT/vendor/flaresolverr/.env.flaresolverr-source-$PRESET")"
-  printf 'export FLARESOLVERR_URL=%s\n' "$(quote_env_value "http://127.0.0.1:8191/v1")"
+  printf 'export CLOAKBROWSER_HEADLESS=%s\n' "$(quote_env_value "$(cloakbrowser_headless_value)")"
   printf '%s\n' "$MANAGED_END"
 }
 
@@ -425,10 +397,7 @@ write_fish_shell_block() {
   printf 'set -gx PAPER_FETCH_ENV_FILE %s\n' "$(quote_env_value "$OFFLINE_ENV_FILE")"
   printf 'set -gx PAPER_FETCH_DOWNLOAD_DIR %s\n' "$(quote_env_value "$BUNDLE_ROOT/downloads")"
   printf 'set -gx PAPER_FETCH_FORMULA_TOOLS_DIR %s\n' "$(quote_env_value "$BUNDLE_ROOT/formula-tools")"
-  printf 'set -gx PLAYWRIGHT_BROWSERS_PATH %s\n' "$(quote_env_value "$BUNDLE_ROOT/ms-playwright")"
-  printf 'set -gx FLARESOLVERR_SOURCE_DIR %s\n' "$(quote_env_value "$BUNDLE_ROOT/vendor/flaresolverr")"
-  printf 'set -gx FLARESOLVERR_ENV_FILE %s\n' "$(quote_env_value "$BUNDLE_ROOT/vendor/flaresolverr/.env.flaresolverr-source-$PRESET")"
-  printf 'set -gx FLARESOLVERR_URL %s\n' "$(quote_env_value "http://127.0.0.1:8191/v1")"
+  printf 'set -gx CLOAKBROWSER_HEADLESS %s\n' "$(quote_env_value "$(cloakbrowser_headless_value)")"
   printf '%s\n' "$MANAGED_END"
 }
 
@@ -695,7 +664,6 @@ uninstall_user_integrations() {
 
 write_managed_env_file() {
   local target="$1"
-  local preset_file="$BUNDLE_ROOT/vendor/flaresolverr/.env.flaresolverr-source-$PRESET"
   local tmp
   tmp="$(mktemp)"
 
@@ -716,10 +684,8 @@ write_managed_env_file() {
     printf '\n%s\n' "$MANAGED_BEGIN"
     printf 'PAPER_FETCH_DOWNLOAD_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/downloads")"
     printf 'PAPER_FETCH_FORMULA_TOOLS_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/formula-tools")"
-    printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$(quote_env_value "$BUNDLE_ROOT/ms-playwright")"
-    printf 'FLARESOLVERR_URL=%s\n' "$(quote_env_value "http://127.0.0.1:8191/v1")"
-    printf 'FLARESOLVERR_ENV_FILE=%s\n' "$(quote_env_value "$preset_file")"
-    printf 'FLARESOLVERR_SOURCE_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/vendor/flaresolverr")"
+    printf 'CLOAKBROWSER_HEADLESS=%s\n' "$(quote_env_value "$(cloakbrowser_headless_value)")"
+    printf '# CLOAKBROWSER_BINARY_PATH="/absolute/path/to/preinstalled/browser"\n'
     printf '%s\n' "$MANAGED_END"
   } >> "$tmp"
 
@@ -749,10 +715,7 @@ export PATH="\$INSTALL_ROOT/.venv/bin:\$INSTALL_ROOT/formula-tools/bin:\$PATH"
 export PAPER_FETCH_ENV_FILE=$offline_env_literal
 export PAPER_FETCH_DOWNLOAD_DIR="\$INSTALL_ROOT/downloads"
 export PAPER_FETCH_FORMULA_TOOLS_DIR="\$INSTALL_ROOT/formula-tools"
-export PLAYWRIGHT_BROWSERS_PATH="\$INSTALL_ROOT/ms-playwright"
-export FLARESOLVERR_SOURCE_DIR="\$INSTALL_ROOT/vendor/flaresolverr"
-export FLARESOLVERR_ENV_FILE="\$INSTALL_ROOT/vendor/flaresolverr/.env.flaresolverr-source-$PRESET"
-export FLARESOLVERR_URL="http://127.0.0.1:8191/v1"
+export CLOAKBROWSER_HEADLESS="\${CLOAKBROWSER_HEADLESS:-$(cloakbrowser_headless_value)}"
 export PYTHONUTF8="\${PYTHONUTF8:-1}"
 export PYTHONIOENCODING="\${PYTHONIOENCODING:-utf-8}"
 EOF
@@ -773,27 +736,33 @@ fi
 export PATH="$INSTALL_ROOT/.venv/bin:$INSTALL_ROOT/formula-tools/bin:$PATH"
 export PAPER_FETCH_DOWNLOAD_DIR="${PAPER_FETCH_DOWNLOAD_DIR:-$INSTALL_ROOT/downloads}"
 export PAPER_FETCH_FORMULA_TOOLS_DIR="${PAPER_FETCH_FORMULA_TOOLS_DIR:-$INSTALL_ROOT/formula-tools}"
-export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$INSTALL_ROOT/ms-playwright}"
-export FLARESOLVERR_SOURCE_DIR="${FLARESOLVERR_SOURCE_DIR:-$INSTALL_ROOT/vendor/flaresolverr}"
-export FLARESOLVERR_ENV_FILE="${FLARESOLVERR_ENV_FILE:-$INSTALL_ROOT/vendor/flaresolverr/.env.flaresolverr-source-__PRESET__}"
-export FLARESOLVERR_URL="${FLARESOLVERR_URL:-http://127.0.0.1:8191/v1}"
+export CLOAKBROWSER_HEADLESS="${CLOAKBROWSER_HEADLESS:-__CLOAKBROWSER_HEADLESS__}"
 export PYTHONUTF8="${PYTHONUTF8:-1}"
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 EOF
-    sed -i "s|__PRESET__|$PRESET|g" "$target"
+    sed -i "s|__CLOAKBROWSER_HEADLESS__|$(cloakbrowser_headless_value)|g" "$target"
   fi
   chmod +x "$target"
 }
 
-check_playwright_browser() {
+check_cloakbrowser_package() {
   local venv_python="$BUNDLE_ROOT/.venv/bin/python"
-  local executable
-  executable="$("$venv_python" -c 'from pathlib import Path; from playwright.sync_api import sync_playwright; p=sync_playwright().start(); path=p.chromium.executable_path; p.stop(); print(path)')"
-  [ -x "$executable" ] || die "Bundled Playwright Chromium executable is missing or not executable: $executable"
-  case "$executable" in
-    "$BUNDLE_ROOT"/ms-playwright/*) ;;
-    *) die "Playwright resolved Chromium outside the offline bundle: $executable" ;;
-  esac
+  "$venv_python" -c 'import cloakbrowser; assert hasattr(cloakbrowser, "launch")'
+  if [ -n "${CLOAKBROWSER_BINARY_PATH:-}" ] && [ ! -x "$CLOAKBROWSER_BINARY_PATH" ]; then
+    die "CLOAKBROWSER_BINARY_PATH is set but is not executable: $CLOAKBROWSER_BINARY_PATH"
+  fi
+}
+
+warm_cloakbrowser_runtime() {
+  local venv_python="$BUNDLE_ROOT/.venv/bin/python"
+  if [ -n "${CLOAKBROWSER_BINARY_PATH:-}" ]; then
+    log "Using preconfigured CLOAKBROWSER_BINARY_PATH; skipping CloakBrowser runtime download"
+    [ -x "$CLOAKBROWSER_BINARY_PATH" ] || die "CLOAKBROWSER_BINARY_PATH is set but is not executable: $CLOAKBROWSER_BINARY_PATH"
+    return 0
+  fi
+  log "Checking CloakBrowser runtime availability"
+  "$venv_python" -c 'import cloakbrowser; cloakbrowser.ensure_runtime()' \
+    || warn "CloakBrowser runtime warmup failed; first use may download it, or set CLOAKBROWSER_BINARY_PATH to a preinstalled binary."
 }
 
 run_smoke_checks() {
@@ -804,7 +773,7 @@ run_smoke_checks() {
   log "Running local smoke checks"
   "$BUNDLE_ROOT/.venv/bin/paper-fetch" --help >/dev/null
   "$BUNDLE_ROOT/formula-tools/bin/texmath" --help >/dev/null
-  check_playwright_browser
+  check_cloakbrowser_package
   for key in "${MCP_ENV_KEYS[@]}"; do
     env_args+=("$key=$(mcp_env_value "$key")")
   done
@@ -829,7 +798,7 @@ main() {
   project_wheel="$(find_project_wheel)"
 
   install_project_venv "$project_wheel"
-  install_flaresolverr_venv
+  warm_cloakbrowser_runtime
 
   if [ "$REUSE_ENV_FILE" = "1" ]; then
     log "Reusing offline.env without modifying it: $OFFLINE_ENV_FILE"
@@ -857,7 +826,8 @@ main() {
   echo "Offline installation complete."
   echo "Shell startup file updated: $SHELL_STARTUP_TARGET"
   echo "Open a new shell, or activate the current one with: source $BUNDLE_ROOT/activate-offline.sh"
-  echo "FlareSolverr preset: $BUNDLE_ROOT/vendor/flaresolverr/.env.flaresolverr-source-$PRESET"
+  echo "CloakBrowser headless: $(cloakbrowser_headless_value)"
+  echo "Optional runtime override: set CLOAKBROWSER_BINARY_PATH in $OFFLINE_ENV_FILE before first browser fetch."
   echo "Restart Codex, Claude Code, and Gemini CLI so they rescan skills and MCP registration."
   echo "Elsevier setup: request a key at https://dev.elsevier.com/, then add ELSEVIER_API_KEY=\"...\" to $OFFLINE_ENV_FILE before fetching Elsevier papers."
 }
