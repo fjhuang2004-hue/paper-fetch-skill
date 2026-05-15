@@ -150,3 +150,26 @@
 - first_pass_failed_test_ids: tests/live/test_live_publishers.py::LivePublisherTests::test_wiley_doi_live_fulltext
 - first_pass_failure: Wiley fulltext live assertion failed after `wiley_html_fail` but PDF/browser fallback and article path succeeded; retry passed.
 - retry_evidence: `1 passed in 26.66s`
+
+## Phase 7
+
+### 命名决定
+- `ProviderSpec.requires_browser_runtime`
+- `_BROWSER_RUNTIME_PROVIDER_NAMES`
+- `_REQUIRES_FLARESOLVERR_DEPRECATION_EMITTED`
+- `_warn_legacy_requires_flaresolverr`
+- `ProviderSpec.to_dict`
+- `ProviderClient.status`
+- `_build_provider_registry_compat`
+- `_install_provider_registry_compat`
+- `CLOAKBROWSER_BINARY_PATH_ENV_VAR`
+- `CLOAKBROWSER_USER_DATA_DIR_ENV_VAR`
+- `browser_runtime`
+
+### 签名决定
+- `ProviderSpec.to_dict(self) -> dict[str, object]`
+- `ProviderClient.status(self, env: Mapping[str, str] | None = None) -> ProviderStatusResult`
+
+### 判断性偏差
+- Phase 7 输入文件未包含 provider entry modules，因此在 `ProviderSpec.__post_init__` 中集中将 Wiley/Science/PNAS/AMS 以及旧 `requires_playwright=True` 声明提升为 `requires_browser_runtime=True`，避免改动输入范围外文件。
+- Phase 7 验收命令引用现有 `registry.py` 未提供的 `build_provider_registry().get(...).status(env)` 形态；为不修改输入范围外的 `registry.py`，在 `providers/base.py` 内安装兼容入口并新增 `ProviderClient.status` 适配。

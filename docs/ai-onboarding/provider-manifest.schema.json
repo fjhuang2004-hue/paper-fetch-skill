@@ -141,7 +141,7 @@
     "probe": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["env_requirements", "requires_playwright", "requires_flaresolverr"],
+      "required": ["env_requirements", "requires_playwright", "requires_browser_runtime", "requires_flaresolverr"],
       "properties": {
         "env_requirements": {
           "$ref": "#/$defs/string_array"
@@ -149,8 +149,12 @@
         "requires_playwright": {
           "type": "boolean"
         },
-        "requires_flaresolverr": {
+        "requires_browser_runtime": {
           "type": "boolean"
+        },
+        "requires_flaresolverr": {
+          "type": "boolean",
+          "deprecated": true
         },
         "ping_url": {
           "type": ["string", "null"],

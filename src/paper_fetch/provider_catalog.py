@@ -1,12 +1,14 @@
 """Static provider identity, routing, and capability catalog."""
 from __future__ import annotations
 from collections.abc import Iterator, Mapping as MappingABC
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import importlib
 from types import MappingProxyType
 from typing import Callable, Literal
+import warnings
 AssetDefault = Literal["none", "body", "all"]
 MetadataProbeShortCircuit = Callable[[str], dict | None]
+_BROWSER_RUNTIME_PROVIDER_NAMES = frozenset({"wiley", "science", "pnas", "ams"})
 @dataclass(frozen=True)
 class BodyTextThresholds:
     min_chars: int = 800
@@ -59,7 +61,37 @@ class ProviderSpec:
     body_text_thresholds: BodyTextThresholds = DEFAULT_BODY_TEXT_THRESHOLDS
     env_requirements: tuple[str, ...] = ()
     requires_playwright: bool = False
+    requires_browser_runtime: bool = False
     requires_flaresolverr: bool = False
+
+    def __post_init__(self) -> None:
+        if self.requires_flaresolverr and not self.requires_browser_runtime:
+            object.__setattr__(self, "requires_browser_runtime", True)
+            _warn_legacy_requires_flaresolverr()
+        if (
+            (self.requires_playwright or self.name in _BROWSER_RUNTIME_PROVIDER_NAMES)
+            and not self.requires_browser_runtime
+        ):
+            object.__setattr__(self, "requires_browser_runtime", True)
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+_REQUIRES_FLARESOLVERR_DEPRECATION_EMITTED = False
+
+
+def _warn_legacy_requires_flaresolverr() -> None:
+    global _REQUIRES_FLARESOLVERR_DEPRECATION_EMITTED
+    if _REQUIRES_FLARESOLVERR_DEPRECATION_EMITTED:
+        return
+    _REQUIRES_FLARESOLVERR_DEPRECATION_EMITTED = True
+    warnings.warn(
+        "ProviderSpec.requires_flaresolverr is deprecated; use "
+        "requires_browser_runtime for browser-backed provider status checks.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 _METADATA_PROBE_SHORT_CIRCUITS: dict[str, MetadataProbeShortCircuit] = {}
 _PROVIDER_CATALOG_CACHE: MappingABC[str, ProviderSpec] | None = None
 _SOURCE_PROVIDER_MAP_CACHE: MappingABC[str, str] | None = None

@@ -27,9 +27,8 @@ SKILL_ENVIRONMENT_VARIABLES: tuple[tuple[str, str], ...] = (
     ("ELSEVIER_API_KEY", "Required for official Elsevier full-text access."),
     ("ELSEVIER_INSTTOKEN", "Optional institution token for Elsevier entitlement."),
     ("WILEY_TDM_CLIENT_TOKEN", "Optional Wiley Text and Data Mining client token for the official Wiley PDF lane; browser PDF/ePDF fallback can still run without it when the local runtime is ready."),
-    ("FLARESOLVERR_URL", "Optional override for the local Wiley/Science/PNAS/AMS FlareSolverr endpoint; defaults to http://127.0.0.1:8191/v1."),
-    ("FLARESOLVERR_ENV_FILE", "Required for Science/PNAS/AMS and for Wiley HTML/browser PDF routes; points at a repo-local vendor/flaresolverr preset file."),
-    ("FLARESOLVERR_SOURCE_DIR", "Optional override for the repo-local vendor/flaresolverr directory."),
+    ("CLOAKBROWSER_HEADLESS", "Optional override (true/false) for the CloakBrowser browser runtime. Defaults to true."),
+    ("CLOAKBROWSER_TIMEOUT_MS", "Optional override for CloakBrowser per-request timeout. Defaults to 120000."),
     ("PAPER_FETCH_DOWNLOAD_DIR", "Overrides the default CLI/MCP download directory."),
     ("PAPER_FETCH_RUN_LIVE", "Test-only flag for live publisher integration checks."),
 )
@@ -88,17 +87,17 @@ def server_instructions() -> str:
         "official Elsevier API PDF lane before degrading to metadata-only, publishing "
         "`elsevier_xml` on XML success and `elsevier_pdf` on PDF fallback success. `springer` keeps a provider-managed direct HTML route "
         "with direct HTTP PDF fallback, publishing `springer_html` on HTML success and `springer_pdf` on PDF fallback success. `wiley` keeps "
-        "the repo-local FlareSolverr HTML route, then seeded-browser publisher PDF/ePDF "
+        "the CloakBrowser HTML route, then seeded-browser publisher PDF/ePDF "
         "fallback, and may still continue into the official Wiley TDM API PDF lane "
         "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing `wiley_browser`. `science`, "
-        "`pnas`, and `ams` require repo-local FlareSolverr/browser runtime but no legacy local "
+        "`pnas`, and `ams` require the local browser runtime but no legacy local "
         "rate-limit env vars; AMS publishes `ams_html` or `ams_pdf` and ignores `citation_xml_url`. `ieee` uses "
         "landing metadata, the Xplore dynamic HTML endpoint, and direct HTTP PDF fallback, "
         "publishing `ieee_html` or `ieee_pdf` when those routes return usable full text. `arxiv` uses "
         "arXiv ID-derived HTML first, optional API/HTML metadata merge, and text-only PDF fallback while publishing "
         "`arxiv_html` or `arxiv_pdf`. `copernicus` uses "
         "direct landing HTML to discover public NLM/JATS XML, then falls back to text-only PDF before metadata fallback, "
-        "requires no FlareSolverr or provider credentials, and publishes `copernicus_xml` or `copernicus_pdf`. "
+        "requires no browser runtime or provider credentials, and publishes `copernicus_xml` or `copernicus_pdf`. "
         "Elsevier PDF fallback currently returns text-only markdown even when "
         "`asset_profile` is `body` or `all`. On successful HTML/XML routes, "
         "`asset_profile='none'` disables local asset downloads but does not remove "
@@ -106,7 +105,7 @@ def server_instructions() -> str:
         "`asset_profile='body'` means provider-cleaned body figure/table/formula assets only, "
         "while `asset_profile='all'` additionally downloads supplementary files. "
         "Inline ImageContent still only comes from body figures. Wiley/Science/PNAS/AMS support "
-        "`asset_profile=body|all` on successful FlareSolverr HTML routes and "
+        "`asset_profile=body|all` on successful CloakBrowser HTML routes and "
         "prefer full-size/original figures before falling back to previews, while "
         "their PDF/ePDF fallback routes remain text-only. Springer, IEEE, arXiv, and Copernicus PDF fallback "
         "routes are also text-only in this version. "
@@ -143,23 +142,23 @@ def fetch_tool_description() -> str:
         "the official Elsevier API PDF lane before degrading to metadata-only, publishing "
         "`elsevier_xml` on XML success and `elsevier_pdf` on PDF fallback success. `springer` uses provider-managed direct HTML and direct "
         "HTTP PDF fallback, publishing `springer_html` or `springer_pdf`. `wiley` keeps "
-        "repo-local FlareSolverr HTML first, then seeded-browser publisher PDF/ePDF "
+        "CloakBrowser HTML first, then seeded-browser publisher PDF/ePDF "
         "fallback, and may still continue into the official Wiley TDM API PDF lane "
         "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing source "
         "`wiley_browser` on success. `science`, `pnas`, and `ams` routes use "
-        "provider-managed FlareSolverr HTML plus seeded-browser publisher PDF/ePDF repo-local "
+        "provider-managed browser runtime HTML plus seeded-browser publisher PDF/ePDF repo-local "
         "workflows; AMS publishes `ams_html` or `ams_pdf` and does not request `citation_xml_url` / `/doc/...xml`. `ieee` uses landing metadata, "
         "the Xplore dynamic HTML endpoint, and direct HTTP PDF fallback while publishing "
         "`ieee_html` or `ieee_pdf`. `arxiv` uses ID-derived official HTML first, optional API/HTML metadata merge, and text-only PDF "
         "fallback while publishing `arxiv_html` or `arxiv_pdf`. `copernicus` uses direct HTTP landing discovery, public NLM/JATS XML, "
-        "and text-only PDF fallback before metadata fallback while publishing `copernicus_xml` or `copernicus_pdf`; it does not need FlareSolverr or credentials. Elsevier PDF "
+        "and text-only PDF fallback before metadata fallback while publishing `copernicus_xml` or `copernicus_pdf`; it does not need browser runtime or credentials. Elsevier PDF "
         "fallback keeps body/all requests text-only. On successful HTML/XML routes, "
         "`asset_profile='none'` disables local asset downloads but keeps rendered "
         "remote Markdown image links when the provider can resolve them. "
         "`asset_profile='body'` means provider-cleaned body figure/table/formula assets only, "
         "while `asset_profile='all'` additionally downloads supplementary files; "
         "supplementary files are saved as assets but are not emitted as ImageContent. "
-        "Wiley/Science/PNAS/AMS support body/all assets on successful FlareSolverr HTML routes while keeping "
+        "Wiley/Science/PNAS/AMS support body/all assets on successful CloakBrowser HTML routes while keeping "
         "PDF/ePDF fallback text-only, and Springer/IEEE/arXiv/Copernicus PDF fallback is also text-only "
         "in this version. Set "
         "download_dir to isolate task-local downloads; the MCP server can also surface "

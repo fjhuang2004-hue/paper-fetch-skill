@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import importlib.machinery
-from pathlib import Path
 from typing import Any
 
+import pytest
+
 from paper_fetch.provider_catalog import ProviderSpec
+from paper_fetch.providers import _cloakbrowser
 from paper_fetch.providers._registry import ProviderBundle
 from paper_fetch.providers.base import ProviderClient
 from paper_fetch.reason_codes import NOT_CONFIGURED, OK, READY
@@ -15,6 +17,7 @@ def _catalog(
     *,
     env_requirements: tuple[str, ...] = (),
     requires_playwright: bool = False,
+    requires_browser_runtime: bool = False,
     requires_flaresolverr: bool = False,
 ) -> ProviderSpec:
     return ProviderSpec(
@@ -31,6 +34,7 @@ def _catalog(
         status_order=999,
         env_requirements=env_requirements,
         requires_playwright=requires_playwright,
+        requires_browser_runtime=requires_browser_runtime,
         requires_flaresolverr=requires_flaresolverr,
     )
 
@@ -94,18 +98,12 @@ def test_default_probe_status_env_present_is_ready(monkeypatch: Any) -> None:
     assert result.checks[0].status == OK
 
 
-def test_default_probe_status_checks_browser_requirements_without_runtime_probe(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
+def test_default_probe_status_checks_playwright_requirement(monkeypatch: Any) -> None:
     catalog = _catalog(
-        "s10_browser_requirements",
+        "s10_playwright_requirement",
         requires_playwright=True,
-        requires_flaresolverr=True,
     )
     _install_catalog(monkeypatch, catalog)
-    env_file = tmp_path / ".env.flaresolverr"
-    env_file.write_text("HEADLESS=true\n", encoding="utf-8")
     find_spec_calls: list[str] = []
 
     def fake_find_spec(name: str):
@@ -113,15 +111,56 @@ def test_default_probe_status_checks_browser_requirements_without_runtime_probe(
         return importlib.machinery.ModuleSpec(name, loader=None)
 
     monkeypatch.setattr("paper_fetch.providers.base.importlib.util.find_spec", fake_find_spec)
+    monkeypatch.setattr(_cloakbrowser, "_dependency_available", lambda: True)
 
-    result = _client(
-        catalog,
-        env={"FLARESOLVERR_ENV_FILE": str(env_file)},
-    ).probe_status()
+    result = _client(catalog).probe_status()
 
     checks = {check.name: check for check in result.checks}
     assert result.status == READY
     assert checks["playwright"].status == OK
-    assert checks["flaresolverr_config"].status == OK
     assert find_spec_calls == ["playwright.sync_api"]
-    assert checks["flaresolverr_config"].details["probe"] == "env_file_exists"
+
+
+def test_default_probe_status_checks_browser_runtime_without_launch(monkeypatch: Any) -> None:
+    catalog = _catalog(
+        "s10_browser_runtime",
+        requires_browser_runtime=True,
+    )
+    _install_catalog(monkeypatch, catalog)
+    monkeypatch.setattr(_cloakbrowser, "_dependency_available", lambda: True)
+
+    result = _client(catalog, env={"CLOAKBROWSER_HEADLESS": "true"}).probe_status()
+
+    checks = {check.name: check for check in result.checks}
+    assert result.status == READY
+    assert checks["browser_runtime"].status == OK
+    assert checks["browser_runtime"].details["probe"] == (
+        "paper_fetch.providers._cloakbrowser.probe_runtime_status"
+    )
+    assert [check["name"] for check in checks["browser_runtime"].details["checks"]] == [
+        "runtime_env",
+        "cloakbrowser_dependency",
+    ]
+
+
+def test_legacy_requires_flaresolverr_still_routes_to_browser_runtime(
+    monkeypatch: Any,
+) -> None:
+    with pytest.warns(DeprecationWarning, match="requires_flaresolverr"):
+        catalog = _catalog(
+            "s10_legacy_flaresolverr",
+            requires_flaresolverr=True,
+        )
+    assert catalog.requires_browser_runtime is True
+    assert catalog.to_dict()["requires_browser_runtime"] is True
+    assert catalog.to_dict()["requires_flaresolverr"] is True
+    _install_catalog(monkeypatch, catalog)
+    monkeypatch.setattr(_cloakbrowser, "_dependency_available", lambda: True)
+
+    result = _client(catalog, env={"CLOAKBROWSER_HEADLESS": "true"}).probe_status()
+
+    checks = {check.name: check for check in result.checks}
+    assert result.status == READY
+    assert checks["browser_runtime"].status == OK
+    assert checks["flaresolverr_config"].status == OK
+    assert checks["flaresolverr_config"].details["legacy_docs"] == "docs/flaresolverr.md"

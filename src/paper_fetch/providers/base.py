@@ -751,23 +751,42 @@ class ProviderClient:
                 )
             )
 
+        if catalog.requires_browser_runtime or catalog.requires_flaresolverr:
+            from . import _cloakbrowser
+
+            runtime_status = _cloakbrowser.probe_runtime_status(env, provider=self.name)
+            if runtime_status.status == ERROR:
+                browser_runtime_status = ERROR
+            elif runtime_status.status == READY:
+                browser_runtime_status = OK
+            else:
+                browser_runtime_status = NOT_CONFIGURED
+            checks.append(
+                build_provider_status_check(
+                    "browser_runtime",
+                    browser_runtime_status,
+                    (
+                        "CloakBrowser browser runtime is configured; browser launch is not probed."
+                        if browser_runtime_status == OK
+                        else "CloakBrowser browser runtime is not configured."
+                    ),
+                    missing_env=runtime_status.missing_env,
+                    details={
+                        "probe": "paper_fetch.providers._cloakbrowser.probe_runtime_status",
+                        "checks": [check.to_dict() for check in runtime_status.checks],
+                    },
+                ),
+            )
+
         if catalog.requires_flaresolverr:
-            env_file_value = str(env.get("FLARESOLVERR_ENV_FILE", "")).strip()
-            env_file = Path(env_file_value).expanduser() if env_file_value else None
-            flaresolverr_ready = env_file is not None and env_file.exists()
             checks.append(
                 build_provider_status_check(
                     "flaresolverr_config",
-                    OK if flaresolverr_ready else NOT_CONFIGURED,
-                    (
-                        "FlareSolverr env file is configured locally; service health is not probed."
-                        if flaresolverr_ready
-                        else "FLARESOLVERR_ENV_FILE must point to a local FlareSolverr preset."
-                    ),
-                    missing_env=[] if flaresolverr_ready else ["FLARESOLVERR_ENV_FILE"],
+                    OK,
+                    "Legacy FlareSolverr config is no longer required for status readiness.",
                     details={
-                        "env_file": str(env_file) if env_file is not None else None,
-                        "probe": "env_file_exists",
+                        "legacy": True,
+                        "legacy_docs": "docs/flaresolverr.md",
                     },
                 )
             )
@@ -800,3 +819,47 @@ class ProviderClient:
             missing_env=result_missing_env,
             checks=checks,
         )
+
+    def status(self, env: Mapping[str, str] | None = None) -> ProviderStatusResult:
+        previous_env = getattr(self, "env", None)
+        had_env = hasattr(self, "env")
+        if env is not None:
+            self.env = dict(env)
+        try:
+            result = self.probe_status()
+        finally:
+            if env is not None:
+                if had_env:
+                    self.env = previous_env
+                else:
+                    delattr(self, "env")
+        return replace(result, status=result.status.upper())
+
+
+def _build_provider_registry_compat(*args: Any, **kwargs: Any) -> dict[str, ProviderClient]:
+    from .registry import build_clients
+
+    return build_clients(*args, **kwargs)
+
+
+def _install_provider_registry_compat() -> None:
+    import sys
+
+    registry_module = sys.modules.get("paper_fetch.providers.registry")
+    if registry_module is None:
+        try:
+            from . import registry as registry_module
+        except Exception:
+            return
+    if registry_module is not None and not hasattr(
+        registry_module,
+        "build_provider_registry",
+    ):
+        setattr(
+            registry_module,
+            "build_provider_registry",
+            _build_provider_registry_compat,
+        )
+
+
+_install_provider_registry_compat()

@@ -18,7 +18,9 @@ DEFAULT_MCP_DOWNLOAD_DIR = DEFAULT_USER_DATA_DIR / "downloads"
 DEFAULT_CLI_DOWNLOAD_DIR = Path("live-downloads")
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_VENDOR_FLARESOLVERR_DIR = DEFAULT_REPO_ROOT / "vendor" / "flaresolverr"
+"""legacy; only consumed by paper_fetch.providers._flaresolverr."""
 DEFAULT_FLARESOLVERR_URL = "http://127.0.0.1:8191/v1"
+"""legacy; only consumed by paper_fetch.providers._flaresolverr."""
 
 DEFAULT_USER_AGENT = "paper-fetch-skill/1.4.1"
 USER_AGENT_ENV_VAR = "PAPER_FETCH_SKILL_USER_AGENT"
@@ -37,11 +39,17 @@ HTTP_DISK_CACHE_MAX_AGE_DAYS_ENV_VAR = "PAPER_FETCH_HTTP_DISK_CACHE_MAX_AGE_DAYS
 ASSET_DOWNLOAD_CONCURRENCY_ENV_VAR = "PAPER_FETCH_ASSET_DOWNLOAD_CONCURRENCY"
 DEFAULT_ASSET_DOWNLOAD_CONCURRENCY = 4
 FLARESOLVERR_URL_ENV_VAR = "FLARESOLVERR_URL"
+"""legacy; only consumed by paper_fetch.providers._flaresolverr."""
 FLARESOLVERR_ENV_FILE_ENV_VAR = "FLARESOLVERR_ENV_FILE"
+"""legacy; only consumed by paper_fetch.providers._flaresolverr."""
 FLARESOLVERR_SOURCE_DIR_ENV_VAR = "FLARESOLVERR_SOURCE_DIR"
+"""legacy; only consumed by paper_fetch.providers._flaresolverr."""
 FLARESOLVERR_KEEP_SESSION_ENV_VAR = "PAPER_FETCH_FLARESOLVERR_KEEP_SESSION"
+"""legacy; only consumed by paper_fetch.providers._flaresolverr."""
 CLOAKBROWSER_HEADLESS_ENV_VAR = "CLOAKBROWSER_HEADLESS"
 CLOAKBROWSER_TIMEOUT_MS_ENV_VAR = "CLOAKBROWSER_TIMEOUT_MS"
+CLOAKBROWSER_BINARY_PATH_ENV_VAR = "CLOAKBROWSER_BINARY_PATH"
+CLOAKBROWSER_USER_DATA_DIR_ENV_VAR = "CLOAKBROWSER_USER_DATA_DIR"
 
 
 def load_env_file(path: Path) -> dict[str, str]:
