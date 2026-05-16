@@ -662,6 +662,7 @@ PAPER_FETCH_ENV_FILE=/path/to/.env
 
 - 覆盖默认下载目录。
 - CLI 与 MCP 都会优先使用它。
+- CLI 会在开始抓取前创建该目录；MCP `download_dir` 仍按 cache/artifact scope 使用。
 
 #### `XDG_DATA_HOME`
 

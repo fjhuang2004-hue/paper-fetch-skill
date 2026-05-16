@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from paper_fetch import cli as paper_fetch_cli
+from paper_fetch.config import DOWNLOAD_DIR_ENV_VAR
 from paper_fetch import service as paper_fetch
 from paper_fetch.models import Asset, RenderOptions
 from paper_fetch.providers.base import ProviderFailure
@@ -225,6 +226,7 @@ class CliTests(unittest.TestCase):
         captured: dict[str, object] = {}
 
         def fake_fetch(*args, **kwargs):
+            self.assertTrue(output_dir.is_dir())
             captured.update(kwargs)
             return paper_fetch.build_fetch_envelope(article, modes=kwargs["modes"], render=kwargs["render"])
 
@@ -250,6 +252,91 @@ class CliTests(unittest.TestCase):
             self.assertEqual(stdout.getvalue(), "")
             self.assertEqual(captured["modes"], {"article", "markdown"})
             self.assertTrue((output_dir / "10.1016_test.md").exists())
+
+    def test_main_creates_env_download_dir_before_fetch(self) -> None:
+        article = sample_article()
+        captured: dict[str, object] = {}
+
+        def fake_fetch(*args, **kwargs):
+            self.assertTrue(output_dir.is_dir())
+            captured.update(kwargs)
+            return paper_fetch.build_fetch_envelope(article, modes=kwargs["modes"], render=kwargs["render"])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "env-downloads"
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with (
+                mock.patch.object(
+                    paper_fetch_cli,
+                    "build_runtime_env",
+                    return_value={DOWNLOAD_DIR_ENV_VAR: str(output_dir)},
+                ),
+                mock.patch.object(paper_fetch_cli, "fetch_paper", side_effect=fake_fetch),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = paper_fetch_cli.main(["--query", "10.1016/test"])
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIn("# Example Article", stdout.getvalue())
+            self.assertEqual(captured["context"].download_dir, output_dir)
+            self.assertTrue((output_dir / "10.1016_test.md").exists())
+
+    def test_main_rejects_output_dir_that_is_existing_file_before_fetch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "papers"
+            output_dir.write_text("not a directory", encoding="utf-8")
+            fetch_mock = mock.Mock(side_effect=AssertionError("fetch should not run"))
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+
+            with (
+                mock.patch.object(paper_fetch_cli, "build_runtime_env", return_value={}),
+                mock.patch.object(paper_fetch_cli, "fetch_paper", fetch_mock),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+            ):
+                exit_code = paper_fetch_cli.main(
+                    ["--query", "10.1016/test", "--output-dir", str(output_dir)]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(fetch_mock.call_count, 0)
+            payload = json.loads(stderr.getvalue())
+            self.assertEqual(payload["status"], "error")
+            self.assertIn("not a directory", payload["reason"])
+
+    def test_main_does_not_create_parent_for_explicit_output_file(self) -> None:
+        article = sample_article()
+        calls: list[str] = []
+
+        def fake_fetch(*args, **kwargs):
+            calls.append("fetch")
+            return paper_fetch.build_fetch_envelope(article, modes=kwargs["modes"], render=kwargs["render"])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "downloads"
+            output_path = Path(tmpdir) / "missing-parent" / "article.md"
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+
+            with (
+                mock.patch.object(paper_fetch_cli, "build_runtime_env", return_value={}),
+                mock.patch.object(paper_fetch_cli, "resolve_cli_download_dir", return_value=output_dir),
+                mock.patch.object(paper_fetch_cli, "fetch_paper", side_effect=fake_fetch),
+                contextlib.redirect_stdout(stdout),
+                contextlib.redirect_stderr(stderr),
+                self.assertRaises(FileNotFoundError),
+            ):
+                paper_fetch_cli.main(["--query", "10.1016/test", "--output", str(output_path)])
+
+            self.assertEqual(calls, ["fetch"])
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertFalse(output_path.parent.exists())
 
     def test_main_writes_json_and_both_to_output_dir_default_files_when_output_is_implicit(self) -> None:
         article = sample_article()
@@ -1134,19 +1221,22 @@ class CliTests(unittest.TestCase):
             query_file.write_text("\n# ignored\n10.1000/a\n\n10.1000/b\n", encoding="utf-8")
             stdout = io.StringIO()
             stderr = io.StringIO()
+            self.assertFalse(output_dir.exists())
 
             with (
                 mock.patch.object(paper_fetch_cli, "build_runtime_env", return_value={}),
-                mock.patch.object(paper_fetch_cli, "resolve_cli_download_dir", return_value=output_dir),
                 mock.patch.object(paper_fetch_cli, "fetch_paper", side_effect=fake_fetch),
                 contextlib.redirect_stdout(stdout),
                 contextlib.redirect_stderr(stderr),
             ):
-                exit_code = paper_fetch_cli.main(["--query-file", str(query_file)])
+                exit_code = paper_fetch_cli.main(
+                    ["--query-file", str(query_file), "--output-dir", str(output_dir)]
+                )
 
             self.assertEqual(exit_code, 0)
             self.assertEqual(stdout.getvalue(), "")
             self.assertEqual(stderr.getvalue(), "")
+            self.assertTrue(output_dir.is_dir())
             self.assertEqual(len(captured), 2)
             self.assertTrue((output_dir / "10.1000_a.md").exists())
             self.assertTrue((output_dir / "10.1000_b.md").exists())

@@ -178,6 +178,8 @@ paper-fetch --query "10.1016/test" \
 
 `--output-dir` 会覆盖本次命令的落盘目录。
 
+CLI 会在开始抓取前创建最终输出目录，包括显式 `--output-dir` 和 `PAPER_FETCH_DOWNLOAD_DIR` 指向的目录。如果该路径已存在但不是目录，命令会以普通错误退出。显式 `--output <path>` 只控制主输出文件，不会自动创建该文件的父目录。
+
 ## 错误输出
 
 运行时抓取失败会把 JSON 写到 stderr，stdout 不输出正文。常见形状：

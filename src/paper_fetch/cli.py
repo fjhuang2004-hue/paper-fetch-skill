@@ -6,6 +6,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,6 +29,10 @@ class SingleFetchResult:
     envelope: FetchEnvelope
     output_path: Path | None = None
     saved_markdown_path: Path | None = None
+
+
+class OutputDirectoryError(Exception):
+    """Raised when the CLI output directory cannot be prepared."""
 
 
 def save_markdown_to_disk(envelope: FetchEnvelope, *, output_dir: Path, render: RenderOptions) -> Path | None:
@@ -59,6 +64,19 @@ def write_output(serialized: str, output: str) -> None:
             sys.stdout.write("\n")
         return
     Path(output).write_text(serialized, encoding="utf-8")
+
+
+def prepare_output_dir(output_dir: Path) -> None:
+    if output_dir.exists() and not output_dir.is_dir():
+        raise OutputDirectoryError(f"output directory path exists but is not a directory: {output_dir}")
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise OutputDirectoryError(f"could not create output directory {output_dir}: {exc}") from exc
+    if not output_dir.is_dir():
+        raise OutputDirectoryError(f"output directory path exists but is not a directory: {output_dir}")
+    if not os.access(output_dir, os.W_OK | os.X_OK):
+        raise OutputDirectoryError(f"output directory is not writable: {output_dir}")
 
 
 def _has_explicit_option(argv: list[str], option: str) -> bool:
@@ -549,6 +567,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         runtime_env = build_runtime_env()
         output_dir = Path(args.output_dir) if args.output_dir else resolve_cli_download_dir(runtime_env)
+        prepare_output_dir(output_dir)
         if batch_mode:
             assert queries is not None
             return run_batch_fetch(
@@ -567,6 +586,9 @@ def main(argv: list[str] | None = None) -> int:
             artifact_mode=artifact_mode,
         )
         return 0
+    except OutputDirectoryError as exc:
+        sys.stderr.write(json.dumps(_error_payload(exc), ensure_ascii=False) + "\n")
+        return exit_code_for_error(exc)
     except PaperFetchFailure as exc:
         sys.stderr.write(json.dumps(_error_payload(exc), ensure_ascii=False) + "\n")
         return exit_code_for_error(exc)

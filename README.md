@@ -233,7 +233,7 @@ paper-fetch-mcp
 - `--format markdown|json|both` 指定 stdout、`--output` 或 `--output-dir` 默认主输出文件的序列化格式，默认是 `markdown`。
 - `--query-file <path>` 启用批量抓取，每行一个 DOI、URL 或标题；空行和以 `#` 开头的注释行会被忽略。批量模式不向 stdout 输出正文，而是把每篇主输出写到输出目录，并生成 JSONL 汇总。
 - `--output <path>` 把这份格式化结果写到指定文件；显式 `--output -` 表示打印到终端。
-- `--output-dir <dir>` 是默认主输出、Markdown、PDF fallback 来源文件和本地资产的保存目录；未显式传 `--output` 时，主输出会写到 `<doi>.md`、`<doi>.json` 或 `<doi>.both.json`，不再把正文打印到终端。
+- `--output-dir <dir>` 是默认主输出、Markdown、PDF fallback 来源文件和本地资产的保存目录；CLI 会在抓取前自动创建该目录，未显式传 `--output` 时，主输出会写到 `<doi>.md`、`<doi>.json` 或 `<doi>.both.json`，不再把正文打印到终端。
 - `--batch-concurrency <1..8>` 控制批量并发，默认 `1`；`--batch-results <path>` 可覆盖默认的 `<output-dir>/batch-results.jsonl`。
 - `--artifact-mode markdown-assets|all|none` 控制中间产物保留，CLI 默认是 `markdown-assets`：保存 Markdown、按 `--asset-profile` 保存资产，不保留 provider 原始 HTML/XML、fetch-envelope/cache JSON 或 HTTP textual cache；如果正文来自 PDF fallback，仍会保存 PDF 源文件便于溯源。
 - `--artifact-mode all` 保留旧行为：provider HTML/PDF、辅助 artifact、HTTP textual cache 等调试 artifact 都可落盘。
@@ -277,6 +277,8 @@ paper-fetch --query "10.1186/1471-2105-11-421" \
   --output ./papers/article.md \
   --output-dir ./papers
 ```
+
+显式 `--output <path>` 只控制主输出文件路径，不会自动创建该文件的父目录。
 
 安装脚本结束时会提示 Elsevier 官方 API 配置入口。抓取 Elsevier 全文前，需要从 <https://dev.elsevier.com/> 申请 key，并在配置文件中填写 `ELSEVIER_API_KEY`。
 
