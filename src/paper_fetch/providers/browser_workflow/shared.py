@@ -42,28 +42,6 @@ _BROWSER_WORKFLOW_DEP_FIELDS = (
     "_browser_workflow_image_download_candidates",
 )
 
-_LEGACY_FAST_BROWSER_FETCHER_ALIAS = "fetch_html_with_direct" "_playwright"
-
-_LEGACY_DEP_ALIASES = {
-    "fetch_html_with_flaresolverr": "fetch_html_with_browser",  # legacy alias
-    "warm_browser_context_with_flaresolverr": "warm_browser_context",  # legacy alias
-    "fetch_pdf_with_playwright": "fetch_pdf_with_browser",
-    _LEGACY_FAST_BROWSER_FETCHER_ALIAS: "fetch_html_with_fast_browser",
-    "_build_shared_playwright_file_fetcher": "_build_shared_browser_file_fetcher",
-    "_build_shared_playwright_image_fetcher": "_build_shared_browser_image_fetcher",
-}
-
-
-def _mark_legacy_html_fetcher(fetcher: Any) -> None:
-    marker = getattr(fetcher, "paper_fetch_html_fetcher_name", None)
-    if isinstance(marker, str):
-        return
-    try:
-        setattr(fetcher, "paper_fetch_html_fetcher_name", "flaresolverr")  # legacy
-    except Exception:
-        pass
-
-
 @dataclass(frozen=True, init=False)
 class BrowserWorkflowDeps:
     load_runtime_config: Callable[..., Any]
@@ -89,14 +67,6 @@ class BrowserWorkflowDeps:
 
     def __init__(self, **values: Any) -> None:
         values = dict(values)
-        for alias, target in _LEGACY_DEP_ALIASES.items():
-            if alias not in values:
-                continue
-            alias_value = values.pop(alias)
-            if alias == "fetch_html_with_flaresolverr":  # legacy alias
-                _mark_legacy_html_fetcher(alias_value)
-            values[target] = alias_value
-
         unknown = sorted(set(values) - set(_BROWSER_WORKFLOW_DEP_FIELDS))
         if unknown:
             unknown_display = ", ".join(unknown)
@@ -109,31 +79,6 @@ class BrowserWorkflowDeps:
 
         for name in _BROWSER_WORKFLOW_DEP_FIELDS:
             object.__setattr__(self, name, values[name])
-
-    @property
-    def fetch_html_with_flaresolverr(self) -> Callable[..., Any]:  # legacy alias
-        return self.fetch_html_with_browser
-
-    @property
-    def warm_browser_context_with_flaresolverr(self) -> Callable[..., Any]:  # legacy alias
-        return self.warm_browser_context
-
-    @property
-    def fetch_pdf_with_playwright(self) -> Callable[..., Any]:
-        return self.fetch_pdf_with_browser
-
-    @property
-    def _build_shared_playwright_file_fetcher(self) -> Callable[..., Any]:
-        return self._build_shared_browser_file_fetcher
-
-    @property
-    def _build_shared_playwright_image_fetcher(self) -> Callable[..., Any]:
-        return self._build_shared_browser_image_fetcher
-
-    def __getattr__(self, name: str) -> Callable[..., Any]:
-        if name == _LEGACY_FAST_BROWSER_FETCHER_ALIAS:
-            return self.fetch_html_with_fast_browser
-        raise AttributeError(f"{self.__class__.__name__!s} has no attribute {name!r}")
 
 
 def default_browser_workflow_deps() -> BrowserWorkflowDeps:
@@ -158,8 +103,8 @@ def default_browser_workflow_deps() -> BrowserWorkflowDeps:
     )
     from .bootstrap import bootstrap_browser_workflow
     from .fetchers import (
-        _build_shared_playwright_file_fetcher,
-        _build_shared_playwright_image_fetcher,
+        _build_shared_browser_file_fetcher,
+        _build_shared_browser_image_fetcher,
     )
     from .html_extraction import (
         _cached_browser_workflow_markdown,
@@ -178,8 +123,8 @@ def default_browser_workflow_deps() -> BrowserWorkflowDeps:
         download_assets=download_assets,
         split_body_and_supplementary_assets=split_body_and_supplementary_assets,
         bootstrap_browser_workflow=bootstrap_browser_workflow,
-        _build_shared_browser_file_fetcher=_build_shared_playwright_file_fetcher,
-        _build_shared_browser_image_fetcher=_build_shared_playwright_image_fetcher,
+        _build_shared_browser_file_fetcher=_build_shared_browser_file_fetcher,
+        _build_shared_browser_image_fetcher=_build_shared_browser_image_fetcher,
         extract_atypon_browser_workflow_markdown=extract_atypon_browser_workflow_markdown,
         pdf_browser_context_seed=warm_browser_context,
         refresh_browser_context_seed=warm_browser_context,
@@ -189,11 +134,6 @@ def default_browser_workflow_deps() -> BrowserWorkflowDeps:
         _assets_matching_download_failures=_assets_matching_download_failures,
         _browser_workflow_image_download_candidates=_browser_workflow_image_download_candidates,
     )
-
-
-def default_browser_workflow_deps_with_legacy_aliases() -> BrowserWorkflowDeps:
-    """返回带旧属性别名的默认依赖，仅供迁移期旧测试使用。"""
-    return default_browser_workflow_deps()
 
 
 def preferred_html_candidate_from_landing_page(

@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Collection, Mapping, Sequence
+
+from ..utils import normalize_text
+from ._retry_categories import (
+    DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
+    NETWORK_RETRYABLE_REASON_TOKENS,
+)
 
 
 @dataclass(frozen=True)
@@ -29,6 +35,26 @@ def _matches_failure(
     asset_key = policy.key_fn(asset)
     failure_key = policy.key_fn(failure)
     return _has_key_value(asset_key) and asset_key == failure_key
+
+
+def is_retryable_asset_failure(
+    failure: Mapping[str, Any],
+    *,
+    retryable_error_categories: Collection[
+        str
+    ] = DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
+    retryable_reason_tokens: Sequence[str] = NETWORK_RETRYABLE_REASON_TOKENS,
+    non_retryable_reason_tokens: Sequence[str] = ("unsupported asset url scheme",),
+) -> bool:
+    if failure.get("status") is not None:
+        return False
+    error_category = normalize_text(str(failure.get("error_category") or "")).lower()
+    if error_category:
+        return error_category in retryable_error_categories
+    reason = normalize_text(str(failure.get("reason") or "")).lower()
+    if not reason or any(token in reason for token in non_retryable_reason_tokens):
+        return False
+    return any(token in reason for token in retryable_reason_tokens)
 
 
 def merge_asset_retry_results(

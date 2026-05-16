@@ -43,7 +43,7 @@ class ProviderBrowserProfile:
     crossref_pdf_position: int
     markdown_publisher: str
     fallback_author_extractor: Callable[[str], list[str]] | None
-    shared_playwright_image_fetcher: bool
+    shared_browser_image_fetcher: bool
     direct_playwright_html_preflight: bool = False
 
 
@@ -65,6 +65,6 @@ def make_atypon_browser_profile(
         crossref_pdf_position=provider_crossref_pdf_position(name),
         markdown_publisher=name,
         fallback_author_extractor=fallback_author_extractor,
-        shared_playwright_image_fetcher=True,
+        shared_browser_image_fetcher=True,
         direct_playwright_html_preflight=direct_playwright_html_preflight,
     )

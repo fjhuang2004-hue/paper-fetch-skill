@@ -483,15 +483,14 @@ class BrowserWorkflowClient(ProviderClient):
         if (
             not request["attempt_body_assets"]
             or profile is None
-            or not profile.shared_playwright_image_fetcher
+            or not profile.shared_browser_image_fetcher
         ):
             return None
-        fetcher = self.deps._build_shared_playwright_image_fetcher(
+        fetcher = self.deps._build_shared_browser_image_fetcher(
             browser_context_seed_getter=request["browser_context_seed_getter"],
             seed_urls_getter=request["seed_urls_getter"],
             browser_user_agent=request["browser_user_agent"],
             headless=request["headless"],
-            challenge_recovery=request["challenge_recovery"],
             runtime_context=context,
             use_runtime_shared_browser=False,
         )
@@ -502,15 +501,14 @@ class BrowserWorkflowClient(ProviderClient):
         if (
             not request["attempt_supplementary_assets"]
             or profile is None
-            or not profile.shared_playwright_image_fetcher
+            or not profile.shared_browser_image_fetcher
         ):
             return None
-        return self.deps._build_shared_playwright_file_fetcher(
+        return self.deps._build_shared_browser_file_fetcher(
             browser_context_seed_getter=request["browser_context_seed_getter"],
             seed_urls_getter=request["seed_urls_getter"],
             browser_user_agent=request["browser_user_agent"],
             headless=request["headless"],
-            challenge_recovery=request["challenge_recovery"],
             runtime_context=context,
             use_runtime_shared_browser=False,
             thread_local=True,

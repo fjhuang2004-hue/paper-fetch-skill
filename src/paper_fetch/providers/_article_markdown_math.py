@@ -182,10 +182,6 @@ def render_inline_formula(element: ET.Element | None) -> str:
     return normalize_compact_text("".join(element.itertext()))
 
 
-def render_display_formula(element: ET.Element | None) -> list[str]:
-    return render_display_formula_result(element).lines
-
-
 def render_display_formula_result(element: ET.Element | None) -> FormulaRenderResult:
     if element is None:
         return FormulaRenderResult(lines=[])

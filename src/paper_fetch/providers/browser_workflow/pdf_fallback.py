@@ -9,7 +9,7 @@ from ...runtime import RuntimeContext
 from ...tracing import trace_from_markers
 from ...reason_codes import PDF_FALLBACK
 from ..base import ProviderContent, RawFulltextPayload
-from .fetchers import _choose_playwright_seed_url
+from .fetchers import _choose_browser_seed_url
 from .shared import BrowserWorkflowDeps, default_browser_workflow_deps
 
 
@@ -44,7 +44,7 @@ def fetch_seeded_browser_pdf_payload(
         config=runtime,
         browser_context_seed=browser_context_seed,
     )
-    seed_url = _choose_playwright_seed_url(
+    seed_url = _choose_browser_seed_url(
         (browser_context_seed or {}).get("browser_final_url"),
         html_candidates[0] if html_candidates else None,
         landing_page_url,

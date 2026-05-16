@@ -6,7 +6,9 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
-_No unreleased changes._
+### Changed
+
+- arXiv HTML asset handling now recovers figure assets from the arXiv e-print source package when official HTML exposes only missing-image placeholders; source PDF figures are rendered to PNG assets and inserted back near their figure captions while full-text extraction remains official-HTML first.
 
 ## 1.4.1 - 2026-05-15
 

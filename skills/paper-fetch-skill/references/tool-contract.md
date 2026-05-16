@@ -8,7 +8,7 @@
 - `fetch_paper(...)`: 返回稳定 JSON 载荷，顶层包含溯源信息、`token_estimate_breakdown={abstract,body,refs}`，并按需附带 `article`、`markdown`、`metadata`；当 `save_markdown=true` 时，响应会改为紧凑结果，只保留路径、元数据和诊断字段。
 - `list_cached()` / `get_cached(doi)`: 多轮会话重新抓取前先检查缓存。
 - `has_fulltext(query)`: 使用解析结果、Crossref 元数据、轻量 Elsevier 元数据探测和落地页 HTML meta 做低成本全文可用性探测，不触发完整抓取流程。
-- `provider_status()`: 返回 `crossref`、`elsevier`、`springer`、`wiley`、`science`、`pnas`、`ieee` 的本地诊断信息，不调用远程出版商 API。
+- `provider_status()`: 按 runtime `provider_status_order()` 返回 provider catalog 中每个 provider 的本地诊断信息，不调用远程出版商 API。
 - `batch_resolve(queries, concurrency)` / `batch_check(queries, mode, concurrency)`: 默认 `concurrency=1`，允许范围 `1..8`，每次最多 `50` 个查询。
 - `summarize_paper(query, focus)` / `verify_citation_list(citations, mode)`: MCP prompt 模板；支持的宿主可直接用于单篇总结和 citation list 分诊。
 
@@ -49,6 +49,7 @@
 - `springer` 使用 provider-managed direct HTML 和 direct HTTP PDF fallback，公开 source 保持 `springer_html`。
 - `wiley` 使用 CloakBrowser HTML 路径，并可在配置 `WILEY_TDM_CLIENT_TOKEN` 时启用官方 TDM API PDF 通道；公开 source 为 `wiley_browser`。
 - `science` 与 `pnas` 使用 provider-managed CloakBrowser HTML 加 CloakBrowser-seeded publisher PDF/ePDF workflow，并保持现有公开 source 名称。
+- `ams` 使用 provider-managed CloakBrowser HTML 加 CloakBrowser-seeded publisher PDF fallback；HTML 成功公开 `ams_html`，PDF fallback 成功公开 `ams_pdf`。
 - `ieee` 使用 landing metadata / article number、Xplore dynamic HTML endpoint、direct HTTP PDF fallback 和 seeded-browser PDF fallback；HTML 成功公开 `ieee_html`，PDF fallback 成功公开 `ieee_pdf`，非 PDF wrapper/access/challenge 页面必须 fail closed 到 abstract-only / metadata-only。
-- Wiley / Science / PNAS 在 HTML 成功路径下支持 `asset_profile="body"` / `"all"` 资源下载；PDF/ePDF 回退路径仍然只返回文本。
+- Wiley / Science / PNAS / AMS 在 HTML 成功路径下支持 `asset_profile="body"` / `"all"` 资源下载；PDF/ePDF 回退路径仍然只返回文本。
 - Elsevier PDF fallback、Springer PDF fallback 和 IEEE PDF fallback 在当前版本也保持 text-only。

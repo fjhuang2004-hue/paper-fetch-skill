@@ -25,33 +25,6 @@ class ElsevierTableRenderResult:
     note: str | None = None
 
 
-def collect_elsevier_table_rows(parent: ET.Element | None) -> list[list[str]]:
-    if parent is None:
-        return []
-
-    rows: list[list[str]] = []
-    for row in list(parent):
-        if not isinstance(row.tag, str) or xml_local_name(row.tag) != "row":
-            continue
-        cells: list[str] = []
-        for entry in list(row):
-            if not isinstance(entry.tag, str) or xml_local_name(entry.tag) != "entry":
-                continue
-            cells.append(normalize_table_cell_text(render_inline_text(entry)))
-        if cells:
-            rows.append(cells)
-    return rows
-
-
-def elsevier_table_has_spans(table: ET.Element) -> bool:
-    for node in table.iter():
-        if not isinstance(node.tag, str) or xml_local_name(node.tag) != "entry":
-            continue
-        if node.get("namest") or node.get("nameend") or node.get("morerows"):
-            return True
-    return False
-
-
 def _elsevier_table_rows_in_order(tgroup: ET.Element | None) -> tuple[list[ET.Element], list[ET.Element]]:
     header_rows: list[ET.Element] = []
     body_rows: list[ET.Element] = []
@@ -197,10 +170,6 @@ def resolve_elsevier_table_key(table: ET.Element | None) -> str:
     if locator:
         return locator
     return ""
-
-
-def render_elsevier_table_rows(table: ET.Element | None) -> list[list[str]]:
-    return render_elsevier_table_result(table).rows
 
 
 def extract_elsevier_table_footnotes(table: ET.Element) -> list[str]:

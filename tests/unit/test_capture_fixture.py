@@ -195,7 +195,7 @@ def test_capture_fixture_skips_manifest_null_doi(tmp_path: Path, monkeypatch: py
     assert not (tmp_path / "tests").exists()
 
 
-def test_capture_fixture_retries_403_with_flaresolverr_placeholder(
+def test_capture_fixture_retries_403_with_browser_placeholder(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -208,11 +208,11 @@ def test_capture_fixture_retries_403_with_flaresolverr_placeholder(
     monkeypatch.setattr(module, "HttpTransport", ForbiddenTransport)
 
     with pytest.raises(module.CaptureFixtureError) as exc_info:
-        module.capture_fixture(_args(tmp_path, retry_via="flaresolverr"))
+        module.capture_fixture(_args(tmp_path, retry_via="browser"))
 
-    assert exc_info.value.code == "FLARESOLVERR_REQUIRED"
+    assert exc_info.value.code == "BROWSER_RUNTIME_REQUIRED"
     assert exc_info.value.previous_code == "HTTP_FORBIDDEN"
-    assert exc_info.value.route == "flaresolverr"
+    assert exc_info.value.route == "browser"
     assert not (tmp_path / "tests").exists()
 
 

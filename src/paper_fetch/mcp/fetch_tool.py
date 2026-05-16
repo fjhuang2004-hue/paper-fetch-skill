@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections.abc import Callable, Mapping
 import mimetypes
 from pathlib import Path
 import threading
-from typing import Any, Mapping
+from typing import Any
 
 from mcp.server.fastmcp import Context
 from mcp.types import CallToolResult, ImageContent, TextContent
@@ -147,24 +148,6 @@ def _call_service_probe_has_fulltext(query: str, *, context: RuntimeContext, dep
     return deps.service_probe_has_fulltext(query, context=context)
 
 
-def _call_service_fetch_paper(
-    query: str,
-    *,
-    modes: set[str],
-    strategy,
-    render,
-    context: RuntimeContext,
-    deps: MCPDeps = default_mcp_deps(),
-) -> FetchEnvelope:
-    return deps.service_fetch_paper(
-        query,
-        modes=modes,
-        strategy=strategy,
-        render=render,
-        context=context,
-    )
-
-
 def _fetch_paper_envelope(
     request: FetchPaperRequest,
     *,
@@ -173,6 +156,7 @@ def _fetch_paper_envelope(
     transport: HttpTransport | None,
     include_article_for_assets: bool,
     context: RuntimeContext | None = None,
+    cancel_check: Callable[[], bool] | None = None,
     deps: MCPDeps = default_mcp_deps(),
 ) -> FetchEnvelope:
     runtime_env = dict(context.env) if context is not None and context.env is not None else deps.build_runtime_env(env)
@@ -202,6 +186,7 @@ def _fetch_paper_envelope(
             env=runtime_env,
             transport=transport,
             context=context,
+            cancel_check=cancel_check,
             download_dir=cache_download_dir,
             artifact_mode=request.artifact_mode,
             no_download=request.no_download,
@@ -529,57 +514,6 @@ def has_fulltext_tool(
         return _tool_result(error_payload_from_exception(error), is_error=True)
 
 
-def fetch_paper_tool(
-    *,
-    query: str,
-    modes: list[str] | None = None,
-    strategy: FetchStrategyInput | Mapping[str, Any] | None = None,
-    include_refs: str | None = None,
-    max_tokens: int | str = "full_text",
-    prefer_cache: bool = False,
-    no_download: bool = False,
-    artifact_mode: ArtifactMode = "markdown-assets",
-    save_markdown: bool = False,
-    markdown_output_dir: str | None = None,
-    markdown_filename: str | None = None,
-    env: Mapping[str, str] | None = None,
-    download_dir: Path | None | object = _MCP_DEFAULT_DOWNLOAD_DIR,
-    deps: MCPDeps = default_mcp_deps(),
-) -> CallToolResult:
-    try:
-        request = FetchPaperRequest(
-            query=query,
-            modes=modes,
-            strategy=strategy,
-            include_refs=include_refs,
-            max_tokens=max_tokens,
-            prefer_cache=prefer_cache,
-            no_download=no_download,
-            artifact_mode=artifact_mode,
-            save_markdown=save_markdown,
-            markdown_output_dir=markdown_output_dir,
-            markdown_filename=markdown_filename,
-        )
-        envelope = deps.fetch_paper_envelope(
-            request,
-            env=env,
-            download_dir=download_dir,
-            transport=None,
-            include_article_for_assets=True,
-            deps=deps,
-        )
-        saved_markdown_path = _save_markdown_for_fetch_request(
-            envelope,
-            request,
-            env=env,
-            download_dir=download_dir,
-            deps=deps,
-        )
-        return build_fetch_tool_result(envelope, request, saved_markdown_path=saved_markdown_path)
-    except Exception as error:
-        return _tool_result(error_payload_from_exception(error), is_error=True)
-
-
 def provider_status_tool(
     *,
     env: Mapping[str, str] | None = None,
@@ -630,12 +564,7 @@ async def fetch_paper_tool_async(
 
     await report_progress(ctx, 1, _FETCH_PROGRESS_TOTAL, "Fetching paper content")
     cancelled = threading.Event()
-    runtime_context = RuntimeContext(
-        env=deps.build_runtime_env(env),
-        artifact_mode="none" if request.no_download else request.artifact_mode,
-        cancel_check=cancelled.is_set,
-    )
-    transport = runtime_context.transport
+    runtime_env = deps.build_runtime_env(env)
     try:
         loop = asyncio.get_running_loop()
         bridge = PaperFetchLogBridge(ctx=ctx, loop=loop) if ctx is not None else None
@@ -643,10 +572,11 @@ async def fetch_paper_tool_async(
             envelope = await run_blocking_call(
                 deps.fetch_paper_envelope,
                 request,
-                env=runtime_context.env,
+                env=runtime_env,
                 download_dir=download_dir,
-                transport=transport,
+                transport=None,
                 include_article_for_assets=True,
+                cancel_check=cancelled.is_set,
                 deps=deps,
                 max_workers=1,
                 cancel_event=cancelled,
@@ -656,10 +586,11 @@ async def fetch_paper_tool_async(
                 envelope = await run_blocking_call(
                     deps.fetch_paper_envelope,
                     request,
-                    env=runtime_context.env,
+                    env=runtime_env,
                     download_dir=download_dir,
-                    transport=transport,
+                    transport=None,
                     include_article_for_assets=True,
+                    cancel_check=cancelled.is_set,
                     deps=deps,
                     max_workers=1,
                     cancel_event=cancelled,
@@ -668,9 +599,8 @@ async def fetch_paper_tool_async(
         saved_markdown_path = _save_markdown_for_fetch_request(
             envelope,
             request,
-            env=runtime_context.env,
+            env=runtime_env,
             download_dir=download_dir,
-            context=runtime_context,
             deps=deps,
         )
         result = build_fetch_tool_result(envelope, request, saved_markdown_path=saved_markdown_path)

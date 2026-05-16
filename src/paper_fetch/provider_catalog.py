@@ -282,9 +282,3 @@ def doi_prefix_provider_map() -> dict[str, str]:
         for spec in ordered_provider_specs()
         for prefix in spec.doi_prefixes
     }
-def url_provider_tokens() -> dict[str, tuple[str, ...]]:
-    return {
-        spec.name: spec.domains + spec.domain_suffixes
-        for spec in ordered_provider_specs()
-        if spec.domains or spec.domain_suffixes
-    }

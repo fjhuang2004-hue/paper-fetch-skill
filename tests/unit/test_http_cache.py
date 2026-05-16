@@ -20,6 +20,8 @@ from paper_fetch.providers import base as provider_base
 from paper_fetch.runtime import RuntimeContext
 import urllib3
 
+from ._logging_support import RecordCaptureHandler
+
 warnings.filterwarnings(
     "ignore",
     message=r"Implicitly cleaning up <HTTPError 429: 'HTTP 429'>",
@@ -72,15 +74,6 @@ def build_http_error(url: str, *, status: int, headers: dict[str, str] | None = 
 
 def lower_header_map(headers: dict[str, str]) -> dict[str, str]:
     return {key.lower(): value for key, value in headers.items()}
-
-
-class RecordCaptureHandler(logging.Handler):
-    def __init__(self) -> None:
-        super().__init__(level=logging.DEBUG)
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
 
 
 class HttpTransportCacheTests(unittest.TestCase):

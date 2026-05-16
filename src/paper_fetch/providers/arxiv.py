@@ -22,7 +22,6 @@ from ..extraction.html.provider_rules import ProviderHtmlRules
 from ..http import (
     DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
     HttpTransport,
-    PDF_ACCEPT_HEADER,
     PDF_MIME_TYPE,
     RequestFailure,
 )
@@ -38,6 +37,8 @@ from ._arxiv_assets import (
     ARXIV_IMAGE_ACCEPT,
     _arxiv_asset_download_concurrency,
     _asset_has_download_candidate,
+    download_arxiv_source_figure_assets,
+    inline_arxiv_source_assets_in_markdown,
 )
 from ._arxiv_atom import (
     ARXIV_API_DELAY_SECONDS,
@@ -56,6 +57,7 @@ from ._arxiv_metadata import (
 )
 from ._payloads import build_provider_payload
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
+from ._pdf_common import default_pdf_headers
 from ._registry import ProviderBundle, register_provider_bundle
 from ._waterfall import (
     DEFAULT_WATERFALL_CONTINUE_CODES,
@@ -171,13 +173,7 @@ class ArxivClient(ProviderClient):
         }
 
     def _pdf_headers(self, *, referer: str | None = None) -> dict[str, str]:
-        headers = {
-            "Accept": PDF_ACCEPT_HEADER,
-            "User-Agent": self.user_agent,
-        }
-        if referer:
-            headers["Referer"] = referer
-        return headers
+        return default_pdf_headers(self.user_agent, referer=referer)
 
     def fetch_metadata(self, query: Mapping[str, str | None]) -> ProviderMetadata:
         arxiv_id = (
@@ -463,13 +459,6 @@ class ArxivClient(ProviderClient):
         ).lower()
         if route_kind != "html":
             return empty_asset_results()
-        extracted_assets = [
-            dict(item)
-            for item in (content.extracted_assets if content is not None else [])
-            if _asset_has_download_candidate(item)
-        ]
-        if not extracted_assets:
-            return empty_asset_results()
         merged_metadata = (
             content.merged_metadata
             if content is not None
@@ -479,6 +468,26 @@ class ArxivClient(ProviderClient):
             str((merged_metadata or {}).get("arxiv_id") or "")
         ) or _arxiv_id_from_metadata_or_doi(doi, merged_metadata or {})
         article_id = arxiv_id or normalize_text(doi) or raw_payload.source_url
+        extracted_assets = [
+            dict(item)
+            for item in (content.extracted_assets if content is not None else [])
+            if _asset_has_download_candidate(item)
+        ]
+        if not extracted_assets:
+            article_html = bytes(
+                content.body if content is not None else raw_payload.body or b""
+            ).decode("utf-8", errors="replace")
+            return download_arxiv_source_figure_assets(
+                self.transport,
+                arxiv_id=arxiv_id,
+                article_id=article_id,
+                article_html=article_html,
+                source_url=normalize_text(
+                    content.source_url if content is not None else raw_payload.source_url
+                ),
+                output_dir=output_dir,
+                user_agent=self.user_agent,
+            )
         asset_download_concurrency = _arxiv_asset_download_concurrency(context.env)
         initial_result = html_assets.download_assets(
             html_assets.FIGURE_KIND,
@@ -556,6 +565,9 @@ class ArxivClient(ProviderClient):
         markdown_text = str(
             (content.markdown_text if content is not None else "") or ""
         ).strip()
+        markdown_text = inline_arxiv_source_assets_in_markdown(
+            markdown_text, downloaded_assets
+        )
         default_route = PDF_FALLBACK if route == PDF_FALLBACK else "html"
         trace = list(
             raw_payload.trace

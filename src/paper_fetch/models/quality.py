@@ -293,19 +293,6 @@ def _quality_body_metrics(
     )
 
 
-def _diagnostic_signals(value: Mapping[str, Any] | None) -> list[str]:
-    if not isinstance(value, Mapping):
-        return []
-    signals = [
-        normalize_text(value.get("reason")).lower(),
-        *[normalize_text(item).lower() for item in value.get("blocking_fallback_signals") or []],
-        *[normalize_text(item).lower() for item in value.get("hard_negative_signals") or []],
-        *[normalize_text(item).lower() for item in value.get("soft_positive_signals") or []],
-        *[normalize_text(item).lower() for item in value.get("strong_positive_signals") or []],
-    ]
-    return [signal for signal in signals if signal]
-
-
 def _diagnostic_access_gate_signals(value: Mapping[str, Any] | None) -> list[str]:
     if not isinstance(value, Mapping):
         return []

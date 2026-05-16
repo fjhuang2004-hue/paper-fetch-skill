@@ -12,13 +12,14 @@ from typing import Any, Mapping
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS
 from ..metadata.types import MetadataMergeRule, merge_metadata_layers
 from ..models import article_from_markdown, metadata_only_article
-from ..publisher_identity import DOI_PATTERN, normalize_doi
+from ..publisher_identity import normalize_doi
 from ..reason_codes import PDF_FALLBACK
 from ..tracing import fulltext_marker, trace_from_markers
 from ..utils import dedupe_authors, normalize_text, strip_html_tags
 from ._asset_retry import merge_asset_retry_results
 from ._html_authors import AuthorExtractionPipeline, AuthorStep
 from ._ieee_url import IEEE_REFERENCES_URL_TEMPLATE, _article_number_from_metadata, _article_number_from_url
+from ._reference_doi import reference_doi_match as _reference_doi_match
 from ._script_json import extract_assignment_json
 
 IEEE_METADATA_ASSIGNMENT = "xplGlobal.document.metadata"
@@ -253,13 +254,6 @@ def _parse_landing_metadata(html_text: str) -> dict[str, Any]:
             if value not in (None, ""):
                 metadata[key] = value
     return metadata
-
-
-def _reference_doi_match(value: str) -> re.Match[str] | None:
-    for match in DOI_PATTERN.finditer(value):
-        if match.start() == 0 or not value[match.start() - 1].isalnum():
-            return match
-    return None
 
 
 def _reference_doi_from_ieee_reference(item: Mapping[str, Any]) -> str:

@@ -16,7 +16,7 @@ from ..reason_codes import NO_RESULT
 from ..runtime import RuntimeContext
 from ..utils import normalize_text
 from ._html_section_markdown import render_container_markdown
-from ._asset_retry import AssetRetryPolicy
+from ._asset_retry import AssetRetryPolicy, is_retryable_asset_failure
 from ._ieee_block_page import _looks_like_ieee_block_page
 from ._ieee_supplementary import (
     _extract_ieee_supplementary_assets,
@@ -29,10 +29,6 @@ from ._ieee_url import (
     _absolute_ieee_asset_url,
     _ieee_asset_url_path,
     _is_ignored_ieee_asset_url,
-)
-from ._retry_categories import (
-    DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
-    NETWORK_RETRYABLE_REASON_TOKENS,
 )
 from .base import ProviderFailure
 
@@ -71,22 +67,10 @@ def _ieee_asset_retry_key(asset: Mapping[str, Any]) -> tuple[Any, ...]:
     return ("",)
 
 
-def _ieee_retryable_asset_failure(failure: Mapping[str, Any]) -> bool:
-    if failure.get("status") is not None:
-        return False
-    error_category = normalize_text(str(failure.get("error_category") or "")).lower()
-    if error_category:
-        return error_category in DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES
-    reason = normalize_text(str(failure.get("reason") or "")).lower()
-    if not reason or "unsupported asset url scheme" in reason:
-        return False
-    return any(token in reason for token in NETWORK_RETRYABLE_REASON_TOKENS)
-
-
 IEEE_ASSET_RETRY_POLICY = AssetRetryPolicy(
     name="ieee",
     key_fn=_ieee_asset_retry_key,
-    retryable_failure=_ieee_retryable_asset_failure,
+    retryable_failure=is_retryable_asset_failure,
 )
 
 
@@ -284,14 +268,6 @@ def _ieee_asset_has_ignored_url(asset: Mapping[str, Any]) -> bool:
         if value and _is_ignored_ieee_asset_url(value):
             return True
     return False
-
-
-def _ieee_asset_dedupe_key(asset: Mapping[str, Any]) -> str:
-    for field in ("full_size_url", "url", "download_url", "source_url", "preview_url", "original_url", "figure_page_url"):
-        value = normalize_text(str(asset.get(field) or ""))
-        if value:
-            return value
-    return ""
 
 
 def _ieee_asset_kind(asset: Mapping[str, Any]) -> str:

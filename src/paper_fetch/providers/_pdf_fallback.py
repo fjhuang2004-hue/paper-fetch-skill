@@ -10,8 +10,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_HEADER, RequestFailure
+from ..http import (
+    DEFAULT_FULLTEXT_TIMEOUT_SECONDS,
+    HttpTransport,
+    PDF_ACCEPT_HEADER,
+    RequestFailure,
+)
 from ..http.headers import header_value
+from ..extraction.html.assets.requester import (
+    cookie_header_for_url as _cookie_header_for_url,
+)
 from ..extraction.html.shared import html_text_snippet, html_title_snippet
 from ..extraction.html.signals import detect_html_block, summarize_html
 from ..runtime import RuntimeContext
@@ -196,42 +204,6 @@ def _response_to_pdf_result(
         pdf_bytes=response_body,
         suggested_filename=filename_from_headers(response_headers),
     )
-
-
-def _cookie_header_for_url(browser_cookies: list[dict[str, Any]] | None, url: str) -> str | None:
-    parsed_url = urllib.parse.urlparse(normalize_text(url))
-    host = normalize_text(parsed_url.hostname).lower()
-    path = normalize_text(parsed_url.path) or "/"
-    scheme = normalize_text(parsed_url.scheme).lower()
-    if not host:
-        return None
-
-    matched_pairs: list[str] = []
-    for cookie in browser_cookies or []:
-        if not isinstance(cookie, dict):
-            continue
-        name = normalize_text(str(cookie.get("name") or ""))
-        value = str(cookie.get("value") or "")
-        if not name:
-            continue
-
-        cookie_domain = normalize_text(str(cookie.get("domain") or "")).lower().lstrip(".")
-        if not cookie_domain:
-            cookie_url = normalize_text(str(cookie.get("url") or ""))
-            cookie_domain = normalize_text(urllib.parse.urlparse(cookie_url).hostname).lower()
-        if cookie_domain and host != cookie_domain and not host.endswith(f".{cookie_domain}"):
-            continue
-
-        cookie_path = normalize_text(str(cookie.get("path") or "")) or "/"
-        if not path.startswith(cookie_path):
-            continue
-
-        if bool(cookie.get("secure")) and scheme != "https":
-            continue
-
-        matched_pairs.append(f"{name}={value}")
-
-    return "; ".join(matched_pairs) if matched_pairs else None
 
 
 def _download_to_pdf_result(

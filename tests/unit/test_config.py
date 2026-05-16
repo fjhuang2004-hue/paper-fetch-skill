@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 from paper_fetch import config
-from paper_fetch.providers import _flaresolverr
+from paper_fetch.providers import browser_runtime
 
 
 class ConfigTests(unittest.TestCase):
@@ -192,64 +192,37 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.resolve_cli_download_dir(env), expected)
         self.assertEqual(config.resolve_mcp_download_dir(env), expected)
 
-    def test_flaresolverr_paths_default_to_repo_local_vendor_and_url(self) -> None:
-        self.assertEqual(
-            _flaresolverr.resolve_flaresolverr_source_dir({}),
-            _flaresolverr.DEFAULT_VENDOR_FLARESOLVERR_DIR,
-        )
-        self.assertEqual(_flaresolverr.resolve_flaresolverr_env_file({}), None)
-        self.assertEqual(_flaresolverr.resolve_flaresolverr_url({}), _flaresolverr.DEFAULT_FLARESOLVERR_URL)
-
-    def test_flaresolverr_paths_expand_explicit_configuration(self) -> None:
-        env = {
-            config.FLARESOLVERR_SOURCE_DIR_ENV_VAR: "~/custom-flaresolverr",
-            config.FLARESOLVERR_ENV_FILE_ENV_VAR: "~/custom-flaresolverr/.env.test",
-            config.FLARESOLVERR_URL_ENV_VAR: "http://127.0.0.1:9000/v1",
-        }
-
-        self.assertEqual(_flaresolverr.resolve_flaresolverr_source_dir(env), Path("~/custom-flaresolverr").expanduser())
-        self.assertEqual(
-            _flaresolverr.resolve_flaresolverr_env_file(env),
-            Path("~/custom-flaresolverr/.env.test").expanduser(),
-        )
-        self.assertEqual(_flaresolverr.resolve_flaresolverr_url(env), "http://127.0.0.1:9000/v1")
-
-    def test_flaresolverr_keep_session_env_defaults_disabled_in_runtime_config(self) -> None:
+    def test_cloakbrowser_runtime_config_defaults_to_user_data_artifacts_and_user_agent(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmp = Path(tmpdir)
-            env_file = tmp / ".env.flaresolverr"
-            env_file.write_text('HEADLESS="true"\n', encoding="utf-8")
+            runtime_config = browser_runtime.load_runtime_config(
+                {config.XDG_DATA_HOME_ENV_VAR: tmpdir},
+                provider="science",
+                doi="10.1126/science.ady3136",
+            )
 
-            runtime_config = _flaresolverr.load_runtime_config(
+        self.assertEqual(runtime_config.provider, "science")
+        self.assertEqual(runtime_config.doi, "10.1126/science.ady3136")
+        self.assertTrue(runtime_config.headless)
+        self.assertEqual(runtime_config.user_agent, config.DEFAULT_USER_AGENT)
+        self.assertIn("publisher-browser-artifacts", runtime_config.artifact_dir.parts)
+
+    def test_cloakbrowser_runtime_config_expands_env_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runtime_config = browser_runtime.load_runtime_config(
                 {
-                    config.FLARESOLVERR_ENV_FILE_ENV_VAR: str(env_file),
-                    config.FLARESOLVERR_SOURCE_DIR_ENV_VAR: str(tmp / "vendor" / "flaresolverr"),
-                    config.XDG_DATA_HOME_ENV_VAR: str(tmp),
+                    config.CLOAKBROWSER_HEADLESS_ENV_VAR: "false",
+                    config.CLOAKBROWSER_TIMEOUT_MS_ENV_VAR: "12345",
+                    config.USER_AGENT_ENV_VAR: "paper-fetch-test/1",
+                    config.XDG_DATA_HOME_ENV_VAR: tmpdir,
                 },
                 provider="science",
                 doi="10.1126/science.ady3136",
             )
 
-        self.assertFalse(runtime_config.keep_session)
-
-    def test_flaresolverr_keep_session_env_enables_runtime_config(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp = Path(tmpdir)
-            env_file = tmp / ".env.flaresolverr"
-            env_file.write_text('HEADLESS="true"\n', encoding="utf-8")
-
-            runtime_config = _flaresolverr.load_runtime_config(
-                {
-                    config.FLARESOLVERR_ENV_FILE_ENV_VAR: str(env_file),
-                    config.FLARESOLVERR_SOURCE_DIR_ENV_VAR: str(tmp / "vendor" / "flaresolverr"),
-                    config.FLARESOLVERR_KEEP_SESSION_ENV_VAR: "1",
-                    config.XDG_DATA_HOME_ENV_VAR: str(tmp),
-                },
-                provider="science",
-                doi="10.1126/science.ady3136",
-            )
-
-        self.assertTrue(runtime_config.keep_session)
+        self.assertFalse(runtime_config.headless)
+        self.assertEqual(runtime_config.timeout_ms, 12345)
+        self.assertEqual(runtime_config.user_agent, "paper-fetch-test/1")
+        self.assertTrue(str(runtime_config.artifact_dir).startswith(str(Path(tmpdir).expanduser())))
 
 
 if __name__ == "__main__":

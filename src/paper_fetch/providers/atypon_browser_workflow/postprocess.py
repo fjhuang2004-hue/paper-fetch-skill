@@ -69,17 +69,6 @@ def _abstract_section_payloads(container: Tag) -> list[dict[str, Any]]:
     ]
 
 
-def _markdown_has_abstract_heading(markdown_text: str) -> bool:
-    for block in re.split(r"\n\s*\n", markdown_text):
-        heading_info = _markdown_heading_info(block)
-        if heading_info is None:
-            continue
-        level, heading_text = heading_info
-        if _heading_category(f"h{min(level, 6)}", heading_text) == "abstract":
-            return True
-    return False
-
-
 def _ensure_body_markdown_heading(markdown_text: str, *, title: str | None = None) -> str:
     blocks = [normalize_markdown_text(block) for block in re.split(r"\n\s*\n", markdown_text) if normalize_text(block)]
     if not blocks:
@@ -204,10 +193,6 @@ def _inject_inline_table_blocks(
             noise_profile=_noise_profile_for_publisher(publisher),
         ),
     )
-
-
-def _known_abstract_block_texts(container: Tag) -> list[str]:
-    return _abstract_block_texts_from_payloads(_abstract_section_payloads(container))
 
 
 def _abstract_block_texts_from_payloads(payloads: list[Mapping[str, Any]] | None) -> list[str]:

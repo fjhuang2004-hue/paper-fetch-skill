@@ -290,7 +290,7 @@ class GeographyLiveTests(unittest.TestCase):
             sections=[],
             references=[],
             warnings=[
-                "Wiley browser workflow requires FLARESOLVERR_ENV_FILE pointing at a repo-local vendor/flaresolverr preset.",
+                "Wiley browser workflow requires the cloakbrowser Python package.",
                 "Full text was not available; returning metadata and abstract only.",
             ],
             source_trail=["fulltext:wiley_not_configured", "fallback:metadata_only"],
@@ -301,7 +301,7 @@ class GeographyLiveTests(unittest.TestCase):
 
         self.assertEqual(result.status, "not_configured")
         self.assertEqual(result.error_code, "not_configured")
-        self.assertIn("FLARESOLVERR_ENV_FILE", result.error_message or "")
+        self.assertIn("cloakbrowser", (result.error_message or "").lower())
 
     def test_report_result_flags_unexpected_source_path_on_fulltext(self) -> None:
         envelope = make_envelope(

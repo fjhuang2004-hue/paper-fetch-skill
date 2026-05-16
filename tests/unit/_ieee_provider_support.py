@@ -16,7 +16,11 @@ from paper_fetch.providers.ieee import IeeeClient
 from paper_fetch.runtime import RuntimeContext
 from paper_fetch.tracing import trace_from_markers
 from paper_fetch.workflow.types import FetchStrategy
-from tests.golden_criteria import golden_criteria_manifest
+from tests.golden_criteria import (
+    golden_criteria_asset,
+    golden_criteria_dir_for_doi,
+    golden_criteria_manifest,
+)
 from tests.paths import REPO_ROOT
 from tests.unit._paper_fetch_support import RecordingTransport
 
@@ -186,20 +190,20 @@ def _dynamic_html_with_ieee_equation_alt_table_asset(article_number: str = "1038
 
 
 IEEE_REAL_HTML_SAMPLES = {
-    "ACCESS": ("10.1109/ACCESS.2024.3352924", "10.1109_ACCESS.2024.3352924", "10388355"),
-    "CICTN": ("10.1109/CICTN64563.2025.10932570", "10.1109_CICTN64563.2025.10932570", "10932570"),
-    "TBME": ("10.1109/TBME.2024.3434477", "10.1109_TBME.2024.3434477", "10612240"),
-    "TCOMM": ("10.1109/TCOMM.2024.3395332", "10.1109_TCOMM.2024.3395332", "10511075"),
-    "TDEI": ("10.1109/TDEI.2024.3373549", "10.1109_TDEI.2024.3373549", "10459335"),
-    "TE": ("10.1109/TE.2024.3376795", "10.1109_TE.2024.3376795", "10496257"),
-    "TIM": ("10.1109/TIM.2024.3509573", "10.1109_TIM.2024.3509573", "10772041"),
+    "ACCESS": ("10.1109/ACCESS.2024.3352924", "10388355"),
+    "CICTN": ("10.1109/CICTN64563.2025.10932570", "10932570"),
+    "TBME": ("10.1109/TBME.2024.3434477", "10612240"),
+    "TCOMM": ("10.1109/TCOMM.2024.3395332", "10511075"),
+    "TDEI": ("10.1109/TDEI.2024.3373549", "10459335"),
+    "TE": ("10.1109/TE.2024.3376795", "10496257"),
+    "TIM": ("10.1109/TIM.2024.3509573", "10772041"),
 }
 
 
-def _real_ieee_fixture_metadata(*, doi: str, fixture_dir: str, article_number: str) -> dict[str, object]:
-    fixture_root = REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / fixture_dir
+def _real_ieee_fixture_metadata(*, doi: str, article_number: str) -> dict[str, object]:
+    fixture_root = golden_criteria_dir_for_doi(doi)
     landing_metadata = _ieee_metadata._parse_landing_metadata(
-        (fixture_root / "landing.html").read_text(encoding="utf-8")
+        golden_criteria_asset(doi, "landing.html").read_text(encoding="utf-8")
     )
     metadata = _ieee_metadata._merge_ieee_metadata(
         {"doi": doi},
@@ -216,13 +220,12 @@ def _real_ieee_fixture_metadata(*, doi: str, fixture_dir: str, article_number: s
 def _real_ieee_fixture_article(
     *,
     doi: str,
-    fixture_dir: str,
     article_number: str,
     tmpdir: Path,
 ):
-    fixture_root = REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / fixture_dir
+    fixture_root = golden_criteria_dir_for_doi(doi)
     source_url = f"https://ieeexplore.ieee.org/rest/document/{article_number}/?logAccess=true"
-    metadata = _real_ieee_fixture_metadata(doi=doi, fixture_dir=fixture_dir, article_number=article_number)
+    metadata = _real_ieee_fixture_metadata(doi=doi, article_number=article_number)
     extraction = _ieee_html._extract_ieee_html(
         (fixture_root / "original.html").read_text(encoding="utf-8"),
         source_url,

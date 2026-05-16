@@ -18,14 +18,7 @@ from ..browser_runtime import (
     BrowserRuntimeFailure,
     merge_browser_context_seeds,
 )
-from .assets import (
-    _merge_download_attempt_results,
-)
-from .fetchers import (
-    _browser_image_document_payload,
-    _browser_image_payload_failure_reason,
-    _compact_failure_diagnostic,
-)
+from .assets import _merge_download_attempt_results
 from .shared import BrowserWorkflowDeps
 
 
@@ -354,12 +347,6 @@ def _build_attempt_image_fetcher(
         browser_user_agent=attempt_seed.get("browser_user_agent")
         or recovery.user_agent,
         headless=getattr(recovery.runtime, "headless", True),
-        challenge_recovery=_asset_challenge_recovery_for(
-            recovery,
-            attempt_seed=attempt_seed,
-            attempt_seed_lock=attempt_seed_lock,
-            deps=deps,
-        ),
     )
 
 
@@ -382,177 +369,6 @@ def _build_attempt_file_fetcher(
         browser_user_agent=attempt_seed.get("browser_user_agent")
         or recovery.user_agent,
         headless=getattr(recovery.runtime, "headless", True),
-        challenge_recovery=_supplementary_challenge_recovery_for(
-            recovery,
-            attempt_seed=attempt_seed,
-            attempt_seed_lock=attempt_seed_lock,
-            deps=deps,
-        ),
-    )
-
-
-def _asset_challenge_recovery_for(
-    recovery: BrowserAssetRecoveryContext,
-    *,
-    attempt_seed: dict[str, Any],
-    attempt_seed_lock: threading.Lock,
-    deps: BrowserWorkflowDeps,
-) -> Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None]:
-    def recover(
-        image_url: str, asset: Mapping[str, Any], failure: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
-        attempts: list[dict[str, Any]] = []
-        for recovery_url in _asset_recovery_urls(image_url, asset):
-            try:
-                html_result = deps.fetch_html_with_browser(
-                    [recovery_url],
-                    publisher=recovery.provider,
-                    config=recovery.runtime,
-                    return_image_payload=True,
-                )
-            except BrowserRuntimeFailure as exc:
-                if exc.browser_context_seed:
-                    with attempt_seed_lock:
-                        attempt_seed.update(
-                            merge_browser_context_seeds(
-                                attempt_seed, exc.browser_context_seed
-                            )
-                        )
-                attempts.append(
-                    _compact_failure_diagnostic(
-                        {
-                            "url": recovery_url,
-                            "status": "failed",
-                            "reason": "challenge_recovery_failed",
-                            "message": exc.message,
-                        }
-                    )
-                )
-                continue
-            with attempt_seed_lock:
-                attempt_seed.update(
-                    merge_browser_context_seeds(
-                        attempt_seed, html_result.browser_context_seed
-                    )
-                )
-            image_payload = _browser_image_document_payload(html_result)
-            recovery_reason = (
-                ""
-                if image_payload is not None
-                else _browser_image_payload_failure_reason(html_result)
-            )
-            return _compact_failure_diagnostic(
-                {
-                    "status": "ok" if image_payload is not None else "failed",
-                    "url": recovery_url,
-                    "final_url": html_result.final_url,
-                    "response_status": html_result.response_status,
-                    "content_type": html_result.response_headers.get("content-type"),
-                    "title_snippet": (html_result.title or "")[:160],
-                    "attempts": attempts,
-                    "reason": recovery_reason,
-                    "image_payload": image_payload,
-                }
-            )
-        return _compact_failure_diagnostic(
-            {
-                "status": "failed",
-                "reason": normalize_text(str(failure.get("reason") or ""))
-                or "challenge_recovery_failed",
-                "attempts": attempts,
-            }
-        )
-
-    return recover
-
-
-def _supplementary_challenge_recovery_for(
-    recovery: BrowserAssetRecoveryContext,
-    *,
-    attempt_seed: dict[str, Any],
-    attempt_seed_lock: threading.Lock,
-    deps: BrowserWorkflowDeps,
-) -> Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None]:
-    def recover(
-        file_url: str, asset: Mapping[str, Any], failure: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
-        attempts: list[dict[str, Any]] = []
-        for recovery_url in _supplementary_recovery_urls(recovery, file_url, asset):
-            try:
-                html_result = deps.fetch_html_with_browser(
-                    [recovery_url],
-                    publisher=recovery.provider,
-                    config=recovery.runtime,
-                )
-            except BrowserRuntimeFailure as exc:
-                if exc.browser_context_seed:
-                    with attempt_seed_lock:
-                        attempt_seed.update(
-                            merge_browser_context_seeds(
-                                attempt_seed, exc.browser_context_seed
-                            )
-                        )
-                attempts.append(
-                    _compact_failure_diagnostic(
-                        {
-                            "url": recovery_url,
-                            "status": "failed",
-                            "reason": "challenge_recovery_failed",
-                            "message": exc.message,
-                        }
-                    )
-                )
-                continue
-            with attempt_seed_lock:
-                attempt_seed.update(
-                    merge_browser_context_seeds(
-                        attempt_seed, html_result.browser_context_seed
-                    )
-                )
-            return _compact_failure_diagnostic(
-                {
-                    "status": "ok",
-                    "url": recovery_url,
-                    "final_url": html_result.final_url,
-                    "response_status": html_result.response_status,
-                    "content_type": html_result.response_headers.get("content-type"),
-                    "title_snippet": (html_result.title or "")[:160],
-                    "attempts": attempts,
-                }
-            )
-        return _compact_failure_diagnostic(
-            {
-                "status": "failed",
-                "reason": normalize_text(str(failure.get("reason") or ""))
-                or "challenge_recovery_failed",
-                "attempts": attempts,
-            }
-        )
-
-    return recover
-
-
-def _asset_recovery_urls(image_url: str, asset: Mapping[str, Any]) -> list[str]:
-    return _dedupe_urls(
-        [
-            image_url,
-            normalize_text(str(asset.get("figure_page_url") or "")),
-        ]
-    )
-
-
-def _supplementary_recovery_urls(
-    recovery: BrowserAssetRecoveryContext,
-    file_url: str,
-    asset: Mapping[str, Any],
-) -> list[str]:
-    return _dedupe_urls(
-        [
-            file_url,
-            *recovery.active_seed_urls,
-            normalize_text(str(asset.get("source_url") or "")),
-            normalize_text(str(asset.get("download_url") or "")),
-        ]
     )
 
 

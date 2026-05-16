@@ -13,7 +13,7 @@ from paper_fetch.quality.issues import collect_issue_flags
 from paper_fetch.extraction.html import assets as html_assets
 from paper_fetch.extraction.image_payloads import image_mime_type_from_bytes
 from paper_fetch.providers import (
-    _flaresolverr,
+    browser_runtime,
     ams as ams_provider,
     browser_workflow,
     pnas as pnas_provider,
@@ -187,16 +187,14 @@ class AtyponBrowserWorkflowProviderTestCase(unittest.TestCase):
             downloaded_asset["path"] = local_path
             downloaded_assets.append(downloaded_asset)
         return downloaded_assets
-    def _runtime_config(self, tmpdir: str, provider: str, doi: str) -> _flaresolverr.FlareSolverrRuntimeConfig:
+    def _runtime_config(self, tmpdir: str, provider: str, doi: str) -> browser_runtime.BrowserRuntimeConfig:
         tmp = Path(tmpdir)
-        return _flaresolverr.FlareSolverrRuntimeConfig(
+        return browser_runtime.BrowserRuntimeConfig(
             provider=provider,
             doi=doi,
-            url="http://127.0.0.1:8191/v1",
-            env_file=tmp / ".env.flaresolverr",
-            source_dir=tmp / "vendor" / "flaresolverr",
             artifact_dir=tmp / "artifacts",
             headless=True,
+            user_agent="paper-fetch-test/1",
         )
     def _build_browser_html_raw_payload(
         self,

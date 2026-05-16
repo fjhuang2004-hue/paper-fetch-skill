@@ -7,7 +7,7 @@ from unittest import mock
 
 from paper_fetch.http import RequestFailure
 from paper_fetch.providers import _springer_html as springer_html
-from paper_fetch.providers import _flaresolverr, browser_workflow, elsevier as elsevier_provider, springer as springer_provider, wiley as wiley_provider
+from paper_fetch.providers import browser_runtime, browser_workflow, elsevier as elsevier_provider, springer as springer_provider, wiley as wiley_provider
 from paper_fetch.providers.base import ProviderContent, ProviderFailure, RawFulltextPayload
 from paper_fetch.runtime import RuntimeContext
 from tests.golden_criteria import golden_criteria_scenario_asset
@@ -37,16 +37,14 @@ def _payload_source_trail(raw_payload: RawFulltextPayload) -> list[str]:
 
 
 class PublisherWaterfallTests(unittest.TestCase):
-    def _runtime_config(self, tmpdir: str, provider: str, doi: str) -> _flaresolverr.FlareSolverrRuntimeConfig:
+    def _runtime_config(self, tmpdir: str, provider: str, doi: str) -> browser_runtime.BrowserRuntimeConfig:
         tmp = Path(tmpdir)
-        return _flaresolverr.FlareSolverrRuntimeConfig(
+        return browser_runtime.BrowserRuntimeConfig(
             provider=provider,
             doi=doi,
-            url="http://127.0.0.1:8191/v1",
-            env_file=tmp / ".env.flaresolverr",
-            source_dir=tmp / "vendor" / "flaresolverr",
             artifact_dir=tmp / "artifacts",
             headless=True,
+            user_agent="paper-fetch-test/1",
         )
 
     def test_elsevier_official_xml_success_keeps_elsevier_xml_source(self) -> None:
@@ -852,15 +850,15 @@ class PublisherWaterfallTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             runtime = self._runtime_config(tmpdir, "wiley", doi)
-            mocked_direct = mock.Mock()
+            mocked_fast = mock.Mock()
             mocked_browser_pdf = mock.Mock()
             install_browser_workflow_deps(
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_direct_playwright=mocked_direct,
-                fetch_html_with_flaresolverr=mock.Mock(
-                    return_value=_flaresolverr.FetchedPublisherHtml(
+                fetch_html_with_fast_browser=mocked_fast,
+                fetch_html_with_browser=mock.Mock(
+                    return_value=browser_runtime.BrowserFetchedHtml(
                         source_url=WILEY_SAMPLE.landing_url,
                         final_url=WILEY_SAMPLE.landing_url,
                         html="<html></html>",
@@ -878,7 +876,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                         {"title": WILEY_SAMPLE.title},
                     )
                 ),
-                fetch_pdf_with_playwright=mocked_browser_pdf,
+                fetch_pdf_with_browser=mocked_browser_pdf,
             )
             with (
                 mock.patch.object(wiley_provider, "_fetch_wiley_tdm_pdf_result") as mocked_api,
@@ -888,7 +886,7 @@ class PublisherWaterfallTests(unittest.TestCase):
 
         mocked_api.assert_not_called()
         mocked_browser_pdf.assert_not_called()
-        mocked_direct.assert_not_called()
+        mocked_fast.assert_not_called()
         self.assertEqual(_payload_route(raw_payload), "html")
         self.assertEqual(article.source, "wiley_browser")
         self.assertIn("fulltext:wiley_html_ok", article.quality.source_trail)
@@ -928,7 +926,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
+                fetch_html_with_browser=mock.Mock(
                     side_effect=browser_workflow.HtmlExtractionFailure(
                         "insufficient_fulltext",
                         "HTML content does not look like a complete full-text article.",
@@ -984,8 +982,8 @@ class PublisherWaterfallTests(unittest.TestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
-                    side_effect=browser_workflow.FlareSolverrFailure(
+                fetch_html_with_browser=mock.Mock(
+                    side_effect=browser_runtime.BrowserRuntimeFailure(
                         "redirected_to_abstract",
                         "HTML redirected to abstract.",
                         browser_context_seed={
@@ -998,7 +996,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                     )
                 ),
                 pdf_browser_context_seed=mocked_warm,
-                fetch_pdf_with_playwright=mocked_browser_pdf,
+                fetch_pdf_with_browser=mocked_browser_pdf,
             )
             with (
                 mock.patch.object(wiley_provider, "_fetch_wiley_tdm_pdf_result") as mocked_api,
@@ -1048,8 +1046,8 @@ class PublisherWaterfallTests(unittest.TestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
-                    side_effect=browser_workflow.FlareSolverrFailure(
+                fetch_html_with_browser=mock.Mock(
+                    side_effect=browser_runtime.BrowserRuntimeFailure(
                         "redirected_to_abstract",
                         "HTML redirected to abstract.",
                         browser_context_seed={
@@ -1112,7 +1110,7 @@ class PublisherWaterfallTests(unittest.TestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
+                fetch_html_with_browser=mock.Mock(
                     side_effect=browser_workflow.HtmlExtractionFailure(
                         "insufficient_fulltext",
                         "HTML content does not look like a complete full-text article.",
@@ -1160,7 +1158,6 @@ class PublisherWaterfallTests(unittest.TestCase):
                 side_effect=ProviderFailure(
                     "not_configured",
                     "Wiley browser workflow is not configured.",
-                    missing_env=["FLARESOLVERR_ENV_FILE"],
                 )
             ),
         )

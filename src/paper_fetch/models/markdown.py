@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 import html
 import re
+import urllib.parse
 from typing import Any
 
 from ..common_patterns import EXTENDED_DATA_LABEL, INLINE_WHITESPACE_PATTERN
@@ -74,12 +75,6 @@ class MarkdownImageMatch:
     attrs_start: int | None
     text: str
 
-    @property
-    def text_without_attrs(self) -> str:
-        if self.attrs_start is None:
-            return self.text
-        return self.text[: self.attrs_start - self.start].rstrip()
-
 
 _MARKDOWN_BLOCK_IMAGE_ALT_PATTERN = (
     rf"fig(?:ure)?\.?|(?:{re.escape(EXTENDED_DATA_LABEL)}|supplementary)?\s*table|supplementary\s+fig(?:ure)?\.?"
@@ -140,6 +135,41 @@ INLINE_HTML_AFTER_SUBSUP_WORD_PATTERN = re.compile(r"(</(?:sub|sup)>)(?=[A-Za-z0
 
 
 INLINE_HTML_AFTER_SUBSUP_PUNCT_PATTERN = re.compile(r"(</(?:sub|sup)>)\s+([,.;:%\]\}\+\)])", flags=re.IGNORECASE)
+
+
+def image_reference_candidates(value: str | None) -> set[str]:
+    normalized = normalize_text(value).strip("<>")
+    if not normalized:
+        return set()
+
+    parsed = urllib.parse.urlsplit(normalized)
+    path = parsed.path or normalized
+    candidates = {normalized, path, urllib.parse.unquote(normalized), urllib.parse.unquote(path)}
+    cleaned: set[str] = set()
+    for candidate in candidates:
+        text = normalize_text(candidate).replace("\\", "/")
+        text = SLASH_RUN_PATTERN.sub("/", text).strip()
+        text = text.removeprefix("./")
+        if text:
+            cleaned.add(text)
+            cleaned.add(text.lstrip("/"))
+    return cleaned
+
+
+def image_reference_basename(value: str) -> str:
+    return value.rstrip("/").rsplit("/", 1)[-1]
+
+
+def image_references_match(left: set[str], right: set[str]) -> bool:
+    if left & right:
+        return True
+    for left_item in left:
+        for right_item in right:
+            if left_item.endswith(f"/{right_item}") or right_item.endswith(f"/{left_item}"):
+                return True
+    left_basenames = {image_reference_basename(item) for item in left if image_reference_basename(item)}
+    right_basenames = {image_reference_basename(item) for item in right if image_reference_basename(item)}
+    return bool(left_basenames & right_basenames)
 
 
 def _find_balanced_markdown_delimiter(text: str, start: int, opener: str, closer: str) -> int:
@@ -548,6 +578,9 @@ __all__ = [
     "INLINE_HTML_AFTER_SUBSUP_NEWLINE_PATTERN",
     "INLINE_HTML_AFTER_SUBSUP_WORD_PATTERN",
     "INLINE_HTML_AFTER_SUBSUP_PUNCT_PATTERN",
+    "image_reference_candidates",
+    "image_reference_basename",
+    "image_references_match",
     "normalize_markdown_text",
     "iter_markdown_images",
     "replace_markdown_images",

@@ -198,6 +198,25 @@ class FixtureHtmlTransport(HttpTransport):
         return response
 
 
+def http_response(
+    url: str,
+    body: bytes,
+    content_type: str,
+    *,
+    status_code: int = 200,
+    headers: dict[str, str] | None = None,
+) -> dict[str, object]:
+    response_headers = {"content-type": content_type}
+    if headers is not None:
+        response_headers.update(headers)
+    return {
+        "status_code": status_code,
+        "headers": response_headers,
+        "body": body,
+        "url": url,
+    }
+
+
 class RecordingTransport(HttpTransport):
     def __init__(self, responses: dict[tuple[str, str], object]) -> None:
         self.responses = responses

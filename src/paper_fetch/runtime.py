@@ -293,20 +293,6 @@ class RuntimeContext:
             self.session_cache[key] = stored
         return copy.deepcopy(stored) if copy_value else stored
 
-    def get_or_set_session_cache(
-        self,
-        key: tuple[Hashable, ...],
-        factory: Callable[[], Any],
-        *,
-        copy_value: bool = True,
-    ) -> Any:
-        with self._session_cache_lock:
-            cached = self.session_cache.get(key, _SESSION_CACHE_MISSING)
-            if cached is not _SESSION_CACHE_MISSING:
-                return copy.deepcopy(cached) if copy_value else cached
-        value = factory()
-        return self.set_session_cache(key, value, copy_value=copy_value)
-
     def record_stage_timing(self, name: str, started_at: float) -> float:
         """Record a non-cumulative stage duration in seconds."""
 

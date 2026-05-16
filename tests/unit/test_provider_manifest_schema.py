@@ -1,30 +1,24 @@
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
-from typing import Any
 
 import yaml
 from jsonschema import Draft202012Validator
 
+from ._manifest_sync import (
+    MANIFESTS_DIR,
+    load_manifest_schema,
+    load_yaml,
+)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ONBOARDING_DIR = REPO_ROOT / "docs" / "ai-onboarding"
-SCHEMA_PATH = ONBOARDING_DIR / "provider-manifest.schema.json"
-MANIFESTS_DIR = ONBOARDING_DIR / "manifests"
+
 REQUIRED_DOI_PURPOSES = {"structure", "figure", "references"}
 PLACEHOLDER_PATTERN = re.compile(r"\b(?:todo|tbd|unknown)\b", re.IGNORECASE)
 
 
-def load_yaml(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    assert isinstance(data, dict), f"{path} must load as a mapping"
-    return data
-
-
-def load_schema() -> dict[str, Any]:
-    return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+def load_schema():
+    return load_manifest_schema()
 
 
 def iter_manifest_paths() -> list[Path]:
@@ -44,8 +38,7 @@ def test_all_provider_manifests_pass_schema_and_local_invariants() -> None:
     assert manifest_paths
 
     for manifest_path in manifest_paths:
-        with manifest_path.open(encoding="utf-8") as handle:
-            manifest = yaml.safe_load(handle)
+        manifest = load_yaml(manifest_path)
         errors = sorted(validator.iter_errors(manifest), key=lambda error: error.json_path)
         assert not errors, [
             f"{manifest_path}: {error.json_path}: {error.message}" for error in errors

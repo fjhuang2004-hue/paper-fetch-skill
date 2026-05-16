@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Mapping
 
 from ..http import HttpTransport
 from ..metadata.crossref import CrossrefLookupClient
@@ -50,12 +50,6 @@ class CrossrefClient(ProviderClient):
         self.user_agent = self.lookup.user_agent
         self.mailto = self.lookup.mailto
 
-    def _headers(self) -> dict[str, str]:
-        return self.lookup.headers()
-
-    def _query_params(self) -> dict[str, str]:
-        return self.lookup.query_params()
-
     def probe_status(self) -> ProviderStatusResult:
         notes: list[str] = []
         if not self.mailto:
@@ -89,6 +83,3 @@ class CrossrefClient(ProviderClient):
             journal_title=journal_title,
             rows=rows,
         )
-
-    def _normalize_message(self, message: Mapping[str, Any], source_url: str) -> CrossrefMetadata:
-        return self.lookup.normalize_message(message, source_url)

@@ -9,13 +9,7 @@ class McpPayloadCacheTests(unittest.TestCase):
         server = build_server()
         for name, tool in server._tool_manager._tools.items():
             self.assertIsNotNone(tool.output_schema, name)
-    def test_build_server_advertises_resource_list_changed_capability(self) -> None:
-        server = build_server()
 
-        options = server._mcp_server.create_initialization_options()
-
-        self.assertIsNotNone(options.capabilities.resources)
-        self.assertTrue(options.capabilities.resources.listChanged)
     def test_build_server_exposes_expected_tool_annotations(self) -> None:
         server = build_server()
         expected = {
@@ -336,23 +330,25 @@ class McpPayloadCacheTests(unittest.TestCase):
         self.assertEqual(strategy.preferred_providers, ["wiley", "crossref"])
     def test_fetch_paper_tool_rejects_invalid_modes_before_service_call(self) -> None:
         with mock.patch.object(mcp_tools, "service_fetch_paper") as mocked_fetch:
-            result = mcp_tools.fetch_paper_tool(query="10.1000/example", modes=["pdf"])
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example", modes=["pdf"]))
 
         self.assertTrue(result.isError)
         self.assertIn("unsupported output modes", result.structuredContent["reason"])
         mocked_fetch.assert_not_called()
     def test_fetch_paper_tool_rejects_invalid_include_refs_before_service_call(self) -> None:
         with mock.patch.object(mcp_tools, "service_fetch_paper") as mocked_fetch:
-            result = mcp_tools.fetch_paper_tool(query="10.1000/example", include_refs="summary")
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example", include_refs="summary"))
 
         self.assertTrue(result.isError)
         self.assertIn("unsupported include_refs value", result.structuredContent["reason"])
         mocked_fetch.assert_not_called()
     def test_fetch_paper_tool_rejects_invalid_asset_profile_before_service_call(self) -> None:
         with mock.patch.object(mcp_tools, "service_fetch_paper") as mocked_fetch:
-            result = mcp_tools.fetch_paper_tool(
-                query="10.1000/example",
-                strategy={"asset_profile": "full"},
+            result = asyncio.run(
+                mcp_tools.fetch_paper_tool_async(
+                    query="10.1000/example",
+                    strategy={"asset_profile": "full"},
+                )
             )
 
         self.assertTrue(result.isError)
@@ -360,9 +356,11 @@ class McpPayloadCacheTests(unittest.TestCase):
         mocked_fetch.assert_not_called()
     def test_fetch_paper_tool_rejects_invalid_artifact_mode_before_service_call(self) -> None:
         with mock.patch.object(mcp_tools, "service_fetch_paper") as mocked_fetch:
-            result = mcp_tools.fetch_paper_tool(
-                query="10.1000/example",
-                artifact_mode="debug",
+            result = asyncio.run(
+                mcp_tools.fetch_paper_tool_async(
+                    query="10.1000/example",
+                    artifact_mode="debug",
+                )
             )
 
         self.assertTrue(result.isError)

@@ -10,7 +10,7 @@ Worker 和 coordinator 必须满足下列机器可判约束。
 - Worker must not modify paths listed in `files_must_not_modify`.
 - Worker must not edit `docs/ai-onboarding/known-providers.yml`.
 - Worker must not edit shared docs: `docs/providers.md`, `docs/extraction-rules.md`, `CHANGELOG.md`.
-- Worker must not write API keys, tokens, FlareSolverr endpoint URLs, or local secret file paths into manifest, docs, tests, or task brief output.
+- Worker must not write API keys, tokens, browser endpoint URLs, or local secret file paths into manifest, docs, tests, or task brief output.
 
 ## Provider Logic
 

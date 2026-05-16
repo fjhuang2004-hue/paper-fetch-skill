@@ -1,4 +1,4 @@
-"""Playwright page scripts for browser workflow fetchers."""
+"""Browser page scripts for browser workflow fetchers."""
 
 from __future__ import annotations
 

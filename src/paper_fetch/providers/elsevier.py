@@ -39,6 +39,7 @@ from ..utils import (
     strip_html_tags,
 )
 from ._article_markdown_elsevier_document import build_article_structure
+from ._article_markdown_xml import xml_local_name
 from ._asset_retry import (
     AssetRetryPolicy,
     assets_for_network_retry,
@@ -127,10 +128,6 @@ _ELSEVIER_NON_RETRYABLE_ASSET_REASON_TOKENS = (
     *ASSET_BLOCKING_REASON_TOKENS,
 )
 _ELSEVIER_RETRYABLE_ASSET_REASON_TOKENS = NETWORK_RETRYABLE_REASON_TOKENS
-
-
-def xml_local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
 def first_xml_child_text(element: ET.Element, child_local_name: str) -> str | None:
@@ -673,9 +670,6 @@ class ElsevierClient(ProviderClient):
 
     def _official_article_url(self, doi: str) -> str:
         return f"https://api.elsevier.com/content/article/doi/{urllib.parse.quote(doi, safe='')}"
-
-    def _fetch_official_payload(self, doi: str) -> RawFulltextPayload:
-        return self._fetch_official_xml_payload(doi)
 
     def _fetch_official_xml_payload(self, doi: str) -> RawFulltextPayload:
         url = self._official_article_url(doi)

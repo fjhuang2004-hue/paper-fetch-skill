@@ -6,7 +6,7 @@ Conventions:
 - Minimal non-DOI rule scenarios live under `tests/fixtures/golden_criteria/_scenarios/<scenario_slug>/`.
 - The DOI slug uses `/` replaced with `_`.
 - Canonical roles use stable names such as `original.html`, `original.xml`, `expected.json`, `abstract.html`, `commentary.html`, `extracted.md`, `article.html`, and `table1.html`.
-- Rule coverage and sample ownership are registered in `tests/fixtures/golden_criteria/manifest.json`.
+- Rule coverage, sample ownership, and replay support files such as `body_assets/*` are registered in `tests/fixtures/golden_criteria/manifest.json`.
 
 Contract:
 

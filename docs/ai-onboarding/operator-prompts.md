@@ -89,7 +89,7 @@ brief 中 output_manifest 指向的路径，并通过 schema 校验。
 - structure / figure / references 三个 purpose 不允许 doi: null。
 - 其它 purpose 找不到样本时允许 doi: null，但 evidence_reason 必须写明搜索失败原因。
 - 禁止写入 TODO / TBD / unknown 占位；未知字段用 schema 允许的 null 或省略表达。
-- 不准把 API key、token、FlareSolverr endpoint URL 写进 manifest。
+- 不准把 API key、token、browser endpoint URL 写进 manifest。
 - 必须写 generation.generated_by=ai_discovery、generated_at(ISO8601)、source_queries
   (实际搜过的 query 列表)、confidence。
 
@@ -155,7 +155,7 @@ docs/adding-a-provider.md、README、audit 文件或聊天记录推断 provider 
   provider-specific 函数或 if name == "<NAME>" 分支。
 - waterfall_steps 顺序按 manifest 的 main_path / pdf_fallback / abstract_only_strategy
   推导，与 scaffold 生成的占位顺序一致。
-- 不准写 API key / token / FlareSolverr endpoint URL；secrets 只从 env 读。
+- 不准写 API key / token / browser endpoint URL；secrets 只从 env 读。
 - 不准保留 # TODO / # kept for compatibility 长期 marker。
 - extraction_hints.* / success_criteria.* / asset_retry / metadata_merge 是 sync-back
   字段，禁止手 edit；由 scripts/manifest_sync_back.py 在后续步骤回写。

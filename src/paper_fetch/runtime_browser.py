@@ -1,34 +1,10 @@
-"""Browser lifecycle manager.
-
-All Playwright-typed objects returned by this module are launched by CloakBrowser, not stock Playwright.
-"""
+"""Browser lifecycle manager."""
 
 from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
 from typing import Any
-
-
-class PlaywrightUnavailableError(RuntimeError):
-    """Legacy error alias for direct browser launch compatibility."""
-
-
-class _NoopBrowserManager:
-    def stop(self) -> None:
-        pass
-
-
-def launch_playwright_chromium(*, headless: bool = True) -> tuple[Any, Any]:
-    """Launch a CloakBrowser browser behind the legacy helper name."""
-
-    try:
-        import cloakbrowser
-    except Exception as exc:
-        raise PlaywrightUnavailableError("cloakbrowser is not installed.") from exc
-
-    browser = cloakbrowser.launch(headless=bool(headless), locale="en-US")
-    return _NoopBrowserManager(), browser
 
 
 @dataclass
@@ -75,13 +51,6 @@ class BrowserContextManager:
         except Exception:
             pass
 
-
-PlaywrightContextManager = BrowserContextManager
-
-
 __all__ = [
     "BrowserContextManager",
-    "PlaywrightContextManager",
-    "PlaywrightUnavailableError",
-    "launch_playwright_chromium",
 ]

@@ -27,6 +27,7 @@ from ..extraction.html.signals import (
 from ..extraction.html.parsing import choose_parser
 from ..extraction.html.semantics import (
     BACK_MATTER_TOKENS,
+    category_for_section_hint_kind,
     classify_html_paragraph,
     coerce_html_section_hints,
     container_has_explicit_body_container,
@@ -172,10 +173,6 @@ def _is_mathml_script(node: Tag) -> bool:
     return normalize_text(getattr(node, "name", "")).lower() == "script" and normalize_text(
         str((getattr(node, "attrs", None) or {}).get("type") or "")
     ).lower() in MATHML_SCRIPT_TYPES
-
-
-def _looks_like_explicit_body_container(node: Tag | None) -> bool:
-    return looks_like_explicit_body_container(node)
 
 
 def _normalized_page_text(html_text: str) -> str:
@@ -599,16 +596,6 @@ def _run_candidate_barrier(kind: str) -> bool:
     }
 
 
-def _category_for_section_hint_kind(kind: str) -> str:
-    if kind == "data_availability":
-        return "data_availability"
-    if kind == "code_availability":
-        return "code_availability"
-    if kind == "references":
-        return "references_or_back_matter"
-    return "body_heading"
-
-
 def _apply_availability_override_policy(
     *,
     provider: str | None,
@@ -825,7 +812,7 @@ def _analyze_markdown_structure(
             matched_hint, next_hint_index = match_next_html_section_hint(coerced_section_hints, section_hint_index, heading)
             if matched_hint is not None:
                 section_hint_index = next_hint_index
-                category = _category_for_section_hint_kind(matched_hint["kind"])
+                category = category_for_section_hint_kind(matched_hint["kind"])
             else:
                 category = heading_category(f"h{min(level, 6)}", heading, title=title)
         else:

@@ -141,13 +141,6 @@ def _write_index_unlocked(download_dir: Path, entries: list[dict[str, Any]]) -> 
     ArtifactStore.from_download_dir(download_dir).write_json_file(index_path, payload)
 
 
-def _write_index(download_dir: Path, entries: list[dict[str, Any]]) -> None:
-    if not download_dir.exists():
-        return
-    with cache_file_lock(cache_index_lock_path(download_dir)):
-        _write_index_unlocked(download_dir, entries)
-
-
 def _normalize_existing_entry(download_dir: Path, raw: Any) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None

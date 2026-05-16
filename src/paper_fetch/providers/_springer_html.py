@@ -431,24 +431,6 @@ def _springer_node_context_text(node: Any) -> str:
     return " ".join(part.lower() for part in parts if part)
 
 
-def _springer_is_figure_or_illustration_context(node: Any) -> bool:
-    current = node
-    while isinstance(current, Tag):
-        context_text = _springer_node_context_text(current)
-        if (
-            current.name == "figure"
-            or "figure" in context_text
-            or "illustration" in context_text
-        ):
-            return True
-        current = (
-            current.parent
-            if isinstance(getattr(current, "parent", None), Tag)
-            else None
-        )
-    return False
-
-
 def _strip_ai_alt_disclaimer_references(root: Any) -> None:
     if not isinstance(root, Tag):
         return

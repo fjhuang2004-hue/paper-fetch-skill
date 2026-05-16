@@ -100,13 +100,6 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
                 "title_snippet": "Just a moment...",
                 "body_snippet": "Just a moment...",
                 "reason": "cloudflare_challenge",
-                "recovery_attempts": [
-                    {
-                        "status": "failed",
-                        "url": SCIENCE_SAMPLE.landing_url,
-                        "reason": "cloudflare_challenge",
-                    }
-                ],
             }
         )
 
@@ -153,25 +146,10 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
         self.assertEqual(result["asset_failures"][0]["status"], 403)
         self.assertEqual(result["asset_failures"][0]["title_snippet"], "Just a moment...")
         self.assertEqual(result["asset_failures"][0]["reason"], "cloudflare_challenge")
-        self.assertEqual(result["asset_failures"][0]["recovery_attempts"][0]["status"], "failed")
-    def test_shared_browser_image_fetcher_recovers_after_cloudflare_challenge(self) -> None:
+        self.assertNotIn("recovery_attempts", result["asset_failures"][0])
+    def test_shared_browser_image_fetcher_records_cloudflare_challenge_without_recovery(self) -> None:
         image_url = "https://onlinelibrary.wiley.com/cms/asset/full/figure1.jpg"
         figure_page_url = "https://onlinelibrary.wiley.com/doi/figure/10.1111/example"
-        recovered_body = png_header(320, 240)
-        challenge_recovery = mock.Mock(
-            return_value={
-                "status": "ok",
-                "url": figure_page_url,
-                "title_snippet": "Figure page",
-                "image_payload": {
-                    "status_code": 200,
-                    "headers": {"content-type": "image/png"},
-                    "body": recovered_body,
-                    "url": image_url,
-                    "dimensions": {"width": 320, "height": 240},
-                },
-            }
-        )
         fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {
                 "browser_cookies": [{"name": "cf_clearance", "value": "seed", "domain": ".wiley.com", "path": "/"}],
@@ -180,7 +158,6 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
             },
             seed_urls_getter=lambda: [figure_page_url],
             browser_user_agent="Mozilla/5.0",
-            challenge_recovery=challenge_recovery,
         )
         fetcher._ensure_page = mock.Mock(return_value=object())
         fetcher._sync_context_cookies = mock.Mock()
@@ -204,17 +181,14 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
         finally:
             fetcher.close()
 
-        self.assertIsNotNone(result)
-        assert result is not None
-        challenge_recovery.assert_called_once()
-        self.assertEqual(challenge_recovery.call_args.args[0], image_url)
-        self.assertEqual(challenge_recovery.call_args.args[2]["status"], 403)
+        self.assertIsNone(result)
         self.assertEqual(fetcher._warm_seed_urls.call_args_list[0].kwargs["force"], False)
         self.assertEqual(fetcher._warm_seed_urls.call_args_list[1].kwargs["force"], True)
-        self.assertEqual(result["url"], image_url)
-        self.assertEqual(result["body"], recovered_body)
-        self.assertEqual(result["dimensions"], {"width": 320, "height": 240})
-        self.assertEqual(fetcher._fetch_with_page.call_count, 1)
+        self.assertEqual(fetcher._fetch_with_page.call_count, 2)
+        failure = fetcher.failure_for(image_url)
+        assert failure is not None
+        self.assertEqual(failure["reason"], "cloudflare_challenge")
+        self.assertNotIn("recovery_attempts", failure)
     def test_pnas_provider_downloads_preview_through_shared_browser_when_no_full_size_candidate(self) -> None:
         figure_page_url = "https://www.pnas.org/figures/figure-1"
         preview_url = "https://www.pnas.org/images/preview/figure1.png"
@@ -260,7 +234,7 @@ class AtyponBrowserWorkflowProviderAssetFailureTests(AtyponBrowserWorkflowProvid
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_browser=mock.Mock(
-                    return_value=_cloakbrowser.FetchedPublisherHtml(
+                    return_value=_cloakbrowser.BrowserFetchedHtml(
                         source_url=figure_page_url,
                         final_url=figure_page_url,
                         html="<html><body><p>Figure page without direct full-size URL.</p></body></html>",

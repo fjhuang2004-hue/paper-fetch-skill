@@ -41,7 +41,7 @@ Date: 2026-05-12
 这份文档不解决：
 
 - 每个 provider 的全部配置变量
-- FlareSolverr 的操作细节
+- 每个 provider 的全部运行时操作细节
 - 所有历史设计演进过程
 
 ## 当前系统分层
@@ -145,7 +145,7 @@ Date: 2026-05-12
 - `request_builder`
   - 负责 CLI/MCP 共享的 `FetchPipelineRequest` 装配，统一 context 派生的 env、transport、clients 与 cancel_check 应用规则
 
-`RuntimeContext` 是 service/workflow 的显式运行时依赖容器，持有 `env`、`transport`、`clients`、`download_dir`、`cancel_check`、`artifact_store`、adapter 可选 `fetch_cache`，以及单次 fetch 生命周期内的 `parse_cache`、`session_cache` 和 `stage_timings`。Playwright 生命周期由 `paper_fetch.runtime_playwright.PlaywrightContextManager` 管理；`RuntimeContext` 只保留 `playwright_browser()`、`new_playwright_context()` 和 `close_playwright()` 委托方法。PNAS direct HTML preflight、browser-workflow 资产 fetcher 与 PDF/ePDF fallback 可复用同一个 browser，但仍按阶段创建隔离 context/page。公开 service API 不再接受旧 `env` / `transport` / `clients` / `download_dir` keyword；调用方必须先构造 `RuntimeContext` 并通过 `context=` 传入。CLI、MCP 与 devtools 都在自己的 facade 层解析外部参数；CLI/MCP 的 fetch 入口通过 `paper_fetch.workflow.request_builder.build_fetch_pipeline_request()` 统一装配 request，再交给 `paper_fetch.workflow.pipeline.FetchPipeline` 创建运行时、调用 service、关闭运行时，并把 MCP sidecar cache 保留为 adapter hook。
+`RuntimeContext` 是 service/workflow 的显式运行时依赖容器，持有 `env`、`transport`、`clients`、`download_dir`、`cancel_check`、`artifact_store`、adapter 可选 `fetch_cache`，以及单次 fetch 生命周期内的 `parse_cache`、`session_cache` 和 `stage_timings`。Browser 生命周期由 CloakBrowser-backed `paper_fetch.runtime_browser.BrowserContextManager` 管理；`RuntimeContext` 保留 `playwright_browser()`、`new_playwright_context()` 和 `close_playwright()` 作为 legacy 委托名，但底层统一打开 CloakBrowser。PNAS fast HTML preflight、browser-workflow 资产 fetcher 与 PDF/ePDF fallback 可复用同一个 browser，但仍按阶段创建隔离 context/page。公开 service API 不再接受旧 `env` / `transport` / `clients` / `download_dir` keyword；调用方必须先构造 `RuntimeContext` 并通过 `context=` 传入。CLI、MCP 与 devtools 都在自己的 facade 层解析外部参数；CLI/MCP 的 fetch 入口通过 `paper_fetch.workflow.request_builder.build_fetch_pipeline_request()` 统一装配 request，再交给 `paper_fetch.workflow.pipeline.FetchPipeline` 创建运行时、调用 service、关闭运行时，并把 MCP sidecar cache 保留为 adapter hook。
 
 ### 6. Extraction 层
 
@@ -225,7 +225,7 @@ Date: 2026-05-12
 - `ProviderArtifacts`
 - `ProviderFetchResult`
 
-能力边界通过 `paper_fetch.providers.protocols` 表达：`MetadataProvider`、`FulltextProvider`、`RawFulltextProvider`、`StatusProvider` 和 `AssetProvider` 用于 workflow typing；`ProviderClient` 仍是 provider 可继承的 convenience base class，不是 registry/runtime 的唯一抽象边界。
+能力边界通过 `paper_fetch.providers.protocols` 表达：`MetadataProvider`、`FulltextProvider`、`RawFulltextProvider` 和 `AssetProvider` 用于 workflow typing；`ProviderClient` 仍是 provider 可继承的 convenience base class，不是 registry/runtime 的唯一抽象边界。
 
 Provider fulltext 内部链路统一接收同一个 `RuntimeContext`：workflow 调用 `FulltextProvider.fetch_result()` 时必须传入 `artifact_store=` 与 `context=`，不再做运行时签名反射或无 `artifact_store` 分支；`fetch_result` 会把 context 继续传给 raw fulltext、abstract-only recovery、related assets 和 `to_article_model`。provider 不再暴露旧 `fetch_fulltext()` dict 入口；需要原始 payload 时使用 `fetch_raw_fulltext()`，需要完整 provider 结果时使用 `fetch_result()`。这样 Elsevier XML root、Springer HTML extraction payload、Wiley/Science/PNAS/AMS browser-workflow Markdown extraction、IEEE dynamic HTML 清洗结果以及资产抽取结果可以在同一次 fetch 内 memo；browser workflow 也能复用 runtime browser。缓存只保存派生 payload 或只读 XML root，不跨阶段共享可变 BeautifulSoup tree。
 
@@ -268,9 +268,9 @@ Crossref 的 provider adapter 位于 `paper_fetch.providers.crossref.CrossrefCli
 
 ### 10. CI / 回归验证边界
 
-`.github/workflows/ci.yml` 是 CI 命令事实来源。`unit`、`integration` 和手动 `full-golden` job 都不传 `-n 0`，默认复用 `pyproject.toml` 的 `pytest-xdist` 并行配置；本地完整 unit / integration 也应使用同一策略。只有 live MCP、FlareSolverr/browser provider smoke、共享真实 publisher/API 状态或专门排查顺序问题的测试可以串行运行，并且命令旁必须说明原因。
+`.github/workflows/ci.yml` 是 CI 命令事实来源。`unit`、`integration` 和手动 `full-golden` job 都不传 `-n 0`，默认复用 `pyproject.toml` 的 `pytest-xdist` 并行配置；本地完整 unit / integration 也应使用同一策略。只有 live MCP、browser provider smoke、共享真实 publisher/API 状态或专门排查顺序问题的测试可以串行运行，并且命令旁必须说明原因。
 
-文档中的验证命令也遵守同一边界：常规 unit / integration 示例保持并行；`tests/live` 或真实外部状态 smoke 示例如果使用 `-n 0`，必须明确它依赖真实站点、secrets、本地 FlareSolverr 服务或外部限流状态。更新提取规则文档后仍先运行 `python3 scripts/validate_extraction_rules.py`，再按变更范围运行并行 unit / integration。
+文档中的验证命令也遵守同一边界：常规 unit / integration 示例保持并行；`tests/live` 或真实外部状态 smoke 示例如果使用 `-n 0`，必须明确它依赖真实站点、secrets、浏览器运行时或外部限流状态。更新提取规则文档后仍先运行 `python3 scripts/validate_extraction_rules.py`，再按变更范围运行并行 unit / integration。
 
 ## 端到端业务流程
 
@@ -378,13 +378,13 @@ provider 内部的多层 metadata enrichment 使用 `paper_fetch.metadata.types.
   - 走 provider 自管 `landing HTML / DOI-derived URL -> NLM/JATS XML -> direct HTTP PDF fallback`
   - XML 成功公开为 `copernicus_xml`；PDF fallback 成功公开为 `copernicus_pdf`
 - `ams`
-  - 走 provider 自管 `Crossref/DOI landing -> FlareSolverr HTML -> seeded-browser PDF fallback`
+  - 走 provider 自管 `Crossref/DOI landing -> CloakBrowser HTML -> seeded-browser PDF fallback`
   - HTML 成功公开为 `ams_html`；PDF fallback 成功公开为 `ams_pdf`
   - AMS 显式忽略 `citation_xml_url`，不请求 `/doc/...xml`，不走 JATS renderer
 
 `paper_fetch.providers.browser_workflow` 是 Wiley / Science / PNAS / AMS 的 canonical browser workflow facade。它保留 `ProviderBrowserProfile`、`BrowserWorkflowClient`、bootstrap、seeded-browser PDF fallback、article conversion 和 related asset download orchestration 的稳定入口。
 
-底层职责已拆到独立包。`profile`、`bootstrap`、`pdf_fallback`、`article`、`assets`、`client`、`shared`、`html_extraction`、`fetchers` 分别承载 profile、HTML bootstrap、PDF/ePDF fallback、article assembly、asset retry helper、client 基类、URL/signal helper、HTML payload/cache helper 和 Playwright fetcher helper。
+底层职责已拆到独立包。`profile`、`bootstrap`、`pdf_fallback`、`article`、`assets`、`client`、`shared`、`html_extraction`、`fetchers` 分别承载 profile、HTML bootstrap、PDF/ePDF fallback、article assembly、asset retry helper、client 基类、URL/signal helper、HTML payload/cache helper 和 browser fetcher helper。
 
 旧兼容入口已删除，包括 `paper_fetch.providers.browser_workflow_fetchers.*`、`_browser_workflow_html_extraction.py`、`_browser_workflow_shared.py`、`_browser_workflow_fetchers.py`、`paper_fetch.providers.science_html`、`paper_fetch.providers.pnas_html` 和 `paper_fetch.providers.wiley_html`。新代码只能从 `paper_fetch.providers.browser_workflow.*` 引入 browser workflow orchestration，从 `paper_fetch.providers._science_html` / `_pnas_html` / `_wiley_html` / `_ams_html` 引入 provider-owned HTML 作者提取和 blocking fallback 信号。
 
@@ -394,9 +394,9 @@ provider-owned author 抽取统一通过 `paper_fetch.providers._html_authors.Au
 
 `paper_fetch.providers._atypon_browser_workflow_profiles` 是 Atypon-only candidate routing/profile dispatch helper。它支持 provider catalog 中的 `science` / `pnas` / `wiley` / `ams`；候选 URL 模板来自 `ProviderSpec`，provider-owned callback 模块按 `ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES` 动态导入。`paper_fetch.providers.atypon_browser_workflow` 承载 Atypon browser HTML markdown、asset scopes、normalization 和 postprocess entrypoint，publisher 差异通过 profile callback 分派。
 
-browser workflow 内部不再通过包级 facade 反射查找 patch 点；`BrowserWorkflowClient`、bootstrap、PDF fallback 和 asset retry helper 统一接收 `shared.BrowserWorkflowDeps`。生产默认依赖由 `default_browser_workflow_deps()` 装配，测试需要替换 runtime、FlareSolverr、Playwright 或 asset downloader 时通过构造定制 deps 注入。
+browser workflow 内部不再通过包级 facade 反射查找 patch 点；`BrowserWorkflowClient`、bootstrap、PDF fallback 和 asset retry helper 统一接收 `shared.BrowserWorkflowDeps`。生产默认依赖由 `default_browser_workflow_deps()` 装配，测试需要替换 runtime、CloakBrowser-backed browser helper 或 asset downloader 时通过构造定制 deps 注入。
 
-`wiley` / `science` / `pnas` / `ams` 的 HTML 正文图片资产下载也属于这套 provider-owned browser workflow：每个 asset download attempt 内，单个 worker 线程会复用自己的 seeded Playwright browser context，先尝试 full-size/original，全部失败后再用同一线程私有 context 尝试 preview；并发 worker 之间不复用 `RuntimeContext` 持有的共享 browser。PNAS direct Playwright HTML preflight 和 PDF/ePDF fallback 同样通过 `RuntimeContext` 复用 browser，但这只适用于非 threaded 的主流程 Playwright 步骤。通用 HTTP-first 资产下载仍保留给非目标 provider，并由 `paper_fetch.extraction.html.assets.download_assets(kind, ...)` 基于 `AssetDownloadKind` 统一处理 figure、table/formula image 与 supplementary 的 resolve/fallback 流程；网络解析阶段进入 bounded worker pool，文件写入、文件名去重、`source_data/` 分流和失败诊断收集仍按原 asset 顺序串行执行。
+`wiley` / `science` / `pnas` / `ams` 的 HTML 正文图片资产下载也属于这套 provider-owned browser workflow：每个 asset download attempt 内，单个 worker 线程会复用自己的 seeded CloakBrowser-backed browser context，先尝试 full-size/original，全部失败后再用同一线程私有 context 尝试 preview；并发 worker 之间不复用 `RuntimeContext` 持有的共享 browser。PNAS fast HTML preflight 和 PDF/ePDF fallback 同样通过 `RuntimeContext` 复用 browser，但这只适用于非 threaded 的主流程 browser 步骤。通用 HTTP-first 资产下载仍保留给非目标 provider，并由 `paper_fetch.extraction.html.assets.download_assets(kind, ...)` 基于 `AssetDownloadKind` 统一处理 figure、table/formula image 与 supplementary 的 resolve/fallback 流程；网络解析阶段进入 bounded worker pool，文件写入、文件名去重、`source_data/` 分流和失败诊断收集仍按原 asset 顺序串行执行。Cloudflare challenge 不触发额外 browser recovery；失败会记录到 asset diagnostics 并进入普通 seed refresh retry。
 
 这些 provider-owned waterfall 由 `paper_fetch.providers._waterfall` 做轻量编排：runner 只负责按 step 顺序执行、累积 warnings、保留失败 label、组合失败并写入成功/失败 source markers；每个 provider 自己定义 XML、HTML、TDM、PDF 或 browser PDF step 的 payload 和错误映射。`ProviderClient.fetch_result` 是 template-method：base 统一完成 raw payload、local-copy flag、related assets、`to_article_model`、artifacts 和 trace/warning 尾部组装，Browser workflow / Springer 只覆盖 abstract-only recovery 与 provider-managed abstract-only finalize。内部 workflow 调用 `fetch_result` 时总是传入 `artifact_store=`；`fetch_result` 仍保留旧 `output_dir` 位置参数和未传 `artifact_store` 时从 `output_dir` 构造默认 store 的直接调用兼容。
 

@@ -116,7 +116,7 @@ class RawFulltextPayloadMetadataCompatibilityTests(unittest.TestCase):
                 "markdown_text": "# Legacy\n\nBody text",
                 "merged_metadata": {"title": "Merged Legacy Title"},
                 "availability_diagnostics": {"accepted": True, "reason": "body_sufficient"},
-                "html_fetcher": "flaresolverr",
+                "html_fetcher": "cloakbrowser",
                 "browser_context_seed": {"browser_final_url": "https://example.test/final"},
                 "suggested_filename": "legacy.html",
                 "html_failure_reason": "abstract_only",
@@ -166,7 +166,7 @@ class RawFulltextPayloadMetadataCompatibilityTests(unittest.TestCase):
                 merged_metadata={"title": "Merged Typed Title"},
                 diagnostics={"availability_diagnostics": {"accepted": True, "reason": "body_sufficient"}},
                 reason="typed reason",
-                fetcher="flaresolverr",
+                fetcher="cloakbrowser",
                 browser_context_seed={"browser_final_url": "https://example.test/final"},
                 suggested_filename="typed.html",
                 html_failure_reason="abstract_only",
@@ -183,7 +183,7 @@ class RawFulltextPayloadMetadataCompatibilityTests(unittest.TestCase):
         self.assertEqual(payload.metadata["markdown_text"], "# Typed\n\nBody text")
         self.assertEqual(payload.metadata["merged_metadata"], {"title": "Merged Typed Title"})
         self.assertEqual(payload.metadata["availability_diagnostics"], {"accepted": True, "reason": "body_sufficient"})
-        self.assertEqual(payload.metadata["html_fetcher"], "flaresolverr")
+        self.assertEqual(payload.metadata["html_fetcher"], "cloakbrowser")
         self.assertEqual(payload.metadata["browser_context_seed"], {"browser_final_url": "https://example.test/final"})
         self.assertEqual(payload.metadata["suggested_filename"], "typed.html")
         self.assertEqual(payload.metadata["html_failure_reason"], "abstract_only")

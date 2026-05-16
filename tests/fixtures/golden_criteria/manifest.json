@@ -248,7 +248,21 @@
       "usage_kind": "content",
       "assets": {
         "article.json": "tests/fixtures/golden_criteria/10.1029_2004gb002273/article.json",
-        "original.html": "tests/fixtures/golden_criteria/10.1029_2004gb002273/original.html"
+        "original.html": "tests/fixtures/golden_criteria/10.1029_2004gb002273/original.html",
+        "body_assets/gbc1137-fig-0001.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0001.png",
+        "body_assets/gbc1137-fig-0002.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0002.png",
+        "body_assets/gbc1137-fig-0003.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0003.png",
+        "body_assets/gbc1137-fig-0004.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0004.png",
+        "body_assets/gbc1137-fig-0005.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0005.png",
+        "body_assets/gbc1137-fig-0006.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0006.png",
+        "body_assets/gbc1137-fig-0007.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0007.png",
+        "body_assets/gbc1137-fig-0008.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0008.png",
+        "body_assets/gbc1137-fig-0009.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0009.png",
+        "body_assets/gbc1137-fig-0010.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0010.png",
+        "body_assets/gbc1137-fig-0011.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0011.png",
+        "body_assets/gbc1137-fig-0012.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0012.png",
+        "body_assets/gbc1137-fig-0013.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0013.png",
+        "body_assets/gbc1137-fig-0014.png": "tests/fixtures/golden_criteria/10.1029_2004gb002273/body_assets/gbc1137-fig-0014.png"
       },
       "fixture_family": "golden"
     },
@@ -776,7 +790,15 @@
       "usage_kind": "content",
       "assets": {
         "article.json": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/article.json",
-        "original.html": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/original.html"
+        "original.html": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/original.html",
+        "body_assets/sciadv.adl6155-f1.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f1.jpg",
+        "body_assets/sciadv.adl6155-f2.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f2.jpg",
+        "body_assets/sciadv.adl6155-f3.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f3.jpg",
+        "body_assets/sciadv.adl6155-f4.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f4.jpg",
+        "body_assets/sciadv.adl6155-f5.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f5.jpg",
+        "body_assets/sciadv.adl6155-f6.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f6.jpg",
+        "body_assets/sciadv.adl6155-f7.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f7.jpg",
+        "body_assets/sciadv.adl6155-f8.jpg": "tests/fixtures/golden_criteria/10.1126_sciadv.adl6155/body_assets/sciadv.adl6155-f8.jpg"
       },
       "fixture_family": "golden"
     },

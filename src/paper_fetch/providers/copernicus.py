@@ -19,7 +19,7 @@ from ..extraction.html.assets import (
     split_body_and_supplementary_assets,
 )
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
-from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_ACCEPT_HEADER, PDF_MIME_TYPE, RequestFailure
+from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYPE, RequestFailure
 from ..http.headers import header_value
 from ..metadata.types import ProviderMetadata
 from ..models import AssetProfile, article_from_markdown, metadata_only_article
@@ -43,6 +43,7 @@ from ..utils import (
 from ._article_markdown_common import first_child, first_descendant, iter_descendants, xml_local_name
 from ._article_markdown_copernicus import CopernicusExtraction, parse_copernicus_xml
 from ._payloads import build_provider_payload
+from ._pdf_common import default_pdf_headers
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
 from ._registry import ProviderBundle, register_provider_bundle
 from ._waterfall import (
@@ -271,13 +272,7 @@ class CopernicusClient(ProviderClient):
         return headers
 
     def _pdf_headers(self, *, referer: str | None = None) -> dict[str, str]:
-        headers = {
-            "Accept": PDF_ACCEPT_HEADER,
-            "User-Agent": self.user_agent,
-        }
-        if referer:
-            headers["Referer"] = referer
-        return headers
+        return default_pdf_headers(self.user_agent, referer=referer)
 
     def _resolve_landing_url(self, doi: str, metadata: Mapping[str, Any]) -> str:
         normalized_doi = normalize_doi(doi)

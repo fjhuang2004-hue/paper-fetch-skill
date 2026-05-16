@@ -74,17 +74,19 @@ class McpAsyncToolTests(unittest.IsolatedAsyncioTestCase):
         started = threading.Event()
         cancelled_seen = threading.Event()
 
-        def fake_fetch_envelope(request, *, env, download_dir, transport, include_article_for_assets):
+        def fake_fetch_paper(query, **kwargs):
             started.set()
             deadline = time.monotonic() + 1.0
             while time.monotonic() < deadline:
+                context = kwargs["context"]
+                transport = context.transport if context is not None else None
                 if transport is not None and transport.cancelled:
                     cancelled_seen.set()
                     raise mcp_tools.RequestCancelledError("Request cancelled.")
                 time.sleep(0.01)
             return sample_envelope(modes={"article", "markdown"})
 
-        with mock.patch.object(mcp_tools, "_fetch_paper_envelope", side_effect=fake_fetch_envelope):
+        with mock.patch.object(mcp_tools, "service_fetch_paper", side_effect=fake_fetch_paper):
             task = asyncio.create_task(mcp_tools.fetch_paper_tool_async(query="10.1000/example"))
             await wait_for_threading_event(started, 1.0)
             task.cancel()

@@ -77,7 +77,7 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
             mock.patch.object(mcp_tools, "service_fetch_paper", return_value=envelope),
             mock.patch.object(mcp_tools, "refresh_cache_index_for_doi"),
         ):
-            result = mcp_tools.fetch_paper_tool(query="10.1000/example", modes=["markdown"])
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example", modes=["markdown"]))
 
         self.assertFalse(result.isError)
         payload = result.structuredContent
@@ -101,7 +101,7 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
             mock.patch.object(mcp_tools, "service_fetch_paper", return_value=envelope),
             mock.patch.object(mcp_tools, "refresh_cache_index_for_doi"),
         ):
-            result = mcp_tools.fetch_paper_tool(query="10.1000/example", modes=["metadata"])
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example", modes=["metadata"]))
 
         self.assertFalse(result.isError)
         payload = result.structuredContent
@@ -118,7 +118,7 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
         )
 
         with mock.patch.object(mcp_tools, "service_fetch_paper", side_effect=error):
-            result = mcp_tools.fetch_paper_tool(query="ambiguous title")
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="ambiguous title"))
 
         self.assertTrue(result.isError)
         self.assertEqual(result.structuredContent["status"], "ambiguous")
@@ -129,7 +129,7 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
             "service_fetch_paper",
             side_effect=ProviderFailure("no_access", "Provider request failed."),
         ):
-            result = mcp_tools.fetch_paper_tool(query="10.1000/example")
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example"))
 
         self.assertTrue(result.isError)
         self.assertEqual(result.structuredContent["status"], "no_access")
@@ -160,7 +160,7 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
                 missing_env=["ELSEVIER_API_KEY"],
             ),
         ):
-            result = mcp_tools.fetch_paper_tool(query="10.1000/example")
+            result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example"))
 
         self.assertTrue(result.isError)
         self.assertEqual(result.structuredContent["status"], "no_access")
@@ -265,8 +265,10 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
         self.assertEqual([item["query"] for item in payload["results"]], ["first", "second", "third"])
         self.assertGreaterEqual(max_active, 2)
     def test_batch_resolve_tool_rejects_too_many_queries(self) -> None:
-        result = mcp_tools.batch_resolve_tool(
-            queries=[f"10.1000/{index}" for index in range(51)],
+        result = asyncio.run(
+            mcp_tools.batch_resolve_tool_async(
+                queries=[f"10.1000/{index}" for index in range(51)],
+            )
         )
 
         self.assertTrue(result.isError)
@@ -313,19 +315,23 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
             {"abstract": 32, "body": 96, "refs": 24},
         )
     def test_batch_check_tool_rejects_invalid_concurrency(self) -> None:
-        result = mcp_tools.batch_check_tool(
-            queries=["10.1000/one"],
-            mode="metadata",
-            concurrency=0,
+        result = asyncio.run(
+            mcp_tools.batch_check_tool_async(
+                queries=["10.1000/one"],
+                mode="metadata",
+                concurrency=0,
+            )
         )
 
         self.assertTrue(result.isError)
         self.assertEqual(result.structuredContent["status"], "error")
         self.assertIn("greater than or equal to 1", result.structuredContent["reason"])
     def test_batch_check_tool_rejects_too_many_queries(self) -> None:
-        result = mcp_tools.batch_check_tool(
-            queries=[f"10.1000/{index}" for index in range(51)],
-            mode="metadata",
+        result = asyncio.run(
+            mcp_tools.batch_check_tool_async(
+                queries=[f"10.1000/{index}" for index in range(51)],
+                mode="metadata",
+            )
         )
 
         self.assertTrue(result.isError)
@@ -413,16 +419,18 @@ class McpBatchResolvePayloadTests(unittest.TestCase):
         tool_schema = server._tool_manager._tools["fetch_paper"].fn_metadata.output_model
         assert tool_schema is not None
 
-        result = mcp_tools.fetch_paper_tool(query="10.1000/example", modes=["pdf"])
+        result = asyncio.run(mcp_tools.fetch_paper_tool_async(query="10.1000/example", modes=["pdf"]))
 
         self.assertTrue(result.isError)
         self.assertEqual(result.structuredContent["status"], "error")
         tool_schema.model_validate(result.structuredContent)
     def test_fetch_paper_tool_rejects_negative_inline_image_budget_before_service_call(self) -> None:
         with mock.patch.object(mcp_tools, "service_fetch_paper") as mocked_fetch:
-            result = mcp_tools.fetch_paper_tool(
-                query="10.1000/example",
-                strategy={"inline_image_budget": {"max_images": -1}},
+            result = asyncio.run(
+                mcp_tools.fetch_paper_tool_async(
+                    query="10.1000/example",
+                    strategy={"inline_image_budget": {"max_images": -1}},
+                )
             )
 
         self.assertTrue(result.isError)

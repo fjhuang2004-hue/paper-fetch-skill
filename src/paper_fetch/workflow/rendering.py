@@ -10,7 +10,7 @@ from typing import Any, Mapping
 
 from ..artifacts import ArtifactStore
 from ..models import ArticleModel, FetchEnvelope, OutputMode, RenderOptions
-from ..models.markdown import replace_markdown_images
+from ..models.markdown import image_reference_basename, image_reference_candidates, replace_markdown_images
 from ..provider_catalog import known_article_source_names
 from ..reason_codes import METADATA_ONLY
 from ..quality.reason_codes import FULLTEXT
@@ -71,7 +71,7 @@ def _local_asset_lookup_by_basename(
         basenames = {Path(str(asset.path or "")).name}
         source_url = str(asset.url or "").strip()
         if source_url:
-            basenames.add(Path(urllib.parse.unquote(urllib.parse.urlparse(source_url).path)).name)
+            basenames.add(image_reference_basename(urllib.parse.unquote(urllib.parse.urlparse(source_url).path)))
         for basename in basenames:
             if not basename:
                 continue
@@ -84,33 +84,10 @@ def _local_asset_lookup_by_basename(
     return {basename: path for basename, path in candidates.items() if basename not in ambiguous}
 
 
-def _image_reference_candidates(value: str | None) -> set[str]:
-    normalized = normalize_text(value).strip("<>")
-    if not normalized:
-        return set()
-
-    parsed = urllib.parse.urlsplit(normalized)
-    path = parsed.path or normalized
-    candidates = {normalized, path, urllib.parse.unquote(normalized), urllib.parse.unquote(path)}
-    cleaned: set[str] = set()
-    for candidate in candidates:
-        text = normalize_text(candidate).replace("\\", "/")
-        text = re.sub(r"/+", "/", text).strip()
-        text = text.removeprefix("./")
-        if text:
-            cleaned.add(text)
-            cleaned.add(text.lstrip("/"))
-    return cleaned
-
-
 def _asset_field(asset: Any, field: str) -> str | None:
     if isinstance(asset, Mapping):
         return normalize_text(asset.get(field)) or None
     return normalize_text(getattr(asset, field, None)) or None
-
-
-def _reference_basename(value: str) -> str:
-    return value.rstrip("/").rsplit("/", 1)[-1]
 
 
 def _local_asset_lookups(
@@ -142,7 +119,7 @@ def _local_asset_lookups(
             "full_size_url",
             "link",
         ):
-            candidates |= _image_reference_candidates(_asset_field(asset, field))
+            candidates |= image_reference_candidates(_asset_field(asset, field))
         for candidate in candidates:
             existing = exact.get(candidate)
             if existing is None:
@@ -150,7 +127,7 @@ def _local_asset_lookups(
             elif existing != relative_path:
                 exact_ambiguous.add(candidate)
 
-            basename = _reference_basename(candidate)
+            basename = image_reference_basename(candidate)
             if not basename:
                 continue
             existing_basename = basenames.get(basename)
@@ -194,14 +171,14 @@ def rewrite_markdown_asset_links(
         destination = match.group(2)
         relative_path = relative_asset_link(destination, target_path=target_path)
         if relative_path is None and prefix.startswith("!["):
-            destination_candidates = _image_reference_candidates(destination)
+            destination_candidates = image_reference_candidates(destination)
             for candidate in destination_candidates:
                 relative_path = local_assets_by_reference.get(candidate)
                 if relative_path is not None:
                     break
             if relative_path is None:
                 for candidate in destination_candidates:
-                    relative_path = local_assets_by_candidate_basename.get(_reference_basename(candidate))
+                    relative_path = local_assets_by_candidate_basename.get(image_reference_basename(candidate))
                     if relative_path is not None:
                         break
             if relative_path is None:
@@ -214,14 +191,14 @@ def rewrite_markdown_asset_links(
         destination = normalize_text(image.url).strip("<>")
         relative_path = relative_asset_link(destination, target_path=target_path)
         if relative_path is None:
-            destination_candidates = _image_reference_candidates(destination)
+            destination_candidates = image_reference_candidates(destination)
             for candidate in destination_candidates:
                 relative_path = local_assets_by_reference.get(candidate)
                 if relative_path is not None:
                     break
             if relative_path is None:
                 for candidate in destination_candidates:
-                    relative_path = local_assets_by_candidate_basename.get(_reference_basename(candidate))
+                    relative_path = local_assets_by_candidate_basename.get(image_reference_basename(candidate))
                     if relative_path is not None:
                         break
             if relative_path is None:

@@ -8,7 +8,7 @@ from typing import Any, Callable, Mapping, Pattern
 
 from ..extraction.html.parsing import choose_parser
 from ..utils import dedupe_authors, normalize_text
-from ._script_json import extract_assignment_json, extract_script_json
+from ._script_json import extract_script_json
 
 from bs4 import BeautifulSoup, Tag
 
@@ -63,13 +63,6 @@ class AuthorExtractionPipeline:
         if isinstance(step, AuthorStep):
             return step
         return AuthorStep(getattr(step, "__name__", step.__class__.__name__), step)
-
-
-def load_json_assignment(
-    html_text: str, pattern: Pattern[str]
-) -> Mapping[str, Any] | None:
-    payload = extract_assignment_json(html_text, pattern)
-    return payload if isinstance(payload, Mapping) else None
 
 
 def normalized_author_tokens(value: str | None) -> list[str]:

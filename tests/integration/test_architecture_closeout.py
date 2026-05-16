@@ -42,6 +42,9 @@ REMOVED_PROVIDER_COMPATIBILITY_MODULE_FILES = [
     PROVIDERS_DIR / "wiley_html.py",
     PROVIDERS_DIR / "html_assets.py",
     PAPER_FETCH_SRC / "extraction" / "html" / "_assets.py",
+    PAPER_FETCH_SRC / "extraction" / "html" / "assets" / "_core.py",
+    PAPER_FETCH_SRC / "models" / "_core.py",
+    PROVIDERS_DIR / "atypon_browser_workflow" / "_core.py",
 ]
 SPRINGER_PROVIDER_PATH = PROVIDERS_DIR / "springer.py"
 ELSEVIER_PROVIDER_PATH = PROVIDERS_DIR / "elsevier.py"
@@ -78,7 +81,6 @@ RAW_PAYLOAD_METADATA_MAGIC_PATTERN = re.compile(
 TARGETED_CYCLE_PATHS = [
     PAPER_FETCH_SRC / "extraction" / "html" / "_metadata.py",
     PAPER_FETCH_SRC / "extraction" / "html" / "_runtime.py",
-    PAPER_FETCH_SRC / "extraction" / "html" / "assets" / "_core.py",
     PROVIDERS_DIR / "html_springer_nature.py",
     PROVIDERS_DIR / "browser_workflow" / "profile.py",
     PROVIDERS_DIR / "browser_workflow" / "shared.py",
@@ -279,7 +281,7 @@ class ArchitectureCloseoutTests(unittest.TestCase):
     def test_repo_hygiene_guards_against_old_script_package_and_tracked_benchmarks(self) -> None:
         self.assertFalse((REPO_ROOT / "scripts" / "__init__.py").exists())
         self.assertFalse((REPO_ROOT / "references" / "formula_backend_report.json").exists())
-        self.assertFalse((REPO_ROOT / "vendor" / "flaresolverr" / "fetch_fulltext.reference.py").exists())
+        self.assertFalse((REPO_ROOT / "vendor" / "fetch_fulltext.reference.py").exists())
 
     def test_removed_provider_compatibility_modules_stay_deleted(self) -> None:
         offenders = [

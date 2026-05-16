@@ -31,8 +31,6 @@ Options:
   --venv-dir <path>             Use a custom virtualenv directory.
   --editable                    Install the Python package in editable mode.
   --skip-pip-upgrade            Do not upgrade pip before installing.
-  --skip-flaresolverr-setup     Skip repo-local FlareSolverr source setup.
-  --skip-playwright-install     Skip Playwright Chromium browser install.
   --no-node                     Skip the Node mathml-to-latex formula fallback.
   -h, --help                    Show this help.
 EOF
@@ -60,7 +58,7 @@ while (($#)); do
         --skip-pip-upgrade)
             UPGRADE_PIP=0
             ;;
-        --skip-flaresolverr-setup|--skip-playwright-install|--no-node)
+        --no-node)
             FORMULA_ARGS+=("$1")
             ;;
         -h|--help)
@@ -121,7 +119,7 @@ if [ "$INSTALL_HEAVY" = "1" ]; then
     PYTHON_BIN="$PYTHON_BIN" \
         bash "$REPO_DIR/install-formula-tools.sh" "${FORMULA_ARGS[@]}"
 else
-    warn "Skipped Playwright Chromium, FlareSolverr, and external formula backends because --lite was set."
+    warn "Skipped browser warmup and external formula backends because --lite was set."
 fi
 
 echo

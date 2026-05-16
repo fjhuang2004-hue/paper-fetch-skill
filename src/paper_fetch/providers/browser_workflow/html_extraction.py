@@ -24,7 +24,10 @@ from ...runtime import RuntimeContext
 from ...runtime_browser import BrowserContextManager
 from ...tracing import fulltext_marker, trace_from_markers
 from ...utils import normalize_text
-from .fetchers import _normalized_response_headers
+from .fetchers.context import (
+    _browser_response_headers as _response_headers,
+    _browser_response_status as _response_status,
+)
 from .shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES, looks_like_abstract_redirect
 from ..browser_runtime import (
     BrowserFetchedHtml,
@@ -59,27 +62,17 @@ _FAST_BROWSER_HTML_RETRY_KINDS = {
     STRUCTURED_ARTICLE_NOT_FULLTEXT,
     STRUCTURED_MISSING_BODY_SECTIONS,
 }
-_DIRECT_PLAYWRIGHT_HTML_TIMEOUT_MS = _FAST_BROWSER_HTML_TIMEOUT_MS  # legacy alias
-_DIRECT_PLAYWRIGHT_HTML_BLOCKED_RESOURCE_TYPES = _FAST_BROWSER_HTML_BLOCKED_RESOURCE_TYPES  # legacy alias
-_FAST_FLARESOLVERR_HTML_WAIT_SECONDS = _FAST_BROWSER_HTML_WAIT_SECONDS  # legacy alias
-_FAST_FLARESOLVERR_HTML_WARM_WAIT_SECONDS = _FAST_BROWSER_HTML_WARM_WAIT_SECONDS  # legacy alias
-_FAST_FLARESOLVERR_RETRY_KINDS = _FAST_BROWSER_HTML_RETRY_KINDS  # legacy alias
 
 __all__ = [
-    "_DIRECT_PLAYWRIGHT_HTML_TIMEOUT_MS",
     "_FAST_BROWSER_HTML_TIMEOUT_MS",
     "_FAST_BROWSER_HTML_WAIT_SECONDS",
     "_FAST_BROWSER_HTML_WARM_WAIT_SECONDS",
     "_FAST_BROWSER_HTML_RETRY_KINDS",
-    "_FAST_FLARESOLVERR_HTML_WAIT_SECONDS",  # legacy
-    "_FAST_FLARESOLVERR_HTML_WARM_WAIT_SECONDS",  # legacy
     "_browser_workflow_html_payload",
     "_cached_browser_workflow_assets",
     "_cached_browser_workflow_markdown",
     "_fetch_browser_html_payload",
     "_fetch_browser_html_payload_with_fast_path",
-    "_fetch_flaresolverr_html_payload",  # legacy
-    "_fetch_flaresolverr_html_payload_with_fast_path",  # legacy
     "extract_browser_workflow_asset_html_scopes",
     "extract_atypon_browser_workflow_markdown",
     "fetch_html_with_fast_browser",
@@ -150,24 +143,6 @@ def _cached_browser_workflow_assets(
         )
 
     return context.get_or_set_parse_cache(key, extract_assets, copy_value=True)
-
-
-def _response_headers(response: Any) -> dict[str, str]:
-    if response is None:
-        return {}
-    try:
-        return _normalized_response_headers(response.all_headers())
-    except Exception:
-        return _normalized_response_headers(getattr(response, "headers", {}) or {})
-
-
-def _response_status(response: Any) -> int | None:
-    if response is None:
-        return None
-    try:
-        return int(getattr(response, "status", 0) or 0) or None
-    except (TypeError, ValueError):
-        return None
 
 
 def _fast_browser_context_seed(context: Any, *, final_url: str, user_agent: str) -> dict[str, Any]:
@@ -304,8 +279,6 @@ def fetch_html_with_fast_browser(
 
 
 fetch_html_with_fast_browser.paper_fetch_html_fetcher_name = "cloakbrowser_fast"  # type: ignore[attr-defined]
-fetch_html_with_direct_playwright = fetch_html_with_fast_browser  # legacy alias
-_direct_playwright_browser_context_seed = _fast_browser_context_seed  # legacy alias
 
 
 def _browser_workflow_html_payload(
@@ -391,9 +364,6 @@ def _fetch_browser_html_payload(
     )
 
 
-_fetch_flaresolverr_html_payload = _fetch_browser_html_payload  # legacy alias
-
-
 def _should_retry_fast_browser_failure(exc: Exception) -> bool:
     if isinstance(exc, BrowserRuntimeFailure):
         return exc.kind in _FAST_BROWSER_HTML_RETRY_KINDS
@@ -447,6 +417,3 @@ def _fetch_browser_html_payload_with_fast_path(
         wait_seconds=DEFAULT_BROWSER_RUNTIME_WAIT_SECONDS,
         warm_wait_seconds=DEFAULT_BROWSER_RUNTIME_WARM_WAIT_SECONDS,
     )
-
-
-_fetch_flaresolverr_html_payload_with_fast_path = _fetch_browser_html_payload_with_fast_path  # legacy alias

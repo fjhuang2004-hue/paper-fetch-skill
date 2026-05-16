@@ -28,6 +28,7 @@ PROVIDER_SECTIONS = (
     "Wiley",
     "Science",
     "PNAS",
+    "AMS",
     "IEEE",
     "Copernicus",
 )

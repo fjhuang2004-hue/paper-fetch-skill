@@ -330,36 +330,16 @@ jobs:
             throw "offline.env managed block does not point at the install root.`n$offlineEnv"
           }
 
-          & $runtimePython -X utf8 -c "import paper_fetch; import paper_fetch.mcp.server; from paper_fetch.mcp.tools import provider_status_payload; assert 'providers' in provider_status_payload()"
+          & $runtimePython -X utf8 -c "import paper_fetch; import paper_fetch.mcp.server; from paper_fetch.mcp.fetch_tool import provider_status_payload; assert 'providers' in provider_status_payload()"
           & (Join-Path $installRoot "bin/paper-fetch.cmd") --help | Out-Null
           & (Join-Path $installRoot "formula-tools/bin/texmath.exe") --help | Out-Null
 
-          $playwrightCheck = @'
-          from pathlib import Path
-          import sys
-          from playwright.sync_api import sync_playwright
+          $cloakbrowserCheck = @'
+          import cloakbrowser
 
-          root = Path(sys.argv[1]).resolve()
-          manager = sync_playwright().start()
-          try:
-              executable = Path(manager.chromium.executable_path).resolve()
-          finally:
-              manager.stop()
-
-          assert executable.is_file(), executable
-          assert root in executable.parents, (root, executable)
+          assert hasattr(cloakbrowser, "launch")
           '@
-          & $runtimePython -X utf8 -c $playwrightCheck (Join-Path $installRoot "ms-playwright")
-
-          try {
-            & (Join-Path $installRoot "bin/flaresolverr-up.cmd")
-            $status = & (Join-Path $installRoot "bin/flaresolverr-status.cmd") | ConvertFrom-Json
-            if ($status.status -ne "ok") {
-              throw "FlareSolverr sessions.list returned status=$($status.status)"
-            }
-          } finally {
-            & (Join-Path $installRoot "bin/flaresolverr-down.cmd")
-          }
+          & $runtimePython -X utf8 -c $cloakbrowserCheck
 
           $log = Get-Content -LiteralPath $fakeLog -Raw
           foreach ($expected in @(

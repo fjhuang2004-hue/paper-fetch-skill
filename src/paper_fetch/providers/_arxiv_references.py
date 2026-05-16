@@ -8,7 +8,6 @@ import re
 from ..extraction.html.semantics import SECTION_HEADING_PATTERN
 from ..extraction.html.tables import render_table_markdown, table_placeholder
 from ..models.markdown import normalize_markdown_text
-from ..publisher_identity import DOI_PATTERN
 from ..utils import normalize_text
 from ._arxiv_html import (
     ArxivSemanticPreparation,
@@ -24,6 +23,7 @@ from ._html_section_markdown import (
     render_clean_text_from_html,
     render_heading_text_from_html,
 )
+from ._reference_doi import reference_doi_match as _reference_doi_match
 
 _REFERENCE_YEAR_PATTERN = re.compile(r"\b((?:18|19|20)\d{2})\b")
 _ARXIV_TABLE_ID_PATTERN = re.compile(
@@ -49,13 +49,6 @@ def _extract_reference_doi(node: Any) -> str | None:
     if match is None:
         return None
     return normalize_text(match.group(0).rstrip(").,;"))
-
-
-def _reference_doi_match(value: str) -> re.Match[str] | None:
-    for match in DOI_PATTERN.finditer(value):
-        if match.start() == 0 or not value[match.start() - 1].isalnum():
-            return match
-    return None
 
 
 def _extract_reference_year(text: str, node: Any) -> str | None:

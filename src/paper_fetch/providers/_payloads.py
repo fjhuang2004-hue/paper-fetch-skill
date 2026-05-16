@@ -5,7 +5,16 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from ..tracing import trace_from_markers
-from .base import ProviderContent, RawFulltextPayload
+from .base import ProviderContent, ProviderFailure, RawFulltextPayload
+
+
+def provider_failure_diagnostics(failure: ProviderFailure | None) -> dict[str, Any] | None:
+    if failure is None:
+        return None
+    diagnostics: dict[str, Any] = {"code": failure.code, "message": failure.message}
+    if failure.source_trail:
+        diagnostics["source_trail"] = list(failure.source_trail)
+    return diagnostics
 
 
 def build_provider_payload(
@@ -60,4 +69,4 @@ def build_provider_payload(
     )
 
 
-__all__ = ["build_provider_payload"]
+__all__ = ["build_provider_payload", "provider_failure_diagnostics"]

@@ -57,7 +57,7 @@ class AtyponBrowserWorkflowProviderRetryTests(AtyponBrowserWorkflowProviderTestC
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 refresh_browser_context_seed=mocked_warm,
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             result = client.download_related_assets(
                 PNAS_SAMPLE.doi,
@@ -320,7 +320,7 @@ class AtyponBrowserWorkflowProviderRetryTests(AtyponBrowserWorkflowProviderTestC
             ],
         )
         self.assertEqual(result["asset_failures"], [])
-    def test_wiley_provider_download_related_assets_uses_shared_playwright_primary_path(self) -> None:
+    def test_wiley_provider_download_related_assets_uses_shared_browser_primary_path(self) -> None:
         full_size_url = "https://onlinelibrary.wiley.com/cms/asset/full/figure1.jpg"
         html = f"""
 <article>
@@ -362,7 +362,7 @@ class AtyponBrowserWorkflowProviderRetryTests(AtyponBrowserWorkflowProviderTestC
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,
@@ -386,7 +386,7 @@ class AtyponBrowserWorkflowProviderRetryTests(AtyponBrowserWorkflowProviderTestC
         self.assertEqual(result["asset_failures"], [])
         self.assertEqual(result["assets"][0]["download_tier"], "full_size")
         self.assertEqual(saved_bytes, b"\xff\xd8\xffprimary-image")
-    def test_wiley_provider_download_related_assets_reuses_shared_playwright_fetcher_across_assets(self) -> None:
+    def test_wiley_provider_download_related_assets_reuses_shared_browser_fetcher_across_assets(self) -> None:
         first_url = "https://onlinelibrary.wiley.com/cms/asset/full/figure1.jpg"
         second_url = "https://onlinelibrary.wiley.com/cms/asset/full/figure2.jpg"
         html = f"""
@@ -442,7 +442,7 @@ class AtyponBrowserWorkflowProviderRetryTests(AtyponBrowserWorkflowProviderTestC
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                _build_shared_playwright_image_fetcher=mocked_builder,
+                _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
                 mock.patch.object(html_assets, "_build_cookie_seeded_opener") as mocked_opener,

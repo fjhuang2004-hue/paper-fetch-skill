@@ -31,9 +31,6 @@ class BrowserFetchedHtml:
     image_payload: Mapping[str, Any] | None = None
 
 
-FetchedPublisherHtml = BrowserFetchedHtml
-
-
 class BrowserRuntimeFailure(Exception):
     def __init__(
         self,
@@ -48,10 +45,6 @@ class BrowserRuntimeFailure(Exception):
         self.message = message
         self.browser_context_seed = dict(browser_context_seed or {})
         self.details = dict(details or {})
-
-
-FlareSolverrFailure = BrowserRuntimeFailure
-
 
 class BrowserImagePayload(TypedDict):
     bodyB64: str

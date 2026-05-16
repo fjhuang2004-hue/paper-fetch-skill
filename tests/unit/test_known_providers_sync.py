@@ -1,32 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-
-import yaml
-
 import paper_fetch.providers  # noqa: F401
 from paper_fetch.provider_catalog import PROVIDER_CATALOG
 from paper_fetch.providers._registry import iter_provider_bundles
 
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ONBOARDING_DIR = REPO_ROOT / "docs" / "ai-onboarding"
-KNOWN_PROVIDERS_PATH = ONBOARDING_DIR / "known-providers.yml"
-MANIFESTS_DIR = ONBOARDING_DIR / "manifests"
-
-
-def load_yaml(path: Path) -> dict[str, Any]:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    assert isinstance(data, dict), f"{path} must load as a mapping"
-    return data
+from ._manifest_sync import (
+    MANIFESTS_DIR,
+    REPO_ROOT,
+    load_known_provider_entries,
+    load_yaml,
+)
 
 
-def known_provider_entries() -> list[dict[str, Any]]:
-    data = load_yaml(KNOWN_PROVIDERS_PATH)
-    entries = data.get("providers")
-    assert isinstance(entries, list)
-    return entries
+def known_provider_entries():
+    return load_known_provider_entries()
 
 
 def test_known_providers_match_runtime_provider_names() -> None:

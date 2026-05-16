@@ -2,20 +2,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import stat
 import subprocess
 import tempfile
-import textwrap
 import unittest
+
+from ._installer_support import write_executable as _write_executable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-
-
-def _write_executable(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
-    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 class SkillInstallerTests(unittest.TestCase):

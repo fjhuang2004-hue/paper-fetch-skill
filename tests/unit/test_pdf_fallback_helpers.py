@@ -7,7 +7,7 @@ import unittest
 from unittest import mock
 
 from paper_fetch.providers import (
-    _flaresolverr,
+    browser_runtime,
     _pdf_candidates,
     _pdf_common,
     _pdf_fallback,
@@ -19,11 +19,11 @@ class PdfFallbackHelperTests(unittest.TestCase):
     def test_sanitize_storage_state_uses_shared_cloudflare_cookie_tokens(self) -> None:
         self.assertIs(
             _pdf_common.CLOUDFLARE_COOKIE_NAMES,
-            _flaresolverr.CLOUDFLARE_COOKIE_NAMES,
+            browser_runtime.CLOUDFLARE_COOKIE_NAMES,
         )
         self.assertIs(
             _pdf_common._CLOUDFLARE_COOKIE_PREFIXES,
-            _flaresolverr._CLOUDFLARE_COOKIE_PREFIXES,
+            browser_runtime._CLOUDFLARE_COOKIE_PREFIXES,
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:

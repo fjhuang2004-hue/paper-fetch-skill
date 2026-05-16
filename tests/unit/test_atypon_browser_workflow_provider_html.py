@@ -17,7 +17,7 @@ class AtyponBrowserWorkflowProviderHtmlTests(AtyponBrowserWorkflowProviderTestCa
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_fast_browser=mocked_direct,
                 fetch_html_with_browser=mock.Mock(
-                    return_value=_flaresolverr.FetchedPublisherHtml(
+                    return_value=browser_runtime.BrowserFetchedHtml(
                         source_url=SCIENCE_SAMPLE.landing_url,
                         final_url=SCIENCE_SAMPLE.landing_url,
                         html="<html></html>",
@@ -35,7 +35,7 @@ class AtyponBrowserWorkflowProviderHtmlTests(AtyponBrowserWorkflowProviderTestCa
                         {"title": SCIENCE_SAMPLE.title},
                     )
                 ),
-                fetch_pdf_with_playwright=mocked_pdf,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(
                 SCIENCE_SAMPLE.doi,

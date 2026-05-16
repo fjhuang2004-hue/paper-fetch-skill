@@ -37,14 +37,7 @@ problems_doc.md
 agent-surface-plan.md
 docs/pm-dev-overview.local.md
 docs/ai-onboarding/onboarding-state.json
-vendor/flaresolverr/.work/
-vendor/flaresolverr/.venv-flaresolverr/
-vendor/flaresolverr/.flaresolverr/
-vendor/flaresolverr/run_logs/
-legacy/flaresolverr/vendor/.work/
-legacy/flaresolverr/vendor/.venv-flaresolverr/
-legacy/flaresolverr/vendor/.flaresolverr/
-legacy/flaresolverr/vendor/run_logs/
+legacy/flaresolverr/
 todo.md
 publisher-provider-todo.md
 

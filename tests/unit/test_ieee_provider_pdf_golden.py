@@ -71,14 +71,14 @@ class IeeeProviderPdfGoldenTests(unittest.TestCase):
         self.assertEqual(headers["Referer"], landing_url)
     def test_legacy_fixture_pdf_candidates_preserve_pdf_url_pdf_path_stamp_order(self) -> None:
         fixtures = [
-            ("10.1109/MPER.1985.5526567", "5526567", "10.1109_MPER.1985.5526567"),
-            ("10.1109/PGEC.1967.264619", "4038993", "10.1109_PGEC.1967.264619"),
+            ("10.1109/MPER.1985.5526567", "5526567"),
+            ("10.1109/PGEC.1967.264619", "4038993"),
         ]
 
-        for doi, article_number, fixture_dir in fixtures:
+        for doi, article_number in fixtures:
             with self.subTest(doi=doi):
                 landing_url = f"https://ieeexplore.ieee.org/document/{article_number}/"
-                html = (REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / fixture_dir / "landing.html").read_text(
+                html = golden_criteria_asset(doi, "landing.html").read_text(
                     encoding="utf-8"
                 )
                 landing_metadata = _ieee_metadata._parse_landing_metadata(html)
@@ -253,12 +253,11 @@ class IeeeProviderPdfGoldenTests(unittest.TestCase):
         )
     def test_real_ieee_html_golden_samples_preserve_semantics(self) -> None:
         """rule: rule-ieee-html-structure"""
-        for label, (doi, fixture_dir, article_number) in IEEE_REAL_HTML_SAMPLES.items():
+        for label, (doi, article_number) in IEEE_REAL_HTML_SAMPLES.items():
             with self.subTest(label=label):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     extraction, article, markdown = _real_ieee_fixture_article(
                         doi=doi,
-                        fixture_dir=fixture_dir,
                         article_number=article_number,
                         tmpdir=Path(tmpdir),
                     )
@@ -320,7 +319,7 @@ class IeeeProviderPdfGoldenTests(unittest.TestCase):
                         self.assertGreater(len(article.metadata.keywords), 0)
     def test_ieee_tim_fixture_original_html_is_parsed_as_body(self) -> None:
         """rule: rule-ieee-html-structure"""
-        fixture = REPO_ROOT / "tests" / "fixtures" / "golden_criteria" / "10.1109_TIM.2024.3509573" / "original.html"
+        fixture = golden_criteria_asset("10.1109/TIM.2024.3509573", "original.html")
         source_url = "https://ieeexplore.ieee.org/rest/document/10772041/?logAccess=true"
 
         extraction = _ieee_html._extract_ieee_html(

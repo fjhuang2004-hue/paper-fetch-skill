@@ -41,7 +41,7 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_browser=mock.Mock(
-                    side_effect=_flaresolverr.FlareSolverrFailure(
+                    side_effect=browser_runtime.BrowserRuntimeFailure(
                         "redirected_to_abstract",
                         "Abstract redirect",
                         browser_context_seed=seed,
@@ -92,7 +92,7 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_browser=mock.Mock(
-                    return_value=_flaresolverr.FetchedPublisherHtml(
+                    return_value=browser_runtime.BrowserFetchedHtml(
                         source_url=PNAS_SAMPLE.landing_url,
                         final_url=PNAS_SAMPLE.landing_url,
                         html="<html></html>",
@@ -237,7 +237,7 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
             "browser_final_url": PNAS_SAMPLE.landing_url,
         }
         mocked_fast = mock.Mock(
-            return_value=_flaresolverr.FetchedPublisherHtml(
+            return_value=browser_runtime.BrowserFetchedHtml(
                 source_url=PNAS_SAMPLE.landing_url,
                 final_url=PNAS_SAMPLE.landing_url,
                 html="<html><body><main>PNAS direct full text</main></body></html>",
@@ -291,11 +291,11 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
             mocked_runtime = mock.Mock(return_value=runtime)
             mocked_browser = mock.Mock(
                 side_effect=[
-                    _flaresolverr.FlareSolverrFailure(
+                    browser_runtime.BrowserRuntimeFailure(
                         "redirected_to_abstract",
                         "Fast browser path redirected to abstract.",
                     ),
-                    _flaresolverr.FetchedPublisherHtml(
+                    browser_runtime.BrowserFetchedHtml(
                         source_url=PNAS_SAMPLE.landing_url,
                         final_url=PNAS_SAMPLE.landing_url,
                         html="<html></html>",
@@ -649,7 +649,7 @@ class AtyponBrowserWorkflowProviderFallbackTests(AtyponBrowserWorkflowProviderTe
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
                 fetch_html_with_browser=mock.Mock(
-                    side_effect=_flaresolverr.FlareSolverrFailure(
+                    side_effect=browser_runtime.BrowserRuntimeFailure(
                         "redirected_to_abstract",
                         "Abstract redirect",
                         browser_context_seed=seed,

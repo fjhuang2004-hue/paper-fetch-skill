@@ -110,11 +110,6 @@ class AtyponBrowserWorkflowBrowserRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(warmed["browser_final_url"], "https://onlinelibrary.wiley.com/doi/10.1111/test")
 
-    def test_runtime_aliases_match_cloakbrowser_backend(self) -> None:
-        self.assertIs(browser_runtime.BrowserRuntimeConfig, _cloakbrowser.CloakBrowserRuntimeConfig)
-        self.assertIs(browser_runtime.BrowserRuntimeFailure, _cloakbrowser.CloakBrowserFailure)
-        self.assertIs(browser_runtime.BrowserFetchedHtml, _cloakbrowser.FetchedPublisherHtml)
-
 
 if __name__ == "__main__":
     unittest.main()

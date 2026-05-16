@@ -12,8 +12,8 @@ from unittest import mock
 
 from paper_fetch.http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, DEFAULT_TIMEOUT_SECONDS, RequestFailure
 from paper_fetch.extraction.html import assets as html_assets
-from paper_fetch.extraction.html.assets import _core as asset_impl
-from paper_fetch.providers import _flaresolverr, browser_workflow
+from paper_fetch.extraction.html.assets import download as asset_impl
+from paper_fetch.providers import browser_runtime, browser_workflow
 from paper_fetch.providers.browser_workflow import fetchers as browser_fetchers
 from paper_fetch.providers.browser_workflow.fetchers import context as fetcher_context
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
@@ -208,22 +208,20 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
     def test_wiley_browser_workflow_prefers_html_route(self) -> None:
         doi = "10.1002/ece3.9361"
-        runtime = _flaresolverr.FlareSolverrRuntimeConfig(
+        runtime = browser_runtime.BrowserRuntimeConfig(
             provider="wiley",
             doi=doi,
-            url="http://127.0.0.1:8191/v1",
-            env_file=Path("/tmp/.env.flaresolverr"),
-            source_dir=Path("/tmp/vendor/flaresolverr"),
             artifact_dir=Path("/tmp/artifacts"),
             headless=True,
+            user_agent="paper-fetch-test/1",
         )
 
         mocked_pdf = mock.Mock()
         deps = browser_workflow_deps(
             load_runtime_config=mock.Mock(return_value=runtime),
             ensure_runtime_ready=mock.Mock(),
-            fetch_html_with_flaresolverr=mock.Mock(
-                return_value=_flaresolverr.FetchedPublisherHtml(
+            fetch_html_with_browser=mock.Mock(
+                return_value=browser_runtime.BrowserFetchedHtml(
                     source_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
                     final_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
                     html="<html></html>",
@@ -241,7 +239,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                     {"title": "Example"},
                 )
             ),
-            fetch_pdf_with_playwright=mocked_pdf,
+            fetch_pdf_with_browser=mocked_pdf,
         )
         client = WileyClient(transport=None, env={}, deps=deps)
         payload = client.fetch_raw_fulltext(
@@ -255,18 +253,16 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(payload.content.route_kind, "html")
         self.assertEqual(payload.content_type, "text/html")
 
-    def test_browser_workflow_flaresolverr_fast_path_uses_conservative_fallback_after_challenge(self) -> None:
+    def test_browser_workflow_fast_path_uses_conservative_fallback_after_challenge(self) -> None:
         doi = "10.1002/ece3.9361"
-        runtime = _flaresolverr.FlareSolverrRuntimeConfig(
+        runtime = browser_runtime.BrowserRuntimeConfig(
             provider="wiley",
             doi=doi,
-            url="http://127.0.0.1:8191/v1",
-            env_file=Path("/tmp/.env.flaresolverr"),
-            source_dir=Path("/tmp/vendor/flaresolverr"),
             artifact_dir=Path("/tmp/artifacts"),
             headless=True,
+            user_agent="paper-fetch-test/1",
         )
-        fallback_html = _flaresolverr.FetchedPublisherHtml(
+        fallback_html = browser_runtime.BrowserFetchedHtml(
             source_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
             final_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
             html="<html><article>Fallback full text</article></html>",
@@ -279,7 +275,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
         mocked_fetch = mock.Mock(
             side_effect=[
-                browser_workflow.FlareSolverrFailure(
+                browser_runtime.BrowserRuntimeFailure(
                     "cloudflare_challenge",
                     "Encountered a challenge page.",
                 ),
@@ -289,7 +285,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         deps = browser_workflow_deps(
             load_runtime_config=mock.Mock(return_value=runtime),
             ensure_runtime_ready=mock.Mock(),
-            fetch_html_with_flaresolverr=mocked_fetch,
+            fetch_html_with_browser=mocked_fetch,
             extract_atypon_browser_workflow_markdown=mock.Mock(
                 return_value=(
                     "# Example Wiley Article\n\n## Results\n\n"
@@ -313,21 +309,19 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertIs(mocked_fetch.call_args_list[1].kwargs["disable_media"], False)
         self.assertIsNotNone(payload.content)
         assert payload.content is not None
-        self.assertEqual(payload.content.fetcher, "flaresolverr")
+        self.assertEqual(payload.content.fetcher, "cloakbrowser")
         self.assertIn("fulltext:wiley_html_ok", [event.marker() for event in payload.trace if event.marker()])
 
-    def test_browser_workflow_flaresolverr_fast_path_falls_back_after_insufficient_body(self) -> None:
+    def test_browser_workflow_fast_path_falls_back_after_insufficient_body(self) -> None:
         doi = "10.1002/ece3.9361"
-        runtime = _flaresolverr.FlareSolverrRuntimeConfig(
+        runtime = browser_runtime.BrowserRuntimeConfig(
             provider="wiley",
             doi=doi,
-            url="http://127.0.0.1:8191/v1",
-            env_file=Path("/tmp/.env.flaresolverr"),
-            source_dir=Path("/tmp/vendor/flaresolverr"),
             artifact_dir=Path("/tmp/artifacts"),
             headless=True,
+            user_agent="paper-fetch-test/1",
         )
-        fast_html = _flaresolverr.FetchedPublisherHtml(
+        fast_html = browser_runtime.BrowserFetchedHtml(
             source_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
             final_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
             html="<html><article>Abstract only</article></html>",
@@ -337,7 +331,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             summary="Abstract only",
             browser_context_seed={},
         )
-        fallback_html = _flaresolverr.FetchedPublisherHtml(
+        fallback_html = browser_runtime.BrowserFetchedHtml(
             source_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
             final_url="https://onlinelibrary.wiley.com/doi/full/10.1002/ece3.9361",
             html="<html><article>Fallback full text</article></html>",
@@ -352,7 +346,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         deps = browser_workflow_deps(
             load_runtime_config=mock.Mock(return_value=runtime),
             ensure_runtime_ready=mock.Mock(),
-            fetch_html_with_flaresolverr=mocked_fetch,
+            fetch_html_with_browser=mocked_fetch,
             extract_atypon_browser_workflow_markdown=mock.Mock(
                 side_effect=[
                     browser_workflow.HtmlExtractionFailure(
@@ -378,7 +372,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertIs(mocked_fetch.call_args_list[1].kwargs["disable_media"], False)
         self.assertIsNotNone(payload.content)
         assert payload.content is not None
-        self.assertEqual(payload.content.fetcher, "flaresolverr")
+        self.assertEqual(payload.content.fetcher, "cloakbrowser")
         self.assertEqual(payload.content_type, "text/html")
 
     def test_html_asset_download_prefers_direct_full_size_url_before_preview(self) -> None:
@@ -544,13 +538,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         file_fetcher = mock.Mock(return_value=None)
         file_fetcher.failure_for = mock.Mock(
             return_value={
-                "recovery_attempts": [
-                    {
-                        "status": "failed",
-                        "url": "https://example.test/article",
-                        "reason": "cloudflare_challenge",
-                    }
-                ]
+                "reason": "cloudflare_challenge",
             }
         )
 
@@ -581,7 +569,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(result["asset_failures"][0]["status"], 403)
         self.assertEqual(result["asset_failures"][0]["title_snippet"], "Just a moment...")
         self.assertIn("Checking your browser", result["asset_failures"][0]["body_snippet"])
-        self.assertEqual(result["asset_failures"][0]["recovery_attempts"][0]["status"], "failed")
+        self.assertNotIn("recovery_attempts", result["asset_failures"][0])
 
     def test_elsevier_all_asset_profile_maps_supplementary_download_to_unified_fields(self) -> None:
         xml_body = b"""<?xml version="1.0"?>
@@ -872,7 +860,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             with mock.patch.object(
                 fetcher_context,
                 "_new_browser_context",
-                side_effect=RuntimeError("sync Playwright context already active"),
+                side_effect=RuntimeError("browser context already active"),
             ):
                 result = fetcher(image_url, {"kind": "figure"})
         finally:
@@ -883,12 +871,8 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertIsNotNone(failure)
         assert failure is not None
         self.assertEqual(failure["reason"], browser_fetchers.BROWSER_CONTEXT_ERROR)
-        self.assertEqual(
-            failure[browser_fetchers.PLAYWRIGHT_CONTEXT_ERROR],
-            browser_fetchers.PLAYWRIGHT_CONTEXT_ERROR,
-        )
         self.assertEqual(failure["error_type"], "RuntimeError")
-        self.assertEqual(failure["error_message"], "sync Playwright context already active")
+        self.assertEqual(failure["error_message"], "browser context already active")
 
     def test_browser_image_wait_stops_immediately_on_cloudflare_challenge_title(self) -> None:
         page = _FakeImagePage(
@@ -1022,7 +1006,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             self.assertEqual(fetcher.failure_for(image_url)["reason"], reason)
 
     def test_browser_image_document_payload_requires_image_payload(self) -> None:
-        result = _flaresolverr.FetchedPublisherHtml(
+        result = browser_runtime.BrowserFetchedHtml(
             source_url="https://example.test/figure.png",
             final_url="https://example.test/figure.png",
             html="<html><title>figure.png (40×30)</title></html>",
@@ -1040,7 +1024,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
     def test_browser_image_document_payload_prefers_browser_exported_pixels(self) -> None:
         image_body = b"\x89PNG\r\n\x1a\ncanvas-export"
-        result = _flaresolverr.FetchedPublisherHtml(
+        result = browser_runtime.BrowserFetchedHtml(
             source_url="https://example.test/figure.png",
             final_url="https://example.test/figure.png",
             html="<html></html>",
@@ -1068,7 +1052,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(payload["dimensions"], {"width": 40, "height": 30})
 
     def test_browser_image_document_payload_rejects_invalid_payload(self) -> None:
-        result = _flaresolverr.FetchedPublisherHtml(
+        result = browser_runtime.BrowserFetchedHtml(
             source_url="https://example.test/figure.png",
             final_url="https://example.test/figure.png",
             html="<html></html>",
@@ -1094,7 +1078,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
     def test_browser_image_document_payload_accepts_svg_payload(self) -> None:
         svg_body = b"\xef\xbb\xbf\n<?xml version='1.0'?><svg xmlns='http://www.w3.org/2000/svg'></svg>"
-        result = _flaresolverr.FetchedPublisherHtml(
+        result = browser_runtime.BrowserFetchedHtml(
             source_url="https://example.test/figure.svg",
             final_url="https://example.test/figure.svg",
             html=svg_body.decode("utf-8-sig"),
@@ -1122,7 +1106,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         self.assertEqual(payload["body"], svg_body)
 
     def test_browser_image_document_payload_rejects_svg_content_type_with_html_body(self) -> None:
-        result = _flaresolverr.FetchedPublisherHtml(
+        result = browser_runtime.BrowserFetchedHtml(
             source_url="https://example.test/figure.svg",
             final_url="https://example.test/figure.svg",
             html="<html><title>Just a moment...</title></html>",
@@ -1144,33 +1128,40 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
         self.assertIsNone(payload)
 
-    def test_challenge_recovery_payload_is_not_recorded_in_failure_diagnostics(self) -> None:
-        image_body = b"\x89PNG\r\n\x1a\nloaded-image"
+    def test_browser_image_fetcher_records_challenge_failure_without_recovery(self) -> None:
         image_url = "https://example.test/cdn/figure.png"
         fetcher = browser_fetchers._SharedBrowserImageDocumentFetcher(
             browser_context_seed_getter=lambda: {},
             seed_urls_getter=lambda: [],
-            challenge_recovery=lambda *_args: {
-                "status": "ok",
-                "image_payload": {
-                    "status_code": 200,
-                    "headers": {"content-type": "image/png"},
-                    "body": image_body,
-                    "url": image_url,
-                    "dimensions": {"width": 500, "height": 198},
-                },
-            },
+        )
+        fetcher._ensure_page = mock.Mock(return_value=object())
+        fetcher._sync_context_cookies = mock.Mock()
+        fetcher._warm_seed_urls = mock.Mock()
+        fetcher._fetch_with_page = mock.Mock(
+            side_effect=lambda current_url: (
+                fetcher._record_failure(
+                    current_url,
+                    status=403,
+                    content_type="text/html; charset=UTF-8",
+                    title_snippet="Just a moment...",
+                    body_snippet="Just a moment...",
+                    reason="cloudflare_challenge",
+                )
+                or None
+            )
         )
 
-        recovered = fetcher._attempt_challenge_recovery(
-            image_url,
-            {"kind": "figure"},
-            {"reason": "cloudflare_challenge"},
-        )
+        try:
+            result = fetcher(image_url, {"kind": "figure"})
+        finally:
+            fetcher.close()
 
-        self.assertTrue(recovered)
-        self.assertEqual(fetcher._recovered_payload_by_url[image_url]["body"], image_body)
-        self.assertNotIn("image_payload", fetcher.failure_for(image_url)["recovery_attempts"][0])
+        self.assertIsNone(result)
+        self.assertEqual(fetcher._fetch_with_page.call_count, 2)
+        failure = fetcher.failure_for(image_url)
+        assert failure is not None
+        self.assertEqual(failure["reason"], "cloudflare_challenge")
+        self.assertNotIn("recovery_attempts", failure)
 
     def test_download_assets_figure_kind_with_image_document_fetcher_runs_in_parallel_and_keeps_order(self) -> None:
         class TrackingFetcher:
@@ -1317,9 +1308,8 @@ class ProviderRequestOptionsTests(unittest.TestCase):
                     return None
                 return {
                     "reason": "browser_context_error",
-                    "playwright_context_error": "playwright_context_error",
                     "error_type": "RuntimeError",
-                    "error_message": "sync Playwright context already active",
+                    "error_message": "browser context already active",
                 }
 
         fetcher = MainThreadFailingFetcher()
@@ -1363,9 +1353,8 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             def failure_for(self, _image_url: str) -> dict[str, object]:
                 return {
                     "reason": "browser_context_error",
-                    "playwright_context_error": "playwright_context_error",
                     "error_type": "RuntimeError",
-                    "error_message": "sync Playwright context already active",
+                    "error_message": "browser context already active",
                 }
 
         assets = [
@@ -1396,7 +1385,7 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         failure = result["asset_failures"][0]
         self.assertEqual(failure["reason"], "browser_context_error")
         self.assertEqual(failure["error_type"], "RuntimeError")
-        self.assertEqual(failure["error_message"], "sync Playwright context already active")
+        self.assertEqual(failure["error_message"], "browser context already active")
 
     def test_download_assets_figure_kind_with_image_document_fetcher_saves_svg_payload(self) -> None:
         svg_body = b"<svg xmlns='http://www.w3.org/2000/svg'><path d='M0 0h1v1H0z'/></svg>"
@@ -1443,14 +1432,12 @@ class ProviderRequestOptionsTests(unittest.TestCase):
 
     def test_browser_workflow_asset_downloads_pass_runtime_asset_concurrency_env(self) -> None:
         doi = "10.1126/science.assets"
-        runtime = _flaresolverr.FlareSolverrRuntimeConfig(
+        runtime = browser_runtime.BrowserRuntimeConfig(
             provider="science",
             doi=doi,
-            url="http://127.0.0.1:8191/v1",
-            env_file=Path("/tmp/.env.flaresolverr"),
-            source_dir=Path("/tmp/vendor/flaresolverr"),
             artifact_dir=Path("/tmp/artifacts"),
             headless=True,
+            user_agent="paper-fetch-test/1",
         )
         raw_payload = RawFulltextPayload(
             provider="science",
@@ -1512,16 +1499,9 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             [html_assets.FIGURE_KIND, html_assets.SUPPLEMENTARY_KIND],
         )
 
-    def test_shared_browser_file_fetcher_recovers_after_cloudflare_challenge(self) -> None:
+    def test_shared_browser_file_fetcher_records_cloudflare_challenge_without_recovery(self) -> None:
         file_url = "https://example.test/supplement.pdf"
         article_url = "https://example.test/article"
-        challenge_recovery = mock.Mock(
-            return_value={
-                "status": "ok",
-                "url": article_url,
-                "title_snippet": "Article page",
-            }
-        )
         fetcher = browser_fetchers._build_shared_browser_file_fetcher(
             browser_context_seed_getter=lambda: {
                 "browser_cookies": [{"name": "cf_clearance", "value": "seed", "domain": ".example.test", "path": "/"}],
@@ -1530,29 +1510,21 @@ class ProviderRequestOptionsTests(unittest.TestCase):
             },
             seed_urls_getter=lambda: [article_url],
             browser_user_agent="Mozilla/5.0",
-            challenge_recovery=challenge_recovery,
         )
         fetcher._ensure_context = mock.Mock(return_value=object())
         fetcher._sync_context_cookies = mock.Mock()
         fetcher._warm_seed_urls = mock.Mock()
 
         def side_effect(current_url: str):
-            if fetcher.failure_for(current_url) is None:
-                fetcher._record_failure(
-                    current_url,
-                    status=403,
-                    content_type="text/html; charset=UTF-8",
-                    title_snippet="Just a moment...",
-                    body_snippet="Just a moment...",
-                    reason="cloudflare_challenge",
-                )
-                return None
-            return {
-                "status_code": 200,
-                "headers": {"content-type": "application/pdf"},
-                "body": b"%PDF-1.7 recovered",
-                "url": current_url,
-            }
+            fetcher._record_failure(
+                current_url,
+                status=403,
+                content_type="text/html; charset=UTF-8",
+                title_snippet="Just a moment...",
+                body_snippet="Just a moment...",
+                reason="cloudflare_challenge",
+            )
+            return None
 
         fetcher._fetch_with_context_request = mock.Mock(side_effect=side_effect)
 
@@ -1561,14 +1533,14 @@ class ProviderRequestOptionsTests(unittest.TestCase):
         finally:
             fetcher.close()
 
-        self.assertIsNotNone(result)
-        assert result is not None
-        self.assertEqual(result["body"], b"%PDF-1.7 recovered")
-        challenge_recovery.assert_called_once()
-        self.assertEqual(challenge_recovery.call_args.args[0], file_url)
-        self.assertEqual(challenge_recovery.call_args.args[2]["status"], 403)
+        self.assertIsNone(result)
         self.assertEqual(fetcher._warm_seed_urls.call_args_list[0].kwargs["force"], False)
         self.assertEqual(fetcher._warm_seed_urls.call_args_list[1].kwargs["force"], True)
+        self.assertEqual(fetcher._fetch_with_context_request.call_count, 2)
+        failure = fetcher.failure_for(file_url)
+        assert failure is not None
+        self.assertEqual(failure["reason"], "cloudflare_challenge")
+        self.assertNotIn("recovery_attempts", failure)
 
     def test_html_asset_download_uses_figure_page_full_size_before_preview(self) -> None:
         transport = RecordingTransport(

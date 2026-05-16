@@ -10,7 +10,7 @@ from paper_fetch.providers.copernicus import CopernicusClient
 from paper_fetch.providers._article_markdown_copernicus import parse_copernicus_xml
 from paper_fetch.providers._article_markdown_jats import parse_jats_xml
 
-from tests.unit._paper_fetch_support import RecordingTransport, fulltext_pdf_bytes
+from tests.unit._paper_fetch_support import RecordingTransport, fulltext_pdf_bytes, http_response
 
 
 DOI = "10.5194/acp-24-1-2024"
@@ -114,15 +114,6 @@ def _abstract_only_xml_fixture(*, body: str = "<body/>") -> bytes:
 """.encode()
 
 
-def _response(url: str, body: bytes, content_type: str) -> dict[str, object]:
-    return {
-        "status_code": 200,
-        "headers": {"content-type": content_type},
-        "body": body,
-        "url": url,
-    }
-
-
 class CopernicusProviderTests(unittest.TestCase):
     def test_doi_org_landing_url_keeps_doi_slash_unescaped(self) -> None:
         client = CopernicusClient(RecordingTransport({}), {})
@@ -135,8 +126,8 @@ class CopernicusProviderTests(unittest.TestCase):
     def test_xml_main_path_builds_fulltext_article_and_records_request_options(self) -> None:
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, _xml_fixture(), "application/xml"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, _xml_fixture(), "application/xml"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -168,8 +159,8 @@ class CopernicusProviderTests(unittest.TestCase):
         )
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, landing, "text/html"),
-                ("GET", linked_xml_url): _response(linked_xml_url, _xml_fixture(), "application/xml"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, landing, "text/html"),
+                ("GET", linked_xml_url): http_response(linked_xml_url, _xml_fixture(), "application/xml"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -183,8 +174,8 @@ class CopernicusProviderTests(unittest.TestCase):
         relative_response_url = "/articles/24/1/2024/acp-24-1-2024.xml"
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(relative_response_url, _xml_fixture(graphic_href="acp-24-1-2024-f01.png"), "application/xml"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(relative_response_url, _xml_fixture(graphic_href="acp-24-1-2024-f01.png"), "application/xml"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -204,9 +195,9 @@ class CopernicusProviderTests(unittest.TestCase):
         figure_url = "https://acp.copernicus.org/articles/24/1/2024/acp-24-1-2024-f01.png"
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, _xml_fixture(graphic_href=figure_url), "application/xml"),
-                ("GET", figure_url): _response(figure_url, b"\x89PNG\r\n\x1a\nfigure", "image/png"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, _xml_fixture(graphic_href=figure_url), "application/xml"),
+                ("GET", figure_url): http_response(figure_url, b"\x89PNG\r\n\x1a\nfigure", "image/png"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -233,9 +224,9 @@ class CopernicusProviderTests(unittest.TestCase):
         pdf_bytes = fulltext_pdf_bytes()
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(body=html_body), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, b"<html>not xml</html>", "text/html"),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(body=html_body), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, b"<html>not xml</html>", "text/html"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -252,13 +243,13 @@ class CopernicusProviderTests(unittest.TestCase):
         pdf_bytes = fulltext_pdf_bytes()
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(
                     XML_URL,
                     _abstract_only_xml_fixture(body="<body><sec><p>Too short.</p></sec></body>"),
                     "application/xml",
                 ),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -273,13 +264,13 @@ class CopernicusProviderTests(unittest.TestCase):
         pdf_bytes = fulltext_pdf_bytes()
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(
                     XML_URL,
                     _abstract_only_xml_fixture(body="<body><sec><title>Introduction</title></sec></body>"),
                     "application/xml",
                 ),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -293,9 +284,9 @@ class CopernicusProviderTests(unittest.TestCase):
         pdf_bytes = fulltext_pdf_bytes()
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, _abstract_only_xml_fixture(), "application/xml"),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, _abstract_only_xml_fixture(), "application/xml"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -311,7 +302,7 @@ class CopernicusProviderTests(unittest.TestCase):
         transport = RecordingTransport(
             {
                 ("GET", LANDING_URL): RequestFailure(503, "landing unavailable", url=LANDING_URL),
-                ("GET", XML_URL): _response(XML_URL, _xml_fixture(), "application/xml"),
+                ("GET", XML_URL): http_response(XML_URL, _xml_fixture(), "application/xml"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -330,8 +321,8 @@ class CopernicusProviderTests(unittest.TestCase):
         transport = RecordingTransport(
             {
                 ("GET", LANDING_URL): RequestFailure(503, "landing unavailable", url=LANDING_URL),
-                ("GET", XML_URL): _response(XML_URL, b"<html>not xml</html>", "text/html"),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", XML_URL): http_response(XML_URL, b"<html>not xml</html>", "text/html"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -348,8 +339,8 @@ class CopernicusProviderTests(unittest.TestCase):
     def test_fulltext_failures_raise_for_metadata_fallback(self) -> None:
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(pdf_url=""), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, b"<html>not xml</html>", "text/html"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(pdf_url=""), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, b"<html>not xml</html>", "text/html"),
                 ("GET", PDF_URL): RequestFailure(404, "missing PDF", url=PDF_URL),
             }
         )
@@ -367,9 +358,9 @@ class CopernicusProviderTests(unittest.TestCase):
         pdf_bytes = fulltext_pdf_bytes()
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, b"<html>not xml</html>", "text/html"),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, b"<html>not xml</html>", "text/html"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -385,9 +376,9 @@ class CopernicusProviderTests(unittest.TestCase):
         pdf_bytes = fulltext_pdf_bytes()
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(pdf_url=""), "text/html"),
-                ("GET", XML_URL): _response(XML_URL, b"<html>not xml</html>", "text/html"),
-                ("GET", PDF_URL): _response(PDF_URL, pdf_bytes, "application/pdf"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(pdf_url=""), "text/html"),
+                ("GET", XML_URL): http_response(XML_URL, b"<html>not xml</html>", "text/html"),
+                ("GET", PDF_URL): http_response(PDF_URL, pdf_bytes, "application/pdf"),
             }
         )
         client = CopernicusClient(transport, {})
@@ -401,7 +392,7 @@ class CopernicusProviderTests(unittest.TestCase):
     def test_xml_request_failures_continue_to_pdf_before_metadata_fallback(self) -> None:
         transport = RecordingTransport(
             {
-                ("GET", LANDING_URL): _response(LANDING_URL, _landing_html(pdf_url=""), "text/html"),
+                ("GET", LANDING_URL): http_response(LANDING_URL, _landing_html(pdf_url=""), "text/html"),
                 ("GET", XML_URL): RequestFailure(503, "temporary outage", url=XML_URL),
                 ("GET", PDF_URL): RequestFailure(404, "missing PDF", url=PDF_URL),
             }

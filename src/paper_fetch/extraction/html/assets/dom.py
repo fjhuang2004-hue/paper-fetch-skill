@@ -69,10 +69,6 @@ FIGURE_PAGE_HINTS = (
 _CLOUDFLARE_CHALLENGE_TOKENS = CLOUDFLARE_CHALLENGE_TITLE_TOKENS
 
 
-def _image_dimensions(body: bytes | bytearray | None) -> tuple[int, int] | None:
-    return image_dimensions_from_bytes(body)
-
-
 def _response_dimensions(response: Mapping[str, Any]) -> tuple[int, int] | None:
     dimensions = response.get("dimensions")
     if isinstance(dimensions, Mapping):
@@ -83,7 +79,7 @@ def _response_dimensions(response: Mapping[str, Any]) -> tuple[int, int] | None:
             width = height = 0
         if width > 0 and height > 0:
             return width, height
-    return _image_dimensions(response.get("body", b""))
+    return image_dimensions_from_bytes(response.get("body", b""))
 
 
 def supplementary_response_block_reason(content_type: str | None, body: bytes | bytearray | None) -> str:
@@ -193,7 +189,6 @@ __all__ = [
     "ACCEPTABLE_WIDE_PREVIEW_MIN_WIDTH",
     "ACCEPTABLE_WIDE_PREVIEW_MIN_HEIGHT",
     "FIGURE_PAGE_HINTS",
-    "_image_dimensions",
     "_response_dimensions",
     "supplementary_response_block_reason",
     "preview_dimensions_are_acceptable",

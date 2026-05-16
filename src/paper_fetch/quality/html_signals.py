@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping, Pattern
+from ..extraction.html.provider_keys import normalize_provider_key
 from ..extraction.html.signals import ACCESS_GATE_PATTERNS
 from ..utils import normalize_text
 def _attr_markers(name: str, value: str) -> tuple[str, str]:
@@ -197,10 +198,8 @@ SCIENCE_AVAILABILITY_OVERRIDES = AvailabilityOverrides(selector_flags=(SelectorF
 ELSEVIER_AVAILABILITY_OVERRIDES = AvailabilityOverrides(canonical_url_rules=(CanonicalUrlRule("/science/article/abs/", "canonical_abstract_url"),))
 SPRINGER_AVAILABILITY_OVERRIDES = AvailabilityOverrides(selector_blocking_rules=(SelectorBlockingRule(".app-article-access__heading, .c-preview-message__link, [data-test='access-via-institution']", "springer_access_preview_wall", require_structure_field_false="post_abstract_body_run"),))
 IEEE_AVAILABILITY_OVERRIDES = AvailabilityOverrides(empty_shell_rules=(EmptyShellRule("#article", ("p", "h2", "h3", "div.section", "div.section_2", "figure", "table", "tex-math"), "ieee_empty_article_shell"),))
-def _normalize_provider_signal_key(value: str | None) -> str:
-    return " ".join(str(value or "").strip().lower().replace("-", "_").split())
 def authorless_heading_signatures_for_provider(provider_name: str | None) -> tuple[tuple[str, ...], ...]:
-    return PROVIDER_AUTHORLESS_HEADING_SIGNATURES.get(_normalize_provider_signal_key(provider_name), ())
+    return PROVIDER_AUTHORLESS_HEADING_SIGNATURES.get(normalize_provider_key(provider_name), ())
 def dedupe_signals(values: list[str]) -> list[str]:
     return list(dict.fromkeys(value for value in values if value))
 def _datalayer_rule_value(value: str) -> str:

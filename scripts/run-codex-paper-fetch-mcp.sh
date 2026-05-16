@@ -6,12 +6,6 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON_BIN="${PAPER_FETCH_MCP_PYTHON_BIN:-python3}"
 OFFLINE_ENV_FILE="$REPO_DIR/offline.env"
 
-unset_legacy_rate_limit_env() {
-    unset FLARESOLVERR_MIN_INTERVAL_SECONDS
-    unset FLARESOLVERR_MAX_REQUESTS_PER_HOUR
-    unset FLARESOLVERR_MAX_REQUESTS_PER_DAY
-}
-
 is_wsl() {
     [ -n "${WSL_DISTRO_NAME:-}" ] || grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null
 }
@@ -51,15 +45,10 @@ load_offline_env_if_present() {
         source "$OFFLINE_ENV_FILE"
         set +a
     fi
-
-    if [ -d "$REPO_DIR/ms-playwright" ] && [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ]; then
-        export PLAYWRIGHT_BROWSERS_PATH="$REPO_DIR/ms-playwright"
-    fi
 }
 
 main() {
     load_offline_env_if_present
-    unset_legacy_rate_limit_env
     if is_wsl; then
         ensure_wslg_env
     fi

@@ -7,21 +7,12 @@ from typing import Any
 
 from ..models import AssetProfile
 from ..provider_catalog import (
-    SOURCE_PROVIDER_MAP,
     default_asset_profile_for_provider,
     default_asset_profile_for_source,
     provider_names,
 )
 from ..utils import normalize_text
 
-HTML_BODY_ASSET_DEFAULT_PROVIDERS = frozenset(
-    provider for provider in provider_names() if default_asset_profile_for_provider(provider) == "body"
-)
-HTML_BODY_ASSET_DEFAULT_SOURCES = frozenset(
-    source
-    for source in SOURCE_PROVIDER_MAP
-    if default_asset_profile_for_source(source) == "body"
-)
 ALLOWED_PREFERRED_PROVIDERS = frozenset(provider_names())
 
 
@@ -111,6 +102,3 @@ class FetchStrategy:
 
     def effective_asset_profile_for_provider(self, provider_name: str | None) -> AssetProfile:
         return effective_asset_profile(self.asset_profile, provider_name=provider_name)
-
-    def effective_asset_profile_for_source(self, source_name: str | None) -> AssetProfile:
-        return effective_asset_profile(self.asset_profile, source_name=source_name)

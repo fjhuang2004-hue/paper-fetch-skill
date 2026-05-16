@@ -25,6 +25,7 @@ from paper_fetch.tracing import trace_from_markers
 from paper_fetch.utils import choose_public_landing_page_url
 from paper_fetch.workflow.fulltext import _provider_fetch_result
 
+from ._logging_support import RecordCaptureHandler
 from ._paper_fetch_support import (
     FixtureHtmlTransport,
     StubProvider,
@@ -32,15 +33,6 @@ from ._paper_fetch_support import (
     fulltext_pdf_bytes,
     sample_article,
 )
-
-
-class RecordCaptureHandler(logging.Handler):
-    def __init__(self) -> None:
-        super().__init__(level=logging.DEBUG)
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
 
 
 def _typed_payload(

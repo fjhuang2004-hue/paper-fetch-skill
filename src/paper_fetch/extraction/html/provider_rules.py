@@ -27,6 +27,7 @@ from .cleanup_policy import (
     CleanupPolicy,
     build_cleanup_policy,
 )
+from .provider_keys import normalize_provider_key
 
 
 DEFAULT_NOISE_PROFILE = "generic"
@@ -357,7 +358,7 @@ GENERIC_HTML_RULES = ProviderHtmlRules(name=DEFAULT_NOISE_PROFILE)
 
 
 def provider_html_rules(name: str | None) -> ProviderHtmlRules:
-    return _rule_lookup().get(_normalize_rule_key(name), GENERIC_HTML_RULES)
+    return _rule_lookup().get(normalize_provider_key(name), GENERIC_HTML_RULES)
 
 
 def cleanup_policy_for_profile(noise_profile: str | None) -> CleanupPolicy:
@@ -437,15 +438,11 @@ class _ProviderHtmlRulesMapping(MappingABC[str, ProviderHtmlRules]):
 PROVIDER_HTML_RULES: Mapping[str, ProviderHtmlRules] = _ProviderHtmlRulesMapping()
 
 
-def _normalize_rule_key(value: str | None) -> str:
-    return " ".join(str(value or "").strip().lower().replace("-", "_").split())
-
-
 def _build_rule_lookup() -> dict[str, ProviderHtmlRules]:
     lookup: dict[str, ProviderHtmlRules] = {DEFAULT_NOISE_PROFILE: GENERIC_HTML_RULES}
     for rules in PROVIDER_HTML_RULES.values():
         for key in (rules.name, rules.noise_profile, *rules.aliases):
-            normalized = _normalize_rule_key(key)
+            normalized = normalize_provider_key(key)
             if normalized:
                 lookup[normalized] = rules
     return lookup

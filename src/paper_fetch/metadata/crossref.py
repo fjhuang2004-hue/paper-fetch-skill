@@ -209,6 +209,3 @@ class CrossrefLookupClient:
             "fulltext_links": links,
             "references": references,
         }
-
-    def _normalize_message(self, message: Mapping[str, Any], source_url: str) -> CrossrefMetadata:
-        return self.normalize_message(message, source_url)

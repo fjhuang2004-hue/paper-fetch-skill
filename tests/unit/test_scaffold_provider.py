@@ -7,19 +7,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "scaffold_provider.py"
-
-
-def _run_scaffold(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), "--output-dir", str(tmp_path), *args],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+from ._scaffold_support import (
+    REPO_ROOT,
+    SCAFFOLD_PROVIDER_SCRIPT as SCRIPT,
+    run_scaffold as _run_scaffold,
+)
 
 
 def _register_call_line(module_text: str) -> int:

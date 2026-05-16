@@ -4,23 +4,18 @@ import hashlib
 import os
 from pathlib import Path
 import shutil
-import stat
 import subprocess
 import tempfile
 import textwrap
 import unittest
+
+from ._installer_support import write_executable as _write_executable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LINUX_INSTALLER = REPO_ROOT / "install-offline.sh"
 WINDOWS_INSTALLER = REPO_ROOT / "install-offline.ps1"
 WINDOWS_INSTALLER_HELPER = REPO_ROOT / "scripts" / "windows-installer-helper.ps1"
-
-
-def _write_executable(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
-    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def _write_file(path: Path, content: str = "") -> None:
@@ -90,10 +85,7 @@ def _fake_python_script(version: str) -> str:
     PAPER_FETCH_MCP_PYTHON_BIN
     PAPER_FETCH_DOWNLOAD_DIR
     PAPER_FETCH_FORMULA_TOOLS_DIR
-    PLAYWRIGHT_BROWSERS_PATH
-    FLARESOLVERR_URL
-    FLARESOLVERR_ENV_FILE
-    FLARESOLVERR_SOURCE_DIR
+    CLOAKBROWSER_HEADLESS
     OUT
         exit 0
       fi
@@ -208,7 +200,7 @@ class OfflineInstallTests(unittest.TestCase):
             check=False,
         )
 
-    def test_default_install_writes_cloakbrowser_env_without_legacy_runtime_paths(self) -> None:
+    def test_default_install_writes_cloakbrowser_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
             user_env = home / ".config" / "paper-fetch" / ".env"
@@ -221,7 +213,6 @@ class OfflineInstallTests(unittest.TestCase):
             offline_env = (bundle / "offline.env").read_text(encoding="utf-8")
             self.assertIn('CLOAKBROWSER_HEADLESS="true"', offline_env)
             self.assertIn("CLOAKBROWSER_BINARY_PATH", offline_env)
-            self.assertNotIn("FLARESOLVERR", offline_env)
             self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", offline_env)
             self.assertIn("CloakBrowser headless: true", result.stdout)
 
@@ -240,7 +231,6 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertIn('export CLOAKBROWSER_HEADLESS="true"', bashrc)
             self.assertIn(f'set -gx PAPER_FETCH_ENV_FILE "{bundle / "offline.env"}"', fish_config)
             self.assertIn('set -gx CLOAKBROWSER_HEADLESS "true"', fish_config)
-            self.assertNotIn("FLARESOLVERR", bashrc + fish_config)
             self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", bashrc + fish_config)
 
     def test_wslg_preset_sets_headful_cloakbrowser_and_requires_display(self) -> None:
@@ -261,7 +251,7 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('CLOAKBROWSER_HEADLESS="false"', (bundle / "offline.env").read_text(encoding="utf-8"))
 
-    def test_cli_registration_uses_cloakbrowser_env_and_filters_legacy_manifest_keys(self) -> None:
+    def test_cli_registration_uses_cloakbrowser_env(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             bundle, fake_bin, home = self._create_bundle(root)
@@ -278,10 +268,9 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertIn(f"PAPER_FETCH_ENV_FILE={bundle / 'offline.env'}", codex_add)
             self.assertIn(f"PAPER_FETCH_MCP_PYTHON_BIN={bundle / '.venv' / 'bin' / 'python'}", codex_add)
             self.assertIn("CLOAKBROWSER_HEADLESS=true", codex_add)
-            self.assertFalse(any("FLARESOLVERR" in arg for arg in codex_add))
             self.assertFalse(any("PLAYWRIGHT_BROWSERS_PATH" in arg for arg in codex_add))
 
-    def test_missing_codex_cli_writes_config_toml_without_legacy_runtime_keys(self) -> None:
+    def test_missing_codex_cli_writes_config_toml_without_playwright_runtime_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             bundle, fake_bin, home = self._create_bundle(Path(tmpdir))
 
@@ -293,7 +282,6 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertIn("[mcp_servers.paper-fetch]", config)
             self.assertIn(f'PAPER_FETCH_ENV_FILE = "{bundle / "offline.env"}"', config)
             self.assertIn('CLOAKBROWSER_HEADLESS = "true"', config)
-            self.assertNotIn("FLARESOLVERR", config)
             self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", config)
 
     def test_reuse_env_file_keeps_file_untouched_and_activate_script_sets_cloakbrowser_default(self) -> None:
@@ -388,16 +376,13 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertIn("bundle requires CPython cp313", result.stderr)
             self.assertIn("detected Python 3.12.1 (cp312)", result.stderr)
 
-    def test_installers_do_not_call_playwright_browser_install_or_flaresolverr_wrappers(self) -> None:
+    def test_installers_do_not_call_playwright_browser_install(self) -> None:
         linux_script = LINUX_INSTALLER.read_text(encoding="utf-8")
         windows_script = WINDOWS_INSTALLER.read_text(encoding="utf-8")
 
         combined = linux_script + windows_script
         self.assertNotIn("python -m playwright install chromium", combined)
         self.assertNotIn("-m playwright install chromium", combined)
-        self.assertNotIn("install_flaresolverr_venv", combined)
-        self.assertNotIn("setup_flaresolverr_source", combined)
-        self.assertNotIn("flaresolverr-up", combined)
         self.assertIn("cloakbrowser.ensure_runtime()", combined)
 
     def test_windows_installer_helper_uses_cloakbrowser_smoke_and_optional_launch_probe(self) -> None:
@@ -410,16 +395,14 @@ class OfflineInstallTests(unittest.TestCase):
         self.assertIn("probe-launch", script)
         self.assertNotIn("sessions.list", script)
         self.assertNotIn("playwright.sync_api", script)
-        self.assertNotIn("FLARESOLVERR_SOURCE_DIR =", script)
 
-    def test_windows_offline_installer_declares_cloakbrowser_env_without_legacy_runtime_paths(self) -> None:
+    def test_windows_offline_installer_declares_cloakbrowser_env_without_playwright_runtime_path(self) -> None:
         script = WINDOWS_INSTALLER.read_text(encoding="utf-8")
 
         self.assertIn("CLOAKBROWSER_HEADLESS", script)
         self.assertIn("CLOAKBROWSER_BINARY_PATH", script)
         self.assertIn("Test-CloakBrowserPackage", script)
         self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH =", script)
-        self.assertNotIn("FLARESOLVERR_SOURCE_DIR =", script)
 
 
 if __name__ == "__main__":

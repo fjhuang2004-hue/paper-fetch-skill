@@ -1,22 +1,8 @@
 from __future__ import annotations
 
-import subprocess
-import sys
 from pathlib import Path
 
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "scaffold_provider.py"
-
-
-def _run_scaffold(tmp_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), "--output-dir", str(tmp_path), *args],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+from ._scaffold_support import run_scaffold as _run_scaffold
 
 
 def test_scaffold_provider_syncs_docs_placeholders_by_default(tmp_path: Path) -> None:

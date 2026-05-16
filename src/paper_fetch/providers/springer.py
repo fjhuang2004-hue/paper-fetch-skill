@@ -35,14 +35,14 @@ from ..utils import (
 )
 from . import _springer_html
 from ..extraction.html.assets import html_asset_identity_key
-from ._asset_retry import AssetRetryPolicy, merge_asset_retry_results
+from ._asset_retry import (
+    AssetRetryPolicy,
+    is_retryable_asset_failure,
+    merge_asset_retry_results,
+)
 from ._pdf_candidates import build_springer_pdf_candidates
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http
 from ._payloads import build_provider_payload
-from ._retry_categories import (
-    DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES,
-    NETWORK_RETRYABLE_REASON_TOKENS,
-)
 from ._waterfall import (
     DEFAULT_WATERFALL_CONTINUE_CODES,
     ProviderWaterfallStep,
@@ -197,22 +197,10 @@ def _springer_asset_retry_key(asset: Mapping[str, Any]) -> tuple[Any, ...]:
     return (normalize_text(html_asset_identity_key(asset)),)
 
 
-def _springer_retryable_asset_failure(failure: Mapping[str, Any]) -> bool:
-    if failure.get("status") is not None:
-        return False
-    error_category = normalize_text(str(failure.get("error_category") or "")).lower()
-    if error_category:
-        return error_category in DEFAULT_RETRYABLE_ASSET_ERROR_CATEGORIES
-    reason = normalize_text(str(failure.get("reason") or "")).lower()
-    if not reason or "unsupported asset url scheme" in reason:
-        return False
-    return any(token in reason for token in NETWORK_RETRYABLE_REASON_TOKENS)
-
-
 SPRINGER_ASSET_RETRY_POLICY = AssetRetryPolicy(
     name="springer",
     key_fn=_springer_asset_retry_key,
-    retryable_failure=_springer_retryable_asset_failure,
+    retryable_failure=is_retryable_asset_failure,
 )
 
 

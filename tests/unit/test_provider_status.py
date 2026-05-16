@@ -89,7 +89,7 @@ class ProviderStatusTests(unittest.TestCase):
         self.assertEqual(checks["pdf_fallback"].details["mode"], "direct_http_pdf")
         self.assertEqual(set(checks), {"metadata_api", "html_route", "pdf_fallback"})
 
-    def test_wiley_browser_runtime_ready_without_flaresolverr_env(self) -> None:
+    def test_wiley_browser_runtime_ready_without_extra_env(self) -> None:
         with mock.patch.object(_cloakbrowser, "_dependency_available", return_value=True):
             result = WileyClient(DummyTransport(), {}).probe_status()
         checks = {check.name: check for check in result.checks}
@@ -134,7 +134,7 @@ class ProviderStatusTests(unittest.TestCase):
         self.assertTrue(result.available)
         self.assertTrue(all(check.status == "ok" for check in checks.values()))
 
-    def test_browser_workflow_providers_are_ready_without_flaresolverr_env(self) -> None:
+    def test_browser_workflow_providers_are_ready_without_extra_env(self) -> None:
         for provider in ("science", "pnas", "ams"):
             with (
                 self.subTest(provider=provider),
@@ -162,14 +162,10 @@ class ProviderStatusTests(unittest.TestCase):
                 self.assertEqual(checks["runtime_env"].status, "not_configured")
                 self.assertEqual(checks["cloakbrowser_dependency"].status, "not_configured")
 
-    def test_browser_workflow_providers_ignore_legacy_rate_limit_env(self) -> None:
+    def test_browser_workflow_providers_ignore_unrelated_rate_limit_env(self) -> None:
         for provider in ("science", "pnas", "ams"):
             with self.subTest(provider=provider):
-                env = {
-                    "FLARESOLVERR_MIN_INTERVAL_SECONDS": "60",
-                    "FLARESOLVERR_MAX_REQUESTS_PER_HOUR": "1",
-                    "FLARESOLVERR_MAX_REQUESTS_PER_DAY": "20",
-                }
+                env = {"PAPER_FETCH_UNUSED_RATE_LIMIT_SECONDS": "60"}
 
                 with mock.patch.object(_cloakbrowser, "_dependency_available", return_value=True):
                     result = self._browser_client(provider, env).probe_status()

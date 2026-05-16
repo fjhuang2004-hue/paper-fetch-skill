@@ -14,10 +14,6 @@ FORWARDED_ARGS=()
 
 while (($#)); do
   case "$1" in
-    --skip-flaresolverr-setup)
-      ;;
-    --skip-playwright-install)
-      ;;
     --skip-cloakbrowser-warmup)
       ;;
     *)

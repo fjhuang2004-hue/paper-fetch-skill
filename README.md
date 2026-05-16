@@ -39,7 +39,7 @@
 
 - 不做主题检索、文献推荐或综述生成。
 - 不绕过付费墙或访问授权；可用性取决于 provider、凭据和本机运行环境。
-- Wiley、Science、PNAS 的浏览器路径需要额外运行时组件，详见 [`docs/flaresolverr.md`](docs/flaresolverr.md)；IEEE 路线不需要额外本地浏览器运行时，但全文可用性取决于 IEEE Xplore 对当前环境的合法访问上下文。
+- Wiley、Science、PNAS、AMS 的浏览器路径统一使用 CloakBrowser；IEEE 路线不需要额外 API key，但全文可用性取决于 IEEE Xplore 对当前环境的合法访问上下文。
 
 ## 效果展示
 
@@ -107,19 +107,9 @@ paper-fetch --help
 ```
 如果有输出`usage: cli.py [-h] -`（后略）则安装成功
 
-**4. 开启 Wiley / Science / PNAS 获取权限**
-如果要启用 Wiley / Science / PNAS 的浏览器路径，启动安装器内置 FlareSolverr：
+**4. 开启 Wiley / Science / PNAS / AMS 浏览器路径**
 
-```powershell
-flaresolverr-up
-flaresolverr-status
-```
-
-停止时运行：
-
-```powershell
-flaresolverr-down
-```
+安装器会注册 CloakBrowser 默认 headless 环境。受限环境可在 `offline.env` 中设置 `CLOAKBROWSER_BINARY_PATH` 指向预装浏览器。
 
 **5. 开启 Elsevier 获取权限**
 
@@ -213,7 +203,7 @@ Linux 在原离线包解压目录运行：
 ./install.sh
 ```
 
-默认会创建仓库内 `.venv`，安装 Python 包，并准备 Playwright Chromium、repo-local FlareSolverr 和公式后端等运行组件。
+默认会创建仓库内 `.venv`，安装 Python 包，并准备 CloakBrowser 依赖和公式后端等运行组件。
 
 如果只想安装 Python 包和基础配置：
 
@@ -432,7 +422,6 @@ Gemini CLI 用户对应执行：
 
 - [`docs/deployment.md`](docs/deployment.md)：安装、配置、MCP 注册和更新。
 - [`docs/providers.md`](docs/providers.md)：provider 能力、环境变量和运行时配置。
-- [`docs/flaresolverr.md`](docs/flaresolverr.md)：Wiley、Science、PNAS 浏览器路径部署与排障。
 - [`docs/README.md`](docs/README.md)：完整文档导航。
 - [`docs/architecture/target-architecture.md`](docs/architecture/target-architecture.md)：架构边界和维护者视角。
 

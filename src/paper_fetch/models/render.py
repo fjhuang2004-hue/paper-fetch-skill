@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import re
-import urllib.parse
 from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any, Mapping
@@ -14,8 +13,9 @@ from ..utils import normalize_text, safe_text
 from .markdown import (
     NATURE_TABLE_LIKE_FIGURE_ASSET_PATTERN,
     NUMBERED_REFERENCE_PATTERN,
-    SLASH_RUN_PATTERN,
     TABLE_LIKE_FIGURE_ASSET_PATTERN,
+    image_reference_candidates,
+    image_references_match,
     iter_markdown_images,
     normalize_inline_html_text,
     normalize_markdown_text,
@@ -302,41 +302,6 @@ def _inline_markdown_image_urls(sections: Sequence["Section"]) -> set[str]:
     return urls
 
 
-def _image_reference_candidates(value: str | None) -> set[str]:
-    normalized = normalize_text(value).strip("<>")
-    if not normalized:
-        return set()
-
-    parsed = urllib.parse.urlsplit(normalized)
-    path = parsed.path or normalized
-    candidates = {normalized, path, urllib.parse.unquote(normalized), urllib.parse.unquote(path)}
-    cleaned: set[str] = set()
-    for candidate in candidates:
-        text = normalize_text(candidate).replace("\\", "/")
-        text = SLASH_RUN_PATTERN.sub("/", text).strip()
-        text = text.removeprefix("./")
-        if text:
-            cleaned.add(text)
-            cleaned.add(text.lstrip("/"))
-    return cleaned
-
-
-def _image_reference_basename(value: str) -> str:
-    return value.rstrip("/").rsplit("/", 1)[-1]
-
-
-def _image_references_match(left: set[str], right: set[str]) -> bool:
-    if left & right:
-        return True
-    for left_item in left:
-        for right_item in right:
-            if left_item.endswith(f"/{right_item}") or right_item.endswith(f"/{left_item}"):
-                return True
-    left_basenames = {_image_reference_basename(item) for item in left if _image_reference_basename(item)}
-    right_basenames = {_image_reference_basename(item) for item in right if _image_reference_basename(item)}
-    return bool(left_basenames & right_basenames)
-
-
 def _asset_link_field(asset: Asset | Mapping[str, Any], field: str) -> str | None:
     if isinstance(asset, Asset):
         return getattr(asset, field, None)
@@ -357,7 +322,7 @@ def _asset_markdown_reference_candidates(asset: Asset | Mapping[str, Any]) -> se
         "full_size_url",
         "link",
     ):
-        candidates |= _image_reference_candidates(_asset_link_field(asset, asset_field))
+        candidates |= image_reference_candidates(_asset_link_field(asset, asset_field))
     return candidates
 
 
@@ -379,15 +344,41 @@ def rewrite_markdown_asset_links(markdown_text: str, assets: Sequence[Asset | Ma
 
     def replace_image(image) -> str:
         inline_url = normalize_text(image.url).strip("<>")
-        inline_candidates = _image_reference_candidates(inline_url)
+        inline_candidates = image_reference_candidates(inline_url)
         if not inline_candidates:
             return image.text
         for replacement_path, asset_candidates in indexed_assets:
-            if _image_references_match(asset_candidates, inline_candidates):
+            if image_references_match(asset_candidates, inline_candidates):
                 return f"![{image.alt}]({replacement_path})"
         return image.text
 
     return replace_markdown_images(markdown_text, replace_image)
+
+
+def filter_inline_body_assets(
+    assets: Sequence[Asset],
+    *,
+    sections: Sequence["Section"],
+) -> list[Asset]:
+    inline_urls = _inline_markdown_image_urls(sections)
+    if not inline_urls:
+        return list(assets)
+    inline_candidates = [image_reference_candidates(url) for url in inline_urls]
+
+    remaining: list[Asset] = []
+    for asset in assets:
+        if not asset_in_body(asset):
+            remaining.append(asset)
+            continue
+        asset_candidates = _asset_markdown_reference_candidates(asset)
+        if asset_candidates and any(
+            image_references_match(asset_candidates, inline_candidate)
+            for inline_candidate in inline_candidates
+            if inline_candidate
+        ):
+            continue
+        remaining.append(asset)
+    return remaining
 
 
 def filter_inline_body_figure_assets(
@@ -395,25 +386,7 @@ def filter_inline_body_figure_assets(
     *,
     sections: Sequence["Section"],
 ) -> list[Asset]:
-    inline_urls = _inline_markdown_image_urls(sections)
-    if not inline_urls:
-        return list(assets)
-    inline_candidates = [_image_reference_candidates(url) for url in inline_urls]
-
-    remaining: list[Asset] = []
-    for asset in assets:
-        if not asset_in_body(asset):
-            remaining.append(asset)
-            continue
-        asset_candidates = _asset_markdown_reference_candidates(asset)
-        if asset_candidates and any(
-            _image_references_match(asset_candidates, inline_candidate)
-            for inline_candidate in inline_candidates
-            if inline_candidate
-        ):
-            continue
-        remaining.append(asset)
-    return remaining
+    return filter_inline_body_assets(assets, sections=sections)
 
 
 def filter_inline_body_table_assets(
@@ -421,25 +394,7 @@ def filter_inline_body_table_assets(
     *,
     sections: Sequence["Section"],
 ) -> list[Asset]:
-    inline_urls = _inline_markdown_image_urls(sections)
-    if not inline_urls:
-        return list(assets)
-    inline_candidates = [_image_reference_candidates(url) for url in inline_urls]
-
-    remaining: list[Asset] = []
-    for asset in assets:
-        if not asset_in_body(asset):
-            remaining.append(asset)
-            continue
-        asset_candidates = _asset_markdown_reference_candidates(asset)
-        if asset_candidates and any(
-            _image_references_match(asset_candidates, inline_candidate)
-            for inline_candidate in inline_candidates
-            if inline_candidate
-        ):
-            continue
-        remaining.append(asset)
-    return remaining
+    return filter_inline_body_assets(assets, sections=sections)
 
 
 def _caption_match_text(value: str | None) -> str:

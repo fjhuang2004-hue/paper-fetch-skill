@@ -59,38 +59,6 @@ def build_metadata_only_result(
     )
 
 
-def maybe_save_provider_payload(
-    provider_name: str,
-    *,
-    content,
-    download_dir: Path | None,
-    doi: str | None,
-    metadata: Mapping[str, Any],
-) -> tuple[list[str], list[str]]:
-    return ArtifactStore.from_download_dir(download_dir).save_provider_payload(
-        provider_name,
-        content=content,
-        doi=doi,
-        metadata=metadata,
-    )
-
-
-def _provider_html_output_path(
-    provider_name: str,
-    *,
-    content,
-    download_dir: Path | None,
-    doi: str | None,
-    metadata: Mapping[str, Any],
-) -> Path | None:
-    return ArtifactStore.from_download_dir(download_dir).provider_html_output_path(
-        provider_name,
-        content=content,
-        doi=doi,
-        metadata=metadata,
-    )
-
-
 def maybe_save_provider_html_payload(
     provider_name: str,
     *,
@@ -165,24 +133,6 @@ def _provider_fetch_result(
             assets=[dict(item) for item in downloaded_assets],
             asset_failures=[dict(item) for item in asset_failures],
         ),
-    )
-
-
-def _apply_provider_artifacts(
-    *,
-    provider_name: str,
-    artifacts: ProviderArtifacts,
-    download_dir: Path | None,
-    asset_profile: AssetProfile,
-    warnings: list[str],
-    source_trail: list[str],
-) -> None:
-    ArtifactStore.from_download_dir(download_dir).apply_provider_artifacts(
-        provider_name=provider_name,
-        artifacts=artifacts,
-        asset_profile=asset_profile,
-        warnings=warnings,
-        source_trail=source_trail,
     )
 
 

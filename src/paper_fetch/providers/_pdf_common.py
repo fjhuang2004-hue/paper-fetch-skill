@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..common_patterns import WORD_TOKEN_PATTERN
-from ..http import is_pdf_content_type
+from ..http import PDF_ACCEPT_HEADER, is_pdf_content_type
 from ..utils import normalize_text
 from .browser_runtime.seed import CLOUDFLARE_COOKIE_NAMES, _CLOUDFLARE_COOKIE_PREFIXES
 
@@ -96,6 +96,16 @@ def filename_from_headers(headers: Mapping[str, str] | None) -> str | None:
     if not match:
         return None
     return normalize_text(match.group(1)) or None
+
+
+def default_pdf_headers(user_agent: str, *, referer: str | None = None) -> dict[str, str]:
+    headers = {
+        "Accept": PDF_ACCEPT_HEADER,
+        "User-Agent": user_agent,
+    }
+    if referer:
+        headers["Referer"] = referer
+    return headers
 
 
 def _pdf_word_count(text: str) -> int:

@@ -53,14 +53,14 @@ def _provider_status_payload(**kwargs):
                 "status": "not_configured",
                 "available": False,
                 "official_provider": True,
-                "missing_env": ["FLARESOLVERR_ENV_FILE"],
+                "missing_env": [],
                 "notes": [],
                 "checks": [
                     {
                         "name": "runtime_env",
                         "status": "not_configured",
                         "message": "Wiley runtime is not configured.",
-                        "missing_env": ["FLARESOLVERR_ENV_FILE"],
+                        "missing_env": [],
                         "details": {},
                     }
                 ],

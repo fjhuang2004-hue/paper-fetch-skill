@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Sequence
 
 from ....utils import normalize_text
+from ...image_payloads import image_mime_type_from_bytes
 from ..shared import (
     html_text_snippet as _html_text_snippet,
     html_title_snippet as _html_title_snippet,
-    image_magic_type as _image_magic_type,
 )
 from .dom import looks_like_full_size_asset_url, supplementary_response_block_reason
 
@@ -171,7 +171,7 @@ def _figure_upgrade_targets(candidate_url: str, asset: Mapping[str, Any]) -> lis
 
 def _figure_accepts_response(content_type: str | None, body: bytes) -> bool:
     normalized_content_type = normalize_text(content_type).split(";", 1)[0].lower()
-    if _image_magic_type(body):
+    if image_mime_type_from_bytes(body):
         return True
     if normalized_content_type and not normalized_content_type.startswith("image/"):
         return False

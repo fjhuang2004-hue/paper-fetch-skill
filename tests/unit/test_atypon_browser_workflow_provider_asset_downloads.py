@@ -46,7 +46,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mocked_fetch,
+                fetch_html_with_browser=mocked_fetch,
                 _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
@@ -213,7 +213,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 browser_context_seed=initial_seed,
             )
             mocked_fetch = mock.Mock(
-                return_value=_flaresolverr.FetchedPublisherHtml(
+                return_value=browser_runtime.BrowserFetchedHtml(
                     source_url=figure_page_url,
                     final_url=figure_page_url,
                     html=(
@@ -233,7 +233,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mocked_fetch,
+                fetch_html_with_browser=mocked_fetch,
                 _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (
@@ -307,8 +307,8 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
-                    return_value=_flaresolverr.FetchedPublisherHtml(
+                fetch_html_with_browser=mock.Mock(
+                    return_value=browser_runtime.BrowserFetchedHtml(
                         source_url=figure_page_url,
                         final_url=figure_page_url,
                         html=(
@@ -399,7 +399,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 browser_context_seed=seed,
             )
             mocked_fetch = mock.Mock(
-                return_value=_flaresolverr.FetchedPublisherHtml(
+                return_value=browser_runtime.BrowserFetchedHtml(
                     source_url=figure_page_url,
                     final_url=figure_page_url,
                     html=(
@@ -418,7 +418,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mocked_fetch,
+                fetch_html_with_browser=mocked_fetch,
                 _build_shared_browser_image_fetcher=mock.Mock(
                     return_value=shared_fetcher
                 ),
@@ -467,7 +467,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mocked_fetch,
+                fetch_html_with_browser=mocked_fetch,
                 _build_shared_browser_image_fetcher=mock.Mock(
                     return_value=shared_fetcher
                 ),
@@ -550,7 +550,7 @@ class AtyponBrowserWorkflowProviderAssetDownloadTests(AtyponBrowserWorkflowProvi
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mocked_fetch,
+                fetch_html_with_browser=mocked_fetch,
                 _build_shared_browser_image_fetcher=mocked_builder,
             )
             with (

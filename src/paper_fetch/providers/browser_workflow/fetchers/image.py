@@ -23,10 +23,8 @@ from ....utils import normalize_text
 from ...browser_runtime.types import BrowserFetchedHtml
 from .context import _BaseBrowserDocumentFetcher, _normalized_response_headers
 from .diagnostics import (
-    _compact_failure_diagnostic,
     _copy_failure_diagnostic,
     _image_fetch_failure_reason,
-    _looks_like_cloudflare_challenge_failure,
     _looks_like_cloudflare_challenge_title,
 )
 from .scripts import _LOADED_IMAGE_CANVAS_EXPORT_SCRIPT
@@ -58,46 +56,6 @@ def _looks_like_image_response_payload(
     if magic_type:
         return True
     return False
-
-
-def _normalized_recovered_image_payload(
-    payload: Any,
-    *,
-    fallback_url: str,
-) -> dict[str, Any] | None:
-    if not isinstance(payload, Mapping):
-        return None
-    body = payload.get("body")
-    if not isinstance(body, (bytes, bytearray)) or not body:
-        return None
-    headers = (
-        payload.get("headers") if isinstance(payload.get("headers"), Mapping) else {}
-    )
-    normalized_headers = _normalized_response_headers(headers)
-    content_type = normalized_headers.get("content-type", "")
-    final_url = normalize_text(str(payload.get("url") or "")) or fallback_url
-    if not _looks_like_image_response_payload(content_type, body, final_url):
-        return None
-    normalized_payload = dict(payload)
-    normalized_payload["status_code"] = int(payload.get("status_code") or 200)
-    normalized_payload["headers"] = dict(normalized_headers)
-    normalized_payload["body"] = bytes(body)
-    normalized_payload["url"] = final_url
-    return normalized_payload
-
-
-def _copy_image_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
-    copied = dict(payload)
-    body = payload.get("body")
-    if isinstance(body, (bytes, bytearray)):
-        copied["body"] = bytes(body)
-    headers = payload.get("headers")
-    if isinstance(headers, Mapping):
-        copied["headers"] = dict(headers)
-    dimensions = payload.get("dimensions")
-    if isinstance(dimensions, Mapping):
-        copied["dimensions"] = dict(dimensions)
-    return copied
 
 
 def _browser_image_document_payload(
@@ -140,6 +98,20 @@ def _payload_from_browser_image_payload(
     }
 
 
+def _copy_image_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    copied = dict(payload)
+    body = payload.get("body")
+    if isinstance(body, (bytes, bytearray)):
+        copied["body"] = bytes(body)
+    headers = payload.get("headers")
+    if isinstance(headers, Mapping):
+        copied["headers"] = dict(headers)
+    dimensions = payload.get("dimensions")
+    if isinstance(dimensions, Mapping):
+        copied["dimensions"] = dict(dimensions)
+    return copied
+
+
 class _SharedBrowserImageDocumentFetcher(_BaseBrowserDocumentFetcher):
     def __init__(
         self,
@@ -150,10 +122,6 @@ class _SharedBrowserImageDocumentFetcher(_BaseBrowserDocumentFetcher):
         headless: bool = True,
         min_width: int = 80,
         min_height: int = 80,
-        challenge_recovery: Callable[
-            [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-        ]
-        | None = None,
         runtime_context: RuntimeContext | None = None,
         use_runtime_shared_browser: bool = True,
     ) -> None:
@@ -162,13 +130,11 @@ class _SharedBrowserImageDocumentFetcher(_BaseBrowserDocumentFetcher):
             seed_urls_getter=seed_urls_getter,
             browser_user_agent=browser_user_agent,
             headless=headless,
-            challenge_recovery=challenge_recovery,
             runtime_context=runtime_context,
             use_runtime_shared_browser=use_runtime_shared_browser,
         )
         self._min_width = min_width
         self._min_height = min_height
-        self._recovered_payload_by_url: dict[str, dict[str, Any]] = {}
 
     def __call__(
         self, image_url: str, _asset: Mapping[str, Any]
@@ -182,24 +148,10 @@ class _SharedBrowserImageDocumentFetcher(_BaseBrowserDocumentFetcher):
 
         self._sync_context_cookies()
         self._warm_seed_urls(force=False)
-        recovered_from_challenge = False
         for attempt in range(3):
             result = self._fetch_with_page(normalized_url)
             if result is not None:
                 return result
-            failure = self.failure_for(normalized_url)
-            if (
-                not recovered_from_challenge
-                and _looks_like_cloudflare_challenge_failure(failure)
-                and self._attempt_challenge_recovery(
-                    normalized_url, _asset, failure or {}
-                )
-            ):
-                recovered_payload = self._recovered_payload_by_url.get(normalized_url)
-                if recovered_payload is not None:
-                    return dict(recovered_payload)
-                recovered_from_challenge = True
-                continue
             if attempt == 0:
                 self._sync_context_cookies()
                 self._warm_seed_urls(force=True)
@@ -240,27 +192,6 @@ class _SharedBrowserImageDocumentFetcher(_BaseBrowserDocumentFetcher):
             reason=failure_reason,
             canvas_error=normalize_text(canvas_error),
         )
-
-    def _record_recovery_payload(
-        self, image_url: str, recovery: Mapping[str, Any]
-    ) -> None:
-        recovered_payload = _normalized_recovered_image_payload(
-            recovery.get("image_payload"), fallback_url=image_url
-        )
-        if recovered_payload is not None:
-            self._recovered_payload_by_url[image_url] = recovered_payload
-
-    def _recovery_diagnostic(self, recovery: Mapping[str, Any]) -> dict[str, Any]:
-        diagnostic_recovery = {
-            key: value for key, value in recovery.items() if key != "image_payload"
-        }
-        if normalize_text(
-            str(diagnostic_recovery.get("status") or "")
-        ).lower() != "ok" and not normalize_text(
-            str(diagnostic_recovery.get("reason") or "")
-        ):
-            diagnostic_recovery["reason"] = "challenge_recovery_failed"
-        return _compact_failure_diagnostic(diagnostic_recovery)
 
     def _fetch_with_page(self, image_url: str) -> dict[str, Any] | None:
         page = self._page
@@ -645,10 +576,6 @@ class _ThreadLocalSharedBrowserImageDocumentFetcher:
         headless: bool = True,
         min_width: int = 80,
         min_height: int = 80,
-        challenge_recovery: Callable[
-            [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-        ]
-        | None = None,
         runtime_context: RuntimeContext | None = None,
         use_runtime_shared_browser: bool = True,
     ) -> None:
@@ -658,7 +585,6 @@ class _ThreadLocalSharedBrowserImageDocumentFetcher:
         self._headless = headless
         self._min_width = min_width
         self._min_height = min_height
-        self._challenge_recovery = challenge_recovery
         self._runtime_context = runtime_context
         self._use_runtime_shared_browser = use_runtime_shared_browser
         self._thread_local = threading.local()
@@ -677,7 +603,6 @@ class _ThreadLocalSharedBrowserImageDocumentFetcher:
             headless=self._headless,
             min_width=self._min_width,
             min_height=self._min_height,
-            challenge_recovery=self._challenge_recovery,
             runtime_context=self._runtime_context,
             use_runtime_shared_browser=self._use_runtime_shared_browser,
         )
@@ -753,10 +678,6 @@ def _build_shared_browser_image_fetcher(
     headless: bool = True,
     min_width: int = 80,
     min_height: int = 80,
-    challenge_recovery: Callable[
-        [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-    ]
-    | None = None,
     runtime_context: RuntimeContext | None = None,
     use_runtime_shared_browser: bool = True,
 ) -> _ThreadLocalSharedBrowserImageDocumentFetcher:
@@ -767,13 +688,12 @@ def _build_shared_browser_image_fetcher(
         headless=headless,
         min_width=min_width,
         min_height=min_height,
-        challenge_recovery=challenge_recovery,
         runtime_context=runtime_context,
         use_runtime_shared_browser=use_runtime_shared_browser,
     )
 
 
-def fetch_image_document_with_playwright(
+def fetch_image_document_with_browser(
     image_url: str,
     *,
     browser_cookies: list[dict[str, Any]] | None = None,
@@ -813,12 +733,3 @@ def fetch_image_document_with_playwright(
         return None
     finally:
         fetcher.close()
-
-
-_flaresolverr_image_document_payload = _browser_image_document_payload  # legacy alias
-_payload_from_flaresolverr_image_payload = _payload_from_browser_image_payload  # legacy alias
-_SharedPlaywrightImageDocumentFetcher = _SharedBrowserImageDocumentFetcher
-_ThreadLocalSharedPlaywrightImageDocumentFetcher = (
-    _ThreadLocalSharedBrowserImageDocumentFetcher
-)
-_build_shared_playwright_image_fetcher = _build_shared_browser_image_fetcher

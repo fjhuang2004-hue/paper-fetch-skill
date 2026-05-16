@@ -15,7 +15,7 @@ from ....logging_utils import emit_structured_log
 from ....runtime import RuntimeContext
 from ....utils import normalize_text
 from .context import _BaseBrowserDocumentFetcher, _normalized_response_headers
-from .diagnostics import _copy_failure_diagnostic, _looks_like_cloudflare_challenge_failure
+from .diagnostics import _copy_failure_diagnostic
 
 logger = logging.getLogger("paper_fetch.providers.browser_workflow")
 
@@ -28,10 +28,6 @@ class _SharedBrowserFileDocumentFetcher(_BaseBrowserDocumentFetcher):
         seed_urls_getter: Callable[[], list[str]],
         browser_user_agent: str | None = None,
         headless: bool = True,
-        challenge_recovery: Callable[
-            [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-        ]
-        | None = None,
         runtime_context: RuntimeContext | None = None,
         use_runtime_shared_browser: bool = True,
     ) -> None:
@@ -40,7 +36,6 @@ class _SharedBrowserFileDocumentFetcher(_BaseBrowserDocumentFetcher):
             seed_urls_getter=seed_urls_getter,
             browser_user_agent=browser_user_agent,
             headless=headless,
-            challenge_recovery=challenge_recovery,
             runtime_context=runtime_context,
             use_runtime_shared_browser=use_runtime_shared_browser,
         )
@@ -56,21 +51,10 @@ class _SharedBrowserFileDocumentFetcher(_BaseBrowserDocumentFetcher):
 
         self._sync_context_cookies()
         self._warm_seed_urls(force=False)
-        recovered_from_challenge = False
         for attempt in range(3):
             result = self._fetch_with_context_request(normalized_url)
             if result is not None:
                 return result
-            failure = self.failure_for(normalized_url)
-            if (
-                not recovered_from_challenge
-                and _looks_like_cloudflare_challenge_failure(failure)
-                and self._attempt_challenge_recovery(
-                    normalized_url, asset, failure or {}
-                )
-            ):
-                recovered_from_challenge = True
-                continue
             if attempt == 0:
                 self._sync_context_cookies()
                 self._warm_seed_urls(force=True)
@@ -163,10 +147,6 @@ class _ThreadLocalSharedBrowserFileDocumentFetcher:
         seed_urls_getter: Callable[[], list[str]],
         browser_user_agent: str | None = None,
         headless: bool = True,
-        challenge_recovery: Callable[
-            [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-        ]
-        | None = None,
         runtime_context: RuntimeContext | None = None,
         use_runtime_shared_browser: bool = True,
     ) -> None:
@@ -174,7 +154,6 @@ class _ThreadLocalSharedBrowserFileDocumentFetcher:
         self._seed_urls_getter = seed_urls_getter
         self._browser_user_agent = browser_user_agent
         self._headless = headless
-        self._challenge_recovery = challenge_recovery
         self._runtime_context = runtime_context
         self._use_runtime_shared_browser = use_runtime_shared_browser
         self._thread_local = threading.local()
@@ -191,7 +170,6 @@ class _ThreadLocalSharedBrowserFileDocumentFetcher:
             seed_urls_getter=self._seed_urls_getter,
             browser_user_agent=self._browser_user_agent,
             headless=self._headless,
-            challenge_recovery=self._challenge_recovery,
             runtime_context=self._runtime_context,
             use_runtime_shared_browser=self._use_runtime_shared_browser,
         )
@@ -265,10 +243,6 @@ def _build_shared_browser_file_fetcher(
     seed_urls_getter: Callable[[], list[str]],
     browser_user_agent: str | None = None,
     headless: bool = True,
-    challenge_recovery: Callable[
-        [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-    ]
-    | None = None,
     runtime_context: RuntimeContext | None = None,
     use_runtime_shared_browser: bool = True,
     thread_local: bool = False,
@@ -290,14 +264,6 @@ def _build_shared_browser_file_fetcher(
         seed_urls_getter=seed_urls_getter,
         browser_user_agent=browser_user_agent,
         headless=headless,
-        challenge_recovery=challenge_recovery,
         runtime_context=runtime_context,
         use_runtime_shared_browser=use_runtime_shared_browser,
     )
-
-
-_SharedPlaywrightFileDocumentFetcher = _SharedBrowserFileDocumentFetcher
-_ThreadLocalSharedPlaywrightFileDocumentFetcher = (
-    _ThreadLocalSharedBrowserFileDocumentFetcher
-)
-_build_shared_playwright_file_fetcher = _build_shared_browser_file_fetcher

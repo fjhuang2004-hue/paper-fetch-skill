@@ -71,19 +71,13 @@ retryable: true
 ## Signal: CHALLENGE_DETECTED
 
 diagnosis: capture 响应包含 challenge 或 CAPTCHA 页面。
-action: 用 `--retry-via=flaresolverr` 重跑 capture；失败后重派 `discover-manifest` 替换该 purpose DOI。
+action: 用 `--retry-via=browser` 重跑 capture；失败后重派 `discover-manifest` 替换该 purpose DOI。
 retryable: true
-
-## Signal: FLARESOLVERR_REQUIRED
-
-diagnosis: 当前 capture 路线需要 FlareSolverr runtime。
-action: 将 provider 状态置为 `blocked`，记录 required runtime 为 `flaresolverr`。
-retryable: false
 
 ## Signal: BROWSER_RUNTIME_REQUIRED
 
-diagnosis: 当前 capture 路线需要 Playwright/browser runtime。
-action: 将 provider 状态置为 `blocked`，记录 required runtime 为 `playwright`。
+diagnosis: 当前 capture 路线需要 browser runtime。
+action: 将 provider 状态置为 `blocked`，required runtime 类型记录在 `details.route`。
 retryable: false
 
 ## Signal: NON_PDF_FALLBACK_CONTENT

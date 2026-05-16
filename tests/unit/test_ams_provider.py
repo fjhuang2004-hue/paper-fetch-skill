@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 from paper_fetch.models import article_from_markdown
-from paper_fetch.providers import _ams_html, _cloakbrowser, _flaresolverr, browser_workflow
+from paper_fetch.providers import _ams_html, _cloakbrowser, browser_runtime, browser_workflow
 from paper_fetch.providers.ams import AmsClient
 from paper_fetch.providers.atypon_browser_workflow.markdown import (
     extract_atypon_browser_workflow_markdown,
@@ -133,12 +133,12 @@ class AmsProviderTests(AtyponBrowserWorkflowProviderTestCase):
         self.assertEqual(caught.exception.code, "not_configured")
         self.assertEqual(caught.exception.missing_env, [])
 
-    def test_ams_html_route_uses_flaresolverr_and_ignores_citation_xml_url(self) -> None:
+    def test_ams_html_route_uses_browser_runtime_and_ignores_citation_xml_url(self) -> None:
         client = AmsClient(transport=None, env={})
         with tempfile.TemporaryDirectory() as tmpdir:
             runtime = self._runtime_config(tmpdir, "ams", AMS_DOI)
             mocked_html = mock.Mock(
-                return_value=_flaresolverr.FetchedPublisherHtml(
+                return_value=browser_runtime.BrowserFetchedHtml(
                     source_url=AMS_LANDING_URL,
                     final_url=AMS_LANDING_URL,
                     html=(
@@ -158,14 +158,14 @@ class AmsProviderTests(AtyponBrowserWorkflowProviderTestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mocked_html,
+                fetch_html_with_browser=mocked_html,
                 extract_atypon_browser_workflow_markdown=mock.Mock(
                     return_value=(
                         f"# {AMS_TITLE}\n\n## Results\n\n" + ("Body text " * 120),
                         {"title": AMS_TITLE},
                     )
                 ),
-                fetch_pdf_with_playwright=mocked_pdf,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(AMS_DOI, self._metadata())
             article = client.to_article_model(self._metadata(), raw_payload)
@@ -208,15 +208,15 @@ class AmsProviderTests(AtyponBrowserWorkflowProviderTestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
-                    side_effect=_flaresolverr.FlareSolverrFailure(
+                fetch_html_with_browser=mock.Mock(
+                    side_effect=browser_runtime.BrowserRuntimeFailure(
                         "insufficient_body",
                         "AMS HTML did not expose enough body.",
                         browser_context_seed=seed,
                     )
                 ),
                 pdf_browser_context_seed=mock.Mock(return_value=seed),
-                fetch_pdf_with_playwright=mocked_pdf,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(AMS_DOI, self._metadata())
             article = client.to_article_model(self._metadata(), raw_payload)
@@ -251,8 +251,8 @@ class AmsProviderTests(AtyponBrowserWorkflowProviderTestCase):
                 client,
                 load_runtime_config=mock.Mock(return_value=runtime),
                 ensure_runtime_ready=mock.Mock(),
-                fetch_html_with_flaresolverr=mock.Mock(
-                    return_value=_flaresolverr.FetchedPublisherHtml(
+                fetch_html_with_browser=mock.Mock(
+                    return_value=browser_runtime.BrowserFetchedHtml(
                         source_url=AMS_LANDING_URL,
                         final_url=AMS_LANDING_URL,
                         html=html,
@@ -269,7 +269,7 @@ class AmsProviderTests(AtyponBrowserWorkflowProviderTestCase):
                     )
                 ),
                 pdf_browser_context_seed=mock.Mock(return_value={}),
-                fetch_pdf_with_playwright=mocked_pdf,
+                fetch_pdf_with_browser=mocked_pdf,
             )
             raw_payload = client.fetch_raw_fulltext(
                 AMS_DOI,

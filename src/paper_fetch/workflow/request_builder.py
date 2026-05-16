@@ -40,7 +40,7 @@ def build_fetch_pipeline_request(
         render=render,
         env=runtime_env,
         download_dir=download_dir,
-        artifact_mode="none" if no_download else artifact_mode,
+        artifact_mode=artifact_mode,
         no_download=no_download,
         transport=context.transport if context is not None else transport,
         clients=context.clients if context is not None else clients,

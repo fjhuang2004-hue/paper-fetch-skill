@@ -288,7 +288,7 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
                 )
                 self.assertEqual(client.provider_label(), label)
                 self.assertEqual(client.profile.markdown_publisher, markdown_publisher)
-                self.assertTrue(client.profile.shared_playwright_image_fetcher)
+                self.assertTrue(client.profile.shared_browser_image_fetcher)
 
     def test_shared_author_helpers_preserve_provider_strategies(self) -> None:
         science_html = """

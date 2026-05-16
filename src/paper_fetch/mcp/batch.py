@@ -302,39 +302,6 @@ def batch_check_payload(
     }
 
 
-def batch_resolve_tool(
-    *,
-    queries: list[str],
-    concurrency: int = 1,
-    env: Mapping[str, str] | None = None,
-    deps: MCPDeps = default_mcp_deps(),
-) -> CallToolResult:
-    try:
-        return _tool_result(
-            batch_resolve_payload(queries=queries, concurrency=concurrency, env=env, deps=deps),
-            is_error=False,
-        )
-    except Exception as error:
-        return _tool_result(error_payload_from_exception(error), is_error=True)
-
-
-def batch_check_tool(
-    *,
-    queries: list[str],
-    mode: str = "metadata",
-    concurrency: int = 1,
-    env: Mapping[str, str] | None = None,
-    deps: MCPDeps = default_mcp_deps(),
-) -> CallToolResult:
-    try:
-        return _tool_result(
-            batch_check_payload(queries=queries, mode=mode, concurrency=concurrency, env=env, deps=deps),
-            is_error=False,
-        )
-    except Exception as error:
-        return _tool_result(error_payload_from_exception(error), is_error=True)
-
-
 async def batch_resolve_tool_async(
     *,
     queries: list[str],

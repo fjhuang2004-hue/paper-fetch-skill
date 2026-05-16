@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime
+import io
 import json
 import re
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,8 +32,12 @@ from paper_fetch.providers.base import ProviderFailure
 from paper_fetch.providers._html_section_markdown import render_container_markdown
 from paper_fetch.resolve.query import resolve_query
 
-from tests.paths import FIXTURE_DIR
-from tests.unit._paper_fetch_support import RecordingTransport, StubProvider
+from tests.golden_criteria import (
+    golden_criteria_asset,
+    golden_criteria_dir_for_doi,
+    golden_criteria_sample_for_doi,
+)
+from tests.unit._paper_fetch_support import RecordingTransport, StubProvider, http_response
 
 
 PDF_FALLBACK_IDS = ("2006.11239v2", "1406.2661v1")
@@ -53,7 +59,6 @@ MARKDOWN_REVIEWED_FIXTURES = {
     "references": "10.48550_arxiv.2605.06663v1",
     "pdf_fallback": "10.48550_arxiv.1406.2661v1",
 }
-GOLDEN_ROOT = FIXTURE_DIR / "golden_criteria"
 PNG_1X1 = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
     b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?"
@@ -66,11 +71,15 @@ def _doi(arxiv_id: str) -> str:
 
 
 def _fixture_dir(arxiv_id: str) -> Path:
-    return GOLDEN_ROOT / _doi(arxiv_id).replace("/", "_")
+    return golden_criteria_dir_for_doi(_doi(arxiv_id))
 
 
 def _api_payload(arxiv_id: str) -> dict:
-    return json.loads((_fixture_dir(arxiv_id) / "api.json").read_text(encoding="utf-8"))
+    return json.loads(
+        golden_criteria_asset(_doi(arxiv_id), "api.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def _metadata(arxiv_id: str) -> dict:
@@ -78,20 +87,21 @@ def _metadata(arxiv_id: str) -> dict:
 
 
 def _fixture_html(arxiv_id: str) -> bytes:
-    return (_fixture_dir(arxiv_id) / "original.html").read_bytes()
+    return golden_criteria_asset(_doi(arxiv_id), "original.html").read_bytes()
 
 
 def _fixture_pdf(arxiv_id: str) -> bytes:
-    return (_fixture_dir(arxiv_id) / "original.pdf").read_bytes()
+    return golden_criteria_asset(_doi(arxiv_id), "original.pdf").read_bytes()
 
 
-def _response(url: str, body: bytes, content_type: str) -> dict[str, object]:
-    return {
-        "status_code": 200,
-        "headers": {"content-type": content_type},
-        "body": body,
-        "url": url,
-    }
+def _source_tar(files: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        for name, body in files.items():
+            info = tarfile.TarInfo(name)
+            info.size = len(body)
+            archive.addfile(info, io.BytesIO(body))
+    return buffer.getvalue()
 
 
 def _atom_feed(arxiv_id: str) -> bytes:
@@ -174,7 +184,7 @@ def _html_transport(
 ) -> RecordingTransport:
     html_url = canonical_arxiv_html_url(arxiv_id)
     responses: dict[tuple[str, str], object] = {
-        ("GET", html_url): _response(
+        ("GET", html_url): http_response(
             html_url,
             html_body if html_body is not None else _fixture_html(arxiv_id),
             html_content_type,
@@ -199,13 +209,13 @@ def _html_then_pdf_transport(
             ("GET", html_url): (
                 html_response
                 if html_response is not None
-                else _response(
+                else http_response(
                     html_url,
                     html_body if html_body is not None else b"not an html document",
                     html_content_type,
                 )
             ),
-            ("GET", pdf_url): _response(
+            ("GET", pdf_url): http_response(
                 pdf_url, _fixture_pdf(arxiv_id), "application/pdf"
             ),
         }
@@ -287,7 +297,7 @@ class ArxivProviderTests(unittest.TestCase):
         arxiv_id = "2605.06663v1"
         transport = RecordingTransport(
             {
-                ("GET", _arxiv_atom.ARXIV_API_URL): _response(
+                ("GET", _arxiv_atom.ARXIV_API_URL): http_response(
                     _arxiv_atom.ARXIV_API_URL,
                     _atom_feed(arxiv_id),
                     "application/atom+xml",
@@ -322,7 +332,7 @@ class ArxivProviderTests(unittest.TestCase):
         arxiv_id = "2605.06663v1"
         transport = RecordingTransport(
             {
-                ("GET", _arxiv_atom.ARXIV_API_URL): _response(
+                ("GET", _arxiv_atom.ARXIV_API_URL): http_response(
                     _arxiv_atom.ARXIV_API_URL,
                     b'<feed xmlns="http://www.w3.org/2005/Atom"></feed>',
                     "application/atom+xml",
@@ -373,17 +383,14 @@ class ArxivProviderTests(unittest.TestCase):
                 self.assertTrue((_fixture_dir(arxiv_id) / "original.pdf").is_file())
                 self.assertFalse((_fixture_dir(arxiv_id) / "original.html").exists())
 
-        manifest = json.loads(
-            (GOLDEN_ROOT / "manifest.json").read_text(encoding="utf-8")
-        )["samples"]
         for arxiv_id in HTML_ROUTE_IDS:
             with self.subTest(arxiv_id=arxiv_id):
-                sample = manifest[_doi(arxiv_id).replace("/", "_")]
+                sample = golden_criteria_sample_for_doi(_doi(arxiv_id))
                 self.assertEqual(sample["route_kind"], "html")
                 self.assertEqual(set(sample["assets"]), {"api.json", "original.html"})
         for arxiv_id in PDF_FALLBACK_IDS:
             with self.subTest(arxiv_id=arxiv_id):
-                sample = manifest[_doi(arxiv_id).replace("/", "_")]
+                sample = golden_criteria_sample_for_doi(_doi(arxiv_id))
                 self.assertEqual(sample["route_kind"], "pdf_fallback")
                 self.assertEqual(set(sample["assets"]), {"api.json", "original.pdf"})
 
@@ -740,7 +747,7 @@ class ArxivProviderTests(unittest.TestCase):
         transport = _html_transport(
             arxiv_id,
             extra_responses={
-                ("GET", _arxiv_atom.ARXIV_API_URL): _response(
+                ("GET", _arxiv_atom.ARXIV_API_URL): http_response(
                     _arxiv_atom.ARXIV_API_URL,
                     b"<feed",
                     "application/atom+xml",
@@ -1429,7 +1436,7 @@ class ArxivProviderTests(unittest.TestCase):
             for field in ("url", "full_size_url", "preview_url"):
                 url = str(asset.get(field) or "")
                 if url:
-                    transport.responses[("GET", url)] = _response(
+                    transport.responses[("GET", url)] = http_response(
                         url, PNG_1X1, "image/png"
                     )
 
@@ -1627,6 +1634,62 @@ class ArxivProviderTests(unittest.TestCase):
             [call["url"] for call in transport.calls],
             [canonical_arxiv_html_url(arxiv_id)],
         )
+
+    def test_html_route_recovers_missing_official_html_images_from_source_archive(
+        self,
+    ) -> None:
+        arxiv_id = "2605.06556v1"
+        metadata = _metadata(arxiv_id)
+        html_body = _fixture_html(arxiv_id).replace(
+            b'src="2605.06556v1/fig_1_tau_picture.png"',
+            b'src=""',
+        )
+        source_url = f"https://arxiv.org/e-print/{arxiv_id}"
+        source_archive = _source_tar(
+            {
+                "main.tex": br"""
+                \documentclass{article}
+                \usepackage{graphicx}
+                \begin{document}
+                \begin{figure}
+                  \includegraphics{fig_1_tau_picture.png}
+                  \caption{\textbf{Tau picture.} Source archive figure.}
+                \end{figure}
+                \end{document}
+                """,
+                "fig_1_tau_picture.png": PNG_1X1,
+            }
+        )
+        transport = _html_transport(
+            arxiv_id,
+            html_body=html_body,
+            extra_responses={
+                ("GET", source_url): http_response(
+                    source_url, source_archive, "application/gzip"
+                )
+            },
+        )
+        client = ArxivClient(transport, {})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = client.fetch_result(
+                metadata["doi"], metadata, Path(tmpdir), asset_profile="body"
+            )
+            self.assertEqual(result.content.route_kind, "html")
+            self.assertEqual(len(result.article.assets), 1)
+            asset = result.article.assets[0]
+            self.assertEqual(asset.download_tier, "arxiv_source")
+            self.assertEqual(asset.source_path, "fig_1_tau_picture.png")
+            self.assertTrue(asset.path and Path(asset.path).is_file())
+            markdown = result.article.to_ai_markdown(asset_profile="body")
+            self.assertIn("![Figure 1]", markdown)
+            self.assertIn("fig_1_tau_picture.png", markdown)
+            self.assertLess(
+                markdown.index("![Figure 1]"),
+                markdown.index("**Figure 1.**"),
+            )
+            self.assertNotIn("\n## Figures\n", markdown)
+        self.assertIn(source_url, [call["url"] for call in transport.calls])
 
     def test_fetch_paper_uses_arxiv_provider_for_resolved_arxiv_id(self) -> None:
         arxiv_id = "2605.06663v1"

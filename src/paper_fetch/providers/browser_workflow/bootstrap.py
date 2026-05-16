@@ -55,10 +55,6 @@ def _fetch_browser_html_payload_with_fast_path(
     )
 
 
-_fetch_flaresolverr_html_payload = _fetch_browser_html_payload  # legacy alias
-_fetch_flaresolverr_html_payload_with_fast_path = _fetch_browser_html_payload_with_fast_path  # legacy alias
-
-
 def bootstrap_browser_workflow(
     client: "BrowserWorkflowClient",
     doi: str,

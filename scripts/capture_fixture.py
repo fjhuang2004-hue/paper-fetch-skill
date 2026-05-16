@@ -470,17 +470,10 @@ def _capture_route(doi: str, *, route: str) -> dict[str, Any]:
                 retryable=True,
                 route=route,
             ) from exc
-    if route == "playwright":
+    if route in {"playwright", "browser"}:
         raise CaptureFixtureError(
             "BROWSER_RUNTIME_REQUIRED",
-            "playwright fixture capture is not implemented in this non-interactive script yet",
-            retryable=False,
-            route=route,
-        )
-    if route == "flaresolverr":
-        raise CaptureFixtureError(
-            "FLARESOLVERR_REQUIRED",
-            "flaresolverr fixture capture requires a configured runtime and is not implemented in this script yet",
+            "browser fixture capture requires an interactive browser runtime and is not implemented in this script yet",
             retryable=False,
             route=route,
         )
@@ -493,7 +486,7 @@ def _capture_route(doi: str, *, route: str) -> dict[str, Any]:
 
 
 def _should_retry_via(error: CaptureFixtureError, *, retry_via: str | None, manifest: ManifestContext | None) -> bool:
-    if retry_via != "flaresolverr":
+    if retry_via != "browser":
         return False
     return error.code in RETRY_VIA_ERROR_CODES
 
@@ -632,10 +625,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = CaptureArgumentParser(description="Capture a DOI replay fixture and register it in the golden manifest.")
     parser.add_argument("--doi", help="DOI to capture, for example 10.1234/sample")
     parser.add_argument("--provider", help="provider name; defaults to DOI/catalog inference")
-    parser.add_argument("--via", choices=("http", "playwright", "flaresolverr"), default="http")
+    parser.add_argument("--via", choices=("http", "playwright", "browser"), default="http")
     parser.add_argument("--purpose", choices=CLI_PURPOSES, required=True)
     parser.add_argument("--from-manifest", help="ProviderManifest YAML input; reads DOI, evidence, and routing by purpose")
-    parser.add_argument("--retry-via", choices=("flaresolverr", "playwright"), help="retry failed capture through another route")
+    parser.add_argument("--retry-via", choices=("browser", "playwright"), help="retry failed capture through another route")
     parser.add_argument("--fail-fast", action="store_true", help="emit JSON stderr and exit non-zero on the first failure")
     parser.add_argument("--dry-run", action="store_true", help="print planned writes without fetching or writing")
     parser.add_argument("--output-dir", default=_repo_root(), help="repo root to write into; defaults to this checkout")

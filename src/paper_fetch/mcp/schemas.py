@@ -4,20 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..artifacts import ArtifactMode
-from ..models import RenderOptions, normalize_text
+from ..models import AssetProfile, OutputMode, RenderOptions, normalize_text
 from ..service import FetchStrategy
 from ..workflow.types import ALLOWED_PREFERRED_PROVIDERS
 from ..utils import dedupe_authors
 
 ALLOWED_INCLUDE_REFS = {"none", "top10", "all"}
-ALLOWED_ASSET_PROFILES = {"none", "body", "all"}
-ALLOWED_ARTIFACT_MODES = {"markdown-assets", "all", "none"}
-ALLOWED_OUTPUT_MODES = {"article", "markdown", "metadata"}
+def _allowed_values_from_literal(literal_type: Any) -> frozenset[str]:
+    return frozenset(str(value) for value in get_args(literal_type))
+
+
+ALLOWED_ASSET_PROFILES = _allowed_values_from_literal(AssetProfile)
+ALLOWED_ARTIFACT_MODES = _allowed_values_from_literal(ArtifactMode)
+ALLOWED_OUTPUT_MODES = _allowed_values_from_literal(OutputMode)
 ALLOWED_BATCH_CHECK_MODES = {"article", "metadata"}
 DEFAULT_MCP_MODES = ["article", "markdown"]
 DEFAULT_MCP_ARTIFACT_MODE: ArtifactMode = "markdown-assets"
@@ -25,6 +29,14 @@ DEFAULT_INLINE_IMAGE_MAX_IMAGES = 3
 DEFAULT_INLINE_IMAGE_MAX_BYTES_PER_IMAGE = 2 * 1024 * 1024
 DEFAULT_INLINE_IMAGE_MAX_TOTAL_BYTES = 8 * 1024 * 1024
 MAX_BATCH_QUERIES = 50
+
+
+def _coerce_optional_string_list(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return [value]
+    return value
 
 
 @dataclass(frozen=True)
@@ -80,11 +92,7 @@ class ResolvePaperRequest(BaseModel):
     @field_validator("authors", mode="before")
     @classmethod
     def coerce_authors(cls, value: Any) -> Any:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            return [value]
-        return value
+        return _coerce_optional_string_list(value)
 
     @field_validator("authors")
     @classmethod
@@ -127,7 +135,7 @@ class ResolvePaperRequest(BaseModel):
         return normalize_text(" ".join(parts))
 
 
-class HasFulltextRequest(BaseModel):
+class _RequiredQueryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str
@@ -139,6 +147,10 @@ class HasFulltextRequest(BaseModel):
         if not normalized:
             raise ValueError("query must not be empty.")
         return normalized
+
+
+class HasFulltextRequest(_RequiredQueryRequest):
+    pass
 
 
 def _normalize_query_list(value: Any) -> list[str]:
@@ -171,11 +183,7 @@ class FetchStrategyInput(BaseModel):
     @field_validator("preferred_providers", mode="before")
     @classmethod
     def coerce_preferred_providers(cls, value: Any) -> Any:
-        if value is None:
-            return None
-        if isinstance(value, str):
-            return [value]
-        return value
+        return _coerce_optional_string_list(value)
 
     @field_validator("preferred_providers")
     @classmethod
@@ -225,10 +233,7 @@ class FetchStrategyInput(BaseModel):
         return self.model_dump(mode="json", exclude={"inline_image_budget"})
 
 
-class FetchPaperRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    query: str
+class FetchPaperRequest(_RequiredQueryRequest):
     modes: list[str] = Field(default_factory=lambda: list(DEFAULT_MCP_MODES))
     strategy: FetchStrategyInput = Field(default_factory=FetchStrategyInput)
     include_refs: str | None = None
@@ -239,14 +244,6 @@ class FetchPaperRequest(BaseModel):
     save_markdown: bool = False
     markdown_output_dir: str | None = None
     markdown_filename: str | None = None
-
-    @field_validator("query")
-    @classmethod
-    def validate_query(cls, value: str) -> str:
-        normalized = normalize_text(value)
-        if not normalized:
-            raise ValueError("query must not be empty.")
-        return normalized
 
     @field_validator("modes", mode="before")
     @classmethod

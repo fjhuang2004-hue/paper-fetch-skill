@@ -63,7 +63,7 @@ function Normalize-McpEnvKeys {
     $filtered = New-Object System.Collections.Generic.List[string]
     $seenHeadless = $false
     foreach ($key in $script:McpEnvKeys) {
-        if ($key -in @("PLAYWRIGHT_BROWSERS_PATH", "FLARESOLVERR_URL", "FLARESOLVERR_ENV_FILE", "FLARESOLVERR_SOURCE_DIR")) {
+        if ($key -eq "PLAYWRIGHT_BROWSERS_PATH") {
             continue
         }
         if ($key -eq "CLOAKBROWSER_HEADLESS") {

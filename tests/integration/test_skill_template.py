@@ -200,7 +200,7 @@ class InstallerSmokeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("One-command installer for the full paper-fetch runtime.", result.stdout)
         self.assertIn("--lite", result.stdout)
-        self.assertIn("--skip-flaresolverr-setup", result.stdout)
+        self.assertNotIn("--skip-playwright-install", result.stdout)
 
     def test_full_installer_completion_mentions_elsevier_api_key(self) -> None:
         temp_dir = tempfile.TemporaryDirectory()
@@ -260,8 +260,6 @@ class InstallerSmokeTests(unittest.TestCase):
             [
                 "bash",
                 str(repo_dir / "install-formula-tools.sh"),
-                "--skip-flaresolverr-setup",
-                "--skip-playwright-install",
                 "--no-node",
             ],
             cwd=repo_dir,
@@ -276,6 +274,13 @@ class InstallerSmokeTests(unittest.TestCase):
         self.assertIn(f"{fake_python} -m paper_fetch.formula.install", log_text)
         self.assertIn("--target-dir", log_text)
         self.assertIn("--no-node", log_text)
+        self.assertNotIn("--skip-playwright-install", log_text)
+
+    def test_codex_mcp_wrapper_does_not_set_playwright_browser_path(self) -> None:
+        text = (REPO_ROOT / "scripts" / "run-codex-paper-fetch-mcp.sh").read_text(encoding="utf-8")
+
+        self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", text)
+        self.assertNotIn("ms-playwright", text)
 
     def test_claude_installer_copies_static_skill_without_repo_bootstrap_side_effects(self) -> None:
         repo_dir, sandbox, log_path = self.run_installer(script_name="install-claude-skill.sh")

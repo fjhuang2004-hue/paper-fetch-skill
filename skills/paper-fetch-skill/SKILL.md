@@ -75,6 +75,6 @@ BLOCKING：默认非 BLOCKING，可连续执行抓取与后续处理；但遇到
 
 ## 参考资料
 
-- 当你需要提供方凭证、下载目录行为，Wiley / Science / PNAS 运行时要求，或 IEEE 访问边界时，读取 [`references/environment.md`](references/environment.md)。
+- 当你需要提供方凭证、下载目录行为，Wiley / Science / PNAS / AMS 运行时要求，或 IEEE 访问边界时，读取 [`references/environment.md`](references/environment.md)。
 - 当 MCP 不可用，或用户明确要求 shell 命令时，读取 [`references/cli-fallback.md`](references/cli-fallback.md)。
 - 当结果为 `ambiguous`、`no_access`、`rate_limited` 或仅有元数据时，读取 [`references/failure-handling.md`](references/failure-handling.md)。

@@ -41,30 +41,6 @@ ERROR_CONTRACT: tuple[tuple[str, str], ...] = (
 )
 
 
-def format_defaults_markdown() -> str:
-    lines = ["Recommended defaults:"]
-    lines.extend(f"- `{key}={value}`" for key, value in DEFAULT_FETCH_VALUES)
-    lines.extend(f"- {note}" for note in DEFAULT_FETCH_NOTES)
-    return "\n".join(lines)
-
-
-def format_environment_markdown() -> str:
-    lines = []
-    for name, description in SKILL_ENVIRONMENT_VARIABLES:
-        lines.append(f"- `{name}`: {description}")
-    return "\n".join(lines)
-
-
-def format_error_contract_markdown() -> str:
-    lines = []
-    for status, description in ERROR_CONTRACT:
-        lines.append(f"- `{status}`: {description}")
-    lines.append("- These fields appear in MCP `structuredContent` and in CLI stderr JSON for runtime fetch failures.")
-    lines.append("- MCP error payloads may also include `missing_env=[...]` when credentials or required env vars are known.")
-    lines.append("- CLI runtime fetch exit codes remain `ambiguous=2`, `no_access=3`, `rate_limited=4`; argparse validation errors also exit `2` but are not ambiguity results.")
-    return "\n".join(lines)
-
-
 def server_instructions() -> str:
     return (
         "Resolve or fetch a specific paper by DOI, landing URL, or title query. "

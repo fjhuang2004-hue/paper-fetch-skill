@@ -30,7 +30,6 @@ from ..utils import normalize_text, provider_display_name, sanitize_filename
 from .browser_runtime.seed import (
     merge_browser_context_seeds,
     normalize_browser_cookies_for_playwright,
-    parse_optional_int,
 )
 from .browser_runtime.types import (
     BrowserFetchedHtml,
@@ -43,7 +42,10 @@ from .base import (
     build_provider_status_check,
     provider_status_check_from_failure,
 )
-from .browser_workflow.fetchers import _normalized_response_headers
+from .browser_workflow.fetchers.context import (
+    _browser_response_headers,
+    _browser_response_status,
+)
 from .browser_workflow.fetchers.scripts import _LOADED_IMAGE_CANVAS_EXPORT_SCRIPT
 from .browser_workflow.shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
 
@@ -66,7 +68,6 @@ _IMAGE_PAYLOAD_FAILURE_ATTR = "_paper_fetch_image_payload_failure"
 
 CloakBrowserRuntimeConfig = BrowserRuntimeConfig
 CloakBrowserFailure = BrowserRuntimeFailure
-FetchedPublisherHtml = BrowserFetchedHtml
 
 
 def _browser_workflow_label(provider: str) -> str:
@@ -224,24 +225,6 @@ def probe_runtime_status(
         notes=[],
         checks=list(checks),
     )
-
-
-def _response_headers(response: Any) -> dict[str, str]:
-    if response is None:
-        return {}
-    try:
-        return _normalized_response_headers(response.all_headers())
-    except Exception:
-        return _normalized_response_headers(getattr(response, "headers", {}) or {})
-
-
-def _response_status(response: Any) -> int | None:
-    if response is None:
-        return None
-    try:
-        return parse_optional_int(getattr(response, "status", None))
-    except Exception:
-        return None
 
 
 def _safe_int(value: Any, *, default: int = 0) -> int:
@@ -407,8 +390,8 @@ def _capture_image_payload(
     normalized_request_url = normalize_text(request_url)
     normalized_final_url = normalize_text(final_url) or normalized_request_url
     response = _capture_expected_response(page, normalized_request_url)
-    status = _response_status(response) or 200
-    headers = _response_headers(response)
+    status = _browser_response_status(response, zero_as_none=False) or 200
+    headers = _browser_response_headers(response)
     content_type = _normalized_content_type(headers.get("content-type"))
 
     if content_type.startswith("image/"):
@@ -531,7 +514,7 @@ def fetch_html_with_cloakbrowser(
     return_image_payload: bool = False,
     return_screenshot: bool = False,
     disable_media: bool = False,
-) -> FetchedPublisherHtml:
+) -> BrowserFetchedHtml:
     del warm_wait_seconds
     if not candidate_urls:
         raise CloakBrowserFailure("empty_html_attempts", "No publisher HTML candidates were attempted.")
@@ -645,8 +628,8 @@ def fetch_html_with_cloakbrowser(
                 title = normalize_text(str(page.title() or "")) or extract_page_title(
                     BeautifulSoup(html, choose_parser())
                 )
-                status = _response_status(response)
-                headers = _response_headers(response)
+                status = _browser_response_status(response, zero_as_none=False)
+                headers = _browser_response_headers(response)
                 summary = summarize_html(html)
                 browser_context_seed = _context_seed(browser_context, final_url=final_url, user_agent=user_agent)
                 if browser_context_seed.get("browser_cookies") or browser_context_seed.get("browser_user_agent"):
@@ -711,7 +694,7 @@ def fetch_html_with_cloakbrowser(
                         screenshot_b64 = screenshot_payload
                 except Exception:
                     screenshot_b64 = None
-            return FetchedPublisherHtml(
+            return BrowserFetchedHtml(
                 source_url=normalized_url,
                 final_url=final_url,
                 html=html,
@@ -747,7 +730,7 @@ def fetch_html_with_cloakbrowser(
 fetch_html_with_cloakbrowser.paper_fetch_html_fetcher_name = "cloakbrowser"  # type: ignore[attr-defined]
 
 
-def fetch_html_with_cloakbrowser_fast(*args: Any, **kwargs: Any) -> FetchedPublisherHtml:
+def fetch_html_with_cloakbrowser_fast(*args: Any, **kwargs: Any) -> BrowserFetchedHtml:
     return fetch_html_with_cloakbrowser(*args, **kwargs)
 
 

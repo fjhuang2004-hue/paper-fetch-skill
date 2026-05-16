@@ -433,8 +433,3 @@ def render_clean_children(node: Any) -> str:
         text += rendered
     flush_inline_tokens()
     return text
-
-
-def needs_space_between(left: str, right: str, previous_child: Any, child: Any) -> bool:
-    del previous_child, child
-    return needs_space_between_inline_text(left, right, right_is_markdown_image=right.startswith("!["))

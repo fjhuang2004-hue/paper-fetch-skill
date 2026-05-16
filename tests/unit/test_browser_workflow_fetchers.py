@@ -65,52 +65,28 @@ class _FakeBrowser:
         self.closed_by = threading.current_thread().name
 
 
-class _FakePlaywrightManager:
-    def __init__(self) -> None:
-        self.browser = _FakeBrowser()
-        self.chromium = self
-        self.stopped = False
-        self.stopped_by: str | None = None
+def _fake_cloakbrowser_modules(browsers: list[_FakeBrowser]) -> dict[str, types.ModuleType]:
+    cloakbrowser_module = types.ModuleType("cloakbrowser")
 
-    def launch(self, **_kwargs) -> _FakeBrowser:
-        return self.browser
+    def launch(**_kwargs) -> _FakeBrowser:
+        browser = _FakeBrowser()
+        browsers.append(browser)
+        return browser
 
-    def stop(self) -> None:
-        self.stopped = True
-        self.stopped_by = threading.current_thread().name
-
-
-class _FakeSyncPlaywrightSession:
-    def __init__(self, managers: list[_FakePlaywrightManager]) -> None:
-        self._managers = managers
-
-    def start(self) -> _FakePlaywrightManager:
-        manager = _FakePlaywrightManager()
-        self._managers.append(manager)
-        return manager
-
-
-def _fake_playwright_modules(managers: list[_FakePlaywrightManager]) -> dict[str, types.ModuleType]:
-    playwright_module = types.ModuleType("playwright")
-    sync_api_module = types.ModuleType("playwright.sync_api")
-    sync_api_module.sync_playwright = lambda: _FakeSyncPlaywrightSession(managers)
-    playwright_module.sync_api = sync_api_module
-    return {
-        "playwright": playwright_module,
-        "playwright.sync_api": sync_api_module,
-    }
+    cloakbrowser_module.launch = launch
+    return {"cloakbrowser": cloakbrowser_module}
 
 
 def _runtime_context_with_forbidden_shared_browser() -> RuntimeContext:
     context = RuntimeContext(env={})
-    context.new_playwright_context = mock.Mock(side_effect=AssertionError("shared runtime browser should not be used"))
+    context.new_browser_context = mock.Mock(side_effect=AssertionError("shared runtime browser should not be used"))
     return context
 
 
-def test_threaded_image_fetcher_uses_thread_private_playwright_when_runtime_context_exists() -> None:
+def test_threaded_image_fetcher_uses_thread_private_browser_when_runtime_context_exists() -> None:
     runtime_context = _runtime_context_with_forbidden_shared_browser()
-    managers: list[_FakePlaywrightManager] = []
-    fetcher = browser_workflow._build_shared_playwright_image_fetcher(
+    browsers: list[_FakeBrowser] = []
+    fetcher = browser_workflow._build_shared_browser_image_fetcher(
         browser_context_seed_getter=lambda: {
             "browser_cookies": [{"name": "cf_clearance", "value": "seed", "domain": ".example.test", "path": "/"}],
             "browser_user_agent": "UnitTestAgent/1.0",
@@ -132,27 +108,26 @@ def test_threaded_image_fetcher_uses_thread_private_playwright_when_runtime_cont
     )
 
     try:
-        with mock.patch.dict(sys.modules, _fake_playwright_modules(managers)):
+        with mock.patch.dict(sys.modules, _fake_cloakbrowser_modules(browsers)):
             result = fetcher("https://example.test/figure.png", {"kind": "figure"})
     finally:
         fetcher.close()
         fetcher.close()
 
     assert result is not None
-    runtime_context.new_playwright_context.assert_not_called()
-    assert len(managers) == 1
-    manager = managers[0]
-    assert manager.stopped is True
-    assert manager.browser.closed is True
-    assert len(manager.browser.contexts) == 1
-    assert manager.browser.contexts[0].closed is True
-    assert len(manager.browser.contexts[0].pages) == 1
-    assert manager.browser.contexts[0].pages[0].closed is True
+    runtime_context.new_browser_context.assert_not_called()
+    assert len(browsers) == 1
+    browser = browsers[0]
+    assert browser.closed is True
+    assert len(browser.contexts) == 1
+    assert browser.contexts[0].closed is True
+    assert len(browser.contexts[0].pages) == 1
+    assert browser.contexts[0].pages[0].closed is True
 
 
-def test_threaded_image_fetcher_records_playwright_context_exception_diagnostic() -> None:
+def test_threaded_image_fetcher_records_browser_context_exception_diagnostic() -> None:
     image_url = "https://example.test/figure.png"
-    fetcher = browser_workflow._build_shared_playwright_image_fetcher(
+    fetcher = browser_workflow._build_shared_browser_image_fetcher(
         browser_context_seed_getter=lambda: {"browser_user_agent": "UnitTestAgent/1.0"},
         seed_urls_getter=lambda: [],
         browser_user_agent="UnitTestAgent/1.0",
@@ -163,7 +138,7 @@ def test_threaded_image_fetcher_records_playwright_context_exception_diagnostic(
         with mock.patch.object(
             fetcher_context,
             "_new_browser_context",
-            side_effect=RuntimeError("sync Playwright context already active"),
+            side_effect=RuntimeError("browser context already active"),
         ):
             result = fetcher(image_url, {"kind": "figure"})
     finally:
@@ -173,15 +148,14 @@ def test_threaded_image_fetcher_records_playwright_context_exception_diagnostic(
     assert result is None
     assert failure is not None
     assert failure["reason"] == "browser_context_error"
-    assert failure["playwright_context_error"] == "playwright_context_error"
     assert failure["error_type"] == "RuntimeError"
-    assert failure["error_message"] == "sync Playwright context already active"
+    assert failure["error_message"] == "browser context already active"
 
 
-def test_threaded_file_fetcher_uses_thread_private_playwright_when_runtime_context_exists() -> None:
+def test_threaded_file_fetcher_uses_thread_private_browser_when_runtime_context_exists() -> None:
     runtime_context = _runtime_context_with_forbidden_shared_browser()
-    managers: list[_FakePlaywrightManager] = []
-    fetcher = browser_workflow._build_shared_playwright_file_fetcher(
+    browsers: list[_FakeBrowser] = []
+    fetcher = browser_workflow._build_shared_browser_file_fetcher(
         browser_context_seed_getter=lambda: {
             "browser_cookies": [{"name": "cf_clearance", "value": "seed", "domain": ".example.test", "path": "/"}],
             "browser_user_agent": "UnitTestAgent/1.0",
@@ -203,28 +177,27 @@ def test_threaded_file_fetcher_uses_thread_private_playwright_when_runtime_conte
     )
 
     try:
-        with mock.patch.dict(sys.modules, _fake_playwright_modules(managers)):
+        with mock.patch.dict(sys.modules, _fake_cloakbrowser_modules(browsers)):
             result = fetcher("https://example.test/supplement.pdf", {"kind": "supplementary"})
     finally:
         fetcher.close()
         fetcher.close()
 
     assert result is not None
-    runtime_context.new_playwright_context.assert_not_called()
-    assert len(managers) == 1
-    manager = managers[0]
-    assert manager.stopped is True
-    assert manager.browser.closed is True
-    assert len(manager.browser.contexts) == 1
-    assert manager.browser.contexts[0].closed is True
-    assert len(manager.browser.contexts[0].pages) == 1
-    assert manager.browser.contexts[0].pages[0].closed is True
+    runtime_context.new_browser_context.assert_not_called()
+    assert len(browsers) == 1
+    browser = browsers[0]
+    assert browser.closed is True
+    assert len(browser.contexts) == 1
+    assert browser.contexts[0].closed is True
+    assert len(browser.contexts[0].pages) == 1
+    assert browser.contexts[0].pages[0].closed is True
 
 
-def test_threaded_image_fetcher_closes_thread_private_playwright_on_worker_thread() -> None:
+def test_threaded_image_fetcher_closes_thread_private_browser_on_worker_thread() -> None:
     runtime_context = _runtime_context_with_forbidden_shared_browser()
-    managers: list[_FakePlaywrightManager] = []
-    fetcher = browser_workflow._build_shared_playwright_image_fetcher(
+    browsers: list[_FakeBrowser] = []
+    fetcher = browser_workflow._build_shared_browser_image_fetcher(
         browser_context_seed_getter=lambda: {"browser_user_agent": "UnitTestAgent/1.0"},
         seed_urls_getter=lambda: [],
         browser_user_agent="UnitTestAgent/1.0",
@@ -241,9 +214,9 @@ def test_threaded_image_fetcher_closes_thread_private_playwright_on_worker_threa
             errors.append(exc)
 
     with (
-        mock.patch.dict(sys.modules, _fake_playwright_modules(managers)),
+        mock.patch.dict(sys.modules, _fake_cloakbrowser_modules(browsers)),
         mock.patch.object(
-            browser_workflow._SharedPlaywrightImageDocumentFetcher,
+            browser_workflow._SharedBrowserImageDocumentFetcher,
             "_fetch_with_page",
             return_value={
                 "status_code": 200,
@@ -261,21 +234,19 @@ def test_threaded_image_fetcher_closes_thread_private_playwright_on_worker_threa
 
     assert errors == []
     assert result_holder["result"] is not None
-    runtime_context.new_playwright_context.assert_not_called()
-    assert len(managers) == 1
-    manager = managers[0]
-    assert manager.stopped is True
-    assert manager.stopped_by == "asset-worker"
-    assert manager.browser.closed is True
-    assert manager.browser.closed_by == "asset-worker"
-    assert manager.browser.contexts[0].closed_by == "asset-worker"
-    assert manager.browser.contexts[0].pages[0].closed_by == "asset-worker"
+    runtime_context.new_browser_context.assert_not_called()
+    assert len(browsers) == 1
+    browser = browsers[0]
+    assert browser.closed is True
+    assert browser.closed_by == "asset-worker"
+    assert browser.contexts[0].closed_by == "asset-worker"
+    assert browser.contexts[0].pages[0].closed_by == "asset-worker"
 
 
-def test_threaded_file_fetcher_closes_thread_private_playwright_on_worker_thread() -> None:
+def test_threaded_file_fetcher_closes_thread_private_browser_on_worker_thread() -> None:
     runtime_context = _runtime_context_with_forbidden_shared_browser()
-    managers: list[_FakePlaywrightManager] = []
-    fetcher = browser_workflow._build_shared_playwright_file_fetcher(
+    browsers: list[_FakeBrowser] = []
+    fetcher = browser_workflow._build_shared_browser_file_fetcher(
         browser_context_seed_getter=lambda: {"browser_user_agent": "UnitTestAgent/1.0"},
         seed_urls_getter=lambda: [],
         browser_user_agent="UnitTestAgent/1.0",
@@ -293,9 +264,9 @@ def test_threaded_file_fetcher_closes_thread_private_playwright_on_worker_thread
             errors.append(exc)
 
     with (
-        mock.patch.dict(sys.modules, _fake_playwright_modules(managers)),
+        mock.patch.dict(sys.modules, _fake_cloakbrowser_modules(browsers)),
         mock.patch.object(
-            browser_workflow._SharedPlaywrightFileDocumentFetcher,
+            browser_workflow._SharedBrowserFileDocumentFetcher,
             "_fetch_with_context_request",
             return_value={
                 "status_code": 200,
@@ -312,21 +283,19 @@ def test_threaded_file_fetcher_closes_thread_private_playwright_on_worker_thread
 
     assert errors == []
     assert result_holder["result"] is not None
-    runtime_context.new_playwright_context.assert_not_called()
-    assert len(managers) == 1
-    manager = managers[0]
-    assert manager.stopped is True
-    assert manager.stopped_by == "asset-worker"
-    assert manager.browser.closed is True
-    assert manager.browser.closed_by == "asset-worker"
-    assert manager.browser.contexts[0].closed_by == "asset-worker"
-    assert manager.browser.contexts[0].pages[0].closed_by == "asset-worker"
+    runtime_context.new_browser_context.assert_not_called()
+    assert len(browsers) == 1
+    browser = browsers[0]
+    assert browser.closed is True
+    assert browser.closed_by == "asset-worker"
+    assert browser.contexts[0].closed_by == "asset-worker"
+    assert browser.contexts[0].pages[0].closed_by == "asset-worker"
 
 
-def test_threaded_file_fetcher_close_releases_all_thread_private_playwright_resources() -> None:
+def test_threaded_file_fetcher_close_releases_all_thread_private_browser_resources() -> None:
     runtime_context = _runtime_context_with_forbidden_shared_browser()
-    managers: list[_FakePlaywrightManager] = []
-    fetcher = browser_workflow._build_shared_playwright_file_fetcher(
+    browsers: list[_FakeBrowser] = []
+    fetcher = browser_workflow._build_shared_browser_file_fetcher(
         browser_context_seed_getter=lambda: {"browser_user_agent": "UnitTestAgent/1.0"},
         seed_urls_getter=lambda: [],
         browser_user_agent="UnitTestAgent/1.0",
@@ -343,7 +312,7 @@ def test_threaded_file_fetcher_close_releases_all_thread_private_playwright_reso
         inner_fetcher._ensure_context()
 
     try:
-        with mock.patch.dict(sys.modules, _fake_playwright_modules(managers)):
+        with mock.patch.dict(sys.modules, _fake_cloakbrowser_modules(browsers)):
             build_fetcher()
             worker = threading.Thread(target=build_fetcher, name="asset-worker")
             worker.start()
@@ -352,13 +321,12 @@ def test_threaded_file_fetcher_close_releases_all_thread_private_playwright_reso
         fetcher.close()
         fetcher.close()
 
-    runtime_context.new_playwright_context.assert_not_called()
+    runtime_context.new_browser_context.assert_not_called()
     assert len(created_fetchers) == 2
-    assert len(managers) == 2
-    for manager in managers:
-        assert manager.stopped is True
-        assert manager.browser.closed is True
-        assert len(manager.browser.contexts) == 1
-        assert manager.browser.contexts[0].closed is True
-        assert len(manager.browser.contexts[0].pages) == 1
-        assert manager.browser.contexts[0].pages[0].closed is True
+    assert len(browsers) == 2
+    for browser in browsers:
+        assert browser.closed is True
+        assert len(browser.contexts) == 1
+        assert browser.contexts[0].closed is True
+        assert len(browser.contexts[0].pages) == 1
+        assert browser.contexts[0].pages[0].closed is True

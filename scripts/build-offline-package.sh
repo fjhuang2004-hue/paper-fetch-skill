@@ -115,7 +115,7 @@ copy_source_snapshot() {
     --exclude='./live-downloads' \
     --exclude='./**/__pycache__' \
     --exclude='./*.egg-info' \
-    --exclude='./legacy/flaresolverr' \
+    --exclude='./legacy' \
     -C "$REPO_DIR" -cf - . | tar -C "$staging" -xf -
 }
 

@@ -38,9 +38,9 @@ from . import _ieee_metadata as ieee_metadata
 from . import _ieee_supplementary as ieee_supplementary
 from . import _ieee_url as ieee_url
 from ._pdf_fallback import PdfFallbackStrategy, PdfFetchFailure, fetch_pdf_over_http, fetch_pdf_with_browser
-from ._payloads import build_provider_payload
+from ._payloads import build_provider_payload, provider_failure_diagnostics as _provider_failure_diagnostics
 from ._registry import ProviderBundle, register_provider_bundle
-from ._waterfall import DEFAULT_WATERFALL_CONTINUE_CODES, ProviderWaterfallStep, ProviderWaterfallState, run_provider_waterfall
+from ._waterfall import DEFAULT_WATERFALL_CONTINUE_CODES, ProviderWaterfallState, ProviderWaterfallStep, run_provider_waterfall
 from .base import (
     ProviderArtifacts,
     ProviderClient,
@@ -95,15 +95,6 @@ def _pdf_failure_diagnostics(failure: PdfFetchFailure | None) -> dict[str, Any] 
     diagnostics: dict[str, Any] = {"kind": failure.kind, "message": failure.message}
     if failure.details:
         diagnostics["details"] = dict(failure.details)
-    return diagnostics
-
-
-def _provider_failure_diagnostics(failure: ProviderFailure | None) -> dict[str, Any] | None:
-    if failure is None:
-        return None
-    diagnostics: dict[str, Any] = {"code": failure.code, "message": failure.message}
-    if failure.source_trail:
-        diagnostics["source_trail"] = list(failure.source_trail)
     return diagnostics
 
 

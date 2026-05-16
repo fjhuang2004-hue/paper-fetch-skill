@@ -106,7 +106,7 @@ normalize_mcp_env_keys() {
   local filtered=()
   for key in "${MCP_ENV_KEYS[@]}"; do
     case "$key" in
-      PLAYWRIGHT_BROWSERS_PATH|FLARESOLVERR_URL|FLARESOLVERR_ENV_FILE|FLARESOLVERR_SOURCE_DIR)
+      PLAYWRIGHT_BROWSERS_PATH)
         continue
         ;;
       CLOAKBROWSER_HEADLESS)

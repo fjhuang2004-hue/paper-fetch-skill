@@ -10,10 +10,10 @@
 这份文档不解决：
 
 - provider 差异、路由规则和限速语义
-- Wiley / Science / PNAS / AMS 的详细运维步骤
+- Wiley / Science / PNAS / AMS 的浏览器运行时细节
 - 架构实现细节
 
-provider 与环境变量说明见 [`providers.md`](providers.md)，Wiley / Science / PNAS / AMS 运维说明见 [`flaresolverr.md`](flaresolverr.md)。
+provider 与环境变量说明见 [`providers.md`](providers.md)，架构说明见 [`architecture/target-architecture.md`](architecture/target-architecture.md)。
 
 ## 1. 安装 Python 包
 
@@ -28,16 +28,16 @@ provider 与环境变量说明见 [`providers.md`](providers.md)，Wiley / Scien
 - 创建仓库内 `.venv`
 - 安装当前 Python 包
 - 如果存在 `.env.example` 且用户配置文件还不存在，创建 `~/.config/paper-fetch/.env`
-- 安装 Python 依赖、Playwright Chromium、repo-local FlareSolverr legacy 对照链路和外部公式后端；默认 provider-owned HTML bootstrap 使用 CloakBrowser
+- 安装 Python 依赖、CloakBrowser 运行时依赖和外部公式后端；默认 provider-owned HTML bootstrap 使用 CloakBrowser
 - 安装结束时提示 Elsevier 官方 API key 的申请入口和配置位置；抓取 Elsevier 全文前需要从 <https://dev.elsevier.com/> 申请并设置 `ELSEVIER_API_KEY`
 
 补充说明：
 
-- 这是在线一键安装入口：用户不需要手动下载浏览器、legacy FlareSolverr 对照依赖和公式后端，但脚本仍会从官方来源拉取这些大型组件
+- 这是在线一键安装入口：用户不需要手动准备公式后端；浏览器路径统一由 CloakBrowser runtime 负责
 - 如果只想安装 Python 包和配置骨架，不准备浏览器链路，使用 `./install.sh --lite`
 - 如果要装进当前 `python3` 环境而不是 `.venv`，使用 `./install.sh --system`
 - arXiv 不需要本地转换器；official HTML 不可用或质量检测失败时直接进入 text-only PDF fallback
-- 如果只想跳过某个重型部分，可使用 `--skip-playwright-install` 或 `--skip-flaresolverr-setup`
+- 如果只想跳过公式 Node fallback，可使用 `--no-node`
 
 ### 离线包
 
@@ -62,7 +62,7 @@ CI 自动发布规则：
 
 - `pyproject.toml` 的 `[project].version` 是 Python 包和离线构建脚本读取的主版本来源。
 - `src/paper_fetch/config.py` 的 `DEFAULT_USER_AGENT` 需要同步默认 `paper-fetch-skill/<version>`。
-- `skills/paper-fetch-skill/references/environment.md` 需要同步默认 User-Agent 文档。
+- `skills/paper-fetch-skill/references/environment.md` 不写死版本号，只指向运行时 `paper_fetch.config.DEFAULT_USER_AGENT`。
 - `installer/paper-fetch-skill.iss` 的 `AppVersion` 默认值需要同步；正常 Windows 构建会从 `pyproject.toml` 传入覆盖值，但直接运行 Inno Setup 模板时会使用这里的默认值。
 - `tests/unit/test_offline_install.py` 中用于离线安装测试的假 `paper_fetch_skill-<version>-py3-none-any.whl` 文件名需要同步。
 - `CHANGELOG.md` 需要新增对应版本章节。`paper-fetch-skill-formula-tools` 的 `package.json` / `package-lock.json` 是公式辅助 Node 包版本，除非单独发布该辅助包，否则不跟随 Python 主包版本。
@@ -127,16 +127,13 @@ source ./activate-offline.sh
 - Linux Python 版本必须与包名和 `offline-manifest.json` 的 `target.python_tag` 完全匹配；例如 `cp313` 包只能用 CPython `3.13.x` 安装，避免 wheelhouse ABI 不匹配
 - Windows 安装器固定使用包内 CPython 3.13 x64 embeddable runtime；目标机不需要预装 Python
 - Linux 所有 Python 依赖只来自包内 `wheelhouse/`，安装时设置 `PIP_NO_INDEX=1`；Windows 构建阶段用 staging 中的 `dist/` 和 `wheelhouse/` 把项目和依赖安装进 `runtime/Lib/site-packages`，随后在写入 manifest、checksums 和 Inno Setup 打包前删除这两个构建期目录，最终安装器不包含它们
-- Playwright 使用包内 `ms-playwright/`，并设置 `PLAYWRIGHT_BROWSERS_PATH="$INSTALL_ROOT/ms-playwright"`；不会触碰 `~/.cache/ms-playwright`
+- CloakBrowser Python wheel 随离线包 wheelhouse 分发；浏览器 binary 不随包分发，受限环境可预先安装并设置 `CLOAKBROWSER_BINARY_PATH`
 - 包内源码快照不包含 `tests/` 目录；离线安装目标是运行已打包工具，不在目标机执行项目测试
-- Linux FlareSolverr 使用包内已 patch 的源码快照 `vendor/flaresolverr/.work/FlareSolverr/`、`vendor/flaresolverr/wheelhouse/` 和已解压的运行 bundle；CI 构建阶段会把 `func-timeout` 这类 source-only 依赖预构建成 wheel，目标机不运行 `git clone`、`git fetch`、`git apply` 或 Python wheel 构建
-- Windows FlareSolverr 使用 CI 中由本项目 patch 后源码运行 upstream `src/build_package.py` 生成的 `flaresolverr_windows_x64.zip`，安装器只纳入解压后的 `vendor/flaresolverr/.flaresolverr/v3.4.6/flaresolverr/` 运行目录；目标机不运行 Python FlareSolverr venv、`git clone` 或 patch 步骤
-- FlareSolverr bundle 只包含运行所需的解压目录，不包含 upstream 原始压缩包
 - Linux 公式工具使用包内 `formula-tools/bin/texmath`，Windows 使用 `formula-tools/bin/texmath.exe`；目标机不编译 texmath，也不运行 `npm install`
-- Linux 默认写包内 `offline.env`、生成 `activate-offline.sh`、复制 `~/.codex/skills/paper-fetch-skill`、`~/.claude/skills/paper-fetch-skill` 和 `~/.gemini/skills/paper-fetch-skill`，并把离线 CLI PATH、formula tools PATH、`PAPER_FETCH_ENV_FILE`、`PAPER_FETCH_FORMULA_TOOLS_DIR`、`PLAYWRIGHT_BROWSERS_PATH`、`FLARESOLVERR_SOURCE_DIR`、`FLARESOLVERR_ENV_FILE`、`FLARESOLVERR_URL` 写入当前 shell 对应启动文件；只有显式传 `--user-config` 才会把受标记管理的运行时块合并到 `~/.config/paper-fetch/.env`
+- Linux 默认写包内 `offline.env`、生成 `activate-offline.sh`、复制 `~/.codex/skills/paper-fetch-skill`、`~/.claude/skills/paper-fetch-skill` 和 `~/.gemini/skills/paper-fetch-skill`，并把离线 CLI PATH、formula tools PATH、`PAPER_FETCH_ENV_FILE`、`PAPER_FETCH_FORMULA_TOOLS_DIR`、`CLOAKBROWSER_HEADLESS` 写入当前 shell 对应启动文件；只有显式传 `--user-config` 才会把受标记管理的运行时块合并到 `~/.config/paper-fetch/.env`
 - Linux `--reuse-env-file <path>` 会把 `PAPER_FETCH_ENV_FILE` 指向现有文件且不修改该文件；其它 runtime 路径仍由新 bundle 写入 shell / MCP 环境
 - Linux 写入 shell 启动文件和 Codex fallback config 时会先替换旧的受管理 block，重复安装不会重复追加；不修改 `/etc/profile`
-- Windows 首次安装会写安装目录内 `offline.env`；升级安装会保留用户已有内容，只替换 `# BEGIN/END paper-fetch offline managed` 包围的运行时 block。MCP 注册环境固定指向安装目录内 `offline.env`、`downloads/`、`formula-tools/`、`ms-playwright/` 和 FlareSolverr 路径，并设置 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`
+- Windows 首次安装会写安装目录内 `offline.env`；升级安装会保留用户已有内容，只替换 `# BEGIN/END paper-fetch offline managed` 包围的运行时 block。MCP 注册环境固定指向安装目录内 `offline.env`、`downloads/` 和 `formula-tools/`，并设置 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`、`CLOAKBROWSER_HEADLESS=true`
 - Windows GUI 安装完成页会提示 Elsevier API key 申请入口和包内 `offline.env` 位置，并提供可选的 Notepad 打开项；silent 安装不会弹出该提示。离线环境抓取 Elsevier 全文前，从 <https://dev.elsevier.com/> 申请 key，并在该文件中填写 `ELSEVIER_API_KEY`
 - `--preset=headless` 会在安装阶段检查 `Xvfb`；`--preset=wslg` 会检查 `DISPLAY` 或 `WAYLAND_DISPLAY`
 
@@ -164,9 +161,9 @@ scripts/verify-offline-package.sh dist/paper-fetch-skill-offline-linux-x86_64-cp
 
 上面的验证路径按实际构建出的 `cp311`、`cp312`、`cp313` 或 `cp314` 包名替换。
 
-验证脚本会先用 guard 拦截 `curl`、`git`、`npm`、`playwright` 等命令来确认安装器没有在线下载或目标机 patch 动作，并使用临时 HOME 和 fake `codex` / `claude` / `gemini` CLI 验证 Linux shell 写入、skill 复制和 MCP remove/add 注册；随后检查 `paper-fetch --help`、`texmath --help`、包内 Playwright Chromium、`paper_fetch.mcp.fetch_tool.provider_status_payload` 和 FlareSolverr `sessions.list`，最后执行 `install-offline.sh --uninstall` 验证用户级集成可清理且不删除包内 `offline.env` 或 `.venv/`。
+验证脚本会先用 guard 拦截 `curl`、`git`、`npm`、`playwright` 等命令来确认安装器没有在线下载或目标机 patch 动作，并使用临时 HOME 和 fake `codex` / `claude` / `gemini` CLI 验证 Linux shell 写入、skill 复制和 MCP remove/add 注册；随后检查 `paper-fetch --help`、`texmath --help`、`cloakbrowser` import、`paper_fetch.mcp.fetch_tool.provider_status_payload`，最后执行 `install-offline.sh --uninstall` 验证用户级集成可清理且不删除包内 `offline.env` 或 `.venv/`。
 
-Windows CI 在 `offline-windows-x86-64` job 中执行安装器验证：通过 `Start-Process -Wait -PassThru` silent install 并检查安装器进程退出码，失败时输出安装日志；随后验证 bundled `runtime\python.exe` import 和 `provider_status_payload()`、`bin\paper-fetch.cmd --help`、`texmath.exe --help`、安装目录内 Playwright Chromium 路径检查、启动安装目录内 FlareSolverr 后调用 `sessions.list`，并用 fake `codex` / `claude` / `gemini` CLI 验证 MCP remove/add 命令。
+Windows CI 在 `offline-windows-x86-64` job 中执行安装器验证：通过 `Start-Process -Wait -PassThru` silent install 并检查安装器进程退出码，失败时输出安装日志；随后验证 bundled `runtime\python.exe` import 和 `provider_status_payload()`、`bin\paper-fetch.cmd --help`、`texmath.exe --help`、CloakBrowser package smoke，并用 fake `codex` / `claude` / `gemini` CLI 验证 MCP remove/add 命令。
 
 只需要复核 Windows 安装器时，可以手动触发 `CI` workflow 并设置 `run_offline_windows_only=true`；该模式只运行 `offline-windows-x86-64`，其它常规 job 会跳过。
 
@@ -242,8 +239,8 @@ paper-fetch-install-formula-tools
 补充说明：
 
 - `paper-fetch-install-formula-tools` 会把工具装到用户数据目录，更适合部署环境
-- `./install-formula-tools.sh` 会把工具装到当前仓库的 `./.formula-tools/`，并默认顺手准备 repo-local FlareSolverr 与 Playwright Chromium
-- 如果只想安装公式工具，可给仓库脚本加 `--skip-flaresolverr-setup --skip-playwright-install`
+- `./install-formula-tools.sh` 会把工具装到当前仓库的 `./.formula-tools/`
+- 如果只想安装公式工具但跳过 Node fallback，可给仓库脚本加 `--no-node`
 - 运行时可用 `PAPER_FETCH_FORMULA_TOOLS_DIR` 覆盖公式工具查找目录；默认会考虑 repo-local `.formula-tools` 和用户数据目录下的 `formula-tools`
 
 ### CI / GitHub Actions
@@ -270,9 +267,9 @@ scripts/clean-local-artifacts.sh --days 7
 
 ## 4. Elsevier / Wiley / Science / PNAS / AMS / IEEE 接入入口
 
-`elsevier` 现在不再依赖 FlareSolverr 浏览器链路；它只需要官方 API 凭据，并走 `官方 XML/API -> 官方 API PDF fallback -> metadata-only`。
+`elsevier` 不依赖本地浏览器链路；它只需要官方 API 凭据，并走 `官方 XML/API -> 官方 API PDF fallback -> metadata-only`。
 
-`ieee` 不需要 FlareSolverr 或 IEEE API key；它走 `landing metadata / article number -> direct REST HTML -> clean-browser HTML -> direct HTTP PDF fallback -> seeded-browser PDF fallback`，但全文是否可用仍取决于当前环境对 IEEE Xplore 的合法访问上下文。clean-browser HTML 使用新的 Playwright context，不读取本机浏览器 profile、不复用用户登录态、不自动登录、不处理验证码，也不绕过访问权限。direct HTTP PDF 返回 `stamp.jsp` HTML wrapper 或 access/challenge 页面时，seeded-browser PDF fallback 只复用当前页面运行期间获得的合法 IEEE cookies/session。
+`ieee` 不需要 IEEE API key；它走 `landing metadata / article number -> direct REST HTML -> clean-browser HTML -> direct HTTP PDF fallback -> seeded-browser PDF fallback`，但全文是否可用仍取决于当前环境对 IEEE Xplore 的合法访问上下文。clean-browser HTML 使用新的 CloakBrowser context，不读取本机浏览器 profile、不复用用户登录态、不自动登录、不处理验证码，也不绕过访问权限。direct HTTP PDF 返回 `stamp.jsp` HTML wrapper 或 access/challenge 页面时，seeded-browser PDF fallback 只复用当前页面运行期间获得的合法 IEEE cookies/session。
 
 `wiley`、`science`、`pnas`、`ams` 默认通过 CloakBrowser HTML bootstrap 进入 provider-owned browser workflow。是否能拿到全文仍取决于 publisher 访问权限、paywall/challenge 与远端站点行为。
 
@@ -291,21 +288,6 @@ export CLOAKBROWSER_TIMEOUT_MS="120000"
 - `arxiv` 不需要额外 env；路径细节见 [`providers.md` 的 arXiv 小节](providers.md#arxiv)。
 - 如果只想启用 `wiley` 的官方 TDM API PDF lane，可以只配置 `WILEY_TDM_CLIENT_TOKEN`；这不会启用 HTML 资产下载或 seeded-browser PDF/ePDF fallback
 - `wiley` / `science` / `pnas` / `ams` 的 browser workflow 顺序见 [`providers.md`](providers.md#wiley-science-pnas-browser-workflow)。
-- 旧 FlareSolverr 对照链路仍可按 [`flaresolverr.md`](flaresolverr.md) 启动、检查和排障；默认 CloakBrowser HTML bootstrap 不再要求 `FLARESOLVERR_ENV_FILE`。
-
-如果你还要准备 legacy FlareSolverr 对照链路，入口是：
-
-```bash
-./install-formula-tools.sh
-```
-
-然后配置旧链路 preset：
-
-```bash
-export FLARESOLVERR_ENV_FILE="$PWD/vendor/flaresolverr/.env.flaresolverr-source-headless"
-```
-
-完整启动、检查和排障步骤见 [`flaresolverr.md`](flaresolverr.md)。
 
 ## 5. 部署到 Codex
 
@@ -322,7 +304,7 @@ python3 -m pip install .
 - 复制静态 skill bundle
 - 在显式传入 `--register-mcp` 时注册 `paper-fetch` MCP server
 - 注册 Codex MCP 时把当前 `python3` 解释器写入 `PAPER_FETCH_MCP_PYTHON_BIN`，并让 Codex 调用仓库里的 launcher
-- 在 WSL 下默认通过 `scripts/run-codex-paper-fetch-mcp.sh` 启动 MCP，优先使用 `vendor/flaresolverr/.env.flaresolverr-source-wslg`，拿不到 WSLg 图形环境时回退到 headless preset
+- 在 WSL 下默认通过 `scripts/run-codex-paper-fetch-mcp.sh` 启动 MCP；如需 headed browser，请在外部环境中设置 `CLOAKBROWSER_HEADLESS=false` 并提供可用显示环境
 
 常用选项：
 
@@ -398,8 +380,8 @@ gemini mcp add paper-fetch -- python3 -m paper_fetch.mcp.server
 这个包装脚本会：
 
 - 在 WSL 下补齐缺失的 `XDG_RUNTIME_DIR`
-- 优先选 `vendor/flaresolverr/.env.flaresolverr-source-wslg`
-- 如果 WSLg 不可用，则回退到 `vendor/flaresolverr/.env.flaresolverr-source-headless`
+- 如需 headed browser，可设置 `CLOAKBROWSER_HEADLESS=false`
+- 默认保持 headless，适合 stdio MCP 场景
 
 如果配置文件不在进程环境里，额外设置：
 
@@ -453,12 +435,11 @@ PYTHONPATH=src pytest
 PAPER_FETCH_RUN_FULL_GOLDEN=1 PYTHONPATH=src python3 -m pytest tests/integration/test_golden_corpus.py -q
 ```
 
-如果你要额外验证 `wiley` / `science` / `pnas` / `ams` live 路径，请先按 [`flaresolverr.md`](flaresolverr.md) 准备环境，再运行对应 live 测试。
+如果你要额外验证 `wiley` / `science` / `pnas` / `ams` live 路径，请先确认 CloakBrowser package 和合法 publisher 访问上下文可用，再运行对应 live 测试。
 
 ## 相关文档
 
 - [`../README.md`](../README.md)
 - [`docs/README.md`](README.md)
 - [`providers.md`](providers.md)
-- [`flaresolverr.md`](flaresolverr.md)
 - [`architecture/target-architecture.md`](architecture/target-architecture.md)

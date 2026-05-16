@@ -457,10 +457,6 @@ def _visible_inline_edge(text: str, *, last: bool) -> str:
     return normalized[-1] if last else normalized[0]
 
 
-def join_inline_fragments(parts: list[str]) -> str:
-    return render_inline_tokens([RawMarkdownToken(part) for part in parts], policy="body")
-
-
 def first_significant_char(text: str) -> str:
     for char in text:
         if not char.isspace():

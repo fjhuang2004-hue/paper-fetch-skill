@@ -55,6 +55,23 @@ class FixtureProvenanceTests(unittest.TestCase):
         self.assertEqual(noncanonical, [], "Non-canonical manifest assets:\n" + "\n".join(noncanonical))
         self.assertEqual(missing, [], "Missing or uncataloged manifest assets:\n" + "\n".join(missing))
 
+    def test_body_asset_files_are_registered_in_manifest_assets(self) -> None:
+        manifest = golden_criteria_manifest()
+        registered = {
+            fixture_path
+            for sample in manifest["samples"].values()
+            for fixture_path in sample.get("assets", {}).values()
+        }
+        missing: list[str] = []
+
+        for body_assets_dir in sorted(GOLDEN_CRITERIA_ROOT.glob("*/body_assets")):
+            for asset_path in sorted(path for path in body_assets_dir.iterdir() if path.is_file()):
+                fixture_path = asset_path.relative_to(REPO_ROOT).as_posix()
+                if fixture_path not in registered:
+                    missing.append(fixture_path)
+
+        self.assertEqual(missing, [], "Unregistered body_assets files:\n" + "\n".join(missing))
+
     def test_registered_rule_tests_exist_and_are_documented(self) -> None:
         manifest = golden_criteria_manifest()
         docs = DOC_PATH.read_text(encoding="utf-8")

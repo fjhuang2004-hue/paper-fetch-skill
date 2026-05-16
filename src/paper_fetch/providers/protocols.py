@@ -12,7 +12,6 @@ from ..runtime import RuntimeContext
 from .base import (
     ProviderFailure,
     ProviderFetchResult,
-    ProviderStatusResult,
     RawFulltextPayload,
 )
 
@@ -20,15 +19,6 @@ from .base import (
 @runtime_checkable
 class MetadataProvider(Protocol):
     def fetch_metadata(self, query: Mapping[str, str | None]) -> dict[str, Any]:
-        ...
-
-
-@runtime_checkable
-class StatusProvider(Protocol):
-    name: str
-    official_provider: bool
-
-    def probe_status(self) -> ProviderStatusResult:
         ...
 
 

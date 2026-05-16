@@ -377,7 +377,3 @@ class CacheMixin:
 
     def _sync_cache_body_bytes(self) -> None:
         self._cache_body_bytes = int(self._cache.currsize)
-
-    def _discard_cache_entry(self, cache_key: _CacheKey) -> None:
-        self._cache.pop(cache_key, None)
-        self._sync_cache_body_bytes()

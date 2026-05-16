@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ONBOARDING_DIR = REPO_ROOT / "docs" / "ai-onboarding"
 KNOWN_PROVIDERS_PATH = ONBOARDING_DIR / "known-providers.yml"
 MANIFEST_SCHEMA_PATH = ONBOARDING_DIR / "provider-manifest.schema.json"
+MANIFESTS_DIR = ONBOARDING_DIR / "manifests"
 STRICT_SYNC_BACK_STATUSES = frozenset({"ready", "live"})
 DRAFT_COMPATIBLE_SYNC_BACK_STATUSES = frozenset({"draft", "implemented"})
 

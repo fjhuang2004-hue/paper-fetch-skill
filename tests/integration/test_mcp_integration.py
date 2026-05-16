@@ -179,16 +179,17 @@ SERVER_SCRIPT = textwrap.dedent(
                     status="not_configured",
                     available=False,
                     official_provider=True,
-                    missing_env=["FLARESOLVERR_ENV_FILE"],
                     checks=[
                         build_provider_status_check(
                             "runtime_env",
                             "not_configured",
-                            "FLARESOLVERR_ENV_FILE is required.",
-                            missing_env=["FLARESOLVERR_ENV_FILE"],
+                            "wiley CloakBrowser runtime requires the cloakbrowser Python package.",
                         ),
-                        build_provider_status_check("repo_local_workflow", "not_configured", "Skipped because runtime_env is not configured."),
-                        build_provider_status_check("flaresolverr_health", "not_configured", "Skipped because runtime_env is not configured."),
+                        build_provider_status_check(
+                            "cloakbrowser_dependency",
+                            "not_configured",
+                            "CloakBrowser Python package is not installed.",
+                        ),
                     ],
                 )
             ),
@@ -198,16 +199,17 @@ SERVER_SCRIPT = textwrap.dedent(
                     status="not_configured",
                     available=False,
                     official_provider=True,
-                    missing_env=["FLARESOLVERR_ENV_FILE"],
                     checks=[
                         build_provider_status_check(
                             "runtime_env",
                             "not_configured",
-                            "FLARESOLVERR_ENV_FILE is required.",
-                            missing_env=["FLARESOLVERR_ENV_FILE"],
+                            "science CloakBrowser runtime requires the cloakbrowser Python package.",
                         ),
-                        build_provider_status_check("repo_local_workflow", "not_configured", "Skipped because runtime_env is not configured."),
-                        build_provider_status_check("flaresolverr_health", "not_configured", "Skipped because runtime_env is not configured."),
+                        build_provider_status_check(
+                            "cloakbrowser_dependency",
+                            "not_configured",
+                            "CloakBrowser Python package is not installed.",
+                        ),
                     ],
                 )
             ),
@@ -219,8 +221,11 @@ SERVER_SCRIPT = textwrap.dedent(
                     official_provider=True,
                     checks=[
                         build_provider_status_check("runtime_env", "ok", "pnas runtime environment is configured."),
-                        build_provider_status_check("repo_local_workflow", "ok", "Repo-local FlareSolverr workflow files are available."),
-                        build_provider_status_check("flaresolverr_health", "ok", "Local FlareSolverr health check passed."),
+                        build_provider_status_check(
+                            "cloakbrowser_dependency",
+                            "ok",
+                            "CloakBrowser Python package is importable; browser launch is not probed.",
+                        ),
                     ],
                 )
             ),
@@ -295,16 +300,17 @@ SERVER_SCRIPT = textwrap.dedent(
                     status="not_configured",
                     available=False,
                     official_provider=True,
-                    missing_env=["FLARESOLVERR_ENV_FILE"],
                     checks=[
                         build_provider_status_check(
                             "runtime_env",
                             "not_configured",
-                            "FLARESOLVERR_ENV_FILE is required.",
-                            missing_env=["FLARESOLVERR_ENV_FILE"],
+                            "ams CloakBrowser runtime requires the cloakbrowser Python package.",
                         ),
-                        build_provider_status_check("repo_local_workflow", "not_configured", "Skipped because runtime_env is not configured."),
-                        build_provider_status_check("flaresolverr_health", "not_configured", "Skipped because runtime_env is not configured."),
+                        build_provider_status_check(
+                            "cloakbrowser_dependency",
+                            "not_configured",
+                            "CloakBrowser Python package is not installed.",
+                        ),
                     ],
                 )
             ),

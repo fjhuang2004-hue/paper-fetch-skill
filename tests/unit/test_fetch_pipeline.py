@@ -78,6 +78,20 @@ class FetchPipelineTests(unittest.TestCase):
         self.assertEqual(context.artifact_mode, "none")
         self.assertIs(context.fetch_cache, fetch_cache)
 
+    def test_request_builder_keeps_artifact_mode_when_no_download(self) -> None:
+        request = build_fetch_pipeline_request(
+            query="10.1016/test",
+            modes={"article"},
+            strategy=FetchStrategy(),
+            render=RenderOptions(),
+            download_dir=Path("/tmp/downloads"),
+            artifact_mode="all",
+            no_download=True,
+        )
+
+        self.assertEqual(request.artifact_mode, "all")
+        self.assertTrue(request.no_download)
+
     def test_run_passes_artifact_mode_to_context(self) -> None:
         captured: dict[str, object] = {}
 

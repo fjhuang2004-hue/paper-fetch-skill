@@ -8,7 +8,7 @@ from ....config import build_user_agent
 from ....runtime import RuntimeContext
 from ....utils import normalize_text
 from ..._pdf_candidates import BROWSER_WORKFLOW_PDF_URL_TOKENS
-from ....reason_codes import ERROR
+from ...browser_runtime.seed import parse_optional_int
 from .diagnostics import (
     _compact_failure_diagnostic,
     _context_failure_diagnostic as _build_context_failure_diagnostic,
@@ -22,7 +22,7 @@ def _looks_like_pdf_navigation_url(url: str | None) -> bool:
     return any(token in normalized for token in BROWSER_WORKFLOW_PDF_URL_TOKENS)
 
 
-def _choose_playwright_seed_url(*candidates: str | None) -> str | None:
+def _choose_browser_seed_url(*candidates: str | None) -> str | None:
     normalized_candidates = [
         normalize_text(candidate)
         for candidate in candidates
@@ -42,6 +42,29 @@ def _normalized_response_headers(headers: Mapping[str, Any] | None) -> dict[str,
         for key, value in headers.items()
         if normalize_text(str(key))
     }
+
+
+def _browser_response_headers(response: Any | None) -> dict[str, str]:
+    if response is None:
+        return {}
+    try:
+        return _normalized_response_headers(response.all_headers())
+    except Exception:
+        return _normalized_response_headers(getattr(response, "headers", {}) or {})
+
+
+def _browser_response_status(
+    response: Any | None, *, zero_as_none: bool = True
+) -> int | None:
+    if response is None:
+        return None
+    try:
+        status = parse_optional_int(getattr(response, "status", None))
+    except Exception:
+        return None
+    if zero_as_none and status == 0:
+        return None
+    return status
 
 
 def _new_browser_context(
@@ -81,10 +104,6 @@ class _BaseBrowserDocumentFetcher:
         seed_urls_getter: Callable[[], list[str]],
         browser_user_agent: str | None = None,
         headless: bool = True,
-        challenge_recovery: Callable[
-            [str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any] | None
-        ]
-        | None = None,
         runtime_context: RuntimeContext | None = None,
         use_runtime_shared_browser: bool = True,
     ) -> None:
@@ -92,7 +111,6 @@ class _BaseBrowserDocumentFetcher:
         self._seed_urls_getter = seed_urls_getter
         self._browser_user_agent = browser_user_agent
         self._headless = headless
-        self._challenge_recovery = challenge_recovery
         self._runtime_context = runtime_context
         self._use_runtime_shared_browser = use_runtime_shared_browser
         self._browser_manager = None
@@ -101,7 +119,6 @@ class _BaseBrowserDocumentFetcher:
         self._warmed_seed_urls: set[str] = set()
         self._last_failure_by_url: dict[str, dict[str, Any]] = {}
         self._last_context_failure: dict[str, Any] = {}
-        self._recovery_attempts_by_url: dict[str, list[dict[str, Any]]] = {}
 
     def failure_for(self, source_url: str) -> dict[str, Any] | None:
         diagnostic = self._last_failure_by_url.get(normalize_text(source_url))
@@ -206,56 +223,8 @@ class _BaseBrowserDocumentFetcher:
         diagnostic = _compact_failure_diagnostic(
             {"source_url": normalized_url, **values}
         )
-        recovery_attempts = self._recovery_attempts_by_url.get(normalized_url) or []
-        if recovery_attempts:
-            diagnostic["recovery_attempts"] = list(recovery_attempts)
         if diagnostic:
             self._last_failure_by_url[normalized_url] = diagnostic
 
     def _context_failure_diagnostic(self, exc: Exception) -> dict[str, Any]:
         return _build_context_failure_diagnostic(exc)
-
-    def _record_recovery_payload(
-        self, source_url: str, recovery: Mapping[str, Any]
-    ) -> None:
-        del source_url, recovery
-
-    def _recovery_diagnostic(self, recovery: Mapping[str, Any]) -> dict[str, Any]:
-        return _compact_failure_diagnostic(recovery)
-
-    def _attempt_challenge_recovery(
-        self,
-        source_url: str,
-        asset: Mapping[str, Any],
-        failure: Mapping[str, Any],
-    ) -> bool:
-        normalized_url = normalize_text(source_url)
-        if not normalized_url or self._challenge_recovery is None:
-            return False
-        try:
-            recovery = self._challenge_recovery(normalized_url, asset, failure)
-        except Exception as exc:
-            recovery = {
-                "status": ERROR,
-                "reason": normalize_text(str(exc)) or exc.__class__.__name__,
-            }
-        if not isinstance(recovery, Mapping):
-            return False
-        self._record_recovery_payload(normalized_url, recovery)
-        compact = self._recovery_diagnostic(recovery)
-        if compact:
-            self._recovery_attempts_by_url.setdefault(normalized_url, []).append(
-                compact
-            )
-            previous = self.failure_for(normalized_url) or {}
-            previous.pop("source_url", None)
-            self._record_failure(normalized_url, **previous)
-        if normalize_text(str(recovery.get("status") or "")).lower() != "ok":
-            return False
-        self._sync_context_cookies()
-        self._warm_seed_urls(force=True)
-        return True
-
-
-_BasePlaywrightDocumentFetcher = _BaseBrowserDocumentFetcher
-_new_playwright_context = _new_browser_context

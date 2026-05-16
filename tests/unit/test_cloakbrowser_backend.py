@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest import mock
 
-from paper_fetch.providers import _cloakbrowser, _flaresolverr, browser_runtime
+from paper_fetch.providers import _cloakbrowser, browser_runtime
 from paper_fetch.providers.browser_workflow.html_extraction import _fetch_browser_html_payload
 from paper_fetch.runtime import RuntimeContext
 
@@ -227,8 +227,7 @@ def test_probe_runtime_status_reports_missing_cloakbrowser_dependency() -> None:
 def test_browser_runtime_module_imports() -> None:
     assert browser_runtime.BrowserRuntimeConfig is _cloakbrowser.CloakBrowserRuntimeConfig
     assert browser_runtime.BrowserRuntimeFailure is _cloakbrowser.CloakBrowserFailure
-    assert issubclass(browser_runtime.BrowserRuntimeFailure, _flaresolverr.FlareSolverrFailure)
-    assert browser_runtime.BrowserFetchedHtml is _flaresolverr.FetchedPublisherHtml
+    assert browser_runtime.BrowserFetchedHtml is _cloakbrowser.BrowserFetchedHtml
     assert hasattr(browser_runtime, "BrowserImagePayload")
     assert browser_runtime.fetch_html_with_browser.paper_fetch_html_fetcher_name == "cloakbrowser"
     assert callable(browser_runtime.warm_browser_context)

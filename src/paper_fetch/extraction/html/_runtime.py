@@ -207,11 +207,6 @@ def _normalize_noise_profile(noise_profile: str | None) -> str:
     return normalize_noise_profile(noise_profile)
 
 
-def _markdown_promo_tokens(noise_profile: str | None) -> tuple[str, ...]:
-    active_noise_profile = _normalize_noise_profile(noise_profile)
-    return cleanup_policy_for_profile(active_noise_profile).markdown_contains_tokens
-
-
 def select_html_content_root(root: Any):
 
     best_candidate = None
@@ -426,10 +421,6 @@ def clean_markdown(markdown_text: str, *, noise_profile: str | None = None) -> s
         cleaned_lines.append(line)
     cleaned = "\n".join(cleaned_lines)
     return normalize_markdown_text(cleaned)
-
-
-def body_character_count(markdown_text: str, metadata: Mapping[str, Any]) -> int:
-    return body_metrics(markdown_text, metadata)["char_count"]
 
 
 def _canonical_text(value: str) -> str:

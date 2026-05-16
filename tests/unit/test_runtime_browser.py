@@ -68,12 +68,6 @@ def test_headless_change_restarts_browser(monkeypatch) -> None:
     assert second_browser.headless is False
 
 
-def test_legacy_playwright_alias_still_works() -> None:
-    from paper_fetch.runtime_playwright import PlaywrightContextManager
-
-    assert PlaywrightContextManager is BrowserContextManager
-
-
 def test_runtime_context_recommended_browser_context_entrypoint() -> None:
     calls: list[tuple[str, dict[str, Any]]] = []
 
@@ -92,13 +86,11 @@ def test_runtime_context_recommended_browser_context_entrypoint() -> None:
     context = RuntimeContext(env={})
     context._browser_context_manager = FakeLifecycle()  # type: ignore[assignment]
 
-    assert context.playwright_browser(headless=False) == "browser"
     assert context.new_browser_context(headless=True, locale="en-US") == "context"
-    assert context.new_playwright_context(headless=True, viewport={"width": 800}) == "context"
-    context.close_playwright()
+    assert context.new_browser_context(headless=True, viewport={"width": 800}) == "context"
+    context.close()
 
     assert calls == [
-        ("browser", {"headless": False}),
         ("new_context", {"headless": True, "locale": "en-US"}),
         ("new_context", {"headless": True, "viewport": {"width": 800}}),
         ("close", {}),
