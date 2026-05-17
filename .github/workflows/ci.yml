@@ -225,7 +225,7 @@ jobs:
           tar -tzf "$package" | grep -F "/runtime/site-packages/paper_fetch/__init__.py"
           tar -tzf "$package" | grep -F "/bin/paper-fetch"
           tar -tzf "$package" | grep -F "/bin/paper-fetch-install-formula-tools"
-          if tar -tzf "$package" | grep -E "/(src|wheelhouse)/"; then
+          if tar -tzf "$package" | grep -E "^[^/]+/(src|wheelhouse)(/|$)"; then
             echo "Linux runtime package must not include source tree or wheelhouse." >&2
             exit 1
           fi

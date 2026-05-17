@@ -42,7 +42,7 @@ class CiReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("/runtime/site-packages/paper_fetch/__init__.py", workflow)
         self.assertIn("/bin/paper-fetch", workflow)
         self.assertIn("/bin/paper-fetch-install-formula-tools", workflow)
-        self.assertIn("/(src|wheelhouse)/", workflow)
+        self.assertIn("^[^/]+/(src|wheelhouse)(/|$)", workflow)
 
 
 if __name__ == "__main__":
