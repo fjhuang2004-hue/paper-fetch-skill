@@ -818,6 +818,11 @@ IEEE direct REST HTML / clean-browser HTML / direct HTTP PDF / seeded-browser PD
 - 仅用于 Wiley / Science / PNAS / AMS 的 CloakBrowser HTML、图片资产恢复和 seeded-browser PDF/ePDF fallback。
 - AGU/Wiley 站点触发 Cloudflare challenge 时，优先在 `.env` 中设置普通 Chrome UA；`CLOAKBROWSER_HEADLESS=true` 仍可继续使用，成功不应依赖 headed 模式。
 
+#### Atypon HTML readiness
+
+- `wiley` / `science` / `pnas` / `ams` 的 HTML fetch 会先等待 provider 正文 DOM 命中并连续两次轮询稳定，再执行 pre-extraction challenge / paywall 判定。
+- 如果稳定正文 DOM 已出现，即使页面 shell 仍残留 Cloudflare / challenge 文案，也会继续进入 Markdown 抽取和 availability 判定；只有等待超时仍无可抽取正文 DOM 时，才把 challenge / paywall 作为 HTML route fallback 条件。
+
 <!-- SCAFFOLD: provider-docs -->
 
 ## 运行时护栏

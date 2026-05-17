@@ -35,6 +35,15 @@ class CiReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("runtime/Lib/site-packages/playwright/driver/node.exe", workflow)
         self.assertIn("$mathmlNode --version", workflow)
 
+    def test_linux_offline_ci_verifies_runtime_package_layout(self) -> None:
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("Verify Linux runtime package layout", workflow)
+        self.assertIn("/runtime/site-packages/paper_fetch/__init__.py", workflow)
+        self.assertIn("/bin/paper-fetch", workflow)
+        self.assertIn("/bin/paper-fetch-install-formula-tools", workflow)
+        self.assertIn("/(src|wheelhouse)/", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

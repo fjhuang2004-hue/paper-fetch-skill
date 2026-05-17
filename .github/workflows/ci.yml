@@ -217,6 +217,19 @@ jobs:
       - name: Verify offline package
         run: scripts/verify-offline-package.sh "$PWD/offline-artifacts/paper-fetch-skill-offline-linux-x86_64-${{ matrix.python-tag }}.tar.gz"
 
+      - name: Verify Linux runtime package layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$PWD/offline-artifacts/paper-fetch-skill-offline-linux-x86_64-${{ matrix.python-tag }}.tar.gz"
+          tar -tzf "$package" | grep -F "/runtime/site-packages/paper_fetch/__init__.py"
+          tar -tzf "$package" | grep -F "/bin/paper-fetch"
+          tar -tzf "$package" | grep -F "/bin/paper-fetch-install-formula-tools"
+          if tar -tzf "$package" | grep -E "/(src|wheelhouse)/"; then
+            echo "Linux runtime package must not include source tree or wheelhouse." >&2
+            exit 1
+          fi
+
       - name: Upload offline package
         uses: actions/upload-artifact@v7
         with:

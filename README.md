@@ -148,6 +148,8 @@ paper-fetch-skill-offline-linux-x86_64-cp313.tar.gz
 paper-fetch-skill-offline-linux-x86_64-cp314.tar.gz
 ```
 
+Linux tarball 是预安装 runtime 包，不再是源码快照：解压后主要包含 `bin/` 启动器、`runtime/site-packages/` 已安装 Python 包、`formula-tools/` 和 skill 文件。
+
 Ubuntu 24.04 系统默认 Python 版本 3.12，Ubuntu 26.04 为 3.14。
 
 解压后执行：
@@ -162,6 +164,8 @@ WSLg 或桌面显示环境可改用：
 ```bash
 ./install-offline.sh --preset=wslg --no-user-config
 ```
+
+Linux 离线安装会优先把 `MATHML_TO_LATEX_NODE_BIN` 指向包内 Playwright Node，避免依赖系统 PATH 上的 `node`。
 
 #### **III. 更新和卸载**
 
@@ -195,7 +199,7 @@ Linux 在原离线包解压目录运行：
 ./install-offline.sh --uninstall
 ```
 
-该命令只清理用户级 PATH / Skill / MCP 集成，不删除解压目录、包内 `.venv/`、`offline.env` 或 `downloads/`；确认不再需要后可手动删除解压目录。
+该命令只清理用户级 PATH / Skill / MCP 集成，不删除解压目录、包内 `bin/`、`runtime/`、`offline.env` 或 `downloads/`；确认不再需要后可手动删除解压目录。
 
 ### 在线安装（不推荐，开发使用）
 

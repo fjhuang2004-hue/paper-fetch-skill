@@ -6,6 +6,7 @@ import base64
 from importlib import metadata as importlib_metadata
 from importlib import util as importlib_util
 import logging
+import time
 from typing import TYPE_CHECKING, Any, Mapping
 
 from bs4 import BeautifulSoup
@@ -48,6 +49,7 @@ from .browser_workflow.fetchers.context import (
     _browser_response_headers,
     _browser_response_status,
 )
+from .browser_workflow.fetchers.readiness import wait_for_atypon_body_dom_ready
 from .browser_workflow.fetchers.scripts import _LOADED_IMAGE_CANVAS_EXPORT_SCRIPT
 from .browser_workflow.shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES
 
@@ -589,6 +591,7 @@ def fetch_html_with_cloakbrowser(
                     wait_seconds,
                     normalized_url,
                 )
+                request_started = time.monotonic()
                 response = None
                 top_level_response = None
                 if return_image_payload:
@@ -630,7 +633,25 @@ def fetch_html_with_cloakbrowser(
                         setattr(page, _IMAGE_PAYLOAD_RESPONSE_ATTR, top_level_response)
                     except Exception:
                         pass
-                if wait_seconds > 0:
+                readiness = None
+                if not return_image_payload:
+                    remaining_timeout_seconds = max(
+                        0.0,
+                        (float(timeout_ms) / 1000.0)
+                        - (time.monotonic() - request_started),
+                    )
+                    readiness = wait_for_atypon_body_dom_ready(
+                        page,
+                        publisher,
+                        timeout_seconds=min(
+                            max(float(wait_seconds), 20.0),
+                            remaining_timeout_seconds,
+                        ),
+                    )
+                if (
+                    (readiness is None or not readiness.attempted)
+                    and wait_seconds > 0
+                ):
                     page.wait_for_timeout(max(0, int(wait_seconds)) * 1000)
                 final_url = normalize_text(str(getattr(page, "url", "") or "")) or normalized_url
                 html = str(page.content() or "")
@@ -681,7 +702,11 @@ def fetch_html_with_cloakbrowser(
                 )
                 continue
 
-            detected = detect_html_block(title or "", summary, status)
+            detected = (
+                None
+                if readiness is not None and readiness.ready
+                else detect_html_block(title or "", summary, status)
+            )
             if detected is not None and not return_image_payload:
                 last_failure = CloakBrowserFailure(
                     detected.reason,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Linux x86_64 CPython 3.11-3.14 offline tarball.
+# Build the Linux x86_64 CPython 3.11-3.14 offline runtime tarball.
 
 set -euo pipefail
 
@@ -19,10 +19,10 @@ Usage:
   scripts/build-offline-package.sh [--output-dir <path>] [--package-name <name>]
 
 Builds a Linux x86_64 CPython 3.11-3.14 tar.gz bundle containing:
-  - source snapshot
-  - project wheel and Python dependency wheelhouse
+  - preinstalled Python runtime under runtime/site-packages
+  - command wrappers under bin/
   - texmath under formula-tools/
-  - cloakbrowser Python wheel; the CloakBrowser browser binary is not bundled
+  - cloakbrowser Python package; the CloakBrowser browser binary is not bundled
 EOF
 }
 
@@ -98,33 +98,25 @@ print(value)
 ' "$INSTALLER_MANIFEST_FILE" "$1"
 }
 
-copy_source_snapshot() {
+copy_runtime_assets() {
   local staging="$1"
-  log "Copying source snapshot"
-  mkdir -p "$staging"
-  tar \
-    --exclude='./.git' \
-    --exclude='./.venv' \
-    --exclude='./.offline-build' \
-    --exclude='./.formula-tools' \
-    --exclude='./.pytest_cache' \
-    --exclude='./.ruff_cache' \
-    --exclude='./build' \
-    --exclude='./dist' \
-    --exclude='./tests' \
-    --exclude='./live-downloads' \
-    --exclude='./**/__pycache__' \
-    --exclude='./*.egg-info' \
-    --exclude='./legacy' \
-    -C "$REPO_DIR" -cf - . | tar -C "$staging" -xf -
+  log "Copying runtime installer assets"
+  mkdir -p "$staging/installer" "$staging/skills"
+  cp "$REPO_DIR/install-offline.sh" "$staging/install-offline.sh"
+  chmod +x "$staging/install-offline.sh"
+  cp "$REPO_DIR/.env.example" "$staging/.env.example"
+  cp "$REPO_DIR/LICENSE" "$staging/LICENSE"
+  cp "$INSTALLER_MANIFEST_FILE" "$staging/installer/manifest.json"
+  cp -a "$REPO_DIR/skills/paper-fetch-skill" "$staging/skills/"
 }
 
-build_project_wheelhouse() {
+build_project_runtime() {
   local staging="$1"
   local project_dist="$BUILD_DIR/project-dist"
-  local wheelhouse="$staging/wheelhouse"
-  rm -rf "$project_dist"
-  mkdir -p "$project_dist" "$wheelhouse" "$staging/dist"
+  local wheelhouse="$BUILD_DIR/linux-runtime-wheelhouse"
+  local site_packages="$staging/runtime/site-packages"
+  rm -rf "$project_dist" "$wheelhouse" "$site_packages"
+  mkdir -p "$project_dist" "$wheelhouse" "$site_packages"
 
   log "Building project wheel"
   "$PYTHON_BIN" -m pip wheel --no-deps --wheel-dir "$project_dist" "$REPO_DIR"
@@ -133,9 +125,8 @@ build_project_wheelhouse() {
   local wheels=("$project_dist"/paper_fetch_skill-*.whl)
   shopt -u nullglob
   [ "${#wheels[@]}" -eq 1 ] || die "Expected one built project wheel, found ${#wheels[@]}."
-  cp "${wheels[0]}" "$staging/dist/"
 
-  log "Downloading project dependency wheelhouse"
+  log "Downloading binary dependency wheelhouse"
   "$PYTHON_BIN" -m pip download \
     --dest "$wheelhouse" \
     --only-binary=:all: \
@@ -145,28 +136,31 @@ build_project_wheelhouse() {
   local cloakbrowser_wheels=("$wheelhouse"/cloakbrowser-*.whl)
   shopt -u nullglob
   [ "${#cloakbrowser_wheels[@]}" -gt 0 ] || die "Dependency wheelhouse is missing cloakbrowser-*.whl."
-}
 
-create_build_venv() {
-  local staging="$1"
-  local build_venv="$BUILD_DIR/build-venv"
-  rm -rf "$build_venv"
-  "$PYTHON_BIN" -m venv "$build_venv"
-  "$build_venv/bin/python" -m pip install --quiet --upgrade pip >&2
-  "$build_venv/bin/python" -m pip install \
+  log "Installing project runtime into package"
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+  "$PYTHON_BIN" -m pip install \
+    --target "$site_packages" \
     --no-index \
-    --find-links "$staging/wheelhouse" \
-    "$staging"/dist/paper_fetch_skill-*.whl >&2
-  printf '%s\n' "$build_venv/bin/python"
+    --find-links "$wheelhouse" \
+    --only-binary=:all: \
+    "${wheels[0]}"
+
+  log "Precompiling Python runtime bytecode"
+  "$PYTHON_BIN" -m compileall -q "$site_packages"
+
+  PYTHONPATH="$site_packages${PYTHONPATH:+:$PYTHONPATH}" \
+    "$PYTHON_BIN" -X utf8 -c 'import cloakbrowser; import paper_fetch; import paper_fetch.mcp.server; assert hasattr(cloakbrowser, "launch")'
 }
 
 bundle_formula_tools() {
   local staging="$1"
-  local build_python="$2"
   log "Bundling formula tools"
-  "$build_python" -m paper_fetch.formula.install --target-dir "$staging/formula-tools" --no-node
+  PYTHONPATH="$staging/runtime/site-packages${PYTHONPATH:+:$PYTHONPATH}" \
+    "$PYTHON_BIN" -m paper_fetch.formula.install --target-dir "$staging/formula-tools" --no-node
   "$staging/formula-tools/bin/texmath" --help >/dev/null
-  "$build_python" - "$staging/formula-tools" <<'PY'
+  PYTHONPATH="$staging/runtime/site-packages${PYTHONPATH:+:$PYTHONPATH}" \
+    "$PYTHON_BIN" - "$staging/formula-tools" <<'PY'
 from pathlib import Path
 import sys
 
@@ -176,12 +170,69 @@ stage_bundled_node_workspace(Path(sys.argv[1]))
 PY
 }
 
+write_cmd_wrappers() {
+  local staging="$1"
+  local bin="$staging/bin"
+  log "Writing command wrappers"
+  mkdir -p "$bin"
+
+  cat > "$bin/python" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -n "${PAPER_FETCH_OFFLINE_PYTHON_BIN:-}" ]; then
+  PYTHON_BIN="$PAPER_FETCH_OFFLINE_PYTHON_BIN"
+elif [ -f "$INSTALL_ROOT/runtime/python-bin" ]; then
+  IFS= read -r PYTHON_BIN < "$INSTALL_ROOT/runtime/python-bin"
+else
+  PYTHON_BIN="python3"
+fi
+export PYTHONPATH="$INSTALL_ROOT/runtime/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONUTF8="${PYTHONUTF8:-1}"
+export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
+exec "$PYTHON_BIN" "$@"
+EOF
+
+  cat > "$bin/paper-fetch" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${PAPER_FETCH_ENV_FILE:-}" ]; then
+  export PAPER_FETCH_ENV_FILE="$INSTALL_ROOT/offline.env"
+fi
+exec "$INSTALL_ROOT/bin/python" -X utf8 -m paper_fetch.cli "$@"
+EOF
+
+  cat > "$bin/paper-fetch-mcp" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "${PAPER_FETCH_ENV_FILE:-}" ]; then
+  export PAPER_FETCH_ENV_FILE="$INSTALL_ROOT/offline.env"
+fi
+exec "$INSTALL_ROOT/bin/python" -X utf8 -m paper_fetch.mcp.server "$@"
+EOF
+
+  cat > "$bin/paper-fetch-install-formula-tools" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec "$INSTALL_ROOT/bin/python" -X utf8 -m paper_fetch.formula.install "$@"
+EOF
+
+  chmod +x "$bin/python" "$bin/paper-fetch" "$bin/paper-fetch-mcp" "$bin/paper-fetch-install-formula-tools"
+}
+
 write_offline_readme() {
   local staging="$1"
   cat > "$staging/README.offline.md" <<'EOF'
 # Paper Fetch Offline Package
 
-This package includes Python wheels, including `cloakbrowser`, and formula tools.
+This package includes an installed Python runtime under `runtime/site-packages`, command wrappers under `bin/`, and formula tools.
 It does not redistribute the CloakBrowser browser binary.
 
 The first browser-backed fetch may need network access so CloakBrowser can download its runtime. In restricted environments, preinstall a compatible browser runtime and set `CLOAKBROWSER_BINARY_PATH` before using browser-backed providers.
@@ -212,13 +263,11 @@ version = sys.argv[2]
 git_revision = sys.argv[3] or None
 python_tag = sys.argv[4]
 installer_manifest = json.loads(Path(sys.argv[5]).read_text(encoding="utf-8"))
-
-project_wheels = sorted(path.name for path in (staging / "dist").glob("paper_fetch_skill-*.whl"))
-wheelhouse = sorted(path.name for path in (staging / "wheelhouse").glob("*.whl"))
-cloakbrowser_wheels = sorted(path.name for path in (staging / "wheelhouse").glob("cloakbrowser-*.whl"))
+site_packages = staging / "runtime" / "site-packages"
+installed_packages = sorted(path.name for path in site_packages.glob("*.dist-info"))
 
 payload = {
-    "schema_version": 1,
+    "schema_version": 2,
     "name": installer_manifest["packages"]["linux_manifest_name"],
     "project": installer_manifest["project"],
     "version": version,
@@ -231,13 +280,13 @@ payload = {
     },
     "entrypoint": "install-offline.sh",
     "components": {
-        "source_snapshot": ".",
+        "python_runtime": "runtime/site-packages",
+        "command_wrappers": "bin",
+        "installed_package_count": len(installed_packages),
         "installer_manifest": "installer/manifest.json",
-        "project_wheels": [f"dist/{name}" for name in project_wheels],
-        "wheelhouse_count": len(wheelhouse),
         "formula_tools": "formula-tools",
         "cloakbrowser": {
-            "wheels": [f"wheelhouse/{name}" for name in cloakbrowser_wheels],
+            "python_package": "runtime/site-packages",
             "browser_binary": "not_bundled",
         },
     },
@@ -268,7 +317,7 @@ create_archive() {
 }
 
 main() {
-  local package_name package_prefix python_tag staging version build_python
+  local package_name package_prefix python_tag staging version
 
   [ -f "$INSTALLER_MANIFEST_FILE" ] || die "Missing installer manifest: $INSTALLER_MANIFEST_FILE"
   python_tag="$(check_target)"
@@ -279,10 +328,11 @@ main() {
   rm -rf "$staging"
   mkdir -p "$BUILD_DIR"
 
-  copy_source_snapshot "$staging"
-  build_project_wheelhouse "$staging"
-  build_python="$(create_build_venv "$staging")"
-  bundle_formula_tools "$staging" "$build_python"
+  mkdir -p "$staging"
+  copy_runtime_assets "$staging"
+  build_project_runtime "$staging"
+  bundle_formula_tools "$staging"
+  write_cmd_wrappers "$staging"
   write_offline_readme "$staging"
   write_manifest_and_checksums "$staging" "$version" "$python_tag"
   create_archive "$BUILD_DIR" "$package_name" "$OUTPUT_DIR"

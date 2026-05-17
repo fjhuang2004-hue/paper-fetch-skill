@@ -245,22 +245,18 @@ check_python() {
   [ "$tag" = "$manifest_tag" ] || die "bundle requires CPython $manifest_tag; detected Python $version ($tag)."
 }
 
+write_runtime_python_file() {
+  local resolved_python
+  resolved_python="$(command -v "$PYTHON_BIN")"
+  mkdir -p "$BUNDLE_ROOT/runtime"
+  printf '%s\n' "$resolved_python" > "$BUNDLE_ROOT/runtime/python-bin"
+}
+
 verify_checksums() {
   require_file "$BUNDLE_ROOT/sha256sums.txt"
   command -v sha256sum >/dev/null 2>&1 || die "sha256sum is required to verify the offline bundle."
   log "Verifying bundled file checksums"
   (cd "$BUNDLE_ROOT" && sha256sum --check sha256sums.txt --quiet)
-}
-
-find_project_wheel() {
-  shopt -s nullglob
-  local wheels=("$BUNDLE_ROOT"/dist/paper_fetch_skill-*.whl)
-  if [ "${#wheels[@]}" -eq 0 ]; then
-    wheels=("$BUNDLE_ROOT"/wheelhouse/paper_fetch_skill-*.whl)
-  fi
-  shopt -u nullglob
-  [ "${#wheels[@]}" -eq 1 ] || die "Expected exactly one paper_fetch_skill wheel, found ${#wheels[@]}."
-  printf '%s\n' "${wheels[0]}"
 }
 
 check_preset_requirements() {
@@ -278,46 +274,33 @@ cloakbrowser_headless_value() {
 }
 
 check_bundle_assets() {
-  require_dir "$BUNDLE_ROOT/wheelhouse"
+  require_dir "$BUNDLE_ROOT/runtime/site-packages"
+  require_file "$BUNDLE_ROOT/runtime/site-packages/paper_fetch/__init__.py"
+  require_file "$BUNDLE_ROOT/bin/python"
+  require_file "$BUNDLE_ROOT/bin/paper-fetch"
+  require_file "$BUNDLE_ROOT/bin/paper-fetch-mcp"
+  require_file "$BUNDLE_ROOT/bin/paper-fetch-install-formula-tools"
+  [ -x "$BUNDLE_ROOT/bin/python" ] || die "Bundled Python wrapper is not executable: $BUNDLE_ROOT/bin/python"
+  [ -x "$BUNDLE_ROOT/bin/paper-fetch" ] || die "Bundled CLI wrapper is not executable: $BUNDLE_ROOT/bin/paper-fetch"
+  [ -x "$BUNDLE_ROOT/bin/paper-fetch-mcp" ] || die "Bundled MCP wrapper is not executable: $BUNDLE_ROOT/bin/paper-fetch-mcp"
+  [ -x "$BUNDLE_ROOT/bin/paper-fetch-install-formula-tools" ] || die "Bundled formula installer wrapper is not executable: $BUNDLE_ROOT/bin/paper-fetch-install-formula-tools"
   require_file "$BUNDLE_ROOT/formula-tools/bin/texmath"
   [ -x "$BUNDLE_ROOT/formula-tools/bin/texmath" ] || die "Bundled texmath is not executable: $BUNDLE_ROOT/formula-tools/bin/texmath"
-
-  shopt -s nullglob
-  local cloakbrowser_wheels=("$BUNDLE_ROOT"/wheelhouse/cloakbrowser-*.whl)
-  shopt -u nullglob
-  [ "${#cloakbrowser_wheels[@]}" -gt 0 ] || die "Bundled wheelhouse is missing cloakbrowser-*.whl."
 
   require_file "$BUNDLE_ROOT/skills/$SKILL_NAME/SKILL.md"
 }
 
-install_project_venv() {
-  local project_wheel="$1"
-  local venv_dir="$BUNDLE_ROOT/.venv"
-
-  if [ ! -x "$venv_dir/bin/python" ]; then
-    log "Creating Python virtual environment at $venv_dir"
-    "$PYTHON_BIN" -m venv "$venv_dir"
-  fi
-
-  export PIP_NO_INDEX=1
-  export PIP_FIND_LINKS="$BUNDLE_ROOT/wheelhouse"
-  export PIP_DISABLE_PIP_VERSION_CHECK=1
-  export PIP_NO_BUILD_ISOLATION=1
-  export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-
-  log "Installing paper-fetch-skill from bundled wheelhouse"
-  "$venv_dir/bin/python" -m pip install \
-    --no-index \
-    --find-links "$BUNDLE_ROOT/wheelhouse" \
-    --only-binary=:all: \
-    "$project_wheel"
-
-  [ -x "$venv_dir/bin/paper-fetch" ] || die "Installed CLI is missing or not executable: $venv_dir/bin/paper-fetch"
-  [ -x "$venv_dir/bin/paper-fetch-mcp" ] || die "Installed MCP CLI is missing or not executable: $venv_dir/bin/paper-fetch-mcp"
+mcp_python_bin() {
+  printf '%s\n' "$BUNDLE_ROOT/bin/python"
 }
 
-mcp_python_bin() {
-  printf '%s\n' "$BUNDLE_ROOT/.venv/bin/python"
+mathml_node_bin() {
+  local bundled_node="$BUNDLE_ROOT/runtime/site-packages/playwright/driver/node"
+  if [ -x "$bundled_node" ]; then
+    printf '%s\n' "$bundled_node"
+  else
+    command -v node || printf 'node\n'
+  fi
 }
 
 mcp_env_value() {
@@ -329,7 +312,7 @@ mcp_env_value() {
     PAPER_FETCH_MCP_PYTHON_BIN) mcp_python_bin ;;
     PAPER_FETCH_DOWNLOAD_DIR) printf '%s\n' "$BUNDLE_ROOT/downloads" ;;
     PAPER_FETCH_FORMULA_TOOLS_DIR) printf '%s\n' "$BUNDLE_ROOT/formula-tools" ;;
-    MATHML_TO_LATEX_NODE_BIN) command -v node || printf 'node\n' ;;
+    MATHML_TO_LATEX_NODE_BIN) mathml_node_bin ;;
     CLOAKBROWSER_HEADLESS) cloakbrowser_headless_value ;;
     *) die "Unknown MCP env key: $key" ;;
   esac
@@ -384,7 +367,7 @@ select_shell_startup_file() {
 
 write_posix_shell_block() {
   printf '%s\n' "$MANAGED_BEGIN"
-  printf 'export PATH=%s:%s:$PATH\n' "$(quote_env_value "$BUNDLE_ROOT/.venv/bin")" "$(quote_env_value "$BUNDLE_ROOT/formula-tools/bin")"
+  printf 'export PATH=%s:%s:$PATH\n' "$(quote_env_value "$BUNDLE_ROOT/bin")" "$(quote_env_value "$BUNDLE_ROOT/formula-tools/bin")"
   printf 'export PAPER_FETCH_ENV_FILE=%s\n' "$(quote_env_value "$OFFLINE_ENV_FILE")"
   printf 'export PAPER_FETCH_DOWNLOAD_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/downloads")"
   printf 'export PAPER_FETCH_FORMULA_TOOLS_DIR=%s\n' "$(quote_env_value "$BUNDLE_ROOT/formula-tools")"
@@ -394,7 +377,7 @@ write_posix_shell_block() {
 
 write_fish_shell_block() {
   printf '%s\n' "$MANAGED_BEGIN"
-  printf 'set -gx PATH %s %s $PATH\n' "$(quote_env_value "$BUNDLE_ROOT/.venv/bin")" "$(quote_env_value "$BUNDLE_ROOT/formula-tools/bin")"
+  printf 'set -gx PATH %s %s $PATH\n' "$(quote_env_value "$BUNDLE_ROOT/bin")" "$(quote_env_value "$BUNDLE_ROOT/formula-tools/bin")"
   printf 'set -gx PAPER_FETCH_ENV_FILE %s\n' "$(quote_env_value "$OFFLINE_ENV_FILE")"
   printf 'set -gx PAPER_FETCH_DOWNLOAD_DIR %s\n' "$(quote_env_value "$BUNDLE_ROOT/downloads")"
   printf 'set -gx PAPER_FETCH_FORMULA_TOOLS_DIR %s\n' "$(quote_env_value "$BUNDLE_ROOT/formula-tools")"
@@ -713,7 +696,8 @@ if [ -f "\$PAPER_FETCH_ENV_FILE" ]; then
   set +a
 fi
 
-export PATH="\$INSTALL_ROOT/.venv/bin:\$INSTALL_ROOT/formula-tools/bin:\$PATH"
+export PATH="\$INSTALL_ROOT/bin:\$INSTALL_ROOT/formula-tools/bin:\$PATH"
+export PYTHONPATH="\$INSTALL_ROOT/runtime/site-packages\${PYTHONPATH:+:\$PYTHONPATH}"
 export PAPER_FETCH_ENV_FILE=$offline_env_literal
 export PAPER_FETCH_DOWNLOAD_DIR="\$INSTALL_ROOT/downloads"
 export PAPER_FETCH_FORMULA_TOOLS_DIR="\$INSTALL_ROOT/formula-tools"
@@ -735,7 +719,8 @@ if [ -f "$PAPER_FETCH_ENV_FILE" ]; then
   set +a
 fi
 
-export PATH="$INSTALL_ROOT/.venv/bin:$INSTALL_ROOT/formula-tools/bin:$PATH"
+export PATH="$INSTALL_ROOT/bin:$INSTALL_ROOT/formula-tools/bin:$PATH"
+export PYTHONPATH="$INSTALL_ROOT/runtime/site-packages${PYTHONPATH:+:$PYTHONPATH}"
 export PAPER_FETCH_DOWNLOAD_DIR="${PAPER_FETCH_DOWNLOAD_DIR:-$INSTALL_ROOT/downloads}"
 export PAPER_FETCH_FORMULA_TOOLS_DIR="${PAPER_FETCH_FORMULA_TOOLS_DIR:-$INSTALL_ROOT/formula-tools}"
 export CLOAKBROWSER_HEADLESS="${CLOAKBROWSER_HEADLESS:-__CLOAKBROWSER_HEADLESS__}"
@@ -748,22 +733,24 @@ EOF
 }
 
 check_cloakbrowser_package() {
-  local venv_python="$BUNDLE_ROOT/.venv/bin/python"
-  "$venv_python" -c 'import cloakbrowser; assert hasattr(cloakbrowser, "launch")'
+  local runtime_python
+  runtime_python="$(mcp_python_bin)"
+  "$runtime_python" -c 'import cloakbrowser; assert hasattr(cloakbrowser, "launch")'
   if [ -n "${CLOAKBROWSER_BINARY_PATH:-}" ] && [ ! -x "$CLOAKBROWSER_BINARY_PATH" ]; then
     die "CLOAKBROWSER_BINARY_PATH is set but is not executable: $CLOAKBROWSER_BINARY_PATH"
   fi
 }
 
 warm_cloakbrowser_runtime() {
-  local venv_python="$BUNDLE_ROOT/.venv/bin/python"
+  local runtime_python
+  runtime_python="$(mcp_python_bin)"
   if [ -n "${CLOAKBROWSER_BINARY_PATH:-}" ]; then
     log "Using preconfigured CLOAKBROWSER_BINARY_PATH; skipping CloakBrowser runtime download"
     [ -x "$CLOAKBROWSER_BINARY_PATH" ] || die "CLOAKBROWSER_BINARY_PATH is set but is not executable: $CLOAKBROWSER_BINARY_PATH"
     return 0
   fi
   log "Checking CloakBrowser runtime availability"
-  "$venv_python" -c 'import cloakbrowser; cloakbrowser.ensure_runtime()' \
+  "$runtime_python" -c 'import cloakbrowser; cloakbrowser.ensure_runtime()' \
     || warn "CloakBrowser runtime warmup failed; first use may download it, or set CLOAKBROWSER_BINARY_PATH to a preinstalled binary."
 }
 
@@ -773,18 +760,16 @@ run_smoke_checks() {
   local key env_args=()
 
   log "Running local smoke checks"
-  "$BUNDLE_ROOT/.venv/bin/paper-fetch" --help >/dev/null
+  "$BUNDLE_ROOT/bin/paper-fetch" --help >/dev/null
   "$BUNDLE_ROOT/formula-tools/bin/texmath" --help >/dev/null
   check_cloakbrowser_package
   for key in "${MCP_ENV_KEYS[@]}"; do
     env_args+=("$key=$(mcp_env_value "$key")")
   done
-  env "${env_args[@]}" "$BUNDLE_ROOT/.venv/bin/python" -c 'from paper_fetch.mcp.fetch_tool import provider_status_payload; payload = provider_status_payload(); assert "providers" in payload'
+  env "${env_args[@]}" "$(mcp_python_bin)" -c 'from paper_fetch.mcp.fetch_tool import provider_status_payload; payload = provider_status_payload(); assert "providers" in payload'
 }
 
 main() {
-  local project_wheel
-
   load_installer_manifest
 
   if [ "$UNINSTALL" = "1" ]; then
@@ -797,9 +782,8 @@ main() {
   verify_checksums
   check_preset_requirements
   check_bundle_assets
-  project_wheel="$(find_project_wheel)"
+  write_runtime_python_file
 
-  install_project_venv "$project_wheel"
   warm_cloakbrowser_runtime
 
   if [ "$REUSE_ENV_FILE" = "1" ]; then

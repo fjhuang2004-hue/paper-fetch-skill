@@ -6,6 +6,16 @@
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+## 1.5.2 - 2026-05-17
+
+### 变更
+
+- Linux 离线 tarball 改为预安装 runtime 包，包含 `bin/` 启动器和 `runtime/site-packages/`，不再分发仓库源码快照或目标机安装用 wheelhouse；安装阶段不再运行 pip。
+
+### 修复
+
+- 修复 Wiley、Science、PNAS、AMS 的 Atypon browser HTML 路线：当稳定全文 DOM 已出现时，不再因为页面残留 Cloudflare/challenge 文案而过早判定 HTML route 失败。
+
 ## 1.5.1 - 2026-05-17
 
 ### 修复

@@ -54,6 +54,10 @@ def _fake_python_script(version: str) -> str:
     VERSION="{version}"
     TAG="{tag}"
 
+    while [[ "${{1:-}}" == "-X" ]]; do
+      shift 2
+    done
+
     if [[ "${{1:-}}" == "-c" ]]; then
       code="${{2:-}}"
       if [[ "$code" == *'join(map(str, sys.version_info[:3]))'* ]]; then
@@ -155,9 +159,16 @@ class OfflineInstallTests(unittest.TestCase):
             f'{{"target": {{"platform": "linux", "arch": "x86_64", "python_tag": "{manifest_python_tag}"}}}}\n',
         )
         _write_file(bundle / ".env.example", 'ELSEVIER_API_KEY=""\n')
-        _write_file(bundle / "dist" / "paper_fetch_skill-1.5.1-py3-none-any.whl")
-        _write_file(bundle / "wheelhouse" / "cloakbrowser-0.3.28-py3-none-any.whl")
-        _write_file(bundle / "wheelhouse" / "dependency-1.0.0-py3-none-any.whl")
+        _write_file(bundle / "runtime" / "site-packages" / "paper_fetch" / "__init__.py", "\n")
+        _write_file(bundle / "runtime" / "site-packages" / "cloakbrowser" / "__init__.py", "\n")
+        _write_executable(bundle / "runtime" / "site-packages" / "playwright" / "driver" / "node", "#!/usr/bin/env bash\nexit 0\n")
+        _write_executable(bundle / "bin" / "python", _fake_python_script(python_version))
+        _write_executable(
+            bundle / "bin" / "paper-fetch",
+            "#!/usr/bin/env bash\nif [[ \"${1:-}\" == \"--help\" ]]; then exit 0; fi\nexit 0\n",
+        )
+        _write_executable(bundle / "bin" / "paper-fetch-mcp", "#!/usr/bin/env bash\nexit 0\n")
+        _write_executable(bundle / "bin" / "paper-fetch-install-formula-tools", "#!/usr/bin/env bash\nexit 0\n")
         _write_file(bundle / "skills" / "paper-fetch-skill" / "SKILL.md", "# Paper fetch skill\n")
         _write_file(
             bundle / "skills" / "paper-fetch-skill" / "references" / "tool-contract.md",
@@ -216,6 +227,7 @@ class OfflineInstallTests(unittest.TestCase):
             self.assertIn('CLOAKBROWSER_HEADLESS="true"', offline_env)
             self.assertIn("CLOAKBROWSER_BINARY_PATH", offline_env)
             self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", offline_env)
+            self.assertEqual((bundle / "runtime" / "python-bin").read_text(encoding="utf-8"), f"{fake_bin / 'python3'}\n")
             self.assertIn("CloakBrowser headless: true", result.stdout)
 
     def test_shell_startup_blocks_use_cloakbrowser_headless(self) -> None:
@@ -268,8 +280,11 @@ class OfflineInstallTests(unittest.TestCase):
             calls = [line.split("\t") for line in cli_log.read_text(encoding="utf-8").splitlines()]
             codex_add = next(call for call in calls if call[:3] == ["codex", "mcp", "add"])
             self.assertIn(f"PAPER_FETCH_ENV_FILE={bundle / 'offline.env'}", codex_add)
-            self.assertIn(f"PAPER_FETCH_MCP_PYTHON_BIN={bundle / '.venv' / 'bin' / 'python'}", codex_add)
-            self.assertTrue(any(arg.startswith("MATHML_TO_LATEX_NODE_BIN=") for arg in codex_add))
+            self.assertIn(f"PAPER_FETCH_MCP_PYTHON_BIN={bundle / 'bin' / 'python'}", codex_add)
+            self.assertIn(
+                f"MATHML_TO_LATEX_NODE_BIN={bundle / 'runtime' / 'site-packages' / 'playwright' / 'driver' / 'node'}",
+                codex_add,
+            )
             self.assertIn("CLOAKBROWSER_HEADLESS=true", codex_add)
             self.assertFalse(any("PLAYWRIGHT_BROWSERS_PATH" in arg for arg in codex_add))
 
@@ -330,7 +345,7 @@ class OfflineInstallTests(unittest.TestCase):
             _write_recording_cli(fake_bin / "gemini", cli_log)
 
             _write_file(bundle / "offline.env", 'ELSEVIER_API_KEY="secret"\n')
-            _write_file(bundle / ".venv" / "bin" / "paper-fetch", "installed\n")
+            _write_file(bundle / "bin" / "paper-fetch", "installed\n")
             _write_file(home / ".codex" / "skills" / "paper-fetch-skill" / "SKILL.md", "codex\n")
             managed = textwrap.dedent(
                 """

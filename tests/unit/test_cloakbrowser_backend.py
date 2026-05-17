@@ -4,7 +4,13 @@ from unittest import mock
 
 from paper_fetch import _cloakbrowser_runtime
 from paper_fetch.providers import _cloakbrowser, browser_runtime
-from paper_fetch.providers.browser_workflow.html_extraction import _fetch_browser_html_payload
+from paper_fetch.providers.browser_workflow.html_extraction import (
+    _fetch_browser_html_payload,
+    fetch_html_with_fast_browser,
+)
+from paper_fetch.providers.browser_workflow.fetchers.readiness import (
+    wait_for_atypon_body_dom_ready,
+)
 from paper_fetch.runtime import RuntimeContext
 
 
@@ -82,6 +88,44 @@ class _FakePage:
         self.closed = True
 
 
+class _ReadinessFakePage(_FakePage):
+    def __init__(
+        self,
+        *,
+        html: str,
+        title: str = "Example Article",
+        readiness_payloads: list[dict[str, object]] | None = None,
+    ) -> None:
+        super().__init__()
+        self._html = html
+        self._title = title
+        self.readiness_payloads = list(readiness_payloads or [])
+        self.evaluate_calls: list[object] = []
+        self.wait_calls: list[int] = []
+
+    def content(self) -> str:
+        return self._html
+
+    def title(self) -> str:
+        return self._title
+
+    def evaluate(self, script, arg=None):
+        self.evaluate_calls.append((script, arg))
+        if self.readiness_payloads:
+            return self.readiness_payloads.pop(0)
+        return {
+            "ready": False,
+            "selector": None,
+            "textLength": 0,
+            "paragraphCount": 0,
+            "headingCount": 0,
+            "fingerprint": "",
+        }
+
+    def wait_for_timeout(self, timeout_ms: int) -> None:
+        self.wait_calls.append(timeout_ms)
+
+
 class _FakeContext:
     def __init__(self) -> None:
         self.page = _FakePage()
@@ -143,6 +187,39 @@ def _runtime_config_without_browser_user_agent(tmp_path):
     )
 
 
+def _wiley_runtime_config(tmp_path):
+    return _cloakbrowser.CloakBrowserRuntimeConfig(
+        provider="wiley",
+        doi="10.1111/gcb.70541",
+        artifact_dir=tmp_path / "artifacts",
+        headless=True,
+        user_agent="paper-fetch-test/1",
+        timeout_ms=12345,
+    )
+
+
+def _ready_payload(*, selector: str, text_length: int, paragraph_count: int, heading_count: int = 0):
+    return {
+        "ready": True,
+        "selector": selector,
+        "textLength": text_length,
+        "paragraphCount": paragraph_count,
+        "headingCount": heading_count,
+        "fingerprint": f"{selector}|{text_length}|{paragraph_count}|{heading_count}|stable",
+    }
+
+
+def _not_ready_payload(*, selector: str | None = None, text_length: int = 0, paragraph_count: int = 0):
+    return {
+        "ready": False,
+        "selector": selector,
+        "textLength": text_length,
+        "paragraphCount": paragraph_count,
+        "headingCount": 0,
+        "fingerprint": f"{selector or ''}|{text_length}|{paragraph_count}|0|unstable",
+    }
+
+
 class _FakeWorkflowClient:
     name = "science"
 
@@ -177,6 +254,87 @@ def test_fetch_html_with_cloakbrowser_returns_existing_html_contract(tmp_path) -
     assert fake_module.browser.context.page.continued_document is True
     assert fake_module.browser.context.closed is True
     assert fake_module.browser.closed is True
+
+
+def test_fetch_html_with_cloakbrowser_skips_challenge_block_after_wiley_body_dom_ready(tmp_path) -> None:
+    body_text = "Wiley article body text with enough substance. " * 18
+    html = (
+        "<html><head><title>Wiley Article</title></head><body>"
+        "<div>Just a moment Cloudflare challenge text remains in the page shell.</div>"
+        f"<section class='article-section__content'><p>{body_text}</p><p>{body_text}</p></section>"
+        "</body></html>"
+    )
+    page = _ReadinessFakePage(
+        html=html,
+        title="Wiley Article",
+        readiness_payloads=[
+            _ready_payload(
+                selector=".article-section__content",
+                text_length=len(body_text) * 2,
+                paragraph_count=2,
+            ),
+            _ready_payload(
+                selector=".article-section__content",
+                text_length=len(body_text) * 2,
+                paragraph_count=2,
+            ),
+        ],
+    )
+    fake_module = _FakeCloakBrowserModule()
+    fake_module.browser.context.page = page
+
+    with mock.patch.object(_cloakbrowser, "_import_cloakbrowser", return_value=fake_module):
+        result = _cloakbrowser.fetch_html_with_cloakbrowser(
+            ["https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.70541"],
+            publisher="wiley",
+            config=_wiley_runtime_config(tmp_path),
+            wait_seconds=0,
+            max_timeout_ms=2000,
+        )
+
+    assert result.final_url == "https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.70541"
+    assert "Cloudflare challenge" in result.summary
+    assert page.wait_calls == [750]
+    assert len(page.evaluate_calls) == 2
+
+
+def test_fetch_html_with_cloakbrowser_keeps_challenge_block_when_body_dom_never_ready(tmp_path) -> None:
+    html = (
+        "<html><head><title>Just a moment</title></head><body>"
+        "<main>Checking your browser before accessing this publisher page. Cloudflare.</main>"
+        "</body></html>"
+    )
+    page = _ReadinessFakePage(
+        html=html,
+        title="Just a moment",
+        readiness_payloads=[
+            _not_ready_payload(),
+            _not_ready_payload(),
+            _not_ready_payload(),
+        ],
+    )
+    fake_module = _FakeCloakBrowserModule()
+    fake_module.browser.context.page = page
+
+    with mock.patch.object(_cloakbrowser, "_import_cloakbrowser", return_value=fake_module):
+        try:
+            _cloakbrowser.fetch_html_with_cloakbrowser(
+                ["https://onlinelibrary.wiley.com/doi/full/10.1111/gcb.70541"],
+                publisher="wiley",
+                config=_wiley_runtime_config(tmp_path),
+                wait_seconds=0,
+                max_timeout_ms=1000,
+            )
+        except browser_runtime.BrowserRuntimeFailure as exc:
+            failure = exc
+        else:  # pragma: no cover - assertion reports the unexpected success path
+            raise AssertionError("expected Cloudflare challenge failure")
+
+    assert failure.kind == "cloudflare_challenge"
+    assert page.wait_calls[0] == 750
+    assert 0 < page.wait_calls[1] <= 250
+    assert sum(page.wait_calls) <= 1000
+    assert len(page.evaluate_calls) == 3
 
 
 def test_fetch_html_with_cloakbrowser_omits_user_agent_when_not_configured(tmp_path) -> None:
@@ -215,6 +373,92 @@ def test_fetch_html_with_cloakbrowser_uses_runtime_context_shared_browser(tmp_pa
     assert fake_module.launch_kwargs == {}
     assert fake_module.browser.context.closed is True
     assert fake_module.browser.closed is False
+
+
+def test_fetch_html_with_fast_browser_returns_pnas_html_when_body_dom_ready_despite_challenge() -> None:
+    body_text = "PNAS article body text with enough substance. " * 18
+    html = (
+        "<html><head><title>PNAS Article</title></head><body>"
+        "<div>Just a moment Cloudflare challenge text remains in the page shell.</div>"
+        f"<section class='article__fulltext'><p>{body_text}</p><p>{body_text}</p></section>"
+        "</body></html>"
+    )
+    page = _ReadinessFakePage(
+        html=html,
+        title="PNAS Article",
+        readiness_payloads=[
+            _ready_payload(
+                selector=".article__fulltext",
+                text_length=len(body_text) * 2,
+                paragraph_count=2,
+            ),
+            _ready_payload(
+                selector=".article__fulltext",
+                text_length=len(body_text) * 2,
+                paragraph_count=2,
+            ),
+        ],
+    )
+    browser_context = _FakeContext()
+    browser_context.page = page
+    runtime_context = RuntimeContext(env={})
+
+    with mock.patch.object(
+        runtime_context,
+        "new_browser_context",
+        return_value=browser_context,
+    ) as new_browser_context:
+        result = fetch_html_with_fast_browser(
+            ["https://www.pnas.org/doi/full/10.1073/pnas.123"],
+            publisher="pnas",
+            user_agent="Mozilla/5.0",
+            timeout_ms=2000,
+            context=runtime_context,
+        )
+
+    new_browser_context.assert_called_once()
+    assert result.final_url == "https://www.pnas.org/doi/full/10.1073/pnas.123"
+    assert "Cloudflare challenge" in result.summary
+    assert result.browser_context_seed["browser_user_agent"] == "Mozilla/5.0"
+    assert page.wait_calls == [750]
+    assert len(page.evaluate_calls) == 2
+    assert browser_context.closed is True
+
+
+def test_atypon_body_dom_readiness_rejects_short_body_dom() -> None:
+    page = _ReadinessFakePage(
+        html="<html></html>",
+        readiness_payloads=[
+            _not_ready_payload(
+                selector=".article-section__content",
+                text_length=120,
+                paragraph_count=1,
+            ),
+            _not_ready_payload(
+                selector=".article-section__content",
+                text_length=120,
+                paragraph_count=1,
+            ),
+            _not_ready_payload(
+                selector=".article-section__content",
+                text_length=120,
+                paragraph_count=1,
+            ),
+        ],
+    )
+
+    result = wait_for_atypon_body_dom_ready(
+        page,
+        "wiley",
+        timeout_seconds=1,
+    )
+
+    assert result.attempted is True
+    assert result.ready is False
+    assert result.selector == ".article-section__content"
+    assert result.text_length == 120
+    assert result.paragraph_count == 1
+    assert page.wait_calls == [750, 250]
 
 
 def test_fetch_html_with_browser_marks_diagnostic(tmp_path) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from ...extraction.html.assets import extract_scoped_html_assets
@@ -27,6 +28,7 @@ from .fetchers.context import (
     _browser_response_headers as _response_headers,
     _browser_response_status as _response_status,
 )
+from .fetchers.readiness import wait_for_atypon_body_dom_ready
 from .shared import BROWSER_HTML_BLOCKED_RESOURCE_TYPES, looks_like_abstract_redirect
 from ..browser_runtime import (
     BrowserFetchedHtml,
@@ -211,7 +213,18 @@ def fetch_html_with_fast_browser(
             if not normalized_url:
                 continue
             try:
+                request_started = time.monotonic()
                 response = page.goto(normalized_url, wait_until="domcontentloaded", timeout=timeout_ms)
+                remaining_timeout_seconds = max(
+                    0.0,
+                    (float(timeout_ms) / 1000.0)
+                    - (time.monotonic() - request_started),
+                )
+                readiness = wait_for_atypon_body_dom_ready(
+                    page,
+                    publisher,
+                    timeout_seconds=min(8.0, remaining_timeout_seconds),
+                )
                 final_url = normalize_text(str(getattr(page, "url", "") or "")) or normalized_url
                 html_text = page.content()
                 title = normalize_text(str(page.title() or "")) or None
@@ -231,7 +244,11 @@ def fetch_html_with_fast_browser(
             status = _response_status(response)
             headers = _response_headers(response)
             summary = summarize_html(html_text)
-            detected = detect_html_block(title or "", summary, status)
+            detected = (
+                None
+                if readiness.attempted and readiness.ready
+                else detect_html_block(title or "", summary, status)
+            )
             if detected is not None:
                 last_failure = detected
                 continue

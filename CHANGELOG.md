@@ -6,6 +6,16 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+## 1.5.2 - 2026-05-17
+
+### Changed
+
+- Changed Linux offline tarballs into preinstalled runtime packages with `bin/` launchers and `runtime/site-packages/`, without the repository source snapshot or target-machine wheelhouse; installation no longer runs pip.
+
+### Fixed
+
+- Prevented Atypon browser HTML routes for Wiley, Science, PNAS, and AMS from treating residual Cloudflare/challenge text as an HTML-route failure once a stable full-text DOM is already present.
+
 ## 1.5.1 - 2026-05-17
 
 ### Fixed
