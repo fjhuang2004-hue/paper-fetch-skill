@@ -20,6 +20,9 @@ SPRINGER_SAMPLE = provider_benchmark_sample("springer")
 SCIENCE_SAMPLE = provider_benchmark_sample("science")
 WILEY_SAMPLE = provider_benchmark_sample("wiley")
 PNAS_SAMPLE = provider_benchmark_sample("pnas")
+AMS_SAMPLE = provider_benchmark_sample("ams")
+IEEE_SAMPLE = provider_benchmark_sample("ieee")
+ARXIV_SAMPLE = provider_benchmark_sample("arxiv")
 COPERNICUS_SAMPLE = provider_benchmark_sample("copernicus")
 
 
@@ -158,6 +161,29 @@ class LiveMcpServerTests(unittest.IsolatedAsyncioTestCase):
             expected_log_prefix="official_provider_",
             args={"modes": ["metadata"], "strategy": {}},
             needs_browser_runtime=True,
+        )
+
+    async def test_ams_doi_live_via_mcp_reports_progress_and_logs(self) -> None:
+        await self._assert_live_fetch(
+            sample=AMS_SAMPLE,
+            expected_log_prefix="official_provider_",
+            args={"modes": ["metadata"], "strategy": {}},
+            needs_browser_runtime=True,
+        )
+
+    async def test_ieee_doi_live_via_mcp_reports_progress_and_logs(self) -> None:
+        await self._assert_live_fetch(
+            sample=IEEE_SAMPLE,
+            expected_log_prefix="official_provider_",
+            args={"modes": ["metadata"], "strategy": {}},
+            needs_browser_runtime=True,
+        )
+
+    async def test_arxiv_doi_live_via_mcp_reports_progress_and_logs(self) -> None:
+        await self._assert_live_fetch(
+            sample=ARXIV_SAMPLE,
+            expected_log_prefix="official_provider_",
+            args={"modes": ["metadata"], "strategy": {}},
         )
 
     async def test_copernicus_doi_live_via_mcp_reports_progress_and_logs(self) -> None:

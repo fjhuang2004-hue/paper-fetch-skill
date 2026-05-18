@@ -457,7 +457,13 @@ PYTHONPATH=src pytest
 PAPER_FETCH_RUN_FULL_GOLDEN=1 PYTHONPATH=src python3 -m pytest tests/integration/test_golden_corpus.py -q
 ```
 
-如果你要额外验证 `wiley` / `science` / `pnas` / `ams` live 路径，请先确认 CloakBrowser package 和合法 publisher 访问上下文可用，再运行对应 live 测试。
+未设置 `PAPER_FETCH_RUN_LIVE=1` 时，`tests/live/test_live_publishers.py` 和 `tests/live/test_live_mcp.py` 应稳定 skip。额外验证 live smoke 时，`arxiv` 不需要凭据或 browser runtime；`wiley` / `science` / `pnas` / `ams` 需要 CloakBrowser-backed browser runtime；`ieee` 不需要 IEEE API key，但 IEEE fulltext smoke 预期当前机器具备合法 IEEE Xplore 访问上下文，并会先检查 CloakBrowser package，避免缺少 browser fallback 能力时误判 provider 行为。live 测试依赖真实 publisher/API/browser/授权上下文和外部限流状态，建议串行运行：
+
+```bash
+PAPER_FETCH_RUN_LIVE=1 PYTHONPATH=src python3 -m pytest tests/live/test_live_publishers.py tests/live/test_live_mcp.py -q -n 0
+```
+
+GitHub Actions 的手动 `live-mcp` job 默认排除 IEEE fulltext smoke；只有在具备合法 IEEE Xplore 授权的 runner/network 上，才应同时启用 `run_live_mcp` 和 `run_ieee_live_mcp`。
 
 ## 相关文档
 

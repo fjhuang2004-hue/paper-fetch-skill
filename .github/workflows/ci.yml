@@ -10,6 +10,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_ieee_live_mcp:
+        description: "Include IEEE Xplore fulltext smoke tests; requires an authorized runner/network"
+        required: false
+        default: false
+        type: boolean
       run_full_golden:
         description: "Run full golden corpus regression"
         required: false
@@ -602,4 +607,10 @@ jobs:
 
           # Live MCP tests share external publisher/API state and secrets, so they
           # run serially even though regular unit/integration suites use xdist.
-          pytest -n 0 tests/live/test_live_mcp.py
+          pytest -n 0 tests/live/test_live_mcp.py -k "not ieee"
+
+          if [ "${{ inputs.run_ieee_live_mcp }}" = "true" ]; then
+            pytest -n 0 tests/live/test_live_mcp.py -k "ieee"
+          else
+            echo "Skipping IEEE live MCP smoke; enable run_ieee_live_mcp on an authorized runner/network."
+          fi

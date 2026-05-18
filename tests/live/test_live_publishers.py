@@ -17,6 +17,8 @@ SPRINGER_SAMPLE = provider_benchmark_sample("springer")
 WILEY_SAMPLE = provider_benchmark_sample("wiley")
 SCIENCE_SAMPLE = provider_benchmark_sample("science")
 PNAS_SAMPLE = provider_benchmark_sample("pnas")
+IEEE_SAMPLE = provider_benchmark_sample("ieee")
+ARXIV_SAMPLE = provider_benchmark_sample("arxiv")
 AMS_SAMPLE = provider_benchmark_sample("ams")
 COPERNICUS_SAMPLE = provider_benchmark_sample("copernicus")
 
@@ -119,6 +121,27 @@ class LivePublisherTests(unittest.TestCase):
         )
 
         self._assert_matches_sample(article, PNAS_SAMPLE)
+
+    def test_ieee_doi_live_fulltext(self) -> None:
+        require_cloakbrowser_or_skip(self)
+        self._require_env(*IEEE_SAMPLE.required_env)
+        article = fetch_article(
+            IEEE_SAMPLE.doi,
+            transport=HttpTransport(),
+            env=self.env,
+        )
+
+        self._assert_matches_sample(article, IEEE_SAMPLE)
+
+    def test_arxiv_doi_live_fulltext(self) -> None:
+        self._require_env(*ARXIV_SAMPLE.required_env)
+        article = fetch_article(
+            ARXIV_SAMPLE.doi,
+            transport=HttpTransport(),
+            env=self.env,
+        )
+
+        self._assert_matches_sample(article, ARXIV_SAMPLE)
 
     def test_ams_doi_live_fulltext(self) -> None:
         self._require_env(*AMS_SAMPLE.required_env)
