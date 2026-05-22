@@ -8,12 +8,12 @@ from pathlib import Path
 import yaml
 from jsonschema import Draft202012Validator
 
+from scripts import backfill_access_reviews as backfill
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "backfill_access_reviews.py"
 ACCESS_REVIEW_SCHEMA_PATH = REPO_ROOT / "docs" / "ai-onboarding" / "access-review.schema.json"
-
-from scripts import backfill_access_reviews as backfill
 
 
 def _write_minimal_onboarding_root(root: Path) -> None:

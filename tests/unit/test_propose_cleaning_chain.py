@@ -8,11 +8,11 @@ from pathlib import Path
 
 import yaml
 
+from scripts import propose_cleaning_chain as cleaning
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "propose_cleaning_chain.py"
-
-from scripts import propose_cleaning_chain as cleaning
 
 
 def _mdpi_subset_manifest() -> dict:

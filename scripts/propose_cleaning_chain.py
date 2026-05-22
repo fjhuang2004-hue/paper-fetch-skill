@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
+from collections import defaultdict
 import hashlib
 import json
 from pathlib import Path

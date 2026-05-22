@@ -8,11 +8,11 @@ from pathlib import Path
 
 import yaml
 
+from scripts import run_provider_drift_report as drift
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "run_provider_drift_report.py"
-
-from scripts import run_provider_drift_report as drift
 
 
 def _load_mdpi_manifest() -> dict:
