@@ -96,7 +96,7 @@ resolve DOI / landing URL
 
 实现细节：
 
-- 路由信号来自 `www.mdpi.com` / `mdpi.com` 域名、Crossref publisher alias `MDPI AG`，以及 DOI prefix `10.3390/`。
+- 路由信号来自 `www.mdpi.com` / `mdpi.com` 域名、Crossref publisher alias `MDPI AG`，以及 DOI prefix `10.3390/`。MDPI 经典数字 article URL 会在解析阶段按 provider-owned ISSN 映射推导 DOI（例如 `2072-4292/18/10/1673` -> `10.3390/rs18101673`），MDPI DOI / DOI URL 会在 provider 阶段反推对应数字 article URL，这样已知期刊 URL 不需要先用普通 HTTP 抓 landing page，Crossref landing 缺失时也不只剩 `doi.org` 候选。
 - HTML 成功公开 `source="mdpi_html"`；PDF fallback 成功公开 `source="mdpi_pdf"`。
 - MDPI HTML cleanup 由 `paper_fetch.providers._mdpi_html` 维护，去掉页面导航、SciProfiles 弹层、分享/引用/metrics chrome、Google Scholar / CrossRef / PubMed / Green Version reference linkout UI，同时保留正文 section、references、figures、tables、formula 和 supplementary section；MDPI reference `li data-content` 中的出版社编号会写回 raw citation，使最终 References 保持编号列表。HTML MathML 在该阶段复用共享转换器输出 `$...$` / `$$...$$` LaTeX Markdown，并保留源站公式编号。`.html-disp-formula-info` / `math[display=block]` 保持 display 公式块；段落内只承载变量、inline MathML、citation、`<sub>` / `<sup>` 或 `html-italic` / `html-bold` 的 MDPI wrapper 会转为 inline，避免变量解释被空行切碎。没有 MathML 的 HTML-only 化学式 / 反应式会保留 `<sub>` / `<sup>` 行内语义，压缩成单个公式块，不输出碎片行。
 - MDPI HTML renderer 会把正文 figure / table display object 按正文首次 `Figure N` / `Fig. N` / `Table N` 引用锚定；无正文引用的对象按源顺序插入 References 前。caption、label 和 popup display 副本在 DOM 阶段去重，避免裸 `Figure N.` / `Table N.` 或重复 caption 泄漏到 Markdown。
@@ -286,7 +286,7 @@ resolve
   - 成功时公开 `source="ams_html"` 或 `source="ams_pdf"`。
 - `mdpi`
   - 固定顺序是 `CloakBrowser HTML -> CloakBrowser-seeded article PDF fallback -> metadata-only`。
-  - HTML 候选优先使用 Crossref/metadata 中的 MDPI landing page，再回退 DOI resolver；MDPI 页面里的 XML 链接不作为 provider success route。
+  - HTML 候选优先使用 Crossref/metadata 中的 MDPI landing page；如果 metadata 只有 MDPI DOI 或 `doi.org` URL，会按已知 journal code 反推 MDPI 数字段 article URL，再回退 DOI resolver；MDPI 数字段 article URL 对已知 ISSN 会先推导 DOI，避免普通 HTTP landing probe 遇到 CDN 403；MDPI 页面里的 XML 链接不作为 provider success route。
   - HTML extractor 从 MDPI article container 中重建正文，清理 article menu、分享/引用/metrics、SciProfiles、Google Scholar / CrossRef / PubMed / Green Version reference linkout UI，保留摘要、正文 section、references、figures、tables、formula 和 supplementary section；reference `li data-content` 编号必须保留，metadata / Crossref fallback 不人工补号；`#html-keywords` 只进入 metadata keywords，不进入 Abstract 或 Markdown 正文。
   - MDPI 正文 figure / table display object 按首次正文引用锚定，未引用对象保留源顺序并插到 References 前；popup display 副本、重复 label 和重复 caption 必须在 DOM 阶段去重。
   - MDPI 正文 figure / table / formula 图片会在正文附近内联成短 alt Markdown 图片行；caption 不进入 alt，下载后本地化到 `body_assets/...` 并通过 `render_state="inline"` 避免尾部重复资产块。HTML `<table>` 走共享表格 renderer；HTML-only 公式保留 `<sub>` / `<sup>` 语义并作为单块输出。

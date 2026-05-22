@@ -258,6 +258,25 @@ class MdpiProviderTests(AtyponBrowserWorkflowProviderTestCase):
         self.assertEqual(_payload_route(raw_payload), "pdf_fallback")
         self.assertEqual(article.source, "mdpi_pdf")
 
+    def test_mdpi_candidates_derive_article_url_from_known_doi(self) -> None:
+        client = MdpiClient(transport=None, env={})
+        metadata = {
+            "doi": "10.3390/rs18101673",
+            "landing_page_url": "https://doi.org/10.3390/rs18101673",
+        }
+
+        self.assertEqual(
+            client.html_candidates("10.3390/rs18101673", metadata),
+            [
+                "https://www.mdpi.com/2072-4292/18/10/1673",
+                "https://doi.org/10.3390/rs18101673",
+            ],
+        )
+        self.assertIn(
+            "https://www.mdpi.com/2072-4292/18/10/1673/pdf",
+            client.pdf_candidates("10.3390/rs18101673", metadata),
+        )
+
     def test_mdpi_structure_fixture_markdown(self) -> None:
         """rule: rule-mdpi-body-semantics-chrome-removal"""
         markdown, extraction = _extract_fixture_markdown(MDPI_STRUCTURE_DOI)

@@ -38,6 +38,8 @@ BACKEND_LEGACY = "legacy"
 DEFAULT_BACKEND = BACKEND_TEXMATH
 DEFAULT_TIMEOUT_SECONDS = 5.0
 DEFAULT_CONVERSION_CACHE_SIZE = 1024
+SUBPROCESS_TEXT_ENCODING = "utf-8"
+SUBPROCESS_TEXT_ERRORS = "replace"
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 ET.register_namespace("", MATHML_NS)
 _CONVERSION_CACHE: LRUCache[tuple[object, ...], FormulaConversionResult] | None = None
@@ -612,6 +614,8 @@ class MathMLToLatexWorker:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding=SUBPROCESS_TEXT_ENCODING,
+            errors=SUBPROCESS_TEXT_ERRORS,
             cwd=str(self.cwd) if self.cwd else None,
             env=subprocess_env(self.env),
         )
@@ -709,6 +713,8 @@ def _run_command(
         input=input_text,
         capture_output=True,
         text=True,
+        encoding=SUBPROCESS_TEXT_ENCODING,
+        errors=SUBPROCESS_TEXT_ERRORS,
         timeout=timeout_seconds,
         env=subprocess_env(env),
         cwd=str(cwd) if cwd else None,

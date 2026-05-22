@@ -6,6 +6,11 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+### Fixed
+
+- Derived DOI values for known MDPI numeric article URLs before generic landing-page fetches, and derived MDPI article landing URLs from known MDPI DOI suffixes before falling back to `doi.org`.
+- Replaced invalid UTF-8 bytes from external formula converter subprocess output instead of letting Windows reader threads raise `UnicodeDecodeError`.
+
 ## 1.6 - 2026-05-22
 
 ### Added

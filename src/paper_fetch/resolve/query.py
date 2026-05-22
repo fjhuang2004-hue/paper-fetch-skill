@@ -26,6 +26,7 @@ from ..html_lookup import is_usable_html_lookup_title
 from ..http import HttpTransport, RequestFailure
 from ..metadata.crossref import CrossrefLookupClient
 from ..metadata.types import CrossrefMetadata
+from ..mdpi_url import mdpi_doi_from_landing_url
 from ..publisher_identity import extract_doi, infer_provider_from_signals, normalize_doi
 from ..reason_codes import ERROR, NO_RESULT, NOT_SUPPORTED
 CONFIDENT_SCORE_MIN = 0.90
@@ -143,6 +144,17 @@ def resolve_query(
     crossref = CrossrefLookupClient(active_transport, active_env)
 
     if is_url(normalized_query):
+        mdpi_doi = mdpi_doi_from_landing_url(normalized_query)
+        if mdpi_doi:
+            return ResolvedQuery(
+                query=normalized_query,
+                query_kind="url",
+                doi=mdpi_doi,
+                landing_url=normalized_query,
+                provider_hint="mdpi",
+                confidence=1.0,
+            )
+
         direct_doi = extract_doi(normalized_query)
         if direct_doi:
             direct_provider_hint = infer_provider_from_signals(

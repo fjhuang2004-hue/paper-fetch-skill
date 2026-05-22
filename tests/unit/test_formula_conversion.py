@@ -7,6 +7,7 @@ import unittest
 import xml.etree.ElementTree as ET
 import subprocess
 import stat
+import sys
 from pathlib import Path
 
 from paper_fetch.formula import convert as formula_conversion
@@ -491,6 +492,24 @@ class FormulaConversionTests(unittest.TestCase):
 
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.latex, "x")
+
+    def test_external_formula_command_replaces_invalid_utf8_output(self) -> None:
+        process = formula_conversion._run_command(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import sys; "
+                    "sys.stdout.buffer.write(b'latex\\xb2\\n'); "
+                    "sys.stderr.buffer.write(b'err\\xd0\\n')"
+                ),
+            ],
+            input_text="",
+        )
+
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(process.stdout, "latex\ufffd\n")
+        self.assertEqual(process.stderr, "err\ufffd\n")
 
     def test_texmath_exe_under_formula_tools_is_discovered(self) -> None:
         raw_mathml = '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>'

@@ -57,6 +57,35 @@ class ResolveQueryTests(unittest.TestCase):
         self.assertEqual(result.landing_url, "https://www.science.org/doi/full/10.1126/science.adp0212")
         self.assertEqual(transport.calls, [])
 
+    def test_mdpi_numeric_article_url_derives_doi_without_landing_fetch(self) -> None:
+        transport = RecordingTransport({})
+
+        result = resolve_query.resolve_query(
+            "https://www.mdpi.com/2072-4292/18/10/1673",
+            transport=transport,
+            env={},
+        )
+
+        self.assertEqual(result.query_kind, "url")
+        self.assertEqual(result.doi, "10.3390/rs18101673")
+        self.assertEqual(result.provider_hint, "mdpi")
+        self.assertEqual(result.landing_url, "https://www.mdpi.com/2072-4292/18/10/1673")
+        self.assertEqual(result.confidence, 1.0)
+        self.assertEqual(transport.calls, [])
+
+    def test_mdpi_numeric_article_url_derives_padded_doi_segments(self) -> None:
+        transport = RecordingTransport({})
+
+        result = resolve_query.resolve_query(
+            "https://www.mdpi.com/2077-0375/15/3/93",
+            transport=transport,
+            env={},
+        )
+
+        self.assertEqual(result.doi, "10.3390/membranes15030093")
+        self.assertEqual(result.provider_hint, "mdpi")
+        self.assertEqual(transport.calls, [])
+
     def test_direct_doi_query_uses_crossref_publisher_before_doi_fallback(self) -> None:
         transport = RecordingTransport(
             {

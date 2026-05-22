@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import urllib.parse
 from typing import Any, Mapping
 
 from ..extraction.html.availability_policy import AvailabilityPolicy
@@ -12,6 +11,7 @@ from ..extraction.html.provider_rules import (
     ProviderFrontMatterRules,
     ProviderHtmlRules,
 )
+from ..mdpi_url import is_mdpi_url, mdpi_landing_url_from_doi
 from ..models import AssetProfile
 from ..provider_catalog import ProviderSpec
 from ..publisher_identity import normalize_doi
@@ -88,19 +88,13 @@ MDPI_BROWSER_PROFILE = ProviderBrowserProfile(
 )
 
 
-def _is_mdpi_url(url: str | None) -> bool:
-    candidate = normalize_text(url)
-    if not candidate:
-        return False
-    parsed = urllib.parse.urlparse(candidate)
-    host = normalize_text(parsed.hostname or "").lower()
-    return parsed.scheme in {"http", "https"} and host in {"www.mdpi.com", "mdpi.com"}
-
-
-def _mdpi_landing_url(metadata: Mapping[str, Any]) -> str | None:
+def _mdpi_landing_url(metadata: Mapping[str, Any], doi: str | None = None) -> str | None:
     landing = normalize_text(str(metadata.get("landing_page_url") or ""))
-    if _is_mdpi_url(landing):
+    if is_mdpi_url(landing):
         return landing
+    derived = mdpi_landing_url_from_doi(doi or str(metadata.get("doi") or ""))
+    if derived:
+        return derived
     return None
 
 
@@ -128,7 +122,7 @@ class MdpiClient(browser_workflow.BrowserWorkflowClient):
     def html_candidates(self, doi: str, metadata: Mapping[str, Any]) -> list[str]:
         normalized_doi = normalize_doi(doi)
         candidates: list[str] = []
-        landing = _mdpi_landing_url(metadata)
+        landing = _mdpi_landing_url(metadata, normalized_doi)
         if landing:
             candidates.append(landing)
         if normalized_doi:
@@ -136,9 +130,12 @@ class MdpiClient(browser_workflow.BrowserWorkflowClient):
         return list(dict.fromkeys(candidate for candidate in candidates if candidate))
 
     def pdf_candidates(self, doi: str, metadata: Mapping[str, Any]) -> list[str]:
-        del doi
+        normalized_doi = normalize_doi(doi)
         candidates: list[str] = []
-        landing = _mdpi_landing_url(metadata)
+        landing = _mdpi_landing_url(
+            metadata,
+            str(metadata.get("doi") or normalized_doi or ""),
+        )
         pdf_from_landing = _mdpi_html.mdpi_pdf_url_from_landing_url(landing)
         if pdf_from_landing:
             candidates.append(pdf_from_landing)

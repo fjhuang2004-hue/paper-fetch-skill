@@ -6,6 +6,11 @@
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+### 修复
+
+- 对已知 MDPI 数字段 article URL 在通用 landing page 抓取前先推导 DOI；对已知 MDPI DOI suffix 在回退 `doi.org` 前先反推 MDPI article landing URL。
+- 外部公式转换子进程输出包含非法 UTF-8 字节时改为 replacement 解码，避免 Windows reader thread 抛出 `UnicodeDecodeError`。
+
 ## 1.6 - 2026-05-22
 
 ### 新增
