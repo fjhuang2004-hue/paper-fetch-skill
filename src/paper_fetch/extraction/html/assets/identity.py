@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Mapping
 
 from ....models import normalize_text
@@ -21,7 +22,7 @@ def html_asset_is_supplementary(asset: Mapping[str, Any]) -> bool:
 
 
 def split_body_and_supplementary_assets(
-    assets: list[dict[str, Any]] | list[dict[str, str]],
+    assets: Sequence[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     body_assets: list[dict[str, Any]] = []
     supplementary_assets: list[dict[str, Any]] = []

@@ -6,10 +6,10 @@ import html
 import re
 import urllib.parse
 from html.parser import HTMLParser
-from typing import Mapping
+from typing import Any, Mapping
 
 from ...html_lookup import is_usable_html_lookup_title
-from ...metadata.types import HtmlLookupHints, HtmlMetadata, ProviderMetadata
+from ...metadata.types import HtmlLookupHints, HtmlMetadata
 from ...utils import dedupe_authors
 from ...models import normalize_text
 from ...publisher_identity import normalize_doi
@@ -194,7 +194,7 @@ def parse_html_metadata(html_text: str, source_url: str) -> HtmlMetadata:
     }
 
 
-def merge_html_metadata(base_metadata: ProviderMetadata | None, html_metadata: HtmlMetadata) -> HtmlMetadata:
+def merge_html_metadata(base_metadata: Mapping[str, Any] | None, html_metadata: HtmlMetadata) -> HtmlMetadata:
     base = dict(base_metadata or {})
     merged = dict(base)
     for key in (

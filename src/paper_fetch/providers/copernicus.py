@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -21,8 +22,7 @@ from ..extraction.html.assets import (
 from ..extraction.html.landing import LandingHtmlFetchResult, LandingRedirectLimitExceeded, fetch_landing_html
 from ..http import DEFAULT_FULLTEXT_TIMEOUT_SECONDS, HttpTransport, PDF_MIME_TYPE, RequestFailure
 from ..http.headers import header_value
-from ..metadata.types import ProviderMetadata
-from ..models import AssetProfile, article_from_markdown, metadata_only_article
+from ..models import AssetProfile, SourceKind, article_from_markdown, metadata_only_article
 from ..provider_catalog import (
     BodyTextThresholds,
     ProviderSpec,
@@ -185,8 +185,8 @@ def _discover_link_urls(html_text: str, base_url: str, *, suffix: str) -> list[s
 
 
 def _merge_assets(
-    extracted_assets: list[Mapping[str, Any]] | None,
-    downloaded_assets: list[Mapping[str, Any]] | None,
+    extracted_assets: Sequence[Mapping[str, Any]] | None,
+    downloaded_assets: Sequence[Mapping[str, Any]] | None,
 ) -> list[dict[str, Any]]:
     merged: list[dict[str, Any]] = []
     by_identity: dict[str, dict[str, Any]] = {}
@@ -210,7 +210,7 @@ def _merge_assets(
 
 
 def _filter_assets_for_profile(
-    assets: list[Mapping[str, Any]] | None,
+    assets: Sequence[Mapping[str, Any]] | None,
     *,
     asset_profile: AssetProfile,
 ) -> list[dict[str, Any]]:
@@ -570,7 +570,7 @@ class CopernicusClient(ProviderClient):
     def fetch_raw_fulltext(
         self,
         doi: str,
-        metadata: ProviderMetadata,
+        metadata: Mapping[str, Any],
         *,
         context: RuntimeContext | None = None,
     ) -> RawFulltextPayload:
@@ -633,7 +633,7 @@ class CopernicusClient(ProviderClient):
     def download_related_assets(
         self,
         doi: str,
-        metadata: ProviderMetadata,
+        metadata: Mapping[str, Any],
         raw_payload: RawFulltextPayload,
         output_dir: Path | None,
         *,
@@ -721,7 +721,7 @@ class CopernicusClient(ProviderClient):
 
     def to_article_model(
         self,
-        metadata: ProviderMetadata,
+        metadata: Mapping[str, Any],
         raw_payload: RawFulltextPayload,
         *,
         downloaded_assets: list[Mapping[str, Any]] | None = None,
@@ -739,7 +739,7 @@ class CopernicusClient(ProviderClient):
         if asset_failures:
             warnings.append(f"Copernicus related assets were only partially downloaded ({len(asset_failures)} failed).")
 
-        source = "copernicus_xml"
+        source: SourceKind = "copernicus_xml"
         if route == PDF_FALLBACK:
             source = "copernicus_pdf"
 

@@ -34,6 +34,7 @@ dev = [
   "build>=1.2,<2",
   "jsonschema>=4,<5",
   "pytest>=8,<10",
+  "pytest-cov>=6,<8",
   "PyYAML>=6,<7",
   "pytest-xdist>=3.6,<4",
   "ruff>=0.8,<1",
@@ -62,6 +63,28 @@ exclude = ["paper_fetch_devtools*"]
 target-version = "py311"
 src = ["src", "tests"]
 
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"paper_fetch.providers._article_markdown".msg = "Removed compatibility module; import the canonical provider or extraction owner instead."
+"paper_fetch.providers._html_access_signals".msg = "Removed compatibility module; import paper_fetch.extraction.html.signals or paper_fetch.quality owners instead."
+"paper_fetch.providers._html_availability".msg = "Removed compatibility module; import paper_fetch.quality.html_availability instead."
+"paper_fetch.providers._html_citations".msg = "Removed compatibility module; import paper_fetch.markdown.citations or provider reference owners instead."
+"paper_fetch.providers._html_semantics".msg = "Removed compatibility module; import paper_fetch.extraction.html.semantics instead."
+"paper_fetch.providers._html_tables".msg = "Removed compatibility module; import paper_fetch.extraction.html.tables instead."
+"paper_fetch.providers._html_text".msg = "Removed compatibility module; import paper_fetch.extraction.html shared/runtime owners instead."
+"paper_fetch.providers._language_filter".msg = "Removed compatibility module; import paper_fetch.extraction.html.language instead."
+"paper_fetch.providers._atypon_browser_workflow".msg = "Removed compatibility module; import paper_fetch.providers.browser_workflow instead."
+"paper_fetch.providers._atypon_browser_workflow_html".msg = "Removed compatibility module; import paper_fetch.providers.browser_workflow.html_extraction instead."
+"paper_fetch.providers.html_assets".msg = "Removed compatibility module; import paper_fetch.extraction.html.assets instead."
+"paper_fetch.providers.pnas_html".msg = "Removed compatibility module; import paper_fetch.providers._pnas_html instead."
+"paper_fetch.providers.science_html".msg = "Removed compatibility module; import paper_fetch.providers._science_html instead."
+"paper_fetch.providers.springer_html".msg = "Removed compatibility module; import paper_fetch.providers._springer_html instead."
+"paper_fetch.providers.wiley_html".msg = "Removed compatibility module; import paper_fetch.providers._wiley_html instead."
+"paper_fetch.extraction.html._assets".msg = "Removed compatibility module; import paper_fetch.extraction.html.assets instead."
+"paper_fetch.resolve.crossref".msg = "Removed compatibility module; import paper_fetch.metadata.crossref instead."
+
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
@@ -70,6 +93,8 @@ files = [
   "src/paper_fetch/workflow",
   "src/paper_fetch/providers/base.py",
   "src/paper_fetch/providers/protocols.py",
+  "src/paper_fetch/providers/copernicus.py",
+  "src/paper_fetch/providers/_article_markdown_copernicus.py",
   "src/paper_fetch/mcp/schemas.py",
 ]
 check_untyped_defs = true

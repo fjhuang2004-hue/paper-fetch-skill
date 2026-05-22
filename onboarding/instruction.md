@@ -120,6 +120,7 @@ runner 只通过 `PROVIDER_ONBOARDING_AGENT_CLI` 调用本地外部 agent CLI；
 - HTML/XML/PDF wrapper、access gate、challenge、empty shell 和 abstract-only 不得误判 fulltext。
 - PDF fallback 必须拒绝 HTML wrapper；text-only fallback 必须标记资产跳过。
 - `asset_profile=none/body/all` 语义稳定；supplementary 只能来自明确 scope。
+- `ProviderMetadata` 是 provider / metadata adapter 产出的可选字段 `TypedDict`，用于 metadata merge、routing probe 和文章构建前的元数据传递；它不是新的 runtime payload 容器。Provider 对外 override 签名必须保持 `Mapping[str, Any]` 兼容，只在内部构造、合并或局部收窄时使用 `ProviderMetadata`。
 - Markdown 无站点 chrome、access noise、重复 boilerplate、重复 figures/tables。
 - References 不被误清洗，正文 citation anchor 不被误当成 references 条目。
 - Formula、table、caption 由 canonical renderer 或 provider adapter 输出，不新建平行 renderer。

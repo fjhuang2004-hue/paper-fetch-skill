@@ -186,6 +186,18 @@ step 函数放在 provider-owned 模块中，签名使用 `def newpub_fetch_html
 
 新 provider 不应绕开这条 template method 自己拼最终结果。旧 provider 已有复杂 `fetch_raw_fulltext()` 覆盖实现时可以保留；新增 scaffold 默认使用 `waterfall_steps`。
 
+### Provider mypy 分批纳入
+
+当前 mypy 覆盖面包含核心模型、workflow、provider base/protocols、MCP schema，以及第一批真实 provider：`src/paper_fetch/providers/copernicus.py` 和 `src/paper_fetch/providers/_article_markdown_copernicus.py`。后续新增 provider typing 批次必须先跑 targeted mypy 清零，再把文件加入 `pyproject.toml` 的 `[tool.mypy].files`。
+
+下一批 backlog 是 arXiv，不应混入 Copernicus 或其它 provider 批次。开始前先运行：
+
+```bash
+PYTHONPATH=src python3 -m mypy src/paper_fetch/providers/arxiv.py src/paper_fetch/providers/_arxiv_*.py --show-error-codes
+```
+
+已知待处理类型边界包括 `ProviderMetadata` / `dict[str, Any]` 协议收敛、provider override 参数回到 `Mapping[str, Any]`、SourceKind 显式标注、只读列表参数改用 `Sequence[...]`、asset facade 显式导出补全，以及 `_arxiv_assets.py` 内的局部变量重定义和可空赋值问题。修复时不得通过文件级 `type: ignore`、扩大 `ignore_missing_imports` 或 `ignore_errors` 掩盖错误。
+
 实现过程中必须把 Markdown Review Loop 当作主循环：
 
 1. 对 manifest 中每个 non-null `fixtures.doi_samples.<purpose>` 生成 baseline Markdown；AI/coordinator manifest 字段定义以 [`onboarding/provider-manifest.md`](../onboarding/provider-manifest.md) 和 [`provider-manifest.schema.json`](../onboarding/provider-manifest.schema.json) 为准。

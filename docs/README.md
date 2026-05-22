@@ -75,11 +75,13 @@
   - 修改后运行 `python3 scripts/validate_extraction_rules.py` 校验 anchor、Owner、fixture、测试名、manifest 引用和未挂规则 fixture 清单。
 - [`deployment.md`](deployment.md)
   - 讲安装、配置入口、MCP 注册、更新和最小验证。
-  - 讲 Wiley / Science / PNAS / AMS 的 repo-local 浏览器工作流、本地 `scripts/dev-preflight.sh` 门禁和 CI 测试耗时信号。
+  - 讲 Wiley / Science / PNAS / AMS / MDPI 的 repo-local 浏览器工作流、本地 `scripts/dev-preflight.sh` 门禁和 CI 测试耗时信号。
 - [`architecture/overview.md`](architecture/overview.md)
   - 讲当前系统分层、端到端业务流程、数据契约和扩展点。
 - [`architecture/probe-semantics.md`](architecture/probe-semantics.md)
   - 讲 `has_fulltext()` 的 probe 语义与边界。
+- [`architecture/fixture-size-baseline.md`](architecture/fixture-size-baseline.md)
+  - 记录 tracked fixture 体积治理基线，并区分本地 ignored 杂物和需要评估的 fixture 体积问题。
 
 ## 术语表
 
@@ -141,7 +143,7 @@
 - 常见值包括 `full_size`、`preview`。旧的通用 HTTP-first 路径仍可能保留 `playwright_canvas_fallback` 诊断，但 `wiley` / `science` / `pnas` / `ams` 的 HTML 资产主链路不再输出这个 tier。
 - `preview` 不是天然错误；当宽高满足阈值且 `source_trail` 有 preview accepted 轨迹时，是可接受降级。
 - preview 降级仍必须导出自包含 Markdown；如果正文图片链接能映射到已下载本地资产，最终 `.md` 不应残留远端图片 URL。
-- `wiley` / `science` / `pnas` / `ams` 的 challenge 恢复链路只接受能识别为图片的 CloakBrowser image payload，包括浏览器导出的 PNG 和原始 SVG；不会再把图片文档 screenshot 裁剪成正文图片资产，也不会把 challenge HTML 保存成图片。
+- `wiley` / `science` / `pnas` / `ams` / `mdpi` 的 challenge 恢复链路只接受能识别为图片的 CloakBrowser image payload，包括浏览器导出的 PNG 和原始 SVG；不会再把图片文档 screenshot 裁剪成正文图片资产，也不会把 challenge HTML 保存成图片。
 - live review 中，只有公式图片发生 preview fallback 时不自动归为 `asset_download_failure`；figure/table preview fallback 仍需要 accepted 轨迹或其它证据才能降噪。资产下载 warning、`asset_failures` 轨迹或 `quality.asset_failures` 会归为 `asset_download_failure`。
 
 ### `semantic_losses`

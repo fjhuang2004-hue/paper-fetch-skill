@@ -87,7 +87,7 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 ```
 
 会生成：
-- `src/paper_fetch/providers/_mdpi_html.py`（含 `register_provider_bundle(...)` 占位）
+- `src/paper_fetch/providers/_mdpi_html.py`（provider HTML starter；provider 变大后应降为 compatibility facade，并按 authors / references / assets / markdown / dom 拆到 `_mdpi_*` helper）
 - `src/paper_fetch/providers/mdpi.py`（ProviderClient 子类骨架）
 - `tests/unit/test_mdpi_provider.py`（测试骨架）
 - `tests/fixtures/golden_criteria/10.3390_membranes15030093/.gitkeep`
@@ -100,7 +100,7 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 
 ### 3.1 填 `ProviderBundle`
 
-打开 `_mdpi_html.py`，把顶部的 `register_provider_bundle(ProviderBundle(...))` 填完整：
+打开 provider entry module（例如 `mdpi.py`）或 scaffold 生成的 HTML starter，把 `register_provider_bundle(ProviderBundle(...))` 填完整：
 
 - `catalog=ProviderSpec(...)`：hosts / 路径模板 / asset_default / probe_capability（见 [§2](provider-development.md#2-先接-provider-catalog)）
 - `html_rules=ProviderHtmlRules(cleanup=..., front_matter=..., availability=..., dom_hooks=..., markdown_hooks=...)`（见 [§5](provider-development.md#5-extraction-owner-复用规则)）
@@ -108,7 +108,7 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 
 ### 3.2 写 hook 函数
 
-`mdpi_before_block_normalization(container)` / `mdpi_normalize_markdown(text)` 等放在同一个 `_mdpi_html.py` 文件里。**不要**在 `extraction/html/provider_rules.py` 写 wrapper——直接函数引用即可。
+`mdpi_before_block_normalization(container)` / `mdpi_normalize_markdown(text)` 等先按职责放到 provider-owned helper。小型 provider 可暂存在 `_mdpi_html.py` starter；一旦出现 authors / references / assets / markdown / dom 多类职责，应让 `_mdpi_html.py` 保持 compatibility facade，并拆到 `_mdpi_authors.py`、`_mdpi_references.py`、`_mdpi_assets.py`、`_mdpi_markdown.py`、`_mdpi_dom.py`。**不要**在 `extraction/html/provider_rules.py` 写 wrapper——直接函数引用即可。
 
 ### 3.3 写客户端 `MdpiClient`
 
@@ -132,7 +132,7 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
 
 1. 生成 baseline Markdown。
 2. 逐篇阅读，记录 `fixture/purpose -> issue -> assertion -> fix`。
-3. 先把 issue 写成 `tests/unit/test_mdpi_provider.py` 里的断言，再修 `_mdpi_html.py` / `mdpi.py`。
+3. 先把 issue 写成 `tests/unit/test_mdpi_provider.py` 里的断言，再修 provider-owned helper / facade / `mdpi.py`。
 4. 主成功路径至少保留一个 Markdown 正断言和一个站点 chrome / access noise / boilerplate 负断言。
 5. 重复到所有 fixture Markdown 干净。
 
@@ -219,7 +219,7 @@ python3 scripts/scaffold_provider.py --name mdpi --doi 10.3390/membranes15030093
   --fulltext-client
 
 # Step 3 (实现, 2-3 天)
-# - 编辑 src/paper_fetch/providers/_mdpi_html.py: 填 ProviderBundle
+# - 编辑 provider entry module 和 provider-owned HTML helper/facade
 # - 编辑 src/paper_fetch/providers/mdpi.py: 填 MdpiClient
 # - 跑 pytest 直到 test_mdpi_provider.py 局部通过
 

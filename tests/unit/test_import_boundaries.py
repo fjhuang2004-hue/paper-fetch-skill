@@ -4,7 +4,7 @@ import ast
 import unittest
 from pathlib import Path
 
-from tests.paths import REPO_ROOT, SRC_DIR, TESTS_ROOT
+from tests.paths import SRC_DIR
 
 PAPER_FETCH_ROOT = SRC_DIR / "paper_fetch"
 BOUNDARY_PATHS = [
@@ -27,29 +27,6 @@ PROVIDER_RULE_HOOK_IMPORTS = frozenset(
     }
 )
 PROVIDER_RULES_PATH = PAPER_FETCH_ROOT / "extraction" / "html" / "provider_rules.py"
-REMOVED_PROVIDER_COMPATIBILITY_MODULES = frozenset(
-    {
-        "paper_fetch.providers._article_markdown",
-        "paper_fetch.providers._html_access_signals",
-        "paper_fetch.providers._html_availability",
-        "paper_fetch.providers._html_citations",
-        "paper_fetch.providers._html_semantics",
-        "paper_fetch.providers._html_tables",
-        "paper_fetch.providers._html_text",
-        "paper_fetch.providers._language_filter",
-        "paper_fetch.providers._atypon_browser_workflow",
-        "paper_fetch.providers._atypon_browser_workflow_html",
-        "paper_fetch.providers.html_assets",
-        "paper_fetch.providers.pnas_html",
-        "paper_fetch.providers.science_html",
-        "paper_fetch.providers.springer_html",
-        "paper_fetch.providers.wiley_html",
-        "paper_fetch.extraction.html._assets",
-        "paper_fetch.resolve.crossref",
-    }
-)
-
-
 def _module_name_for_path(path: Path) -> str:
     relative = path.relative_to(SRC_DIR).with_suffix("")
     return ".".join(relative.parts)
@@ -92,42 +69,11 @@ def _forbidden_provider_private_imports(path: Path) -> list[str]:
     return offenders
 
 
-def _iter_python_files(root: Path) -> list[Path]:
-    return [
-        path
-        for path in sorted(root.rglob("*.py"))
-        if "__pycache__" not in path.parts
-    ]
-
-
-def _uses_removed_compatibility_module(imported_module: str) -> bool:
-    return any(
-        imported_module == removed or imported_module.startswith(f"{removed}.")
-        for removed in REMOVED_PROVIDER_COMPATIBILITY_MODULES
-    )
-
-
 class ImportBoundaryTests(unittest.TestCase):
     def test_provider_neutral_modules_do_not_import_provider_private_helpers(self) -> None:
         offenders: list[str] = []
         for path in BOUNDARY_PATHS:
             offenders.extend(_forbidden_provider_private_imports(path))
-
-        self.assertEqual(offenders, [], "\n".join(offenders))
-
-    def test_source_and_tests_do_not_import_removed_provider_compatibility_modules(self) -> None:
-        offenders: list[str] = []
-        for path in [*_iter_python_files(PAPER_FETCH_ROOT), *_iter_python_files(TESTS_ROOT)]:
-            module_name = (
-                _module_name_for_path(path)
-                if path.is_relative_to(SRC_DIR)
-                else ".".join(path.relative_to(REPO_ROOT).with_suffix("").parts)
-            )
-            for imported_module, lineno in _imported_modules(path, module_name=module_name):
-                if _uses_removed_compatibility_module(imported_module):
-                    offenders.append(
-                        f"{path.relative_to(REPO_ROOT)}:{lineno} imports {imported_module}"
-                    )
 
         self.assertEqual(offenders, [], "\n".join(offenders))
 
