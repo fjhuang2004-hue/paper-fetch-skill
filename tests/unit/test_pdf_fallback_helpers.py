@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+import sys
 import threading
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -481,6 +483,75 @@ class PdfFallbackHelperTests(unittest.TestCase):
         self.assertEqual(result, default_markdown)
         mocked_stats.assert_not_called()
         mocked_transparent.assert_not_called()
+
+    def test_default_pdf_markdown_protects_pymupdf_text_subprocess_decoding(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def fake_run(*args, **kwargs):
+            calls.append(dict(kwargs))
+            return mock.Mock(returncode=1, stdout="", stderr="")
+
+        def fake_to_markdown(path: str) -> str:
+            self.assertEqual(path, "sample.pdf")
+            _pdf_common.subprocess.run(
+                "where tesseract",
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+            return "## Results\n\nExtracted PDF body."
+
+        fake_pymupdf4llm = types.SimpleNamespace(to_markdown=fake_to_markdown)
+
+        with (
+            mock.patch.dict(sys.modules, {"pymupdf4llm": fake_pymupdf4llm}),
+            mock.patch.object(_pdf_common.subprocess, "run", side_effect=fake_run),
+        ):
+            result = _pdf_common._render_default_pdf_markdown(Path("sample.pdf"))
+
+        self.assertEqual(result, "## Results\n\nExtracted PDF body.")
+        self.assertEqual(calls[0]["errors"], "replace")
+
+    def test_transparent_pdf_markdown_protects_pymupdf_text_subprocess_decoding(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def fake_run(*args, **kwargs):
+            calls.append(dict(kwargs))
+            return mock.Mock(returncode=1, stdout="", stderr="")
+
+        def fake_to_markdown(path: str, *, ignore_alpha: bool, hdr_info: bool) -> str:
+            self.assertEqual(path, "transparent.pdf")
+            self.assertTrue(ignore_alpha)
+            self.assertFalse(hdr_info)
+            _pdf_common.subprocess.run(
+                "where tesseract",
+                shell=True,
+                capture_output=True,
+                text=True,
+            )
+            return "## Results\n\nTransparent PDF body."
+
+        fake_pymupdf_rag = types.SimpleNamespace(to_markdown=fake_to_markdown)
+        fake_pymupdf4llm = types.ModuleType("pymupdf4llm")
+        fake_helpers = types.ModuleType("pymupdf4llm.helpers")
+        fake_helpers.pymupdf_rag = fake_pymupdf_rag
+        fake_pymupdf4llm.helpers = fake_helpers
+
+        with (
+            mock.patch.dict(
+                sys.modules,
+                {
+                    "pymupdf4llm": fake_pymupdf4llm,
+                    "pymupdf4llm.helpers": fake_helpers,
+                    "pymupdf4llm.helpers.pymupdf_rag": fake_pymupdf_rag,
+                },
+            ),
+            mock.patch.object(_pdf_common.subprocess, "run", side_effect=fake_run),
+        ):
+            result = _pdf_common._render_transparent_pdf_markdown(Path("transparent.pdf"))
+
+        self.assertEqual(result, "## Results\n\nTransparent PDF body.")
+        self.assertEqual(calls[0]["errors"], "replace")
 
     def test_render_pdf_markdown_uses_transparent_fallback_for_license_footer(self) -> None:
         pdf_path = Path("legacy-ieee.pdf")

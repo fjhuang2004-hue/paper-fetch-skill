@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import tempfile
+import threading
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +51,7 @@ _IEEE_PDF_LICENSE_MARKERS = (
 _MIN_USABLE_PDF_MARKDOWN_WORDS = 250
 _MIN_TRANSPARENT_TEXT_WORDS = 500
 _TRANSPARENT_FALLBACK_WORD_FACTOR = 3
+_PYMUPDF_SUBPROCESS_PATCH_LOCK = threading.RLock()
 
 
 @dataclass(frozen=True)
@@ -133,12 +136,38 @@ def _pdf_markdown_quality(markdown_text: str) -> _PdfMarkdownQuality:
     )
 
 
+class _SubprocessTextDecodeReplace:
+    def __enter__(self) -> None:
+        _PYMUPDF_SUBPROCESS_PATCH_LOCK.acquire()
+        self._original_run = subprocess.run
+
+        def run_with_replace(*args, **kwargs):
+            if (
+                "errors" not in kwargs
+                and (
+                    kwargs.get("text")
+                    or kwargs.get("universal_newlines")
+                    or kwargs.get("encoding") is not None
+                )
+            ):
+                kwargs = dict(kwargs)
+                kwargs["errors"] = "replace"
+            return self._original_run(*args, **kwargs)
+
+        subprocess.run = run_with_replace
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        subprocess.run = self._original_run
+        _PYMUPDF_SUBPROCESS_PATCH_LOCK.release()
+
+
 def _render_default_pdf_markdown(pdf_path: Path) -> str:
     try:
         import pymupdf4llm
     except Exception as exc:  # pragma: no cover - exercised by missing dependency integration tests
         raise PdfFetchFailure("missing_pymupdf4llm", "pymupdf4llm is not installed; cannot use PDF fallback.") from exc
-    return str(pymupdf4llm.to_markdown(str(pdf_path)) or "")
+    with _SubprocessTextDecodeReplace():
+        return str(pymupdf4llm.to_markdown(str(pdf_path)) or "")
 
 
 def _render_transparent_pdf_markdown(pdf_path: Path) -> str:
@@ -146,7 +175,8 @@ def _render_transparent_pdf_markdown(pdf_path: Path) -> str:
         from pymupdf4llm.helpers import pymupdf_rag
     except Exception as exc:  # pragma: no cover - exercised by missing dependency integration tests
         raise PdfFetchFailure("missing_pymupdf4llm", "pymupdf4llm is not installed; cannot use PDF fallback.") from exc
-    return str(pymupdf_rag.to_markdown(str(pdf_path), ignore_alpha=True, hdr_info=False) or "")
+    with _SubprocessTextDecodeReplace():
+        return str(pymupdf_rag.to_markdown(str(pdf_path), ignore_alpha=True, hdr_info=False) or "")
 
 
 def _pdf_text_layer_stats(pdf_path: Path) -> _PdfTextLayerStats:

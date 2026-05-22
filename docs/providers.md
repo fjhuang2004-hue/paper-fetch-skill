@@ -466,6 +466,7 @@ CLI、Python API、MCP 当前统一采用这些默认值：
 - 即使 `asset_profile=body|all`，这些 PDF / ePDF fallback 也只返回 text-only Markdown。
 - 共享 PDF Markdown 转换会拒绝明显过短或主要由 IEEE 授权页脚组成的结果。
 - PDF 内有大量透明文本层时，会用 PyMuPDF legacy transparent-text 路径二次转换。
+- Windows 上 PyMuPDF 探测 Tesseract 时可能产生本地编码的 stdout/stderr；PDF Markdown 转换会对这类第三方文本子进程输出使用 replacement 解码，避免非 UTF-8 字节让 reader thread 抛出 `UnicodeDecodeError`。
 - 二次转换仍不足时，继续走候选重试或 provider 降级。
 
 #### Provider HTML 资产语义（wiley / science / pnas / ams / arxiv / ieee / copernicus / springer / elsevier）

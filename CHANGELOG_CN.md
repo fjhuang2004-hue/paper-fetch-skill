@@ -10,6 +10,7 @@
 
 - 对已知 MDPI 数字段 article URL 在通用 landing page 抓取前先推导 DOI；对已知 MDPI DOI suffix 在回退 `doi.org` 前先反推 MDPI article landing URL。
 - 外部公式转换子进程输出包含非法 UTF-8 字节时改为 replacement 解码，避免 Windows reader thread 抛出 `UnicodeDecodeError`。
+- PDF fallback 转 Markdown 时，PyMuPDF 在 Windows 上探测 Tesseract 的子进程输出如果包含非法 UTF-8 字节，也改为 replacement 解码。
 
 ## 1.6 - 2026-05-22
 
