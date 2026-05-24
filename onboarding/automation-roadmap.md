@@ -7,6 +7,10 @@
 ## 可自动化项
 
 - `scripts/onboard_from_manifests.py run` 串行执行 provider DAG，并持久化 state、DAG、worker brief、worker stdout/stderr/prompt 日志。
+- `scripts/onboard_from_manifests.py prepare-discovery` 可在 discovery worker 前生成 `<output-dir>/discovery/evidence-pack.json`，包含 query plan、Crossref/OpenAlex candidate、轻量 publisher 页面信号、score/confidence 和 rejection hint；`--no-network` 只生成 query plan，供默认单测和离线预检使用。
+- `scripts/onboard_from_manifests.py run --provider ...` 会在派发 `discover-manifest` 前自动写 evidence pack，把摘要加入 worker prompt，并在 `validate-manifest` 前自动执行一次 `autofix-manifest --write`。
+- `validate-manifest` 若以 `MANIFEST_SCHEMA_INVALID` 失败，runner 会再执行一次 targeted manifest autofix 并重跑 validate；仍失败才按既有 retry/blocked 流程处理。
+- `scripts/onboard_from_manifests.py inspect-discovery` 可只读列出候选、低置信度 purpose 和 discovery proof 缺口。
 - `scripts/capture_fixture.py --auto-via` 根据 manifest `probe.requires_browser_runtime` / `probe.requires_playwright` 和 access review `allowed_runtimes` 选择 `http` 或 `browser`。
 - fixture capture 对 `HTTP_FORBIDDEN`、`HTTP_RATE_LIMITED`、`CHALLENGE_DETECTED` 可在 access review 允许 browser runtime 时自动 retry 到 browser route；否则返回 structured JSON。
 - `scripts/scaffold_provider.py --from-manifest --merge-existing=safe` 复用相同内容，保留完整已有 provider 文件，并继续生成 fixture/capture/scaffold summary。
@@ -24,6 +28,7 @@
 ## 不可自动化边界
 
 - access approval 不能由脚本伪造；`onboarding/access-reviews/<provider>.yml` 必须由 operator 批准，且 `may_continue: true`。
+- manifest autofix 不能替代 discovery worker 写 manifest 初稿；它只补机器可判 schema/proof/contract 缺口。低置信 DOI candidate 只能写入 proof/rejection，不会自动替换样本。
 - access review backfill 草稿默认 `status: blocked`、`may_continue: false`；脚本不得把草稿升级为批准。
 - CAPTCHA、paywall、challenge、登录和权限不确定时，脚本不得绕过；只能按 access review 和 [`failure-recovery.md`](./failure-recovery.md) stop / retry / report。
 - `markdown_semantic_reviewed: true` 不能由 bootstrap 自动设置；最终 Markdown 语义审查签字必须来自 worker/operator 的真实阅读结论。
@@ -40,6 +45,16 @@ python3 scripts/onboard_from_manifests.py run \
   --provider mdpi \
   --domain mdpi.com \
   --output-dir .paper-fetch-runs/mdpi-onboarding
+
+python3 scripts/onboard_from_manifests.py prepare-discovery \
+  --provider mdpi \
+  --domain mdpi.com \
+  --doi-prefix 10.3390 \
+  --output-dir .paper-fetch-runs/mdpi-onboarding
+
+python3 scripts/onboard_from_manifests.py inspect-discovery \
+  --manifest onboarding/manifests/mdpi.yml \
+  --evidence-pack .paper-fetch-runs/mdpi-onboarding/discovery/evidence-pack.json
 
 python3 scripts/onboard_from_manifests.py run \
   --manifest onboarding/manifests/mdpi.yml \
@@ -64,6 +79,8 @@ python3 scripts/onboard_from_manifests.py repair-markdown-quality \
 ```
 
 `--until <task>` 是 inclusive cutoff；完成该 task 后停止，并把下一步保留在 state 中。`--state` 默认写 `onboarding/onboarding-state.json`。
+
+真实网络 discovery 是 runner 默认行为；默认 CI/单元测试使用 fake transport 或 `prepare-discovery --no-network`，不把 live discovery 纳入常规 gate。
 
 从零实现、已有 manifest 继续、查漏补缺、单 DOI quality repair 和 blocked state 恢复的场景化命令组合，统一见 [`runbook.md`](./runbook.md)。
 

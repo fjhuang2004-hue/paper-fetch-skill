@@ -33,7 +33,7 @@
 |---|---|---:|---|---|
 | `generated_by` | string | 是 | enum `ai_discovery` / `manual_replay` | 新 provider 使用 discovery；现有 provider golden manifest 使用 replay。 |
 | `generated_at` | string | 是 | JSON Schema `date-time` | 记录生成时间，便于审计 stale manifest。 |
-| `source_queries` | array[string] | 是 | `minItems: 1` | 记录 discovery query 或 replay 输入来源。 |
+| `source_queries` | array[string] | 是 | `minItems: 1` | 记录 discovery query 或 replay 输入来源；必须覆盖 `fixtures.discovery_proof.*.queries`。 |
 | `confidence` | string | 是 | enum `high` / `medium` / `low` | 标识 manifest 初稿证据强度。 |
 
 ## `routing`
@@ -134,6 +134,21 @@ route_sources:
 | `evidence_reason` | string | 是 | 非空 | 解释此 DOI 覆盖该 purpose 的原因。 |
 | `observed_signals` | array[string] | 是 | 可为空数组 | 页面或 fixture 中可观察的信号。 |
 | `confidence` | string | 是 | enum `high` / `medium` / `low` | 标识该样本证据强度。 |
+
+## `fixtures.discovery_proof`
+
+`discovery_proof` 对 `table`、`formula`、`supplementary` 强制记录候选检索矩阵。它用于证明 non-null 选择来自充分搜索，也用于证明 null purpose 不是“没搜到就写 null”。固定 required key：`table`、`formula`、`supplementary`。
+
+| 字段 | Type | Required | 约束 | 决策依据 |
+|---|---|---:|---|---|
+| `<purpose>.queries` | array[string] | 是 | 至少 3 条；每条包含 provider 名称、域名或 DOI prefix，并包含 purpose 关键词 | 证明搜索不是只基于 seed DOI。 |
+| `<purpose>.candidates` | array[string] | 是 | DOI 列表；已选择 DOI 时必须包含 `selected_doi` | 记录候选池，便于 review 和 retry。 |
+| `<purpose>.selected_doi` | string/null | 是 | 必须等于 `fixtures.doi_samples.<purpose>.doi` | 防止 proof 与实际 fixture 脱节。 |
+| `<purpose>.rejections` | object | 是 | key 为未选择候选 DOI，value 为拒绝原因 | 让 null 或未选候选可审计。 |
+| `<purpose>.exhausted` | boolean | 是 | 已选择 DOI 时为 `false`；null purpose 必须为 `true` | 区分已选样本和候选池耗尽。 |
+| `<purpose>.evidence_summary` | string | 是 | 非空；null purpose 不能只写“未找到样本” | 说明当前选择或 null 结论。 |
+
+`table`、`formula`、`supplementary` 为 `doi: null` 时，必须有候选 DOI 和拒绝理由。如果同一 manifest 的 non-null fixture 或 cleaning evidence 已暴露该 purpose 强信号，必须选择该 DOI，或在对应 rejection 中明确说明同 DOI 为什么不适合作为该 purpose fixture。
 
 ## `extra_fixtures`
 

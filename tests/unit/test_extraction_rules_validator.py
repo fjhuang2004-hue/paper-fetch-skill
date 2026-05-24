@@ -256,7 +256,7 @@ class ExtractionRulesValidatorUnitTests(unittest.TestCase):
             errors = validator.validate_provider_rule_registry()
 
         self.assertIn(
-            "REGISTERED_NOISE_PROFILES stale/missing profile(s): ieee, mdpi, pnas, springer_nature",
+            "REGISTERED_NOISE_PROFILES stale/missing profile(s): annualreviews, ieee, mdpi, pnas, springer_nature",
             errors,
         )
         self.assertIn(

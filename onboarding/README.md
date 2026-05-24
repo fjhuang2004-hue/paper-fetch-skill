@@ -8,6 +8,7 @@
 - `onboarding/access-reviews/<name>.yml` 是 operator 对合法访问、runtime、challenge/CAPTCHA 和临时站点策略的批准记录；未批准时 coordinator 不进入 discovery。
 - `onboarding/provider-manifest.schema.json` 定义 provider manifest schema。
 - `onboarding/manifests/<name>.yml` 是单 provider 的 routing、fixture、probe、asset profile、sync-back 和 docs fact base。
+- `onboarding/manifests/<name>.yml` 中的 `fixtures.discovery_proof` 强制记录 `table`、`formula`、`supplementary` 的候选检索矩阵；`validate-manifest` 会阻断缺失 proof、query 不足、`selected_doi` 不一致，以及与本地 fixture/cleaning evidence 矛盾的 null purpose。
 - `onboarding/reviews/<name>.yml` 是 fixture 代表性和最终 Markdown 语义审查 artifact；acceptance 不接受只写在 worker 回复里的审查结果。
 - `onboarding/instruction.md` 是可复用 `/goal` provider onboarding 执行入口，按 manifest contract 驱动从零新增或继续实现 provider。
 - `onboarding/runbook.md` 是不同使用场景的入口索引，说明从零实现、已有 manifest 继续、查漏补缺、单 DOI quality repair 和 blocked state 恢复该用哪条命令。
@@ -65,7 +66,7 @@ The provider DAG is fixed:
 12. `global-lint`
 13. `merge-ready`
 
-`operator-access-preflight` validates `onboarding/access-reviews/<name>.yml` before discovery. `propose-cleaning-chain` runs after fixture capture and before scaffold, writing compact proposal/evidence artifacts bound to fixture digests. `start --provider` includes all 13 tasks and writes discovery plus implementation briefs. `start --manifest` skips `discover-manifest`, reads provider identity from manifest YAML, and still starts with the access preflight gate.
+`operator-access-preflight` validates `onboarding/access-reviews/<name>.yml` before discovery. `validate-manifest` validates schema plus discovery proof sufficiency for `table`、`formula`、`supplementary`; null optional purposes are accepted only after an exhausted candidate search is recorded and local evidence does not contradict it. `propose-cleaning-chain` runs after fixture capture and before scaffold, writing compact proposal/evidence artifacts bound to fixture digests. `start --provider` includes all 13 tasks and writes discovery plus implementation briefs. `start --manifest` skips `discover-manifest`, reads provider identity from manifest YAML, and still starts with the access preflight gate.
 
 ## Required Verification
 

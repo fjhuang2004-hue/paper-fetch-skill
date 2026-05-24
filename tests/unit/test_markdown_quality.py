@@ -21,6 +21,7 @@ BASE = {
 def test_prompt_contains_review_task_paths_contract_and_semantic_risks() -> None:
     prompt = build_markdown_quality_prompt(
         **BASE,
+        purpose="supplementary",
         report_path="tests/fixtures/golden_criteria/10.1234_demo/markdown-quality.json",
     )
 
@@ -28,9 +29,11 @@ def test_prompt_contains_review_task_paths_contract_and_semantic_risks() -> None
     assert "Read the Markdown as a human reviewer" in prompt
     assert BASE["markdown_path"] in prompt
     assert BASE["prompt_path"] in prompt
+    assert "Fixture purpose: `supplementary`" in prompt
     assert "schema_version" in prompt
     assert '"review_method": "agent_prompt"' in prompt
     assert "Semantic Risks To Check" in prompt
+    assert "asset_contract.figures.purposes" in prompt
     assert "Broken tables" in prompt
     assert "References" in prompt
 
@@ -38,6 +41,7 @@ def test_prompt_contains_review_task_paths_contract_and_semantic_risks() -> None
 def test_fresh_prompt_requires_rereading_current_extracted_markdown() -> None:
     prompt = build_fresh_markdown_quality_prompt(
         **BASE,
+        purpose="formula",
         report_path=".paper-fetch-runs/demo/fresh-markdown-quality.json",
         markdown_sha256="a" * 64,
     )
@@ -45,6 +49,7 @@ def test_fresh_prompt_requires_rereading_current_extracted_markdown() -> None:
     assert "Fresh Markdown Quality Review" in prompt
     assert "Open and read the current Markdown file from disk" in prompt
     assert "Fresh report to write" in prompt
+    assert "Fixture purpose: `formula`" in prompt
     assert BASE["markdown_path"] in prompt
     assert '"fresh_review": true' in prompt
 

@@ -1,113 +1,134 @@
 # Provider Onboarding Runbook
 
-本文说明不同使用场景下如何选择 `/goal` runbook 和本地 coordinator 命令。权威输入仍是 `onboarding/` 目录；本文只做入口索引，不替代 manifest、access review、task brief、hard constraints 或 acceptance contract。
+本文是 provider onboarding 的三阶段 operator runbook，只负责说明阶段入口、人工审核点和可复制的 `/goal` 提示词。权威输入仍是 `onboarding/` 下的 schema、manifest、access review、provider review、hard constraints、failure recovery 和 acceptance 文档；本文不替代这些文件，也不提供脚本命令或 shell recipe。
 
-## Quick Decision Table
+## 使用原则
 
-| 场景 | 使用入口 | 适用条件 |
-|---|---|---|
-| 从零添加 provider | `/goal follow onboarding/instruction.md 添加 <provider> provider` | 只有 provider 名称、domain 或 DOI prefix，需要 discovery、capture、scaffold、实现、验收全链路 |
-| 已有 manifest 继续实现 | `python3 scripts/onboard_from_manifests.py run --manifest onboarding/manifests/<provider>.yml --until merge-ready` | manifest 已存在，想从当前 state 继续推进到 merge-ready |
-| 已有 provider 查漏补缺 | `summarize` + `diagnose` + `run-checks --all-local` | provider 已有实现，需要找缺失 fixture、review、snapshot、contract 或 acceptance 缺口 |
-| 单 DOI snapshot/quality 修复 | `check-snapshot`、`snapshot_expected.py`、`repair-markdown-quality` | 某个 DOI 的 `expected.json`、`extracted.md`、正文 figure 内联、fresh Markdown review 或 `markdown-quality.json` 缺失、过期或 fail |
-| blocked state 恢复 | `diagnose` + `resume-blocked --dry-run` | state 中 provider 已 blocked，需要按 failure code 决定能否续跑 |
-| 只做本地验收 | `python3 scripts/onboard_from_manifests.py run-checks --provider <provider> --all-local` | 不想推进 DAG，只想验证当前工作区状态 |
+Provider onboarding 按三段推进：先做准入批准和启动上下文确认，再审 fixture 证据与覆盖，最后收口实现并完成 Markdown 语义终审。每一段都要求 operator 明确检查对应 artifact，而不是只接受 worker 的自然语言总结。
 
-## Codex Goal Templates
+准入阶段只判断是否允许继续访问和启动，不批准未审核的 access review。Fixture 阶段只判断 manifest 样本、discovery proof、null purpose 和本地 fixture 证据是否足以支撑实现，不提前承担 Markdown 终审。实现收口阶段才阅读当前 `extracted.md`、真实 `markdown-quality.json` 和 `onboarding/reviews/<provider>.yml`，并决定是否可以写入最终语义签字。
 
-从零实现：
+## 1. 准入与启动
 
-```text
-/goal follow onboarding/instruction.md 添加 <provider> provider，domain 是 <domain>。
-默认用本机 codex exec 派发 worker；只有需要 override 时才设置 PROVIDER_ONBOARDING_AGENT_CLI。不触发 GitHub CI，不提交 commit。
-遇到 access review、challenge、captcha、样本不可用或 retry exhaustion 时停止并报告 structured error code。
-```
+### 目标
 
-已有 manifest 继续实现：
+确认 provider 的访问策略已经由 operator 人工批准，并把后续 worker 的边界固定在 `onboarding/` 权威输入内。该阶段关注能否合法、稳定、可审计地开始 discovery 或继续已有 manifest，不评估 fixture 质量，也不签署 Markdown 语义审查。
+
+### `/goal` 提示词
 
 ```text
-/goal follow onboarding/instruction.md 继续实现 provider <provider>。
-优先运行 python3 scripts/onboard_from_manifests.py run --manifest onboarding/manifests/<provider>.yml --until merge-ready。
-只使用 onboarding/ 权威输入和项目脚本；不要触发 GitHub CI，不要自动批准 access review。
+/goal 按 onboarding/ 权威输入启动 provider <provider> 的 onboarding 准入阶段。
+
+目标：只完成 access review 人工批准状态、启动上下文和 worker 边界检查；不要实现 provider，不要捕获 fixture，不要签署 Markdown 语义审查。
+
+边界：
+- 只使用 onboarding/access-reviews/<provider>.yml、onboarding/hard-constraints.md、onboarding/failure-recovery.md、onboarding/acceptance.md 和相关 manifest/schema 文档判断是否可继续。
+- 不自动把 access review 草稿改成 approved，也不自动设置 may_continue。
+- 遇到登录、challenge、CAPTCHA、paywall、临时站点策略不清楚或访问异常时停止并报告原因。
+- 不触发 GitHub CI，不提交 commit。
+
+完成后输出：当前 access review 状态、是否允许进入 fixture/discovery 阶段、阻塞原因和需要 operator 人工决定的事项。
 ```
 
-查漏补缺：
+### 人工审核点
+
+- `onboarding/access-reviews/<provider>.yml` 是否存在、符合 schema，且 `status` 与 `may_continue` 是 operator 真实批准后的结果。
+- 访问策略是否清楚说明 runtime、登录需求、challenge/CAPTCHA/paywall 风险、限流风险和允许的抓取方式。
+- `onboarding/hard-constraints.md` 中的 worker scope 是否能约束后续任务，尤其是不得绕过访问控制、不得写 secrets、不得触碰禁止路径。
+- provider 名称、domain、DOI prefix 或已有 manifest 是否与启动目标一致，避免把一个 provider 的批准用于另一个 provider。
+
+### 通过标准
+
+- access review 已人工批准，且没有未解释的访问异常。
+- 后续 worker 的输入范围、可写路径和停止条件清楚。
+- operator 明确同意进入下一阶段；未批准、低信任或访问状态不明时必须停下报告。
+
+## 2. Fixture 检测
+
+### 目标
+
+检查 manifest 中的 fixture 覆盖、discovery proof 和本地 fixture 证据是否足以支撑实现。该阶段只审样本代表性和证据链，不把 `markdown_semantic_reviewed` 设为最终通过，也不替代实现后的 Markdown 终审。
+
+### `/goal` 提示词
 
 ```text
-/goal 对已有 provider <provider> 做 onboarding 查漏补缺。
-先运行 summarize、diagnose、run-checks --all-local 找缺口；按缺口使用 check-snapshot、snapshot_expected.py、repair-markdown-quality 或 resume-blocked。
-不要自动把 markdown_semantic_reviewed 改为 true，不要改 access approval，不触发 GitHub CI。
+/goal 检测 provider <provider> 的 fixture 覆盖与代表性。
+
+目标：审查 onboarding/manifests/<provider>.yml 中的 DOI samples、extra fixtures、discovery proof、null purpose 说明、本地 fixture 路径和样本证据，判断是否足以进入实现阶段。
+
+边界：
+- 只评估 fixture 选择、证据充分性、覆盖范围和与 manifest contract 的一致性。
+- 对 table、formula、supplementary 的 discovery proof，检查 queries、candidates、selected_doi、rejections、exhausted 和 evidence_summary 是否能证明选择或 null 结论。
+- 对低置信、样本不可用、proof 与本地 fixture/cleaning evidence 矛盾、null purpose 解释不足的情况，不自动通过。
+- 不提前签署 markdown_semantic_reviewed: true；Markdown 语义终审留到实现收口阶段。
+- 不触发 GitHub CI，不提交 commit。
+
+完成后输出：每个 fixture purpose 的 DOI、confidence、代表性判断、缺失或矛盾证据、是否允许进入实现阶段。
 ```
 
-Markdown quality repair：
+### 人工审核点
+
+- `fixtures.doi_samples` 是否覆盖必需 purpose；`structure`、`figure`、`references` 是否为非空 DOI。
+- 每个非空 DOI 是否有可审计的 `evidence_url`、`evidence_reason`、`observed_signals` 和可信的 `confidence`。
+- `fixtures.discovery_proof` 是否对 `table`、`formula`、`supplementary` 记录足够查询、候选、拒绝理由和选择依据。
+- `doi: null` 的 optional purpose 是否真的有耗尽证据；若本地 fixture 或 cleaning evidence 已显示相关信号，null 结论必须重新审查。
+- `extra_fixtures` 是否补充了结构广度，而不是替代固定 purpose 的必需覆盖。
+- 本地 fixture 路径是否与 manifest DOI 和 purpose 对应，且样本不是 access gate、空壳或错误页伪装成正文。
+
+### 通过标准
+
+- 每个必需 fixture purpose 都有明确、可追溯、与本地证据一致的结论。
+- 低置信样本已被解释并由 operator 接受，或被替换为更可靠样本。
+- null purpose 有充分 exhausted proof，且没有与本地证据矛盾。
+- Fixture 阶段只给出进入实现的许可，不给出 Markdown 语义终审许可。
+
+## 3. 剩余实现与 Markdown 终审
+
+### 目标
+
+完成 provider 实现收口、本地验收和最终 Markdown 语义审查。该阶段必须基于当前 `extracted.md`、真实 `markdown-quality.json` 和 `onboarding/reviews/<provider>.yml` 做判断，不能只依赖旧报告、worker 回复或 bootstrap 草稿。
+
+### `/goal` 提示词
 
 ```text
-/goal 修复 provider <provider> 的 DOI <doi> Markdown quality failure。
-先运行 check-snapshot 或 repair-markdown-quality；链路会通过默认 codex exec 或 PROVIDER_ONBOARDING_AGENT_CLI override 重新读取当前 extracted.md 做 fresh review，不再只信旧 markdown-quality.json。
-使用 python3 scripts/onboard_from_manifests.py repair-markdown-quality --provider <provider> --doi <doi>。
+/goal 收口 provider <provider> 的剩余实现并完成 Markdown 终审。
+
+目标：根据 onboarding/manifests/<provider>.yml、onboarding/reviews/<provider>.yml、当前 fixture extracted.md 和真实 markdown-quality.json，完成 provider-local 实现验收、Markdown quality 修复确认、figure asset 终审和最终 review artifact 检查。
+
+边界：
+- 所有实现判断必须回到 manifest 的 route_contract、markdown_contract、asset_contract 和 hard constraints。
+- 阅读当前 extracted.md，而不是只信旧的 markdown-quality.json 或 worker 总结。
+- markdown-quality.json 必须是对应当前 extracted.md 的真实审查记录；存在 blocking issue 时不得通过。
+- 只有完成真实语义审查后，才能接受 markdown_semantic_reviewed: true。
+- figure asset 终审必须确认正文内联位置、本地文件落盘、字节数和最终 Markdown 本地路径 rewrite；caption-only、remote-only 或缺少 provider-local 断言都不能通过。
+- 不触发 GitHub CI，不提交 commit。
+
+完成后输出：剩余实现状态、本地验收结果、每个 fixture 的 Markdown 语义结论、figure asset 结论、review artifact 是否可作为最终通过依据。
 ```
 
-## Command Recipes
+### 人工审核点
 
-从零或继续跑全链路：
+- provider-local 测试是否覆盖每个非空 fixture purpose、每个 `route_contract` step，以及 `markdown_contract` 的正向和负向断言。
+- `extracted.md` 是否包含预期正文、结构、引用、表格、公式、图片或补充材料信号，并排除站点 chrome、access noise、重复 boilerplate 和错误页内容。
+- `markdown-quality.json` 是否对应当前 `extracted.md`，且没有 fresh blocking issue。
+- `onboarding/reviews/<provider>.yml` 是否为 durable artifact：包含每个非空 fixture 和 `extra_fixtures` 的路径、sha256、review notes、issues、assertions、fixes、`sample_representative: true` 和真实的 `markdown_semantic_reviewed: true`。
+- `issues` 和 `fixes` 是否使用稳定 id，且每个 fix 都引用现有 issue 并列出 provider-local 测试。
+- `asset_contract.figures.inline: body` 时，正文中的 Markdown 图片是否位于 References/Figures/Supplementary 等尾部 section 之前。
+- `asset_contract.figures.download: required` 时，provider-local 断言是否覆盖本地文件路径、字节数、asset result state 和最终 Markdown 链接重写。
 
-```bash
-python3 scripts/onboard_from_manifests.py run \
-  --provider <provider> \
-  --domain <domain> \
-  --output-dir .paper-fetch-runs/<provider>-onboarding
+### 终审通过标准
 
-python3 scripts/onboard_from_manifests.py run \
-  --manifest onboarding/manifests/<provider>.yml \
-  --until merge-ready
-```
+- 实现只修改允许的 provider-owned 文件和 review artifact，没有触碰禁止路径或中心 provider-specific 逻辑。
+- 本地验收通过，且失败、跳过或 warning 都有明确解释。
+- 当前 `extracted.md`、`markdown-quality.json` 和 `onboarding/reviews/<provider>.yml` 三者一致。
+- 每个非空 fixture 和 `extra_fixtures` 都完成真实语义审查；没有 TODO、TBD、unknown 或 bootstrap 占位。
+- figure asset contract 满足 manifest 要求；不满足时必须阻塞并说明原因。
 
-查漏补缺和恢复：
+## 通用边界
 
-```bash
-python3 scripts/onboard_from_manifests.py summarize \
-  --provider <provider> \
-  --format markdown \
-  --output .paper-fetch-runs/<provider>-onboarding/summary.md
-
-python3 scripts/onboard_from_manifests.py diagnose --provider <provider>
-python3 scripts/onboard_from_manifests.py resume-blocked --provider <provider> --dry-run
-python3 scripts/onboard_from_manifests.py run-checks --provider <provider> --all-local
-```
-
-单 DOI snapshot 和 quality：
-
-```bash
-PYTHONPATH=src python3 scripts/snapshot_expected.py --doi "<doi>" --review
-PYTHONPATH=src python3 scripts/snapshot_expected.py --doi "<doi>"
-python3 scripts/onboard_from_manifests.py check-snapshot --provider <provider> --doi "<doi>"
-
-python3 scripts/onboard_from_manifests.py repair-markdown-quality \
-  --provider <provider> \
-  --doi "<doi>" \
-  --output-dir .paper-fetch-runs/<provider>-markdown-repair
-```
-
-`check-snapshot` 每次都会派发 fresh Markdown quality worker 读取当前 `extracted.md`，临时报告写入 `.paper-fetch-runs/<provider>-markdown-quality-audit/<doi_slug>/attempt-N/`。full `run` 在 `snapshot-expected` 阶段遇到 fresh blocking issue 时会自动调 `repair-markdown-quality`，单独运行 `check-snapshot` 只负责阻断并报告问题。
-
-有 `asset_contract.figures.inline: body` 的 provider，snapshot/quality 修复必须确认 `extracted.md` 正文中有 `![Figure ...](...)`，且图片出现在 References/Figures/Supplementary 等尾部 section 之前。`download: required` 还必须由 provider-local marker `asset-download-contract: provider=<provider>` 覆盖本地文件落盘、字节数和最终 Markdown 本地路径 rewrite。
-
-## Guardrails
-
-- 默认 worker dispatch 是本机 `codex exec --cd <repo-root> --sandbox workspace-write -c approval_policy="never" -`；`PROVIDER_ONBOARDING_AGENT_CLI` 仅用于 operator override。不要从脚本里接入 LLM SDK。
-- `markdown-quality.json` 是持久审查记录，不是唯一 gate；fresh review 和持久报告都必须无 blocking issue。
-- figure asset contract 是 blocking gate；caption-only `## Figures`、远程-only 图片链接或缺少 provider-local 下载断言都不能作为通过依据。
-- coordinator 负责 state、验证、snapshot、changed-path scope 检查和 failure recovery；worker 只做 brief 允许的窄范围任务。
-- access review 必须由 operator 批准；脚本和 worker 不得把 blocked 草稿升级为 approved。
-- `markdown_semantic_reviewed: true` 只能来自真实语义签字；bootstrap 和 repair 都不能自动设置。
-- 不触发 GitHub CI；本地验收使用 repo-local commands。
-- 多 provider 或多 DOI repair 不要在同一个工作区并发写入；需要并行时使用独立 worktree 后由 coordinator 串行合并。
-
-## Expected Outputs
-
-- Coordinator state：`onboarding/onboarding-state.json`，包含 runs、verifications 和 repairs 摘要。
-- DAG/worker logs：`.paper-fetch-runs/<provider>-onboarding/`。
-- Markdown repair logs：`.paper-fetch-runs/<provider>-markdown-repair/markdown-quality/<doi_slug>/attempt-N/`。
-- Fresh Markdown quality audit logs：`.paper-fetch-runs/<provider>-markdown-quality-audit/<doi_slug>/attempt-N/`。
-- Operator digest：`.paper-fetch-runs/<provider>-onboarding/summary.md`。
-- Review artifact：`onboarding/reviews/<provider>.yml`，acceptance 不接受只写在 worker 回复里的审查结论。
+- 不自动批准 access review；`status: approved` 和 `may_continue: true` 只能来自 operator 人工决定。
+- 不自动登录、处理 CAPTCHA、绕过 challenge 或 paywall，也不发明临时站点策略。
+- 不自动签 `markdown_semantic_reviewed: true`；该字段只能来自对当前 `extracted.md` 的真实语义审查。
+- 不触发 GitHub CI；验收以本地、repo-owned artifact 和 acceptance 文档为准。
+- 低置信 fixture、样本不可用、null purpose 证据不足、访问异常、retry exhaustion 或 blocked state 必须停下报告原因。
+- Worker 回复和临时日志只能作为辅助材料；最终判断以 manifest、fixture、quality report、review artifact 和本地验收结果为准。

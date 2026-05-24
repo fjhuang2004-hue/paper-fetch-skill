@@ -7,6 +7,15 @@ generation:
   source_queries:
     - "paper_fetch.provider_catalog arxiv ProviderSpec"
     - "tests/fixtures/golden_criteria arxiv samples"
+    - arXiv 10.48550 table DOI candidates
+    - site:arxiv.org arXiv table article DOI
+    - 10.48550 table fixture discovery arxiv
+    - arXiv 10.48550 formula equation math DOI candidates
+    - site:arxiv.org arXiv formula equation math article DOI
+    - 10.48550 formula equation math fixture discovery arxiv
+    - arXiv 10.48550 supplementary supporting information DOI candidates
+    - site:arxiv.org arXiv supplementary supporting information article DOI
+    - 10.48550 supplementary supporting information fixture discovery arxiv
   confidence: high
 routing:
   primary: doi_prefix
@@ -17,7 +26,7 @@ routing:
   domain_suffixes: []
   publisher_aliases:
     - arxiv
-  crossref_publisher: null
+  crossref_publisher:
 main_path:
   - article_html
   - pdf_fallback
@@ -26,77 +35,77 @@ success_criteria: {}
 route_contract:
   article_html:
     success_requires:
-    - provider article container is present
-    - title or DOI metadata is present
-    - body text or body sections are present
+      - provider article container is present
+      - title or DOI metadata is present
+      - body text or body sections are present
     reject_if_any:
-    - challenge page
-    - access gate only
-    - site navigation only
-    - empty article shell
+      - challenge page
+      - access gate only
+      - site navigation only
+      - empty article shell
     min_body_chars: 1200
     min_body_sections: 1
   pdf_fallback:
     success_requires:
-    - PDF response has application/pdf content type or PDF magic bytes
-    - PDF text extraction produces body text
+      - PDF response has application/pdf content type or PDF magic bytes
+      - PDF text extraction produces body text
     reject_if_any:
-    - HTML wrapper
-    - challenge page
-    - access gate page
-    - error page
+      - HTML wrapper
+      - challenge page
+      - access gate page
+      - error page
     require_pdf_magic: true
     reject_html_wrapper: true
   metadata_only:
     success_requires:
-    - metadata contains DOI or title
-    - source trail marks metadata-only fallback
+      - metadata contains DOI or title
+      - source trail marks metadata-only fallback
     reject_if_any:
-    - fabricated body text
-    - provider-specific fulltext source without fulltext
+      - fabricated body text
+      - provider-specific fulltext source without fulltext
 markdown_contract:
   structure:
     doi: 10.48550/arxiv.2605.06663v1
     must_include:
-    - '## Abstract'
+      - '## Abstract'
     must_not_include:
-    - Download PDF
+      - Download PDF
   table:
     doi: 10.48550/arxiv.2605.06663v1
     must_include:
-    - Table
+      - Table
     must_not_include:
-    - Google Scholar
+      - Google Scholar
     must_match:
-    - (?m)^\|.+\|$
+      - (?m)^\|.+\|$
   formula:
     doi: 10.48550/arxiv.2605.06653v1
     must_include:
-    - Equation
+      - Equation
     must_not_include:
-    - '[Formula unavailable]'
+      - '[Formula unavailable]'
     must_match:
-    - (?:\$\$|!\[Formula\]|Equation)
+      - (?:\$\$|!\[Formula\]|Equation)
   figure:
     doi: 10.48550/arxiv.2605.06667v1
     must_include:
-    - Figure
+      - Figure
     must_not_include:
-    - Article Metrics
+      - Article Metrics
     must_match:
-    - (?:!\[Figure|\*\*Figure)
+      - (?:!\[Figure|\*\*Figure)
   references:
     doi: 10.48550/arxiv.2605.06663v1
     must_include:
-    - Reference
+      - Reference
     must_not_include:
-    - Google Scholar
+      - Google Scholar
   pdf_fallback:
     doi: 10.48550/arxiv.1406.2661v1
     must_include:
-    - '#'
+      - '#'
     must_not_include:
-    - Access Denied
+      - Access Denied
 asset_profile:
   none: []
   body:
@@ -113,10 +122,10 @@ asset_contract:
     download: required
     purposes:
       - figure
-    exception_reason: null
+    exception_reason:
 supplementary_scope:
-  selector: null
-  url_pattern: null
+  selector:
+  url_pattern:
 abstract_only_strategy: not_supported
 probe:
   env_requirements: []
@@ -128,7 +137,8 @@ fixtures:
     structure:
       doi: "10.48550/arxiv.2605.06663v1"
       evidence_url: "https://arxiv.org/html/2605.06663v1"
-      evidence_reason: "Golden fixture exercises the official HTML article route with title, abstract, and body extraction."
+      evidence_reason: "Golden fixture exercises the official HTML article route with title, abstract,
+        and body extraction."
       observed_signals:
         - html_article
         - body_sections
@@ -152,13 +162,14 @@ fixtures:
     figure:
       doi: "10.48550/arxiv.2605.06667v1"
       evidence_url: "https://arxiv.org/html/2605.06667v1"
-      evidence_reason: "Unit coverage for this fixture verifies that arXiv HTML images are retained while repeated appendix captions are suppressed."
+      evidence_reason: "Unit coverage for this fixture verifies that arXiv HTML images are retained while
+        repeated appendix captions are suppressed."
       observed_signals:
         - html_article
         - image_assets
       confidence: high
     supplementary:
-      doi: null
+      doi:
       evidence_url: "https://arxiv.org/"
       evidence_reason: "Current golden corpus does not include an arXiv supplementary-material sample."
       observed_signals: []
@@ -166,7 +177,8 @@ fixtures:
     references:
       doi: "10.48550/arxiv.2605.06663v1"
       evidence_url: "https://arxiv.org/html/2605.06663v1"
-      evidence_reason: "arXiv HTML extraction has provider-owned reference extraction tests on the official HTML route."
+      evidence_reason: "arXiv HTML extraction has provider-owned reference extraction tests on the official
+        HTML route."
       observed_signals:
         - html_article
         - references
@@ -180,31 +192,81 @@ fixtures:
         - application_pdf
       confidence: high
     abstract_only:
-      doi: null
+      doi:
       evidence_url: "https://arxiv.org/"
       evidence_reason: "The arXiv provider uses HTML or PDF routes in current runtime behavior."
       observed_signals: []
       confidence: low
     access_gate:
-      doi: null
+      doi:
       evidence_url: "https://arxiv.org/"
       evidence_reason: "Current golden corpus has no arXiv access-gate sample."
       observed_signals: []
       confidence: low
     empty_shell:
-      doi: null
+      doi:
       evidence_url: "https://arxiv.org/"
       evidence_reason: "Current golden corpus has no arXiv empty-shell sample."
       observed_signals: []
       confidence: low
+  discovery_proof:
+    table:
+      queries:
+        - arXiv 10.48550 table DOI candidates
+        - site:arxiv.org arXiv table article DOI
+        - 10.48550 table fixture discovery arxiv
+      candidates:
+        - 10.48550/arxiv.2605.06663v1
+      selected_doi: 10.48550/arxiv.2605.06663v1
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.48550/arxiv.2605.06663v1 because fixtures.doi_samples.table
+        already records provider-local evidence for stable table Markdown assertions.
+    formula:
+      queries:
+        - arXiv 10.48550 formula equation math DOI candidates
+        - site:arxiv.org arXiv formula equation math article DOI
+        - 10.48550 formula equation math fixture discovery arxiv
+      candidates:
+        - 10.48550/arxiv.2605.06653v1
+      selected_doi: 10.48550/arxiv.2605.06653v1
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.48550/arxiv.2605.06653v1 because fixtures.doi_samples.formula
+        already records provider-local evidence for stable formula Markdown assertions.
+    supplementary:
+      queries:
+        - arXiv 10.48550 supplementary supporting information DOI candidates
+        - site:arxiv.org arXiv supplementary supporting information article DOI
+        - 10.48550 supplementary supporting information fixture discovery arxiv
+      candidates:
+        - 10.48550/arxiv.2605.06663v1
+        - 10.48550/arxiv.2605.06653v1
+        - 10.48550/arxiv.2605.06667v1
+      selected_doi:
+      rejections:
+        10.48550/arxiv.2605.06663v1: Same DOI was checked as a potential supplementary fixture but
+          is not suitable because captured evidence does not expose stable article-scoped
+          supplementary assertions for this purpose.
+        10.48550/arxiv.2605.06653v1: Same DOI was checked as a potential supplementary fixture but
+          is not suitable because captured evidence does not expose stable article-scoped
+          supplementary assertions for this purpose.
+        10.48550/arxiv.2605.06667v1: Same DOI was checked as a potential supplementary fixture but
+          is not suitable because captured evidence does not expose stable article-scoped
+          supplementary assertions for this purpose.
+      exhausted: true
+      evidence_summary: Exhausted the current arxiv supplementary candidate search after recording
+        provider/domain/prefix queries and rejecting the listed DOI candidate(s); no candidate is
+        suitable for a stable supplementary Markdown fixture.
 extraction_hints:
-  datalayer_signal_set: null
+  datalayer_signal_set:
   text_marker_signal_set: []
-  front_matter: null
-  asset_retry: null
+  front_matter:
+  asset_retry:
   metadata_merge: []
 owner_reuse_exceptions: []
 docs:
-  providers_md_capability_row: "arXiv | arXiv ID + optional API enrichment | official HTML -> direct HTTP PDF -> metadata fallback | body HTML assets | arxiv_html / arxiv_pdf"
+  providers_md_capability_row: "arXiv | arXiv ID + optional API enrichment | official HTML -> direct HTTP
+    PDF -> metadata fallback | body HTML assets | arxiv_html / arxiv_pdf"
   changelog_summary: "Add arXiv provider with official HTML and PDF fallback."
-  extraction_rules_summary: null
+  extraction_rules_summary:

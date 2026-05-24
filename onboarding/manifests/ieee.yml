@@ -9,6 +9,15 @@ generation:
     - "tests/fixtures/golden_criteria ieee samples"
     - "tests/unit/test_ieee_provider_pdf_golden.py"
     - "tests/unit/test_ieee_provider_routes.py"
+    - IEEE 10.1109 table DOI candidates
+    - site:ieeexplore.ieee.org IEEE table article DOI
+    - 10.1109 table fixture discovery ieee
+    - IEEE 10.1109 formula equation math DOI candidates
+    - site:ieeexplore.ieee.org IEEE formula equation math article DOI
+    - 10.1109 formula equation math fixture discovery ieee
+    - IEEE 10.1109 supplementary supporting information DOI candidates
+    - site:ieeexplore.ieee.org IEEE supplementary supporting information article DOI
+    - 10.1109 supplementary supporting information fixture discovery ieee
   confidence: high
 routing:
   primary: doi_prefix
@@ -20,7 +29,7 @@ routing:
   publisher_aliases:
     - ieee
     - institute of electrical and electronics engineers
-  crossref_publisher: null
+  crossref_publisher:
 main_path:
   - landing_html
   - article_html
@@ -30,97 +39,97 @@ success_criteria: {}
 route_contract:
   landing_html:
     success_requires:
-    - provider landing page resolves a fulltext route or fallback candidate
-    - response is not a browser challenge or empty shell
+      - provider landing page resolves a fulltext route or fallback candidate
+      - response is not a browser challenge or empty shell
     reject_if_any:
-    - challenge page
-    - empty shell
+      - challenge page
+      - empty shell
     notes: Landing HTML is discovery-only unless the provider declares it as article content.
   article_html:
     success_requires:
-    - provider article container is present
-    - title or DOI metadata is present
-    - body text or body sections are present
+      - provider article container is present
+      - title or DOI metadata is present
+      - body text or body sections are present
     reject_if_any:
-    - challenge page
-    - access gate only
-    - site navigation only
-    - empty article shell
+      - challenge page
+      - access gate only
+      - site navigation only
+      - empty article shell
     min_body_chars: 1200
     min_body_sections: 1
   pdf_fallback:
     success_requires:
-    - PDF response has application/pdf content type or PDF magic bytes
-    - PDF text extraction produces body text
+      - PDF response has application/pdf content type or PDF magic bytes
+      - PDF text extraction produces body text
     reject_if_any:
-    - HTML wrapper
-    - challenge page
-    - access gate page
-    - error page
+      - HTML wrapper
+      - challenge page
+      - access gate page
+      - error page
     require_pdf_magic: true
     reject_html_wrapper: true
   abstract_only:
     success_requires:
-    - provider-managed page or payload exposes abstract text
-    - source trail marks abstract-only degradation
+      - provider-managed page or payload exposes abstract text
+      - source trail marks abstract-only degradation
     reject_if_any:
-    - empty shell
-    - fulltext body misclassified as abstract-only
+      - empty shell
+      - fulltext body misclassified as abstract-only
 markdown_contract:
   structure:
     doi: 10.1109/ACCESS.2024.3352924
     must_include:
-    - '**Abstract.**'
+      - '**Abstract.**'
     must_not_include:
-    - Download PDF
+      - Download PDF
   table:
     doi: 10.1109/TBME.2024.3434477
     must_include:
-    - Table
+      - Table
     must_not_include:
-    - Google Scholar
+      - Google Scholar
     must_match:
-    - (?m)^\|.+\|$
+      - (?m)^\|.+\|$
   formula:
     doi: 10.1109/CICTN64563.2025.10932570
     must_include:
-    - '$$'
+      - '$$'
     must_not_include:
-    - '[Formula unavailable]'
+      - '[Formula unavailable]'
     must_match:
-    - (?:\$\$|!\[Formula\]|Equation)
+      - (?:\$\$|!\[Formula\]|Equation)
   figure:
     doi: 10.1109/TIM.2024.3509573
     must_include:
-    - Figure
+      - Figure
     must_not_include:
-    - Article Metrics
+      - Article Metrics
     must_match:
-    - (?:!\[Figure|\*\*Figure)
+      - (?:!\[Figure|\*\*Figure)
   supplementary:
     doi: 10.1109/RITA.2026.3668995
     must_include:
-    - Computational Thinking Assessment Instrument
+      - Computational Thinking Assessment Instrument
     must_not_include:
-    - Download Citation
+      - Download Citation
   references:
     doi: 10.1109/ACCESS.2024.3352924
     must_include:
-    - Reference
+      - Reference
     must_not_include:
-    - Google Scholar
+      - Google Scholar
   pdf_fallback:
     doi: 10.1109/MPER.1985.5526567
     must_include:
-    - '#'
+      - '#'
     must_not_include:
-    - Access Denied
+      - Access Denied
   abstract_only:
     doi: 10.1109/PGEC.1967.264619
     must_include:
-    - '## Abstract'
+      - '## Abstract'
     must_not_include:
-    - Download PDF
+      - Download PDF
 asset_profile:
   none: []
   body:
@@ -138,10 +147,10 @@ asset_contract:
     download: required
     purposes:
       - figure
-    exception_reason: null
+    exception_reason:
 supplementary_scope:
-  selector: null
-  url_pattern: null
+  selector:
+  url_pattern:
 abstract_only_strategy: provider_managed
 probe:
   env_requirements: []
@@ -153,7 +162,8 @@ fixtures:
     structure:
       doi: "10.1109/ACCESS.2024.3352924"
       evidence_url: "https://ieeexplore.ieee.org/document/10388355/"
-      evidence_reason: "Provider-local golden tests verify IEEE Xplore HTML structure, sections, references, and Markdown cleanup."
+      evidence_reason: "Provider-local golden tests verify IEEE Xplore HTML structure, sections, references,
+        and Markdown cleanup."
       observed_signals:
         - html_article
         - body_sections
@@ -161,7 +171,8 @@ fixtures:
     table:
       doi: "10.1109/TBME.2024.3434477"
       evidence_url: "https://ieeexplore.ieee.org/document/10612240/"
-      evidence_reason: "Provider-local tests verify IEEE table assets and table-kind preservation from a real fixture."
+      evidence_reason: "Provider-local tests verify IEEE table assets and table-kind preservation from
+        a real fixture."
       observed_signals:
         - html_article
         - body_table
@@ -169,7 +180,8 @@ fixtures:
     formula:
       doi: "10.1109/CICTN64563.2025.10932570"
       evidence_url: "https://ieeexplore.ieee.org/document/10932570/"
-      evidence_reason: "Provider-local tests verify IEEE formula extraction and absence of formula-unavailable placeholders."
+      evidence_reason: "Provider-local tests verify IEEE formula extraction and absence of formula-unavailable
+        placeholders."
       observed_signals:
         - html_article
         - math_markup
@@ -177,7 +189,8 @@ fixtures:
     figure:
       doi: "10.1109/TIM.2024.3509573"
       evidence_url: "https://ieeexplore.ieee.org/document/10772041/"
-      evidence_reason: "Provider-local tests verify IEEE figure and table markers from the recorded TIM fixture."
+      evidence_reason: "Provider-local tests verify IEEE figure and table markers from the recorded TIM
+        fixture."
       observed_signals:
         - html_article
         - figures
@@ -185,7 +198,8 @@ fixtures:
     supplementary:
       doi: "10.1109/RITA.2026.3668995"
       evidence_url: "https://ieeexplore.ieee.org/document/11417163/"
-      evidence_reason: "Provider-local manifest-shape tests record IEEE multimedia and supplementary assets for a real fixture."
+      evidence_reason: "Provider-local manifest-shape tests record IEEE multimedia and supplementary assets
+        for a real fixture."
       observed_signals:
         - html_article
         - multimedia
@@ -193,7 +207,8 @@ fixtures:
     references:
       doi: "10.1109/ACCESS.2024.3352924"
       evidence_url: "https://ieeexplore.ieee.org/document/10388355/"
-      evidence_reason: "Provider-local tests verify IEEE raw citation text overrides DOI-only metadata references."
+      evidence_reason: "Provider-local tests verify IEEE raw citation text overrides DOI-only metadata
+        references."
       observed_signals:
         - html_article
         - references
@@ -201,7 +216,8 @@ fixtures:
     pdf_fallback:
       doi: "10.1109/MPER.1985.5526567"
       evidence_url: "https://ieeexplore.ieee.org/document/5526567/"
-      evidence_reason: "Provider-local tests exercise legacy IEEE PDF fallback candidates and text-only PDF article assembly."
+      evidence_reason: "Provider-local tests exercise legacy IEEE PDF fallback candidates and text-only
+        PDF article assembly."
       observed_signals:
         - pdf_fallback
         - landing_html
@@ -209,31 +225,73 @@ fixtures:
     abstract_only:
       doi: "10.1109/PGEC.1967.264619"
       evidence_url: "https://ieeexplore.ieee.org/document/4038993/"
-      evidence_reason: "Provider-local tests verify IEEE provider-managed abstract-only return when PDF fallback reaches an access challenge."
+      evidence_reason: "Provider-local tests verify IEEE provider-managed abstract-only return when PDF
+        fallback reaches an access challenge."
       observed_signals:
         - abstract_only
         - pdf_fallback_failed
       confidence: high
     access_gate:
-      doi: null
+      doi:
       evidence_url: "https://ieeexplore.ieee.org/"
       evidence_reason: "Current recorded fixtures do not include a stable IEEE access-gate sample."
       observed_signals: []
       confidence: low
     empty_shell:
-      doi: null
+      doi:
       evidence_url: "https://ieeexplore.ieee.org/"
       evidence_reason: "Current recorded fixtures do not include a stable IEEE empty-shell sample."
       observed_signals: []
       confidence: low
+  discovery_proof:
+    table:
+      queries:
+        - IEEE 10.1109 table DOI candidates
+        - site:ieeexplore.ieee.org IEEE table article DOI
+        - 10.1109 table fixture discovery ieee
+      candidates:
+        - 10.1109/TBME.2024.3434477
+      selected_doi: 10.1109/TBME.2024.3434477
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.1109/TBME.2024.3434477 because fixtures.doi_samples.table
+        already records provider-local evidence for stable table Markdown assertions.
+    formula:
+      queries:
+        - IEEE 10.1109 formula equation math DOI candidates
+        - site:ieeexplore.ieee.org IEEE formula equation math article DOI
+        - 10.1109 formula equation math fixture discovery ieee
+      candidates:
+        - 10.1109/CICTN64563.2025.10932570
+      selected_doi: 10.1109/CICTN64563.2025.10932570
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.1109/CICTN64563.2025.10932570 because
+        fixtures.doi_samples.formula already records provider-local evidence for stable formula
+        Markdown assertions.
+    supplementary:
+      queries:
+        - IEEE 10.1109 supplementary supporting information DOI candidates
+        - site:ieeexplore.ieee.org IEEE supplementary supporting information article DOI
+        - 10.1109 supplementary supporting information fixture discovery ieee
+      candidates:
+        - 10.1109/RITA.2026.3668995
+      selected_doi: 10.1109/RITA.2026.3668995
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.1109/RITA.2026.3668995 because
+        fixtures.doi_samples.supplementary already records provider-local evidence for stable
+        supplementary Markdown assertions.
 extraction_hints:
-  datalayer_signal_set: null
+  datalayer_signal_set:
   text_marker_signal_set: []
-  front_matter: null
-  asset_retry: null
+  front_matter:
+  asset_retry:
   metadata_merge: []
 owner_reuse_exceptions: []
 docs:
-  providers_md_capability_row: "IEEE | Crossref merge + landing metadata | clean-browser HTML -> seeded-browser PDF | HTML body/all assets; PDF fallback is text-only | ieee_html / ieee_pdf"
-  changelog_summary: "Track IEEE implemented provider manifest for Xplore HTML, PDF fallback, and asset onboarding sync."
-  extraction_rules_summary: null
+  providers_md_capability_row: "IEEE | Crossref merge + landing metadata | clean-browser HTML -> seeded-browser
+    PDF | HTML body/all assets; PDF fallback is text-only | ieee_html / ieee_pdf"
+  changelog_summary: "Track IEEE implemented provider manifest for Xplore HTML, PDF fallback, and asset
+    onboarding sync."
+  extraction_rules_summary:

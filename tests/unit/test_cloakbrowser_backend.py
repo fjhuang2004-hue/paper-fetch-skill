@@ -11,6 +11,7 @@ from paper_fetch.providers.browser_workflow.html_extraction import (
     fetch_html_with_fast_browser,
 )
 from paper_fetch.providers.browser_workflow.fetchers.readiness import (
+    atypon_body_ready_selectors,
     wait_for_atypon_body_dom_ready,
 )
 from paper_fetch.runtime import RuntimeContext
@@ -487,6 +488,59 @@ def test_fetch_html_with_fast_browser_returns_pnas_html_when_body_dom_ready_desp
     assert page.wait_calls == [750]
     assert len(page.evaluate_calls) == 2
     assert browser_context.closed is True
+
+
+def test_atypon_body_ready_selectors_include_annualreviews_fulltext_containers() -> None:
+    selectors = atypon_body_ready_selectors("annualreviews")
+
+    assert "#itemFullTextId" in selectors
+    assert "#html_fulltext" in selectors
+    assert ".articleSection" in selectors
+
+
+def test_atypon_body_dom_readiness_waits_for_annualreviews_dynamic_body() -> None:
+    body_text = "Annual Reviews article body text with enough substance. " * 12
+    page = _ReadinessFakePage(
+        html="<html><body><div>Full text loading...</div></body></html>",
+        readiness_payloads=[
+            _not_ready_payload(
+                selector="#itemFullTextId",
+                text_length=len("Full text loading..."),
+                paragraph_count=0,
+            ),
+            _ready_payload(
+                selector="#itemFullTextId",
+                text_length=len(body_text),
+                paragraph_count=2,
+                heading_count=1,
+            ),
+            _ready_payload(
+                selector="#itemFullTextId",
+                text_length=len(body_text),
+                paragraph_count=2,
+                heading_count=1,
+            ),
+        ],
+    )
+
+    result = wait_for_atypon_body_dom_ready(
+        page,
+        "annualreviews",
+        timeout_seconds=3,
+    )
+
+    assert result.attempted is True
+    assert result.ready is True
+    assert result.selector == "#itemFullTextId"
+    assert result.text_length == len(body_text)
+    assert result.paragraph_count == 2
+    assert result.heading_count == 1
+    assert page.wait_calls == [750, 750]
+    assert page.evaluate_calls[0][1]["selectors"] == [
+        "#itemFullTextId",
+        "#html_fulltext",
+        ".articleSection",
+    ]
 
 
 def test_atypon_body_dom_readiness_rejects_short_body_dom() -> None:

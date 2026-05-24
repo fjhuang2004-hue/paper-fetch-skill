@@ -8,6 +8,15 @@ generation:
   - MDPI DOI prefix 10.3390 browser article pages
   - doi.org handle redirects for MDPI article URL evidence
   - CloakBrowser probes of MDPI article pages
+  - MDPI 10.3390 table DOI candidates
+  - site:www.mdpi.com MDPI table article DOI
+  - 10.3390 table fixture discovery mdpi
+  - MDPI 10.3390 formula equation math DOI candidates
+  - site:www.mdpi.com MDPI formula equation math article DOI
+  - 10.3390 formula equation math fixture discovery mdpi
+  - MDPI 10.3390 supplementary supporting information DOI candidates
+  - site:www.mdpi.com MDPI supplementary supporting information article DOI
+  - 10.3390 supplementary supporting information fixture discovery mdpi
   confidence: high
 routing:
   primary: doi_prefix
@@ -234,6 +243,44 @@ fixtures:
         empty-shell block fixture is collected for onboarding.
       observed_signals: []
       confidence: high
+  discovery_proof:
+    table:
+      queries:
+      - MDPI 10.3390 table DOI candidates
+      - site:www.mdpi.com MDPI table article DOI
+      - 10.3390 table fixture discovery mdpi
+      candidates:
+      - 10.3390/su12072826
+      selected_doi: 10.3390/su12072826
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.3390/su12072826 because fixtures.doi_samples.table
+        already records provider-local evidence for stable table Markdown assertions.
+    formula:
+      queries:
+      - MDPI 10.3390 formula equation math DOI candidates
+      - site:www.mdpi.com MDPI formula equation math article DOI
+      - 10.3390 formula equation math fixture discovery mdpi
+      candidates:
+      - 10.3390/math11030657
+      selected_doi: 10.3390/math11030657
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.3390/math11030657 because fixtures.doi_samples.formula
+        already records provider-local evidence for stable formula Markdown assertions.
+    supplementary:
+      queries:
+      - MDPI 10.3390 supplementary supporting information DOI candidates
+      - site:www.mdpi.com MDPI supplementary supporting information article DOI
+      - 10.3390 supplementary supporting information fixture discovery mdpi
+      candidates:
+      - 10.3390/s23010001
+      selected_doi: 10.3390/s23010001
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.3390/s23010001 because fixtures.doi_samples.supplementary
+        already records provider-local evidence for stable supplementary Markdown
+        assertions.
 extra_fixtures:
 - purpose: structure
   doi: 10.3390/foods10081757

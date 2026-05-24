@@ -6,10 +6,19 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+### Added
+
+- Add Annual Reviews (`annualreviews`) provider for `10.1146/` DOI routing, CloakBrowser-rendered HTML full text, seeded-browser PDF fallback, provider-managed abstract-only degradation, fixture replay, golden corpus coverage, and HTML body figure extraction.
+
 - Add Royal Society Publishing direct HTTP HTML provider with strict PDF fallback.
 
 ### Fixed
 
+- Wait for Annual Reviews dynamic full-text DOM containers during fast browser fixture capture, and stop treating institutional "access provided by" labels as paywall blockers while keeping them as Markdown cleanup noise.
+- Classify browser PDF fixture downloads that return non-PDF payloads as `NON_PDF_FALLBACK_CONTENT` instead of a network transient, and require replacing the failed PDF sample before onboarding resumes.
+- Refetch browser PDF fallback responses through the browser request context when Chromium exposes a PDF viewer shell instead of the underlying PDF bytes.
+- Allow manifest-driven fixture capture to reuse an already registered DOI fixture when multiple onboarding purposes share the same article.
+- Avoid classifying publisher access UI as an access gate during fixture capture when the captured page has a populated full-text container.
 - Preserved Royal Society Publishing Silverchair figure captions and stripped Royal Society PDF fallback watermark/page placeholder noise from Markdown.
 - Derived DOI values for known MDPI numeric article URLs before generic landing-page fetches, and derived MDPI article landing URLs from known MDPI DOI suffixes before falling back to `doi.org`.
 - Replaced invalid UTF-8 bytes from external formula converter subprocess output instead of letting Windows reader threads raise `UnicodeDecodeError`.

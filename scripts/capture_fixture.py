@@ -21,6 +21,7 @@ if SRC_PATH.is_dir() and str(SRC_PATH) not in sys.path:
 
 from _structured_errors import ToolError, emit_error, error_payload  # noqa: E402
 from paper_fetch.config import build_user_agent  # noqa: E402
+from paper_fetch.extraction.html.parsing import choose_parser  # noqa: E402
 from paper_fetch.extraction.html.signals import CHALLENGE_PATTERNS, contains_access_gate_text, summarize_html  # noqa: E402
 from paper_fetch.http import (  # noqa: E402
     HttpTransport,
@@ -30,6 +31,8 @@ from paper_fetch.http import (  # noqa: E402
 )  # noqa: E402
 from paper_fetch.publisher_identity import infer_provider_from_doi, normalize_doi  # noqa: E402
 from paper_fetch.utils import normalize_text  # noqa: E402
+
+from bs4 import BeautifulSoup  # noqa: E402
 
 
 HTTP_REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
@@ -54,6 +57,14 @@ PURPOSE_ALIASES = {
 CLI_PURPOSES = sorted(set(PURPOSES) | set(PURPOSE_ALIASES))
 RETRY_VIA_ERROR_CODES = {"HTTP_FORBIDDEN", "HTTP_RATE_LIMITED", "CHALLENGE_DETECTED"}
 ACCESS_REVIEW_DIR = REPO_ROOT / "onboarding" / "access-reviews"
+FULLTEXT_CONTAINER_SELECTORS = (
+    "#itemFullTextId",
+    "#html_fulltext",
+    ".articleSection",
+    "article",
+    "main",
+)
+MIN_FULLTEXT_CONTAINER_TEXT_CHARS = 1200
 
 
 class CaptureArgumentParser(argparse.ArgumentParser):
@@ -514,6 +525,18 @@ def _looks_empty_article_shell(content_type: str, body: bytes) -> bool:
     return not text and "<html" in html.lower()
 
 
+def _has_populated_fulltext_container(html: str) -> bool:
+    try:
+        soup = BeautifulSoup(html, choose_parser())
+    except Exception:
+        return False
+    for selector in FULLTEXT_CONTAINER_SELECTORS:
+        for node in soup.select(selector):
+            if len(normalize_text(node.get_text(" ", strip=True))) >= MIN_FULLTEXT_CONTAINER_TEXT_CHARS:
+                return True
+    return False
+
+
 def _validate_capture_response(
     *,
     response: dict[str, Any],
@@ -563,11 +586,16 @@ def _validate_capture_response(
         raise CaptureFixtureError(
             "NON_PDF_FALLBACK_CONTENT",
             "pdf_fallback sample did not return PDF content",
-            retryable=False,
+            retryable=True,
             status_code=status_code,
             route=route,
         )
-    if purpose != "access_gate" and _is_html_response(content_type, body) and contains_access_gate_text(body_text):
+    if (
+        purpose != "access_gate"
+        and _is_html_response(content_type, body)
+        and contains_access_gate_text(body_text)
+        and not _has_populated_fulltext_container(body_text)
+    ):
         raise CaptureFixtureError(
             "ACCESS_GATE_CAPTURED",
             "captured HTML is an access gate instead of the requested fixture purpose",
@@ -661,6 +689,16 @@ def _browser_capture_error(
         return CaptureFixtureError(
             "CHALLENGE_DETECTED",
             message or "publisher returned a challenge page while capturing fixture",
+            retryable=True,
+            route=route,
+        )
+    if normalized_reason in {
+        "downloaded_file_not_pdf",
+        "pdf_download_not_triggered",
+    }:
+        return CaptureFixtureError(
+            "NON_PDF_FALLBACK_CONTENT",
+            message or "pdf_fallback sample did not return PDF content",
             retryable=True,
             route=route,
         )
@@ -834,6 +872,42 @@ def capture_fixture(args: argparse.Namespace) -> dict[str, Any]:
     slug = doi_slug(doi)
     provider = provider or infer_provider_from_doi(doi) or "unknown"
     source_url = _manifest_evidence_url(manifest.sample if manifest else None) or f"https://doi.org/{doi}"
+    reuse_content_type = "application/pdf" if purpose == "pdf_fallback" else "text/html"
+    reuse_fixture_path = _fixture_path(root, slug, purpose, reuse_content_type)
+    manifest_path = root / "tests" / "fixtures" / "golden_criteria" / "manifest.json"
+    fixture_manifest = _load_manifest(manifest_path)
+    samples = fixture_manifest["samples"]
+    if (
+        not args.force
+        and not args.dry_run
+        and slug in samples
+        and reuse_fixture_path.exists()
+    ):
+        existing_entry = samples.get(slug) if isinstance(samples.get(slug), dict) else {}
+        summary = {
+            "status": "OK",
+            "reused": True,
+            "doi": doi,
+            "dry_run": False,
+            "fixture_path": reuse_fixture_path.relative_to(root).as_posix(),
+            "manifest_sample_id": slug,
+            "manifest_entry": existing_entry,
+            "content_type": existing_entry.get("content_type") or reuse_content_type,
+            "bytes": reuse_fixture_path.stat().st_size,
+            "route": existing_entry.get("route_kind") or _extension_for(reuse_content_type, purpose),
+            "capture_route": "reused",
+            "route_kind": existing_entry.get("route_kind") or _extension_for(reuse_content_type, purpose),
+            "purpose": purpose,
+            "provider": provider,
+        }
+        if getattr(args, "from_manifest", None):
+            provider_manifest = getattr(args, "_manifest_context", None) or _manifest_context(getattr(args, "from_manifest", None), purpose)
+            summary["manifest"] = str(args.from_manifest)
+            summary["manifest_sample"] = _manifest_evidence(provider_manifest.sample if provider_manifest else None)
+            summary["evidence_confidence"] = (provider_manifest.sample or {}).get("confidence") if provider_manifest else None
+            summary["provider_routing"] = provider_manifest.routing if provider_manifest else {}
+            summary["manifest_sample_path"] = provider_manifest.sample_path if provider_manifest else None
+        return summary
 
     fetched_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     if args.dry_run:
@@ -885,9 +959,6 @@ def capture_fixture(args: argparse.Namespace) -> dict[str, Any]:
                 raise
 
     fixture_path = _fixture_path(root, slug, purpose, content_type)
-    manifest_path = root / "tests" / "fixtures" / "golden_criteria" / "manifest.json"
-    manifest = _load_manifest(manifest_path)
-    samples = manifest["samples"]
     exists = fixture_path.exists() or slug in samples
     if exists and not args.force and not args.dry_run:
         raise CaptureFixtureError(
@@ -937,7 +1008,7 @@ def capture_fixture(args: argparse.Namespace) -> dict[str, Any]:
     fixture_path.parent.mkdir(parents=True, exist_ok=True)
     fixture_path.write_bytes(body)
     samples[slug] = entry
-    _write_manifest(manifest_path, manifest)
+    _write_manifest(manifest_path, fixture_manifest)
     return summary
 
 

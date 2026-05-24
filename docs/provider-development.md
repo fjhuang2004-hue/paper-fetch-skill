@@ -266,7 +266,7 @@ Provider-specific 代码只负责：
 - 在自己的 provider entry module 顶部 `register_provider_bundle(ProviderBundle(...))` 声明 `ProviderSpec`、`ProviderHtmlRules` 和 availability data。bundle 内的 HTML rules 持有 publisher cleanup profile、Markdown promo tokens、availability site rule、access-block tokens、availability policy、公式 container/selector、supplementary 文本扩展和必要 alias；运行时通过 bundle discovery 合成 DOM / Markdown 清洗规则。不要在 `_runtime.py`、`formula_rules.py`、`assets/supplementary.py`、`quality/issues.py`、`quality/html_signals.py` 或 `quality/html_availability.py` 直接追加 publisher 私有 token。
 - Provider-specific figure/table caption regex 可以保留行首锚定、caption remainder、Extended Data 变体或 ar5iv 兼容分支，但应复用 `common_patterns` 的 label core / prefix helper 或在旁边说明差异。
 - Provider HTML availability signal 也通过 bundle 内 `ProviderHtmlRules.availability` 声明；必须提供 `signal_set` 或显式 `no_signals=True`。
-- 新 access-gate 文案先登记到共享 `ACCESS_GATE_LABELS` 或 `ACCESS_GATE_PATTERNS`；Markdown 降噪复用 `MARKDOWN_ACCESS_NOISE_LABELS`，provider markdown/postprocess break tokens 只放非访问门的站点 chrome。
+- 新 access-gate 文案先登记到共享 `ACCESS_GATE_LABELS` 或 `ACCESS_GATE_PATTERNS`；只有会阻断全文访问的文案进入 `ACCESS_GATE_PATTERNS`，机构访问确认等非阻断提示只保留在 `MARKDOWN_ACCESS_NOISE_LABELS` 等降噪词表中。provider markdown/postprocess break tokens 只放非访问门的站点 chrome。
 - 定义 asset scope 和 fallback 候选。
 - 把提取结果写入 `ProviderContent.diagnostics`，而不是塞进 legacy metadata。
 

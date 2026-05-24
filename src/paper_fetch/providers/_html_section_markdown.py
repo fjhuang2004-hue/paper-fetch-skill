@@ -182,7 +182,7 @@ def render_container_markdown(
                 lines.extend([text, ""])
             continue
         if child.name == "pre":
-            text = render_clean_text_from_html(child)
+            text = normalize_text(child.get_text("\n", strip=False))
             if text:
                 lines.extend([text, ""])
             continue

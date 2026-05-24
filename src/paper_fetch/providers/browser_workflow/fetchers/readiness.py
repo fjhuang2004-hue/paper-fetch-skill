@@ -9,6 +9,11 @@ from ....provider_catalog import provider_body_text_thresholds
 from ....utils import normalize_text
 
 ATYPON_BODY_READY_SELECTORS: Mapping[str, tuple[str, ...]] = {
+    "annualreviews": (
+        "#itemFullTextId",
+        "#html_fulltext",
+        ".articleSection",
+    ),
     "wiley": (
         ".article-section__content.en.main",
         "section.article-section__content",

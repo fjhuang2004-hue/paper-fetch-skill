@@ -98,7 +98,6 @@ ACCESS_GATE_PATTERNS = (
     "login to your account",
     "subscribe to continue",
     "access through your institution",
-    ACCESS_GATE_ACCESS_PROVIDED_BY_LABEL,
     "rent or buy",
     "purchase this article",
     "purchase article",

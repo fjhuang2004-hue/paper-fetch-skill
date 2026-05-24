@@ -21,6 +21,8 @@ SourceKind = Literal[
     "mdpi_pdf",
     "royalsocietypublishing_html",
     "royalsocietypublishing_pdf",
+    "annualreviews_html",
+    "annualreviews_pdf",
     "ieee_html",
     "ieee_pdf",
     "arxiv_html",

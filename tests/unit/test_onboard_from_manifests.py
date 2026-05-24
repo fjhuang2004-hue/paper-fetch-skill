@@ -84,6 +84,9 @@ def test_help_includes_discover() -> None:
     result = run_cli("--help")
 
     assert "discover" in result.stdout
+    assert "prepare-discovery" in result.stdout
+    assert "autofix-manifest" in result.stdout
+    assert "inspect-discovery" in result.stdout
     assert "run" in result.stdout
     assert "diagnose" in result.stdout
     assert "resume-blocked" in result.stdout
@@ -137,6 +140,9 @@ def test_start_provider_dry_run_writes_dag_and_worker_briefs(tmp_path: Path) -> 
     assert implement_brief_path.is_file()
     assert "current_step: discover-manifest" in discover_brief
     assert "output_manifest: onboarding/manifests/mdpi.yml" in discover_brief
+    assert "evidence_pack:" in discover_brief
+    assert "contract_templates:" in discover_brief
+    assert "autofix_policy:" in discover_brief
     assert "domain: mdpi.com" in discover_brief
     assert implement_brief["task_id"] == "mdpi-implement-provider"
     assert implement_brief["provider_manifest"] == "onboarding/manifests/mdpi.yml"
@@ -256,6 +262,29 @@ def test_discover_prints_brief_with_requested_output_manifest() -> None:
     assert "current_step: discover-manifest" in result.stdout
     assert "output_manifest: onboarding/manifests/mdpi.yml" in result.stdout
     assert "access_review: onboarding/access-reviews/mdpi.yml" in result.stdout
+    assert "producer: prepare-discovery" in result.stdout
+
+
+def test_prepare_discovery_cli_no_network_writes_evidence_pack(tmp_path: Path) -> None:
+    result = run_cli(
+        "prepare-discovery",
+        "--provider",
+        "newpub",
+        "--domain",
+        "newpub.example",
+        "--doi-prefix",
+        "10.4242",
+        "--output-dir",
+        str(tmp_path),
+        "--no-network",
+    )
+    payload = json.loads(result.stdout)
+    pack = json.loads((tmp_path / "discovery" / "evidence-pack.json").read_text(encoding="utf-8"))
+
+    assert payload["provider"] == "newpub"
+    assert payload["network_enabled"] is False
+    assert pack["provider_seed"]["domain"] == "newpub.example"
+    assert len(pack["query_plan"]["table"]) == 3
 
 
 def test_start_manifest_replay_skips_discover_brief(tmp_path: Path) -> None:
@@ -708,6 +737,7 @@ print("worker ok")
     payload = json.loads(result.stdout)
 
     assert payload["executed"] == ["operator-access-preflight", "discover-manifest"]
+    assert (output_dir / "discovery" / "evidence-pack.json").is_file()
     assert (output_dir / "workers" / "discover-manifest-attempt-1.prompt.md").is_file()
     assert (
         output_dir / "workers" / "discover-manifest-attempt-1.stdout.log"
@@ -774,10 +804,51 @@ print("codex worker ok")
     assert record["argv"][0] == "exec"
     assert record["argv"][-1] == "-"
     assert "mdpi-discover-manifest" in record["prompt"]
+    assert "Discovery Evidence Pack Summary" in record["prompt"]
+    assert (output_dir / "discovery" / "evidence-pack.json").is_file()
     assert state["agent_cli"].startswith("codex exec --cd ")
     assert (
         output_dir / "workers" / "discover-manifest-attempt-1.stdout.log"
     ).read_text(encoding="utf-8") == "codex worker ok\n"
+
+
+def test_validate_manifest_runs_pre_and_targeted_autofix(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_script_module("onboard_from_manifests")
+    calls: list[bool] = []
+
+    def fake_autofix(**kwargs: object) -> dict[str, object]:
+        calls.append(bool(kwargs.get("targeted")))
+        return {
+            "changed": bool(kwargs.get("targeted")),
+            "changed_paths": ["fixtures.discovery_proof.table"],
+            "targeted": bool(kwargs.get("targeted")),
+        }
+
+    results = iter(
+        [
+            subprocess.CompletedProcess(
+                ["pytest"],
+                1,
+                "",
+                json.dumps({"code": "MANIFEST_SCHEMA_INVALID", "retryable": True}),
+            ),
+            subprocess.CompletedProcess(["pytest"], 0, "ok\n", ""),
+        ]
+    )
+    monkeypatch.setattr(module, "_autofix_manifest_for_runner", fake_autofix)
+    monkeypatch.setattr(module, "_run_env_command", lambda command: next(results))
+
+    module._execute_local_task(
+        provider="mdpi",
+        task="validate-manifest",
+        provider_state={"manifest": "onboarding/manifests/mdpi.yml"},
+        output_dir=tmp_path,
+    )
+
+    assert calls == [False, True]
 
 
 def test_run_checks_emits_structured_failure_for_missing_access_review(tmp_path: Path) -> None:
@@ -937,6 +1008,25 @@ def test_diagnose_reports_retryable_failure_and_recovery_action(tmp_path: Path) 
     assert diagnosis["failure"]["code"] == "NETWORK_TRANSIENT"
     assert diagnosis["failure"]["retryable"] is True
     assert "retry budget" in diagnosis["failure"]["action"]
+
+
+def test_resume_blocked_requires_pdf_fallback_sample_replacement(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    _write_blocked_state(state_path, code="NON_PDF_FALLBACK_CONTENT")
+
+    result = run_cli(
+        "resume-blocked",
+        "--provider",
+        "mdpi",
+        "--state",
+        str(state_path),
+        "--dry-run",
+    )
+    payload = json.loads(result.stdout)
+    plan = payload["resume_plan"]
+
+    assert plan["resumable"] is False
+    assert "failed pdf_fallback DOI sample must be replaced before retry" in plan["blockers"]
 
 
 def test_diagnose_ignores_stale_failure_for_completed_task(tmp_path: Path) -> None:

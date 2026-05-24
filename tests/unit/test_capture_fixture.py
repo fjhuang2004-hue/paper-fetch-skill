@@ -166,6 +166,46 @@ def test_capture_fixture_refuses_to_overwrite_without_force(tmp_path: Path, monk
     assert exc_info.value.code == "UNSUITABLE_DOI_SAMPLE"
 
 
+def test_capture_fixture_reuses_existing_manifest_sample_for_duplicate_purpose(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_script_module("capture_fixture")
+    fixture_path = tmp_path / "tests" / "fixtures" / "golden_criteria" / "10.1234_example" / "original.html"
+    fixture_path.parent.mkdir(parents=True)
+    fixture_path.write_text("<html>existing article</html>", encoding="utf-8")
+    manifest_path = tmp_path / "tests" / "fixtures" / "golden_criteria" / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "samples": {
+                    "10.1234_example": {
+                        "doi": "10.1234/example",
+                        "publisher": "examplepub",
+                        "content_type": "text/html",
+                        "route_kind": "html",
+                        "assets": {"original.html": str(fixture_path.relative_to(tmp_path))},
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FailingTransport:
+        def request(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+            raise AssertionError("existing duplicate fixture must be reused without fetching")
+
+    monkeypatch.setattr(module, "HttpTransport", FailingTransport)
+
+    summary = module.capture_fixture(_args(tmp_path))
+
+    assert summary["status"] == "OK"
+    assert summary["reused"] is True
+    assert summary["capture_route"] == "reused"
+    assert summary["bytes"] == len("<html>existing article</html>")
+
+
 def test_capture_fixture_routes_block_purpose_to_block_fixture_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_script_module("capture_fixture")
 
@@ -424,6 +464,57 @@ def test_capture_fixture_maps_challenge_html(tmp_path: Path, monkeypatch: pytest
     assert exc_info.value.code == "CHALLENGE_DETECTED"
 
 
+def test_capture_fixture_validation_allows_annualreviews_access_provided_by_fulltext() -> None:
+    module = load_script_module("capture_fixture")
+    body_text = "Annual Reviews full article section text with enough substance. " * 8
+    html = (
+        "<html><head><title>Annual Reviews Article</title></head><body>"
+        "<div>Access provided by: Peking University</div>"
+        f"<div id='itemFullTextId'><h2>Introduction</h2><p>{body_text}</p><p>{body_text}</p></div>"
+        "</body></html>"
+    )
+
+    content_type, body, final_url = module._validate_capture_response(
+        response={
+            "headers": {"content-type": "text/html; charset=utf-8"},
+            "body": html.encode("utf-8"),
+            "url": "https://www.annualreviews.org/content/journals/10.1146/example",
+            "status_code": 200,
+        },
+        purpose="structure",
+        route="browser",
+    )
+
+    assert content_type == "text/html; charset=utf-8"
+    assert body == html.encode("utf-8")
+    assert final_url == "https://www.annualreviews.org/content/journals/10.1146/example"
+
+
+def test_capture_fixture_validation_allows_access_ui_when_fulltext_container_is_populated() -> None:
+    module = load_script_module("capture_fixture")
+    body_text = "Annual Reviews full article section text with enough substance. " * 80
+    html = (
+        "<html><head><title>Annual Reviews Article</title></head><body>"
+        "<aside>Sign in to access your institutional or personal subscription.</aside>"
+        f"<main id='html_fulltext'><section class='articleSection'><h2>Introduction</h2><p>{body_text}</p></section></main>"
+        "</body></html>"
+    )
+
+    content_type, body, _final_url = module._validate_capture_response(
+        response={
+            "headers": {"content-type": "text/html; charset=utf-8"},
+            "body": html.encode("utf-8"),
+            "url": "https://www.annualreviews.org/content/journals/10.1146/example",
+            "status_code": 200,
+        },
+        purpose="references",
+        route="browser",
+    )
+
+    assert content_type == "text/html; charset=utf-8"
+    assert body == html.encode("utf-8")
+
+
 def test_capture_fixture_maps_non_pdf_fallback_content(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -444,6 +535,21 @@ def test_capture_fixture_maps_non_pdf_fallback_content(
         module.capture_fixture(_args(tmp_path, purpose="pdf_fallback"))
 
     assert exc_info.value.code == "NON_PDF_FALLBACK_CONTENT"
+    assert exc_info.value.retryable is True
+
+
+def test_capture_fixture_maps_browser_pdf_non_pdf_failure_to_non_pdf_content() -> None:
+    module = load_script_module("capture_fixture")
+
+    class BrowserPdfFailure(Exception):
+        kind = "downloaded_file_not_pdf"
+        message = "PDF fallback did not produce a PDF file."
+
+    error = module._browser_capture_error(BrowserPdfFailure(), route="browser")
+
+    assert error.code == "NON_PDF_FALLBACK_CONTENT"
+    assert error.retryable is True
+    assert error.route == "browser"
 
 
 def test_capture_fixture_maps_timeout_to_network_transient(

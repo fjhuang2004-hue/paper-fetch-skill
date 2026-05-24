@@ -2722,6 +2722,86 @@
         "markdown-quality.json": "tests/fixtures/golden_criteria/10.1098_rspb.2020.0097/markdown-quality.json",
         "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1098_rspb.2020.0097/markdown-quality-prompt.md"
       }
+    },
+    "10.1146_annurev-control-030123-013355": {
+      "doi": "10.1146/annurev-control-030123-013355",
+      "publisher": "annualreviews",
+      "source_url": "https://www.annualreviews.org/content/journals/10.1146/annurev-control-030123-013355",
+      "fetched_at": "2026-05-23T13:39:59Z",
+      "purpose": "figure",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/html;charset=UTF-8",
+      "route_kind": "html",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.html": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/original.html",
+        "expected.json": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/markdown-quality.json"
+      }
+    },
+    "10.1146_annurev-med-120811-171056": {
+      "doi": "10.1146/annurev-med-120811-171056",
+      "publisher": "annualreviews",
+      "source_url": "https://www.annualreviews.org/docserver/fulltext/med/65/1/annurev-med-120811-171056.pdf?expires=1779544513&id=id&accname=ar-387953&checksum=59CE5DF6C95684936821561B61D37FBC",
+      "fetched_at": "2026-05-23T13:40:08Z",
+      "purpose": "pdf_fallback",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "application/pdf",
+      "route_kind": "pdf_fallback",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.pdf": "tests/fixtures/golden_criteria/10.1146_annurev-med-120811-171056/original.pdf",
+        "expected.json": "tests/fixtures/golden_criteria/10.1146_annurev-med-120811-171056/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1146_annurev-med-120811-171056/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1146_annurev-med-120811-171056/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1146_annurev-med-120811-171056/markdown-quality.json"
+      }
+    },
+    "10.1146_annurev-environ-102511-084654": {
+      "doi": "10.1146/annurev-environ-102511-084654",
+      "publisher": "annualreviews",
+      "source_url": "https://www.annualreviews.org/content/journals/10.1146/annurev-environ-102511-084654",
+      "fetched_at": "2026-05-23T13:43:01Z",
+      "purpose": "references",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/html;charset=UTF-8",
+      "route_kind": "html",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.html": "tests/fixtures/golden_criteria/10.1146_annurev-environ-102511-084654/original.html",
+        "expected.json": "tests/fixtures/golden_criteria/10.1146_annurev-environ-102511-084654/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1146_annurev-environ-102511-084654/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1146_annurev-environ-102511-084654/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1146_annurev-environ-102511-084654/markdown-quality.json"
+      }
+    },
+    "10.1146_annurev-neuro-062111-150343": {
+      "doi": "10.1146/annurev-neuro-062111-150343",
+      "publisher": "annualreviews",
+      "source_url": "https://www.annualreviews.org/content/journals/10.1146/annurev-neuro-062111-150343",
+      "fetched_at": "2026-05-24T03:09:58Z",
+      "purpose": "supplementary",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/html;charset=UTF-8",
+      "route_kind": "html",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.html": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/original.html",
+        "expected.json": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/markdown-quality.json"
+      }
     }
   },
   "tests": [

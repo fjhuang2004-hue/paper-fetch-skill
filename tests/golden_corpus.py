@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import tempfile
 from typing import Any
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -19,6 +20,7 @@ from paper_fetch.providers import (
     _pnas_html,
     _science_html,
     _ams_html,
+    _annualreviews_html,
     _atypon_browser_workflow_profiles as atypon_browser_workflow_profiles,
     _arxiv_html,
     _ieee_html,
@@ -32,6 +34,7 @@ from paper_fetch.providers import (
     pnas as pnas_provider,
     science as science_provider,
     ams as ams_provider,
+    annualreviews as annualreviews_provider,
     mdpi as mdpi_provider,
     royalsocietypublishing as royalsocietypublishing_provider,
     springer as springer_provider,
@@ -51,7 +54,12 @@ from tests.golden_corpus_adapters import (
     register_golden_corpus_adapter,
     representative_golden_corpus_dois,
 )
-from tests.golden_criteria import golden_criteria_asset, golden_criteria_sample_for_doi, iter_manifest_samples
+from tests.golden_criteria import (
+    golden_criteria_asset,
+    golden_criteria_repo_path,
+    golden_criteria_sample_for_doi,
+    iter_manifest_samples,
+)
 
 
 @dataclass(frozen=True)
@@ -220,6 +228,7 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
     metadata = _base_metadata(fixture)
     client_map = {
         "ams": ams_provider.AmsClient,
+        "annualreviews": annualreviews_provider.AnnualreviewsClient,
         "mdpi": mdpi_provider.MdpiClient,
         "science": science_provider.ScienceClient,
         "pnas": pnas_provider.PnasClient,
@@ -277,6 +286,14 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
         fixture.source_url,
         metadata=metadata,
     )
+    downloaded_assets = (
+        _downloaded_annualreviews_body_assets(fixture, list(extraction.get("extracted_assets") or []))
+        if (
+            fixture.provider == "annualreviews"
+            and str(fixture.sample.get("purpose") or "") == "figure"
+        )
+        else []
+    )
     raw_payload = RawFulltextPayload(
         provider=fixture.provider,
         source_url=fixture.source_url,
@@ -292,11 +309,61 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
                 "extraction": extraction,
                 "availability_diagnostics": extraction.get("availability_diagnostics"),
             },
+            extracted_assets=list(extraction.get("extracted_assets") or []),
         ),
         trace=trace_from_markers([f"fulltext:{fixture.provider}_html_ok"]),
         merged_metadata=metadata,
     )
-    return client.to_article_model(metadata, raw_payload)
+    return client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+
+
+_FIXTURE_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+    b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
+    b"\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\xf8\x0f\x00\x01\x01\x01\x00"
+    b"\x18\xdd\x8d\xb0\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def _downloaded_annualreviews_body_assets(
+    fixture: GoldenCorpusFixture,
+    extracted_assets: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    downloaded: list[dict[str, Any]] = []
+    assets_dir = golden_criteria_asset(fixture.doi, "body_assets")
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    figure_index = 0
+    for item in extracted_assets:
+        if str(item.get("kind") or "").lower() != "figure":
+            continue
+        if str(item.get("section") or "body").lower() not in {"", "body"}:
+            continue
+        asset_url = str(
+            item.get("full_size_url")
+            or item.get("url")
+            or item.get("preview_url")
+            or ""
+        )
+        if not asset_url:
+            continue
+        figure_index += 1
+        suffix = Path(urlparse(asset_url).path).suffix or ".png"
+        asset_path = assets_dir / f"annualreviews-figure-{figure_index}{suffix}"
+        if not asset_path.exists():
+            asset_path.write_bytes(_FIXTURE_PNG_BYTES)
+        downloaded_asset = dict(item)
+        downloaded_asset.update(
+            {
+                "path": golden_criteria_repo_path(asset_path),
+                "download_url": asset_url,
+                "source_url": asset_url,
+                "content_type": "image/png",
+                "download_tier": "full_size",
+                "downloaded_bytes": asset_path.stat().st_size,
+            }
+        )
+        downloaded.append(downloaded_asset)
+    return downloaded
 
 
 def _ieee_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
@@ -762,6 +829,33 @@ def _lightweight_mdpi_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     }
 
 
+def _lightweight_annualreviews_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
+    if fixture.route_kind == "pdf_fallback":
+        return _article_model_positive_summary(_build_browser_workflow_article(fixture), fixture)
+    html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
+    metadata = parse_html_metadata(html_text, fixture.source_url)
+    article_html, title, _container_text_length, section_hints, abstract_sections = (
+        _annualreviews_html._cleaned_article_html(html_text, fixture.source_url)
+    )
+    client = annualreviews_provider.AnnualreviewsClient(HttpTransport(), {})
+    candidate_urls = client.html_candidates(
+        fixture.doi,
+        {"landing_page_url": fixture.landing_url},
+    )
+    return {
+        "doi": normalize_doi(str(metadata.get("doi") or fixture.doi)),
+        "has": {
+            "title": bool(normalize_text(title or metadata.get("title"))),
+            "authors": bool(_annualreviews_html.extract_authors(html_text)),
+            "abstract": bool(abstract_sections),
+            "body": bool(section_hints) or bool(normalize_text(article_html)),
+        },
+        "validated_fields": ("title", "authors", "abstract", "body"),
+        "blocking_fallback_signals": tuple(_annualreviews_html.blocking_fallback_signals(html_text)),
+        "source_candidate_hit": fixture.source_url in candidate_urls or fixture.landing_url in candidate_urls,
+    }
+
+
 def _lightweight_ieee_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     metadata = _ieee_fixture_metadata(fixture)
     html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
@@ -821,6 +915,29 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1175/jcli-d-23-0738.1",
+        )
+    )
+    register_golden_corpus_adapter(
+        GoldenCorpusAdapter(
+            provider="annualreviews",
+            build_article=_build_browser_workflow_article,
+            lightweight_summary=_lightweight_annualreviews_summary,
+            primary_contract=ProviderGoldenContract(
+                route_kind="html",
+                content_prefix="text/html",
+                source="annualreviews_html",
+                primary_marker="fulltext:annualreviews_html_ok",
+            ),
+            fallback_contracts={
+                "pdf_fallback": ProviderGoldenContract(
+                    route_kind="pdf_fallback",
+                    content_prefix="application/pdf",
+                    source="annualreviews_pdf",
+                    primary_marker="fulltext:annualreviews_pdf_fallback_ok",
+                ),
+            },
+            representative_doi="10.1146/annurev-control-030123-013355",
+            representative_count_fields=("sections", "abstract_sections", "body_sections"),
         )
     )
     register_golden_corpus_adapter(

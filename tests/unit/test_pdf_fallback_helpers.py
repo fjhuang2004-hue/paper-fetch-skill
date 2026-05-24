@@ -285,6 +285,67 @@ class PdfFallbackHelperTests(unittest.TestCase):
             ],
         )
 
+    def test_browser_pdf_viewer_html_response_refetches_pdf_from_request_context(self) -> None:
+        class FakeNavigationResponse:
+            headers = {"content-type": "application/pdf"}
+
+            def body(self) -> bytes:
+                return b"<!doctype html><html><body>PDF viewer shell</body></html>"
+
+        class FakeRequestResponse:
+            status = 200
+            headers = {
+                "content-type": "application/pdf",
+                "content-disposition": 'inline; filename="article.pdf"',
+            }
+
+            def body(self) -> bytes:
+                return b"%PDF-1.7 annualreviews"
+
+        class FakeRequestContext:
+            def __init__(self) -> None:
+                self.urls: list[str] = []
+
+            def get(self, url: str, **_kwargs: object) -> FakeRequestResponse:
+                self.urls.append(url)
+                return FakeRequestResponse()
+
+        request_context = FakeRequestContext()
+        page = types.SimpleNamespace(request=request_context)
+        expected = _pdf_common.PdfFetchResult(
+            source_url="https://example.org/doi/pdf/10.1146/example",
+            final_url="https://example.org/docserver/fulltext/example.pdf?token=1",
+            pdf_bytes=b"%PDF-1.7 annualreviews",
+            markdown_text="# Example",
+            suggested_filename="article.pdf",
+        )
+
+        with mock.patch.object(
+            _pdf_fallback,
+            "pdf_fetch_result_from_bytes",
+            side_effect=[
+                _pdf_common.PdfFetchFailure(
+                    "downloaded_file_not_pdf",
+                    "PDF fallback did not produce a PDF file.",
+                ),
+                expected,
+            ],
+        ) as mocked_from_bytes:
+            result = _pdf_fallback._response_to_pdf_result(
+                FakeNavigationResponse(),
+                artifact_dir=Path("/tmp/pdf"),
+                source_url="https://example.org/doi/pdf/10.1146/example",
+                final_url="https://example.org/docserver/fulltext/example.pdf?token=1",
+                page=page,
+            )
+
+        self.assertIs(result, expected)
+        self.assertEqual(
+            request_context.urls,
+            ["https://example.org/docserver/fulltext/example.pdf?token=1"],
+        )
+        self.assertEqual(mocked_from_bytes.call_args.kwargs["pdf_bytes"], b"%PDF-1.7 annualreviews")
+
     def test_extract_pdf_candidate_urls_from_html_finds_iframe_pdf_sources(self) -> None:
         html = """
         <html><body>

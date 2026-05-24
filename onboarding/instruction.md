@@ -19,6 +19,8 @@ python3 scripts/onboard_from_manifests.py run --manifest onboarding/manifests/<p
 
 runner 默认通过本机 Codex CLI（`codex exec --cd <repo-root> --sandbox workspace-write -c approval_policy="never" -`）派发 coding-agent-subagent；`PROVIDER_ONBOARDING_AGENT_CLI` 仅作为 operator override。runner 不能代替 operator 批准 access review，也不能把最终 Markdown 语义审查自动签为 true。snapshot gate 会每次重新读取当前 `extracted.md` 做 fresh Markdown quality review，不能只信旧 `markdown-quality.json`。
 
+从 `--provider` 种子启动时，runner 会在 discovery worker 前自动生成 `.paper-fetch-runs/<provider>-onboarding/discovery/evidence-pack.json`，并把 evidence pack 摘要、contract 模板和 autofix policy 写入 `discover-manifest` brief/prompt。Worker 仍负责写 manifest 初稿；coordinator 只在 validate 前后自动补机器可判的 schema/proof/contract 缺口。
+
 ## 目标
 
 新增或更新一个 provider，使项目可以对该 provider 的 DOI 或 article URL 走 provider-owned fulltext waterfall，返回结构化 `ArticleModel` / Markdown，并覆盖真实 DOI replay fixture、route 成功判定、Markdown Review Loop、资产语义、fallback、provider status 和文档同步。
@@ -61,9 +63,14 @@ runner 默认通过本机 Codex CLI（`codex exec --cd <repo-root> --sandbox wor
    - 检查 DAG 顺序和 generated briefs。
 3. 编写或修复 manifest：
    - 若缺少 `onboarding/access-reviews/<provider>.yml`，可用 `python3 scripts/backfill_access_reviews.py --provider <provider> --write` 生成 blocked 草稿；草稿不等于批准，operator 仍需补齐合法访问、allowed runtime、禁止行为、challenge 策略、临时站点策略并改为 `may_continue: true`。
-   - 填 `routing`、`main_path`、`route_contract`、`markdown_contract`、`asset_profile`、`asset_contract`、`supplementary_scope`、`probe`、`fixtures.doi_samples` 和 docs fact base。
+   - 如需单独检查 discovery 输入，运行 `python3 scripts/onboard_from_manifests.py prepare-discovery --provider <provider> --domain <domain> --doi-prefix <doi-prefix> --output-dir .paper-fetch-runs/<provider>-onboarding`；离线预检或单测使用 `--no-network`。
+   - 可用 `python3 scripts/onboard_from_manifests.py inspect-discovery --manifest onboarding/manifests/<provider>.yml --evidence-pack .paper-fetch-runs/<provider>-onboarding/discovery/evidence-pack.json` 查看候选、低置信度 purpose 和 proof 缺口。
+   - 填 `routing`、`main_path`、`route_contract`、`markdown_contract`、`asset_profile`、`asset_contract`、`supplementary_scope`、`probe`、`fixtures.doi_samples`、`fixtures.discovery_proof` 和 docs fact base。
+   - `fixtures.discovery_proof` 对 `table`、`formula`、`supplementary` 强制记录候选检索矩阵；每类至少 3 条 query、候选 DOI、未选候选拒绝原因，并且 `selected_doi` 必须与 `doi_samples` 一致。
+   - `table`、`formula`、`supplementary` 为 `doi: null` 时，`validate-manifest` 会要求 `discovery_proof.<purpose>.exhausted: true` 和具体拒绝理由；如果当前 fixture 或 cleaning evidence 已暴露同类强信号，必须补 DOI sample 或用同 DOI 写明不适合作为该 purpose fixture 的具体原因。
    - 填 `asset_contract.figures`：有可用 figure asset 的 fixture 必须 `inline: body`、`download: required`、`purposes: [figure]`；text-only PDF fallback、无可下载图片或 access/empty-shell 类样本才允许 `not_applicable`，且必须写明原因。
    - `success_criteria` 和 `extraction_hints` 是 sync-back 字段，初稿只放空对象、空数组或 null。
+   - `autofix-manifest --write` 只允许补结构容器、proof/source query 同步、contract 模板和 high-confidence DOI sample replacement；低置信候选只能进入 rejection/proof，不能自动替换样本。
    - 验证：`PYTHONPATH=src python3 -m pytest tests/unit/test_provider_manifest_schema.py -q`
 4. 捕获 fixtures：
    - 运行 `scripts/capture_fixture.py --from-manifest onboarding/manifests/<provider>.yml --all --auto-via --fail-fast`。

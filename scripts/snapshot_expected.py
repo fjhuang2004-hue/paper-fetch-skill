@@ -417,6 +417,7 @@ def snapshot_expected(args: argparse.Namespace) -> tuple[dict[str, Any], bool]:
         provider=str(sample.get("publisher") or ""),
         doi=doi,
         sample_id=sample_id,
+        purpose=str(sample.get("purpose") or ""),
         markdown_path=markdown_rel_path,
         prompt_path=prompt_rel_path,
         report_path=quality_rel_path,

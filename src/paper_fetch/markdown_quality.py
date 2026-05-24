@@ -24,9 +24,11 @@ def build_markdown_quality_prompt(
     markdown_path: str,
     prompt_path: str,
     report_path: str,
+    purpose: str | None = None,
 ) -> str:
     """Return the prompt an agent must use to author a Markdown quality report."""
 
+    purpose_line = f"- Fixture purpose: `{purpose}`\n" if purpose else ""
     report_template = {
         "schema_version": SCHEMA_VERSION,
         "review_method": REVIEW_METHOD,
@@ -51,6 +53,7 @@ def build_markdown_quality_prompt(
         f"- Provider: `{provider}`\n"
         f"- DOI: `{doi}`\n"
         f"- Sample ID: `{sample_id}`\n"
+        f"{purpose_line}"
         f"- Markdown to review: `{markdown_path}`\n"
         f"- Prompt path: `{prompt_path}`\n"
         f"- Report to write: `{report_path}`\n"
@@ -69,8 +72,9 @@ def build_markdown_quality_prompt(
         "- Publisher chrome, navigation, cookie text, license boilerplate, or download widgets mixed into article content.\n"
         "- Broken tables, orphan table rows, malformed formula blocks, or formula text glued to prose.\n"
         "- Missing figure captions, empty figure/table sections, or media placeholders presented as content.\n"
-        "- When the provider manifest has `asset_contract.figures.inline: body`, missing body `![Figure ...](...)` images before References/Figures/Supplementary tail sections is blocking; a caption-only `## Figures` appendix is not enough.\n"
-        "- When the provider manifest has `asset_contract.figures.download: required`, missing local asset-path rewrites for downloaded figure images is blocking; remote-only image links do not satisfy the asset contract.\n"
+        "- Enforce `asset_contract.figures` only when this fixture purpose is listed in the provider manifest `asset_contract.figures.purposes`; for other purposes, remote figure links are not blocking by themselves.\n"
+        "- For figure-contract purposes with `asset_contract.figures.inline: body`, missing body `![Figure ...](...)` images before References/Figures/Supplementary tail sections is blocking; a caption-only `## Figures` appendix is not enough.\n"
+        "- For figure-contract purposes with `asset_contract.figures.download: required`, missing local asset-path rewrites for downloaded figure images is blocking; remote-only image links do not satisfy the asset contract.\n"
         "- References that are absent when expected from the article, mostly DOI-only, duplicated, or polluted by unrelated text.\n"
         "- JavaScript placeholder links, unresolved template text, severe OCR noise, or repeated article fragments.\n"
         "- Any other semantic corruption that would make `extracted.md` unsafe as a golden Markdown baseline.\n"
@@ -101,9 +105,11 @@ def build_fresh_markdown_quality_prompt(
     prompt_path: str,
     report_path: str,
     markdown_sha256: str,
+    purpose: str | None = None,
 ) -> str:
     """Return a prompt for a fresh machine review of the current Markdown file."""
 
+    purpose_line = f"- Fixture purpose: `{purpose}`\n" if purpose else ""
     report_template = {
         "schema_version": SCHEMA_VERSION,
         "review_method": REVIEW_METHOD,
@@ -130,6 +136,7 @@ def build_fresh_markdown_quality_prompt(
         f"- Provider: `{provider}`\n"
         f"- DOI: `{doi}`\n"
         f"- Sample ID: `{sample_id}`\n"
+        f"{purpose_line}"
         f"- Markdown to read now: `{markdown_path}`\n"
         f"- Markdown SHA-256 at dispatch: `{markdown_sha256}`\n"
         f"- Standing review instructions: `{prompt_path}`\n"
@@ -148,7 +155,8 @@ def build_fresh_markdown_quality_prompt(
         "content; broken tables; orphan rows; malformed formula blocks; formula "
         "text glued into prose; empty figure/table sections; missing captions; "
         "missing body inline `![Figure ...](...)` images or local downloaded asset "
-        "paths when the provider manifest requires the figure asset contract; "
+        "paths only when this fixture purpose is listed in the provider manifest "
+        "`asset_contract.figures.purposes`; "
         "missing or DOI-only references; missing back matter; JavaScript links; "
         "unresolved template text; severe OCR noise; and repeated article fragments.\n"
         "\n"

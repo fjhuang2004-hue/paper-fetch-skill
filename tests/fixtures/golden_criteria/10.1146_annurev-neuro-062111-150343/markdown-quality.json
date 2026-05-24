@@ -1,0 +1,14 @@
+{
+  "blocking_issue_count": 0,
+  "doi": "10.1146/annurev-neuro-062111-150343",
+  "issues": [],
+  "markdown_path": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/extracted.md",
+  "prompt_path": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/markdown-quality-prompt.md",
+  "provider": "annualreviews",
+  "review_method": "agent_prompt",
+  "reviewed_at": "2026-05-24T03:22:45Z",
+  "reviewed_by": "codex-agent",
+  "sample_id": "10.1146_annurev-neuro-062111-150343",
+  "schema_version": 2,
+  "status": "pass"
+}

@@ -47,3 +47,7 @@ providers:
     display_source: royalsocietypublishing_html
     status: implemented
     manifest_path: onboarding/manifests/royalsocietypublishing.yml
+  - name: annualreviews
+    display_source: annualreviews_html
+    status: implemented
+    manifest_path: onboarding/manifests/annualreviews.yml

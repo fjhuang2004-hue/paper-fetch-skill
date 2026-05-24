@@ -80,6 +80,27 @@ class HtmlAccessSignalsTests(unittest.TestCase):
                 "institutional login",
             ],
         )
+        self.assertEqual(
+            matched_access_gate_patterns(
+                "Purchase access. Access through your institution. Sign in to access. "
+                "View access options."
+            ),
+            [
+                "purchase access",
+                "access through your institution",
+                "sign in to access",
+                "view access options",
+            ],
+        )
+
+    def test_access_provided_by_is_markdown_noise_not_access_gate(self) -> None:
+        text = "Access provided by: Peking University"
+
+        self.assertEqual(matched_access_gate_patterns(text), [])
+        self.assertIsNone(detect_html_block("Example article", text, 200))
+        self.assertIn("access provided by", ACCESS_GATE_LABELS)
+        self.assertIn("access provided by", MARKDOWN_ACCESS_NOISE_LABELS)
+        self.assertNotIn("access provided by", ACCESS_GATE_PATTERNS)
 
     def test_access_gate_labels_feed_markdown_noise_and_asset_blocking_vocabularies(
         self,

@@ -1,0 +1,14 @@
+{
+  "blocking_issue_count": 0,
+  "doi": "10.1146/annurev-control-030123-013355",
+  "issues": [],
+  "markdown_path": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/extracted.md",
+  "prompt_path": "tests/fixtures/golden_criteria/10.1146_annurev-control-030123-013355/markdown-quality-prompt.md",
+  "provider": "annualreviews",
+  "review_method": "agent_prompt",
+  "reviewed_at": "2026-05-24T02:30:08Z",
+  "reviewed_by": "agent",
+  "sample_id": "10.1146_annurev-control-030123-013355",
+  "schema_version": 2,
+  "status": "pass"
+}

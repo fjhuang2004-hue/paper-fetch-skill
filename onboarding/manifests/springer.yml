@@ -9,6 +9,15 @@ generation:
     - "tests/fixtures/golden_criteria springer samples"
     - "tests/unit/test_springer_html_regressions.py"
     - "tests/unit/test_springer_html_tables.py"
+    - Springer 10.1038 table DOI candidates
+    - site:springer.com Springer table article DOI
+    - 10.1038 table fixture discovery springer
+    - Springer 10.1038 formula equation math DOI candidates
+    - site:springer.com Springer formula equation math article DOI
+    - 10.1038 formula equation math fixture discovery springer
+    - Springer 10.1038 supplementary supporting information DOI candidates
+    - site:springer.com Springer supplementary supporting information article DOI
+    - 10.1038 supplementary supporting information fixture discovery springer
   confidence: high
 routing:
   primary: doi_prefix
@@ -26,7 +35,7 @@ routing:
     - springer
     - springer nature
     - springer science and business media llc
-  crossref_publisher: null
+  crossref_publisher:
 main_path:
   - article_html
   - pdf_fallback
@@ -36,96 +45,96 @@ success_criteria: {}
 route_contract:
   article_html:
     success_requires:
-    - provider article container is present
-    - title or DOI metadata is present
-    - body text or body sections are present
+      - provider article container is present
+      - title or DOI metadata is present
+      - body text or body sections are present
     reject_if_any:
-    - challenge page
-    - access gate only
-    - site navigation only
-    - empty article shell
+      - challenge page
+      - access gate only
+      - site navigation only
+      - empty article shell
     min_body_chars: 1200
     min_body_sections: 1
   pdf_fallback:
     success_requires:
-    - PDF response has application/pdf content type or PDF magic bytes
-    - PDF text extraction produces body text
+      - PDF response has application/pdf content type or PDF magic bytes
+      - PDF text extraction produces body text
     reject_if_any:
-    - HTML wrapper
-    - challenge page
-    - access gate page
-    - error page
+      - HTML wrapper
+      - challenge page
+      - access gate page
+      - error page
     require_pdf_magic: true
     reject_html_wrapper: true
   abstract_only:
     success_requires:
-    - provider-managed page or payload exposes abstract text
-    - source trail marks abstract-only degradation
+      - provider-managed page or payload exposes abstract text
+      - source trail marks abstract-only degradation
     reject_if_any:
-    - empty shell
-    - fulltext body misclassified as abstract-only
+      - empty shell
+      - fulltext body misclassified as abstract-only
   metadata_only:
     success_requires:
-    - metadata contains DOI or title
-    - source trail marks metadata-only fallback
+      - metadata contains DOI or title
+      - source trail marks metadata-only fallback
     reject_if_any:
-    - fabricated body text
-    - provider-specific fulltext source without fulltext
+      - fabricated body text
+      - provider-specific fulltext source without fulltext
 markdown_contract:
   structure:
     doi: 10.1038/s43247-024-01885-8
     must_include:
-    - '## Abstract'
+      - '## Abstract'
     must_not_include:
-    - Download PDF
+      - Download PDF
   table:
     doi: 10.1038/s43247-024-01295-w
     must_include:
-    - Table
+      - Table
     must_not_include:
-    - Google Scholar
+      - Google Scholar
     must_match:
-    - (?m)^\|.+\|$
+      - (?m)^\|.+\|$
   formula:
     doi: 10.1038/nature12915
     must_include:
-    - '![Formula]'
+      - '![Formula]'
     must_not_include:
-    - '[Formula unavailable]'
+      - '[Formula unavailable]'
     must_match:
-    - (?:\$\$|!\[Formula\]|Equation)
+      - (?:\$\$|!\[Formula\]|Equation)
   figure:
     doi: 10.1038/s41561-022-00912-7
     must_include:
-    - Figure
+      - Figure
     must_not_include:
-    - Article Metrics
+      - Article Metrics
     must_match:
-    - (?:!\[Figure|\*\*Figure)
+      - (?:!\[Figure|\*\*Figure)
   supplementary:
     doi: 10.1038/s41561-022-00912-7
     must_include:
-    - Supplementary
+      - Supplementary
     must_not_include:
-    - Download Citation
+      - Download Citation
   references:
     doi: 10.1007/s10584-011-0143-4
     must_include:
-    - Reference
+      - Reference
     must_not_include:
-    - Google Scholar
+      - Google Scholar
   abstract_only:
     doi: 10.1007/s00382-018-4286-0
     must_include:
-    - '## Abstract'
+      - '## Abstract'
     must_not_include:
-    - Download PDF
+      - Download PDF
   access_gate:
     doi: 10.1007/s00382-018-4286-0
     must_include:
-    - '## Abstract'
+      - '## Abstract'
     must_not_include:
-    - Subscribe
+      - Subscribe
 asset_profile:
   none: []
   body:
@@ -143,10 +152,10 @@ asset_contract:
     download: required
     purposes:
       - figure
-    exception_reason: null
+    exception_reason:
 supplementary_scope:
-  selector: null
-  url_pattern: null
+  selector:
+  url_pattern:
 abstract_only_strategy: provider_managed
 probe:
   env_requirements: []
@@ -158,7 +167,8 @@ fixtures:
     structure:
       doi: "10.1038/s43247-024-01885-8"
       evidence_url: "https://www.nature.com/articles/s43247-024-01885-8"
-      evidence_reason: "Provider-local tests build a real Springer/Nature article and verify body, data availability, and code availability sections."
+      evidence_reason: "Provider-local tests build a real Springer/Nature article and verify body, data
+        availability, and code availability sections."
       observed_signals:
         - html_article
         - body_sections
@@ -166,7 +176,8 @@ fixtures:
     table:
       doi: "10.1038/s43247-024-01295-w"
       evidence_url: "https://www.nature.com/articles/s43247-024-01295-w"
-      evidence_reason: "Provider-local table tests exercise a real Nature table page and inline table injection."
+      evidence_reason: "Provider-local table tests exercise a real Nature table page and inline table
+        injection."
       observed_signals:
         - html_article
         - body_table
@@ -174,7 +185,8 @@ fixtures:
     formula:
       doi: "10.1038/nature12915"
       evidence_url: "https://www.nature.com/articles/nature12915"
-      evidence_reason: "Provider-local tests exercise Springer/Nature formula image extraction from a real fixture."
+      evidence_reason: "Provider-local tests exercise Springer/Nature formula image extraction from a
+        real fixture."
       observed_signals:
         - html_article
         - formula_images
@@ -182,7 +194,8 @@ fixtures:
     figure:
       doi: "10.1038/s41561-022-00912-7"
       evidence_url: "https://www.nature.com/articles/s41561-022-00912-7"
-      evidence_reason: "Provider-local tests verify Springer figure placement and downloaded asset rewrite for a real fixture."
+      evidence_reason: "Provider-local tests verify Springer figure placement and downloaded asset rewrite
+        for a real fixture."
       observed_signals:
         - html_article
         - figures
@@ -190,7 +203,8 @@ fixtures:
     supplementary:
       doi: "10.1038/s41561-022-00912-7"
       evidence_url: "https://www.nature.com/articles/s41561-022-00912-7"
-      evidence_reason: "Provider-local tests exercise Springer supplementary section extraction and source-data separation."
+      evidence_reason: "Provider-local tests exercise Springer supplementary section extraction and source-data
+        separation."
       observed_signals:
         - html_article
         - supplementary
@@ -198,13 +212,14 @@ fixtures:
     references:
       doi: "10.1007/s10584-011-0143-4"
       evidence_url: "https://link.springer.com/article/10.1007/s10584-011-0143-4"
-      evidence_reason: "Provider-local tests use a real Springer article fixture while separately verifying numbered reference extraction behavior."
+      evidence_reason: "Provider-local tests use a real Springer article fixture while separately verifying
+        numbered reference extraction behavior."
       observed_signals:
         - html_article
         - references
       confidence: medium
     pdf_fallback:
-      doi: null
+      doi:
       evidence_url: "https://link.springer.com/"
       evidence_reason: "Current recorded fixtures do not include a reusable Springer PDF fallback replay."
       observed_signals: []
@@ -212,7 +227,8 @@ fixtures:
     abstract_only:
       doi: "10.1007/s00382-018-4286-0"
       evidence_url: "https://link.springer.com/article/10.1007/s00382-018-4286-0"
-      evidence_reason: "Block fixture coverage verifies Springer preview or abstract-only page cleanup and provider-managed degradation."
+      evidence_reason: "Block fixture coverage verifies Springer preview or abstract-only page cleanup
+        and provider-managed degradation."
       observed_signals:
         - abstract_only
         - preview_page
@@ -220,25 +236,66 @@ fixtures:
     access_gate:
       doi: "10.1007/s00382-018-4286-0"
       evidence_url: "https://link.springer.com/article/10.1007/s00382-018-4286-0"
-      evidence_reason: "Block fixture coverage verifies Springer preview text is stripped from Markdown output."
+      evidence_reason: "Block fixture coverage verifies Springer preview text is stripped from Markdown
+        output."
       observed_signals:
         - access_gate
         - preview_page
       confidence: medium
     empty_shell:
-      doi: null
+      doi:
       evidence_url: "https://link.springer.com/"
       evidence_reason: "Current recorded fixtures do not include a Springer empty-shell sample."
       observed_signals: []
       confidence: low
+  discovery_proof:
+    table:
+      queries:
+        - Springer 10.1038 table DOI candidates
+        - site:springer.com Springer table article DOI
+        - 10.1038 table fixture discovery springer
+      candidates:
+        - 10.1038/s43247-024-01295-w
+      selected_doi: 10.1038/s43247-024-01295-w
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.1038/s43247-024-01295-w because fixtures.doi_samples.table
+        already records provider-local evidence for stable table Markdown assertions.
+    formula:
+      queries:
+        - Springer 10.1038 formula equation math DOI candidates
+        - site:springer.com Springer formula equation math article DOI
+        - 10.1038 formula equation math fixture discovery springer
+      candidates:
+        - 10.1038/nature12915
+      selected_doi: 10.1038/nature12915
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.1038/nature12915 because fixtures.doi_samples.formula already
+        records provider-local evidence for stable formula Markdown assertions.
+    supplementary:
+      queries:
+        - Springer 10.1038 supplementary supporting information DOI candidates
+        - site:springer.com Springer supplementary supporting information article DOI
+        - 10.1038 supplementary supporting information fixture discovery springer
+      candidates:
+        - 10.1038/s41561-022-00912-7
+      selected_doi: 10.1038/s41561-022-00912-7
+      rejections: {}
+      exhausted: false
+      evidence_summary: Selected 10.1038/s41561-022-00912-7 because
+        fixtures.doi_samples.supplementary already records provider-local evidence for stable
+        supplementary Markdown assertions.
 extraction_hints:
-  datalayer_signal_set: null
+  datalayer_signal_set:
   text_marker_signal_set: []
-  front_matter: null
-  asset_retry: null
+  front_matter:
+  asset_retry:
   metadata_merge: []
 owner_reuse_exceptions: []
 docs:
-  providers_md_capability_row: "Springer | Crossref merge | direct HTML -> direct HTTP PDF | HTML body/all assets; PDF fallback is text-only | springer_html / springer_pdf"
-  changelog_summary: "Track Springer implemented provider manifest for HTML, assets, and PDF fallback onboarding sync."
-  extraction_rules_summary: null
+  providers_md_capability_row: "Springer | Crossref merge | direct HTML -> direct HTTP PDF | HTML body/all
+    assets; PDF fallback is text-only | springer_html / springer_pdf"
+  changelog_summary: "Track Springer implemented provider manifest for HTML, assets, and PDF fallback
+    onboarding sync."
+  extraction_rules_summary:

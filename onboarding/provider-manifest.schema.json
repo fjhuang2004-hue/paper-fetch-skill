@@ -225,7 +225,7 @@
     "fixtures": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["doi_samples"],
+      "required": ["doi_samples", "discovery_proof"],
       "properties": {
         "doi_samples": {
           "type": "object",
@@ -272,6 +272,22 @@
             },
             "empty_shell": {
               "$ref": "#/$defs/doi_sample"
+            }
+          }
+        },
+        "discovery_proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["table", "formula", "supplementary"],
+          "properties": {
+            "table": {
+              "$ref": "#/$defs/discovery_proof_entry"
+            },
+            "formula": {
+              "$ref": "#/$defs/discovery_proof_entry"
+            },
+            "supplementary": {
+              "$ref": "#/$defs/discovery_proof_entry"
             }
           }
         }
@@ -592,6 +608,77 @@
           }
         }
       ]
+    },
+    "discovery_proof_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queries",
+        "candidates",
+        "selected_doi",
+        "rejections",
+        "exhausted",
+        "evidence_summary"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "exhausted": {
+                "const": false
+              }
+            },
+            "required": ["exhausted"]
+          },
+          "then": {
+            "properties": {
+              "candidates": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "queries": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/doi"
+          }
+        },
+        "selected_doi": {
+          "oneOf": [
+            {"$ref": "#/$defs/doi"},
+            {"type": "null"}
+          ]
+        },
+        "rejections": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/doi"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exhausted": {
+          "type": "boolean"
+        },
+        "evidence_summary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "extra_fixture": {
       "type": "object",

@@ -6,8 +6,17 @@
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+### 新增
+
+- 新增 Annual Reviews (`annualreviews`) provider：支持 `10.1146/` DOI 路由、CloakBrowser 渲染 HTML 全文、seeded-browser PDF fallback、provider-managed abstract-only 降级、fixture replay、golden corpus 覆盖和 HTML 正文图片资产抽取。
+
 ### 修复
 
+- Annual Reviews fast browser fixture 捕获会等待动态全文 DOM 容器填充；机构访问提示 `access provided by` 不再作为 paywall 阻断词，但仍保留为 Markdown 降噪词。
+- browser PDF fixture 下载返回非 PDF payload 时改为 `NON_PDF_FALLBACK_CONTENT`，不再误报为网络暂态，并要求替换失败 PDF 样本后才能续跑 onboarding。
+- Chromium 暴露 PDF viewer shell 而不是底层 PDF 字节时，browser PDF fallback 会通过同一 browser request context 重新获取真实 PDF payload。
+- manifest 驱动的 fixture 捕获在多个 purpose 复用同一 DOI 文章时，会复用已登记 fixture，避免重复 purpose 阻断批量捕获。
+- fixture 捕获页已经包含填充的全文容器时，不再把同页访问 UI 文案误判为 access gate。
 - 对已知 MDPI 数字段 article URL 在通用 landing page 抓取前先推导 DOI；对已知 MDPI DOI suffix 在回退 `doi.org` 前先反推 MDPI article landing URL。
 - 外部公式转换子进程输出包含非法 UTF-8 字节时改为 replacement 解码，避免 Windows reader thread 抛出 `UnicodeDecodeError`。
 - PDF fallback 转 Markdown 时，PyMuPDF 在 Windows 上探测 Tesseract 的子进程输出如果包含非法 UTF-8 字节，也改为 replacement 解码。

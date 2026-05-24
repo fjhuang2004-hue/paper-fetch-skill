@@ -185,6 +185,7 @@ def _response_to_pdf_result(
     artifact_dir: Path,
     source_url: str,
     final_url: str,
+    page: Any | None = None,
 ) -> PdfFetchResult | None:
     if response is None:
         return None
@@ -200,12 +201,66 @@ def _response_to_pdf_result(
         ) from exc
     if not looks_like_pdf_payload(content_type, response_body, final_url):
         return None
+    try:
+        return pdf_fetch_result_from_bytes(
+            artifact_dir=artifact_dir,
+            source_url=source_url,
+            final_url=final_url,
+            pdf_bytes=response_body,
+            suggested_filename=filename_from_headers(response_headers),
+        )
+    except PdfFallbackFailure as exc:
+        if exc.kind != "downloaded_file_not_pdf" or page is None:
+            raise
+        refetched = _refetch_pdf_with_browser_request(
+            page,
+            artifact_dir=artifact_dir,
+            source_url=source_url,
+            final_url=final_url,
+        )
+        if refetched is not None:
+            return refetched
+        raise
+
+
+def _refetch_pdf_with_browser_request(
+    page: Any,
+    *,
+    artifact_dir: Path,
+    source_url: str,
+    final_url: str,
+) -> PdfFetchResult | None:
+    normalized_final_url = normalize_text(final_url)
+    if not normalized_final_url:
+        return None
+    parsed = urllib.parse.urlparse(normalized_final_url)
+    normalized_path = normalize_text(parsed.path).lower()
+    if not (
+        normalized_path.endswith(".pdf")
+        or "/doi/pdf/" in normalized_path
+        or "/doi/epdf/" in normalized_path
+        or "/pdf" in normalized_path
+    ):
+        return None
+    try:
+        response = page.request.get(normalized_final_url, timeout=60000)
+        headers = {str(key).lower(): str(value) for key, value in (response.headers or {}).items()}
+        body = response.body()
+    except Exception as exc:
+        raise PdfFallbackFailure(
+            "pdf_download_failed",
+            f"Failed to refetch PDF fallback response from browser request context: {exc}",
+            details={"source_url": source_url, "final_url": normalized_final_url},
+        ) from exc
+    content_type = normalize_text(str(headers.get("content-type") or "")).lower()
+    if not looks_like_pdf_payload(content_type, body, normalized_final_url):
+        return None
     return pdf_fetch_result_from_bytes(
         artifact_dir=artifact_dir,
         source_url=source_url,
-        final_url=final_url,
-        pdf_bytes=response_body,
-        suggested_filename=filename_from_headers(response_headers),
+        final_url=normalized_final_url,
+        pdf_bytes=body,
+        suggested_filename=filename_from_headers(headers),
     )
 
 
@@ -362,6 +417,7 @@ def fetch_pdf_with_browser(
                             artifact_dir=artifact_dir,
                             source_url=url,
                             final_url=page.url,
+                            page=page,
                         )
                         if pdf_result is not None:
                             return pdf_result

@@ -162,6 +162,21 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         fixture_name=golden_criteria_fixture("10.1098/rsta.2019.0558", "original.html"),
         fixture_kind="html",
     ),
+    "annualreviews": ProviderBenchmarkSample(
+        provider="annualreviews",
+        doi="10.1146/annurev-control-030123-013355",
+        year=2025,
+        title="Stretchable Shape Sensing and Computation for General Shape-Changing Robots",
+        landing_url="https://www.annualreviews.org/content/journals/10.1146/annurev-control-030123-013355",
+        expected_source="annualreviews_html",
+        accepted_live_source_trail_groups=(
+            ("fulltext:annualreviews_html_ok",),
+            ("fulltext:annualreviews_pdf_fallback_ok",),
+        ),
+        required_env=("CROSSREF_MAILTO",),
+        fixture_name=golden_criteria_fixture("10.1146/annurev-control-030123-013355", "original.html"),
+        fixture_kind="html",
+    ),
 }
 
 
