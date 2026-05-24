@@ -202,154 +202,154 @@ The authors are not aware of any affiliations, memberships, funding, or financia
 
 ## References (151 total, showing 151)
 
-- Agmon-Snir H, Segev I. 1993. Signal delay and input synchronization in passive dendritic structures. J. Neurophysiol. 70: 2066– 85
-- Amitai Y, Friedman A, Connors BW, Gutnick MJ. 1993. Regenerative activity in apical dendrites of pyramidal cells in neocortex. Cereb. Cortex 3: 26– 38
-- Antic SD, Zhou WL, Moore AR, Short SM, Ikonomu KD. 2010. The decade of the dendritic NMDA spike. J. Neurosci. Res. 88: 2991– 3001
-- Archie KA, Mel BW. 2000. A model for intradendritic computation of binocular disparity. Nat. Neurosci. 3: 54– 63
-- Ariav G, Polsky A, Schiller J. 2003. Submillisecond precision of the input-output transformation function mediated by fast sodium dendritic spikes in basal dendrites of CA1 pyramidal neurons. J. Neurosci. 23: 7750– 58
-- Azouz R, Gray CM. 2000. Dynamic spike threshold reveals a mechanism for synaptic coincidence detection in cortical neurons in vivo. Proc. Natl. Acad. Sci. USA 97: 8110– 15
-- Behabadi BF, Polsky A, Jadi M, Schiller J, Mel BW. 2012. Location-dependent excitatory synaptic interactions in pyramidal neuron dendrites. PLoS Comput. Biol. 8: 7 e1002599
-- Berger T, Larkum ME, Lüscher HR. 2001. High I(h) channel density in the distal apical dendrite of layer V pyramidal cells increases bidirectional attenuation of EPSPs. J. Neurophysiol. 85: 855– 68
-- Berger T, Lüscher HR. 2003. Timing and precision of spike initiation in layer V pyramidal cells of the rat somatosensory cortex. Cereb. Cortex 13: 274– 81
-- Binzegger T, Douglas RJ, Martin KA. 2004. A quantitative map of the circuit of cat primary visual cortex. J. Neurosci. 24: 8441– 53
-- Borst A, Egelhaaf M. 1992. In vivo imaging of calcium accumulation in fly interneurons as elicited by visual motion stimulation. Proc. Natl. Acad. Sci. USA 89: 4139– 43
-- Branco T, Clark BA, Häusser M. 2010. Dendritic discrimination of temporal input sequences in cortical neurons. Science 329: 1671– 75
-- Branco T, Häusser M. 2010. The single dendritic branch as a fundamental functional unit in the nervous system. Curr. Opin. Neurobiol. 20: 494– 502
-- Branco T, Häusser M. 2011. Synaptic integration gradients in single cortical pyramidal cell dendrites. Neuron 69: 885– 92
-- Briggs F, Callaway EM. 2005. Laminar patterns of local excitatory input to layer 5 neurons in macaque primary visual cortex. Cereb. Cortex 15: 479– 88
-- Byerly L, Masuda MO. 1979. Voltage-clamp analysis of the potassium current that produces a negative-going action potential in Ascaris muscle. J. Physiol. 288: 263– 84
-- Cai X, Liang CW, Muralidharan S, Kao JP, Tang CM, Thompson SM. 2004. Unique roles of SK and Kv4.2 potassium channels in dendritic integration. Neuron 44: 351– 64
-- Cash S, Yuste R. 1999. Linear summation of excitatory inputs by CA1 pyramidal neurons. Neuron 22: 383– 94
-- Cauller LJ, Connors BW. 1994. Synaptic physiology of horizontal afferents to layer-I in slices of rat SI neocortex. J. Neurosci. 14: 751– 62
-- Chalifoux JR, Carter AG. 2010. GABAB receptors modulate NMDA receptor calcium signals in dendritic spines. Neuron 66: 101– 13
-- Chen X, Leischner U, Rochefort NL, Nelken I, Konnerth A. et al. 2011. Functional mapping of single spines in cortical neurons in vivo. Nature 475: 501– 5
-- Coyle JT, Tsai G, Goff D. 2003. Converging evidence of NMDA receptor hypofunction in the pathophysiology of schizophrenia. Ann. N. Y. Acad. Sci. 1003: 318– 27
-- Dalby NO, Mody I. 2003. Activation of NMDA receptors in rat dentate gyrus granule cells by spontaneous and evoked transmitter release. J. Neurophysiol. 90: 786– 97
-- D'Angelo E, Rossi P, Taglietti V. 1994. Voltage-dependent kinetics of N-methyl-D-aspartate synaptic currents in rat cerebellar granule cells. Eur. J. Neurosci. 6: 640– 45
-- Dantzker JL, Callaway EM. 2000. Laminar sources of synaptic input to cortical inhibitory interneurons and pyramidal neurons. Nat. Neurosci. 3: 701– 7
-- Daw NW, Stein PS, Fox K. 1993. The role of NMDA receptors in information processing. Annu. Rev. Neurosci. 16: 207– 22
-- de Kock CP, Bruno RM, Spors H, Sakmann B. 2007. Layer- and cell-type-specific suprathreshold stimulus representation in rat primary somatosensory cortex. J. Physiol. 581: 139– 54
-- de Polavieja GG, Harsch A, Kleppe I, Robinson HP, Juusola M. 2005. Stimulus history reliably shapes action potential waveforms of cortical neurons. J. Neurosci. 25: 5657– 65
-- Dzubay JA, Jahr CE. 1996. Kinetics of NMDA channel opening. J. Neurosci. 16: 4129– 34
-- Garaschuk O, Schneggenburger R, Schirra C, Tempia F, Konnerth A. 1996. Fractional Ca 2+ currents through somatic and dendritic glutamate receptor channels of rat hippocampal CA1 pyramidal neurones. J. Physiol. 491: 757– 72
-- Gardner SM, Trussell LO, Oertel D. 2001. Correlation of AMPA receptor subunit composition with synaptic input in the mammalian cochlear nuclei. J. Neurosci. 21: 7428– 37
-- Gentet LJ, Kremer Y, Taniguchi H, Huang ZJ, Staiger JF, Petersen CC. 2012. Unique functional properties of somatostatin-expressing GABAergic neurons in mouse barrel cortex. Nat. Neurosci. 15: 607– 12
-- Gordon U, Polsky A, Schiller J. 2006. Plasticity compartments in basal dendrites of neocortical pyramidal neurons. J. Neurosci. 26: 12717– 26
-- Gulledge AT, Kampa BM, Stuart GJ. 2005. Synaptic integration in dendritic trees. J. Neurobiol. 64: 75– 90
-- Hardingham NR, Read JC, Trevelyan AJ, Nelson JC, Jack JJ, Bannister NJ. 2010. Quantal analysis reveals a functional correlation between presynaptic and postsynaptic efficacy in excitatory connections from rat neocortex. J. Neurosci. 30: 1441– 51
-- Häusser M, Mel B. 2003. Dendrites: bug or feature?. Curr. Opin. Neurobiol. 13: 372– 83
-- Häusser M, Spruston N, Stuart GJ. 2000. Diversity and dynamics of dendritic signaling. Science 290: 739– 44
-- Herz AV, Gollisch T, Machens CK, Jaeger D. 2006. Modeling single-neuron dynamics and computations: a balance of detail and abstraction. Science 314: 80– 85
-- Jadi M, Polsky A, Schiller J, Mel BW. 2012. Location-dependent effects of inhibition on local spiking in pyramidal neuron dendrites. PLoS Comput. Biol. 8: e1002550
-- Jagadeesh B, Wheat HS, Ferster D. 1993. Linearity of summation of synaptic potentials underlying direction selectivity in simple cells of the cat visual cortex. Science 262: 1901– 4
-- Jahr CE, Stevens CF. 1993. Calcium permeability of the N-methyl-D-aspartate receptor channel in hippocampal neurons in culture. Proc. Natl. Acad. Sci. USA 90: 11573– 77
-- Jia H, Rochefort NL, Chen X, Konnerth A. 2010. Dendritic organization of sensory input to cortical neurons in vivo. Nature 464: 1307– 12
-- Johnston D, Magee JC, Colbert CM, Cristie BR. 1996. Active properties of neuronal dendrites. Annu. Rev. Neurosci. 19: 165– 86
-- Judkewitz B, Roth A, Häusser M. 2006. Dendritic enlightenment: using patterned two-photon uncaging to reveal the secrets of the brain's smallest dendrites. Neuron 50: 180– 83
-- Kampa BM, Clements J, Jonas P, Stuart GJ. 2004. Kinetics of Mg 2+ unblock of NMDA receptors: implications for spike-timing dependent synaptic plasticity. J. Physiol. 556: 337– 45
-- Kashiwagi K, Masuko T, Nguyen CD, Kuno T, Tanaka I. et al. 2002. Channel blockers acting at N-methyl-D-aspartate receptors: differential effects of mutations in the vestibule and ion channel pore. Mol. Pharmacol. 61: 533– 45
-- Kleindienst T, Winnubst J, Roth-Alpermann C, Bonhoeffer T, Lohmann C. 2011. Activity-dependent clustering of functional synaptic inputs on developing hippocampal dendrites. Neuron 72: 1012– 24
-- Koch C, Poggio T, Torre V. 1983. Nonlinear interactions in a dendritic tree: localization, timing, and role in information processing. Proc. Natl. Acad. Sci. USA 80: 2799– 802
-- Koch C, Segev I. 2000. The role of single neurons in information processing. Nat. Neurosci. 3: Suppl. 1171– 77
-- Kole MH, Hallermann S, Stuart GJ. 2006. Single Ih channels in pyramidal neuron dendrites: properties, distribution, and impact on action potential output. J. Neurosci. 26: 1677– 87
-- Kole MH, Stuart GJ. 2008. Is action potential threshold lowest in the axon?. Nat. Neurosci. 11: 1253– 55
-- Korinek M, Sedlacek M, Cais O, Dittert I, Vyklicky L Jr. 2010. Temperature dependence of N-methyl-D-aspartate receptor channels and N-methyl-D-aspartate receptor excitatory postsynaptic currents. Neuroscience 165: 736– 48
-- Larkman AU. 1991. Dendritic morphology of pyramidal neurones of the visual cortex of the rat: III. Spine distributions. J. Comp. Neurol. 306: 332– 43
-- Larkman AU, Major G, Stratford KJ, Jack JJ. 1992. Dendritic morphology of pyramidal neurones of the visual cortex of the rat. IV: Electrical geometry. J. Comp. Neurol. 323: 137– 52
-- Larkum M. 2013. A cellular mechanism for cortical associations: an organizing principle for the cerebral cortex. Trends Neurosci. 36: 141– 51
-- Larkum ME, Nevian T. 2008. Synaptic clustering by dendritic signalling mechanisms. Curr. Opin. Neurobiol. 18: 3 321– 31
-- Larkum ME, Nevian T, Sandler M, Polsky A, Schiller J. 2009. Synaptic integration in tuft dendrites of layer 5 pyramidal neurons: a new unifying principle. Science 325: 756– 60
-- Larkum ME, Zhu JJ. 2002. Signaling of layer 1 and whisker-evoked Ca 2+ and Na + action potentials in distal and terminal dendrites of rat neocortical pyramidal neurons in vitro and in vivo. J. Neurosci. 22: 6991– 7005
-- Larkum ME, Zhu JJ, Sakmann B. 1999. A new cellular mechanism for coupling inputs arriving at different cortical layers. Nature 398: 338– 41
-- Larkum ME, Zhu JJ, Sakmann B. 2001. Dendritic mechanisms underlying the coupling of the dendritic with the axonal action potential initiation zone of adult rat layer 5 pyramidal neurons. J. Physiol. 533: 447– 66
-- Lavzin M, Rapoport S, Polsky A, Garion L, Schiller J. 2012. Non-linear dendritic processing determines angular tuning of barrel cortex neurons in-vivo. Nature 490: 397– 401
-- Lee D, Lin B-J, Lee AK. 2012. Hippocampal place fields emerge upon single-cell manipulation of excitability during behavior. Science 337: 849– 53
-- Lisman JE, Fellous JM, Wang XJ. 1998. A role for NMDA-receptor channels in working memory. Nat. Neurosci. 1: 273– 75
-- Liu G. 2004. Local structural balance and functional interaction of excitatory and inhibitory synapses in hippocampal dendrites. Nat. Neurosci. 7: 373– 79
-- Llinás R, Nicholson C, Freeman JA, Hillman DE. 1968. Dendritic spikes and their inhibition in alligator Purkinje cells. Science 160: 1132– 35
-- London M, Häusser M. 2005. Dendritic computation. Annu. Rev. Neurosci. 28: 503– 32
-- London M, Larkum ME, Hausser M. 2008. Predicting the synaptic information efficacy in cortical layer 5 pyramidal neurons using a minimal integrate-and-fire model. Biol. Cybern. 99: 393– 401
-- Losonczy A, Magee JC. 2006. Integrative properties of radial oblique dendrites in hippocampal CA1 pyramidal neurons. Neuron 50: 291– 307
-- Lübke J, Feldmeyer D. 2007. Excitatory signal flow and connectivity in a cortical column: focus on barrel cortex. Brain Struct. Funct. 212: 3– 17
-- Magee JC. 2000. Dendritic integration of excitatory synaptic input. Nat. Rev. Neurosci. 1: 181– 90
-- Major G. 1992. The physiology, morphology and modelling of cortical pyramidal neurones PhD thesis. Oxford Univ., Oxford, UK
-- Major G, Larkman AU, Jonas P, Sakmann B, Jack JJ. 1994. Detailed passive cable models of whole-cell recorded CA3 pyramidal neurons in rat hippocampal slices. J. Neurosci. 14: 4613– 38
-- Major G, Polsky A, Denk W, Schiller J, Tank DW. 2008. Spatiotemporally graded NMDA spike/plateau potentials in basal dendrites of neocortical pyramidal neurons. J. Neurophysiol. 99: 2584– 601
-- Major G, Tank DW. 2004. Persistent neural activity: prevalence and mechanisms. Curr. Opin. Neurobiol. 14: 675– 84
-- McCormick DA, Shu Y, Yu Y. 2007. Neurophysiology: Hodgkin and Huxley model—still standing?. Nature 445: E1– 2 discussion E2–3
-- Mel BW. 1993. Synaptic integration in an excitable dendritic tree. J. Neurophysiol. 70: 1086– 101
-- Mel BW. 1994. Information processing in dendritic trees. Neural Comput. 6: 1031– 85
-- Migliore M, Shepherd GM. 2002. Emerging rules for the distributions of active dendritic conductances. Nat. Rev. Neurosci. 3: 362– 70
-- Milojkovic BA, Radojicic MS, Antic SD. 2005a. A strict correlation between dendritic and somatic plateau depolarizations in the rat prefrontal cortex pyramidal neurons. J. Neurosci. 25: 3940– 51
-- Milojkovic BA, Radojicic MS, Goldman-Rakic PS, Antic SD. 2004. Burst generation in rat pyramidal neurones by regenerative potentials elicited in a restricted part of the basilar dendritic tree. J. Physiol. 558: 193– 211
-- Milojkovic BA, Wuskell JP, Loew LM, Antic SD. 2005b. Initiation of sodium spikelets in basal dendrites of neocortical pyramidal neurons. J. Membr. Biol. 208: 155– 69
-- Milojkovic BA, Zhou WL, Antic SD. 2007. Voltage and calcium transients in basal dendrites of the rat prefrontal cortex. J. Physiol. 585: Pt. 2 447– 68
-- Mirsky JS, Nadkarni PM, Healy MD, Miller PL, Shepherd GM. 1998. Database tools for integrating and searching membrane property data correlated with neuronal morphology. J. Neurosci. Methods 82: 105– 21
-- Myme CI, Sugino K, Turrigiano GG, Nelson SB. 2003. The NMDA-to-AMPA ratio at synapses onto layer 2/3 pyramidal neurons is conserved across prefrontal and visual cortices. J. Neurophysiol. 90: 771– 79
-- Nevian T, Larkum ME, Polsky A, Schiller J. 2007. Properties of basal dendrites of layer 5 pyramidal neurons: a direct patch-clamp recording study. Nat. Neurosci. 10: 206– 14
-- Ngo-Anh TJ, Bloodgood BL, Lin M, Sabatini BL, Maylie J, Adelman JP. 2005. SK channels and NMDA receptors form a Ca 2+ -mediated feedback loop in dendritic spines. Nat. Neurosci. 8: 642– 49
-- Nimchinsky EA, Yasuda R, Oertner TG, Svoboda K. 2004. The number of glutamate receptors opened by synaptic stimulation in single hippocampal spines. J. Neurosci. 24: 2054– 64
-- Palmer LM, Schulz JM, Murphy SC, Ledergerber D, Murayama M, Larkum ME. 2012. The cellular basis of GABA B -mediated interhemispheric inhibition. Science 335: 989– 93
-- Paoletti P. 2011. Molecular basis of NMDA receptor functional diversity. Eur. J. Neurosci. 33: 1351– 65
-- Patneau DK, Mayer ML. 1990. Structure-activity relationships for amino acid transmitter candidates acting at N-methyl-D-aspartate and quisqualate receptors. J. Neurosci. 10: 2385– 99
-- Petreanu L, Mao T, Sternson SM, Svoboda K. 2009. The subcellular organization of neocortical excitatory connections. Nature 457: 1142– 45
-- Platkiewicz J, Brette R. 2011. Impact of fast sodium channel inactivation on spike threshold dynamics and synaptic integration. PLoS Comput. Biol. 7: e1001129
-- Poirazi P, Brannon T, Mel BW. 2003. Pyramidal neuron as two-layer neural network. Neuron 37: 989– 99
-- Polsky A, Mel B, Schiller J. 2009. Encoding and decoding bursts by NMDA spikes in basal dendrites of layer 5 pyramidal neurons. J. Neurosci. 29: 11891– 903
-- Polsky A, Mel BW, Schiller J. 2004. Computational subunits in thin dendrites of pyramidal cells. Nat. Neurosci. 7: 621– 27
-- Popescu G, Robert A, Howe JR, Auerbach A. 2004. Reaction mechanism determines NMDA receptor response to repetitive stimulation. Nature 430: 790– 93
-- Postlethwaite M, Hennig MH, Steinert JR, Graham BP, Forsythe ID. 2007. Acceleration of AMPA receptor kinetics underlies temperature-dependent changes in synaptic strength at the rat calyx of Held. J. Physiol. 579: 69– 84
-- Priebe NJ, Ferster D. 2010. Neuroscience: each synapse to its own. Nature 464: 1290– 91
-- Rall W. 1964. Theoretical significance of dendritic trees for neuronal input-output relations. Neural Theory and Modeling R Reiss 73– 97 Stanford, CA: Stanford Univ. Press
-- Rall W. 1977. Core conductor theory and cable properties of neurons. Handbook of Physiology, the Nervous System, Cellular Biology of Neurons. Sect. 1. Vol. 1, Part 1, ed. ER Kandel 39– 98 Bethesda, MD: Am. Physiol. Soc.
-- Rapp M, Yarom Y, Segev I. 1996. Modeling back propagating action potential in weakly excitable dendrites of neocortical pyramidal cells. Proc. Natl. Acad. Sci. USA 93: 11985– 90
-- Rhodes P. 2006. The properties and implications of NMDA spikes in neocortical pyramidal cells. J. Neurosci. 26: 6704– 15
-- Rhodes PA. 1999. Functional implications of active currents in the dendrites of pyramidal neurons. Cerebral Cortex 13 PS Ulinski, EG Jones, A Peters 139– 200 New York: Plenum
-- Rhodes PA, Llinas RR. 2001. Apical tuft input efficacy in layer 5 pyramidal cells from rat visual cortex. J. Physiol. 536: 167– 87
-- Rinzel J, Rall W. 1974. Transient response in a dendritic neuron model for current injected at one branch. Biophys. J. 14: 759– 90
-- Sanders H, Berends M, Major G, Goldman MS, Lisman JE. 2013. NMDA and GABA B (KIR) conductances: the “perfect couple” for bistability. J. Neurosci. 33: 424– 29
-- Schaefer AT, Larkum ME, Sakmann B, Roth A. 2003. Coincidence detection in pyramidal neurons is tuned by their dendritic branching pattern. J. Neurophysiol. 89: 3143– 54
-- Schiller J, Major G, Koester HJ, Schiller Y. 2000. NMDA spikes in basal dendrites of cortical pyramidal neurons. Nature 404: 285– 89
-- Schiller J, Schiller Y. 2001. NMDA receptor-mediated dendritic spikes and coincident signal amplification. Curr. Opin. Neurobiol. 11: 343– 48
-- Schiller J, Schiller Y, Stuart G, Sakmann B. 1997. Calcium action potentials restricted to distal apical dendrites of rat neocortical pyramidal neurons. J. Physiol. 505: Pt. 3 605– 16
-- Schneggenburger R, Zhou Z, Konnerth A, Neher E. 1993. Fractional contribution of calcium to the cation current through glutamate receptor channels. Neuron 11: 133– 43
-- Schubert D, Staiger JF, Cho N, Kotter R, Zilles K, Luhmann HJ. 2001. Layer-specific intracolumnar and transcolumnar functional connectivity of layer V pyramidal cells in rat barrel cortex. J. Neurosci. 21: 3580– 92
-- Schwindt P, Crill W. 1999. Mechanisms underlying burst and regular spiking evoked by dendritic depolarization in layer 5 cortical pyramidal neurons. J. Neurophysiol. 81: 1341– 54
-- Schwindt PC, Crill WE. 1997. Local and propagated dendritic action potentials evoked by glutamate iontophoresis on rat neocortical pyramidal neurons. J. Neurophysiol. 77: 2466– 83
-- Self MW, Kooijmans RN, Super H, Lamme VA, Roelfsema PR. 2012. Different glutamate receptors convey feedforward and recurrent processing in macaque V1. Proc. Natl. Acad. Sci. USA 109: 11031– 36
-- Shu Y, Hasenstaub A, Duque A, Yu Y, McCormick DA. 2006. Modulation of intracortical synaptic potentials by presynaptic somatic membrane potential. Nature 441: 761– 65
-- Sobczyk A, Svoboda K. 2007. Activity-dependent plasticity of the NMDA-receptor fractional Ca(2+) current. Neuron 53: 17– 24
-- Spruston N. 2008. Pyramidal neurons: dendritic structure and synaptic integration. Nat. Rev. Neurosci. 9: 206– 21
-- Spruston N, Jaffe DB, Johnston D. 1994. Dendritic attenuation of synaptic potentials and currents: the role of passive membrane properties. Trends Neurosci. 17: 161– 66
-- Spruston N, Jonas P, Sakmann B. 1995a. Dendritic glutamate receptor channels in rat hippocampal CA3 and CA1 pyramidal neurons. J. Physiol. 482: Pt. 2 325– 52
-- Spruston N, Schiller Y, Stuart G, Sakmann B. 1995b. Activity-dependent action-potential invasion and calcium influx into hippocampal CA1 dendrites. Science 268: 297– 300
-- Stafstrom CE, Schwindt PC, Crill WE. 1984. Cable properties of layer V neurons from cat sensorimotor cortex in vitro. J. Neurophysiol. 52: 278– 89
-- Stern P, Edwards FA, Sakmann B. 1992. Fast and slow components of unitary EPSCs on stellate cells elicited by focal stimulation in slices of rat visual cortex. J. Physiol. 449: 247– 78
-- Storm JF. 1990. Potassium currents in hippocampal pyramidal cells. Prog. Brain Res. 83: 161– 87
-- Stratford K, Mason A, Larkman AU, Major G, Jack JJ. 1989. The modelling of pyramidal neurons in the visual cortex. The Computing Neuron R Durbin, C Miall, G Mitchison 296– 321 Wokingham, UK: Addison-Wesley
-- Stuart G, Spruston N. 1998. Determinants of voltage attenuation in neocortical pyramidal neuron dendrites. J. Neurosci. 18: 3501– 10
-- Stuart G, Spruston N, Sakmann B, Häusser M. 1997. Action potential initiation and backpropagation in neurons of the mammalian CNS. Trends Neurosci. 20: 125– 31
-- Stuart GJ, Sakmann B. 1994. Active propagation of somatic action potentials into neocortical pyramidal cell dendrites. Nature 367: 69– 72
-- Stuart GJ, Spruston N, Häusser M. 1999. Dendrites New York: Oxford Univ. Press.
-- Suzuki T, Kodama S, Hoshino C, Izumi T, Miyakawa H. 2008. A plateau potential mediated by the activation of extrasynaptic NMDA receptors in rat hippocampal CA1 pyramidal neurons. Eur. J. Neurosci. 28: 521– 34
-- Takahashi N, Kitamura K, Matsuo N, Mayford M, Kano M. et al. 2012. Locally synchronized synaptic inputs. Science 335: 353– 56
-- Tateno T, Harsch A, Robinson HP. 2004. Threshold firing frequency-current relationships of neurons in rat somatosensory cortex: type 1 and type 2 dynamics. J. Neurophysiol. 92: 2283– 94
-- Trussell LO, Fischbach GD. 1989. Glutamate receptor desensitization and its role in synaptic transmission. Neuron 3: 209– 18
-- Varga Z, Jia H, Sakmann B, Konnerth A. 2011. Dendritic coding of multiple sensory inputs in single cortical neurons in vivo. Proc. Natl. Acad. Sci. USA 108: 15420– 25
-- Vyklický L Jr, Benveniste M, Mayer ML. 1990. Modulation of N -methyl-D-aspartic acid receptor desensitization by glycine in mouse cultured hippocampal neurones. J. Physiol. 428: 313– 31
-- Waters J, Helmchen F. 2006. Background synaptic activity is sparse in neocortex. J. Neurosci. 26: 8267– 77
-- Wei DS, Mei YA, Bagal A, Kao JP, Thompson SM, Tang CM. 2001. Compartmentalized and binary behavior of terminal dendrites in hippocampal pyramidal neurons. Science 293: 2272– 75
-- Wilent WB, Contreras D. 2005. Stimulus-dependent changes in spike threshold enhance feature selectivity in rat barrel cortex neurons. J. Neurosci. 25: 2983– 91
-- Williams SR. 2004. Spatial compartmentalization and functional impact of conductance in pyramidal neurons. Nat. Neurosci. 7: 961– 67
-- Williams SR, Stuart GJ. 1999. Mechanisms and consequences of action potential burst firing in rat neocortical pyramidal neurons. J. Physiol. 521: 467– 82
-- Williams SR, Stuart GJ. 2000. Site independence of EPSP time course is mediated by dendritic I-h in neocortical pyramidal neurons. J. Neurophysiol. 83: 3177– 82
-- Williams SR, Stuart GJ. 2002. Dependence of EPSP efficacy on synapse location in neocortical pyramidal neurons. Science 295: 1907– 10
-- Williams SR, Stuart GJ. 2003. Role of dendritic synapse location in the control of action potential output. Trends Neurosci. 26: 147– 54
-- Wong RKS, Prince DA, Basbaum AI. 1979. Intra-dendritic recordings from hippocampal neurons. Proc. Natl. Acad. Sci. USA 76: 986– 90
-- Xu NL, Harnett MT, Huber D, O'Connor DH, Svoboda K, Magee JC. 2012. Nonlinear dendritic integration of sensory and motor input during an active sensing task. Nature 492: 247– 51
-- Yamada M, Inanobe A, Kurachi Y. 1998. G protein regulation of potassium ion channels. Pharmacol. Rev. 50: 723– 60
-- Yu Y, Shu Y, McCormick DA. 2008. Cortical action potential backpropagation explains spike threshold variability and rapid-onset kinetics. J. Neurosci. 28: 7260– 72
-- Yuan H, Geballe MT, Hansen KB, Traynelis SF. 2008. Structure and function of the NMDA receptor. Structural and Functional Organization of the Synapse JW Hell, MD Ehlers 289– 316 New York: Springer Sci.+Bus. Media
-- Yuste R, Gutnick MJ, Saar D, Delaney KR, Tank DW. 1994. Ca 2+ accumulations in dendrites of neocortical pyramidal neurons: an apical band and evidence for two functional compartments. Neuron 13: 23– 43
-- Zhang S, Trussell LO. 1994. Voltage clamp analysis of excitatory synaptic transmission in the avian nucleus magnocellularis. J. Physiol. 480: Pt. 1 123– 36
-- Zhu JJ. 2000. Maturation of layer 5 neocortical pyramidal neurons: amplifying salient layer 1 and layer 4 inputs by Ca 2+ action potentials in adult rat tuft dendrites. J. Physiol. 526: Pt. 3 571– 87
+1. Agmon-Snir H, Segev I. 1993. Signal delay and input synchronization in passive dendritic structures. J. Neurophysiol. 70: 2066– 85
+2. Amitai Y, Friedman A, Connors BW, Gutnick MJ. 1993. Regenerative activity in apical dendrites of pyramidal cells in neocortex. Cereb. Cortex 3: 26– 38
+3. Antic SD, Zhou WL, Moore AR, Short SM, Ikonomu KD. 2010. The decade of the dendritic NMDA spike. J. Neurosci. Res. 88: 2991– 3001
+4. Archie KA, Mel BW. 2000. A model for intradendritic computation of binocular disparity. Nat. Neurosci. 3: 54– 63
+5. Ariav G, Polsky A, Schiller J. 2003. Submillisecond precision of the input-output transformation function mediated by fast sodium dendritic spikes in basal dendrites of CA1 pyramidal neurons. J. Neurosci. 23: 7750– 58
+6. Azouz R, Gray CM. 2000. Dynamic spike threshold reveals a mechanism for synaptic coincidence detection in cortical neurons in vivo. Proc. Natl. Acad. Sci. USA 97: 8110– 15
+7. Behabadi BF, Polsky A, Jadi M, Schiller J, Mel BW. 2012. Location-dependent excitatory synaptic interactions in pyramidal neuron dendrites. PLoS Comput. Biol. 8: 7 e1002599
+8. Berger T, Larkum ME, Lüscher HR. 2001. High I(h) channel density in the distal apical dendrite of layer V pyramidal cells increases bidirectional attenuation of EPSPs. J. Neurophysiol. 85: 855– 68
+9. Berger T, Lüscher HR. 2003. Timing and precision of spike initiation in layer V pyramidal cells of the rat somatosensory cortex. Cereb. Cortex 13: 274– 81
+10. Binzegger T, Douglas RJ, Martin KA. 2004. A quantitative map of the circuit of cat primary visual cortex. J. Neurosci. 24: 8441– 53
+11. Borst A, Egelhaaf M. 1992. In vivo imaging of calcium accumulation in fly interneurons as elicited by visual motion stimulation. Proc. Natl. Acad. Sci. USA 89: 4139– 43
+12. Branco T, Clark BA, Häusser M. 2010. Dendritic discrimination of temporal input sequences in cortical neurons. Science 329: 1671– 75
+13. Branco T, Häusser M. 2010. The single dendritic branch as a fundamental functional unit in the nervous system. Curr. Opin. Neurobiol. 20: 494– 502
+14. Branco T, Häusser M. 2011. Synaptic integration gradients in single cortical pyramidal cell dendrites. Neuron 69: 885– 92
+15. Briggs F, Callaway EM. 2005. Laminar patterns of local excitatory input to layer 5 neurons in macaque primary visual cortex. Cereb. Cortex 15: 479– 88
+16. Byerly L, Masuda MO. 1979. Voltage-clamp analysis of the potassium current that produces a negative-going action potential in Ascaris muscle. J. Physiol. 288: 263– 84
+17. Cai X, Liang CW, Muralidharan S, Kao JP, Tang CM, Thompson SM. 2004. Unique roles of SK and Kv4.2 potassium channels in dendritic integration. Neuron 44: 351– 64
+18. Cash S, Yuste R. 1999. Linear summation of excitatory inputs by CA1 pyramidal neurons. Neuron 22: 383– 94
+19. Cauller LJ, Connors BW. 1994. Synaptic physiology of horizontal afferents to layer-I in slices of rat SI neocortex. J. Neurosci. 14: 751– 62
+20. Chalifoux JR, Carter AG. 2010. GABAB receptors modulate NMDA receptor calcium signals in dendritic spines. Neuron 66: 101– 13
+21. Chen X, Leischner U, Rochefort NL, Nelken I, Konnerth A. et al. 2011. Functional mapping of single spines in cortical neurons in vivo. Nature 475: 501– 5
+22. Coyle JT, Tsai G, Goff D. 2003. Converging evidence of NMDA receptor hypofunction in the pathophysiology of schizophrenia. Ann. N. Y. Acad. Sci. 1003: 318– 27
+23. Dalby NO, Mody I. 2003. Activation of NMDA receptors in rat dentate gyrus granule cells by spontaneous and evoked transmitter release. J. Neurophysiol. 90: 786– 97
+24. D'Angelo E, Rossi P, Taglietti V. 1994. Voltage-dependent kinetics of N-methyl-D-aspartate synaptic currents in rat cerebellar granule cells. Eur. J. Neurosci. 6: 640– 45
+25. Dantzker JL, Callaway EM. 2000. Laminar sources of synaptic input to cortical inhibitory interneurons and pyramidal neurons. Nat. Neurosci. 3: 701– 7
+26. Daw NW, Stein PS, Fox K. 1993. The role of NMDA receptors in information processing. Annu. Rev. Neurosci. 16: 207– 22
+27. de Kock CP, Bruno RM, Spors H, Sakmann B. 2007. Layer- and cell-type-specific suprathreshold stimulus representation in rat primary somatosensory cortex. J. Physiol. 581: 139– 54
+28. de Polavieja GG, Harsch A, Kleppe I, Robinson HP, Juusola M. 2005. Stimulus history reliably shapes action potential waveforms of cortical neurons. J. Neurosci. 25: 5657– 65
+29. Dzubay JA, Jahr CE. 1996. Kinetics of NMDA channel opening. J. Neurosci. 16: 4129– 34
+30. Garaschuk O, Schneggenburger R, Schirra C, Tempia F, Konnerth A. 1996. Fractional Ca 2+ currents through somatic and dendritic glutamate receptor channels of rat hippocampal CA1 pyramidal neurones. J. Physiol. 491: 757– 72
+31. Gardner SM, Trussell LO, Oertel D. 2001. Correlation of AMPA receptor subunit composition with synaptic input in the mammalian cochlear nuclei. J. Neurosci. 21: 7428– 37
+32. Gentet LJ, Kremer Y, Taniguchi H, Huang ZJ, Staiger JF, Petersen CC. 2012. Unique functional properties of somatostatin-expressing GABAergic neurons in mouse barrel cortex. Nat. Neurosci. 15: 607– 12
+33. Gordon U, Polsky A, Schiller J. 2006. Plasticity compartments in basal dendrites of neocortical pyramidal neurons. J. Neurosci. 26: 12717– 26
+34. Gulledge AT, Kampa BM, Stuart GJ. 2005. Synaptic integration in dendritic trees. J. Neurobiol. 64: 75– 90
+35. Hardingham NR, Read JC, Trevelyan AJ, Nelson JC, Jack JJ, Bannister NJ. 2010. Quantal analysis reveals a functional correlation between presynaptic and postsynaptic efficacy in excitatory connections from rat neocortex. J. Neurosci. 30: 1441– 51
+36. Häusser M, Mel B. 2003. Dendrites: bug or feature?. Curr. Opin. Neurobiol. 13: 372– 83
+37. Häusser M, Spruston N, Stuart GJ. 2000. Diversity and dynamics of dendritic signaling. Science 290: 739– 44
+38. Herz AV, Gollisch T, Machens CK, Jaeger D. 2006. Modeling single-neuron dynamics and computations: a balance of detail and abstraction. Science 314: 80– 85
+39. Jadi M, Polsky A, Schiller J, Mel BW. 2012. Location-dependent effects of inhibition on local spiking in pyramidal neuron dendrites. PLoS Comput. Biol. 8: e1002550
+40. Jagadeesh B, Wheat HS, Ferster D. 1993. Linearity of summation of synaptic potentials underlying direction selectivity in simple cells of the cat visual cortex. Science 262: 1901– 4
+41. Jahr CE, Stevens CF. 1993. Calcium permeability of the N-methyl-D-aspartate receptor channel in hippocampal neurons in culture. Proc. Natl. Acad. Sci. USA 90: 11573– 77
+42. Jia H, Rochefort NL, Chen X, Konnerth A. 2010. Dendritic organization of sensory input to cortical neurons in vivo. Nature 464: 1307– 12
+43. Johnston D, Magee JC, Colbert CM, Cristie BR. 1996. Active properties of neuronal dendrites. Annu. Rev. Neurosci. 19: 165– 86
+44. Judkewitz B, Roth A, Häusser M. 2006. Dendritic enlightenment: using patterned two-photon uncaging to reveal the secrets of the brain's smallest dendrites. Neuron 50: 180– 83
+45. Kampa BM, Clements J, Jonas P, Stuart GJ. 2004. Kinetics of Mg 2+ unblock of NMDA receptors: implications for spike-timing dependent synaptic plasticity. J. Physiol. 556: 337– 45
+46. Kashiwagi K, Masuko T, Nguyen CD, Kuno T, Tanaka I. et al. 2002. Channel blockers acting at N-methyl-D-aspartate receptors: differential effects of mutations in the vestibule and ion channel pore. Mol. Pharmacol. 61: 533– 45
+47. Kleindienst T, Winnubst J, Roth-Alpermann C, Bonhoeffer T, Lohmann C. 2011. Activity-dependent clustering of functional synaptic inputs on developing hippocampal dendrites. Neuron 72: 1012– 24
+48. Koch C, Poggio T, Torre V. 1983. Nonlinear interactions in a dendritic tree: localization, timing, and role in information processing. Proc. Natl. Acad. Sci. USA 80: 2799– 802
+49. Koch C, Segev I. 2000. The role of single neurons in information processing. Nat. Neurosci. 3: Suppl. 1171– 77
+50. Kole MH, Hallermann S, Stuart GJ. 2006. Single Ih channels in pyramidal neuron dendrites: properties, distribution, and impact on action potential output. J. Neurosci. 26: 1677– 87
+51. Kole MH, Stuart GJ. 2008. Is action potential threshold lowest in the axon?. Nat. Neurosci. 11: 1253– 55
+52. Korinek M, Sedlacek M, Cais O, Dittert I, Vyklicky L Jr. 2010. Temperature dependence of N-methyl-D-aspartate receptor channels and N-methyl-D-aspartate receptor excitatory postsynaptic currents. Neuroscience 165: 736– 48
+53. Larkman AU. 1991. Dendritic morphology of pyramidal neurones of the visual cortex of the rat: III. Spine distributions. J. Comp. Neurol. 306: 332– 43
+54. Larkman AU, Major G, Stratford KJ, Jack JJ. 1992. Dendritic morphology of pyramidal neurones of the visual cortex of the rat. IV: Electrical geometry. J. Comp. Neurol. 323: 137– 52
+55. Larkum M. 2013. A cellular mechanism for cortical associations: an organizing principle for the cerebral cortex. Trends Neurosci. 36: 141– 51
+56. Larkum ME, Nevian T. 2008. Synaptic clustering by dendritic signalling mechanisms. Curr. Opin. Neurobiol. 18: 3 321– 31
+57. Larkum ME, Nevian T, Sandler M, Polsky A, Schiller J. 2009. Synaptic integration in tuft dendrites of layer 5 pyramidal neurons: a new unifying principle. Science 325: 756– 60
+58. Larkum ME, Zhu JJ. 2002. Signaling of layer 1 and whisker-evoked Ca 2+ and Na + action potentials in distal and terminal dendrites of rat neocortical pyramidal neurons in vitro and in vivo. J. Neurosci. 22: 6991– 7005
+59. Larkum ME, Zhu JJ, Sakmann B. 1999. A new cellular mechanism for coupling inputs arriving at different cortical layers. Nature 398: 338– 41
+60. Larkum ME, Zhu JJ, Sakmann B. 2001. Dendritic mechanisms underlying the coupling of the dendritic with the axonal action potential initiation zone of adult rat layer 5 pyramidal neurons. J. Physiol. 533: 447– 66
+61. Lavzin M, Rapoport S, Polsky A, Garion L, Schiller J. 2012. Non-linear dendritic processing determines angular tuning of barrel cortex neurons in-vivo. Nature 490: 397– 401
+62. Lee D, Lin B-J, Lee AK. 2012. Hippocampal place fields emerge upon single-cell manipulation of excitability during behavior. Science 337: 849– 53
+63. Lisman JE, Fellous JM, Wang XJ. 1998. A role for NMDA-receptor channels in working memory. Nat. Neurosci. 1: 273– 75
+64. Liu G. 2004. Local structural balance and functional interaction of excitatory and inhibitory synapses in hippocampal dendrites. Nat. Neurosci. 7: 373– 79
+65. Llinás R, Nicholson C, Freeman JA, Hillman DE. 1968. Dendritic spikes and their inhibition in alligator Purkinje cells. Science 160: 1132– 35
+66. London M, Häusser M. 2005. Dendritic computation. Annu. Rev. Neurosci. 28: 503– 32
+67. London M, Larkum ME, Hausser M. 2008. Predicting the synaptic information efficacy in cortical layer 5 pyramidal neurons using a minimal integrate-and-fire model. Biol. Cybern. 99: 393– 401
+68. Losonczy A, Magee JC. 2006. Integrative properties of radial oblique dendrites in hippocampal CA1 pyramidal neurons. Neuron 50: 291– 307
+69. Lübke J, Feldmeyer D. 2007. Excitatory signal flow and connectivity in a cortical column: focus on barrel cortex. Brain Struct. Funct. 212: 3– 17
+70. Magee JC. 2000. Dendritic integration of excitatory synaptic input. Nat. Rev. Neurosci. 1: 181– 90
+71. Major G. 1992. The physiology, morphology and modelling of cortical pyramidal neurones PhD thesis. Oxford Univ., Oxford, UK
+72. Major G, Larkman AU, Jonas P, Sakmann B, Jack JJ. 1994. Detailed passive cable models of whole-cell recorded CA3 pyramidal neurons in rat hippocampal slices. J. Neurosci. 14: 4613– 38
+73. Major G, Polsky A, Denk W, Schiller J, Tank DW. 2008. Spatiotemporally graded NMDA spike/plateau potentials in basal dendrites of neocortical pyramidal neurons. J. Neurophysiol. 99: 2584– 601
+74. Major G, Tank DW. 2004. Persistent neural activity: prevalence and mechanisms. Curr. Opin. Neurobiol. 14: 675– 84
+75. McCormick DA, Shu Y, Yu Y. 2007. Neurophysiology: Hodgkin and Huxley model—still standing?. Nature 445: E1– 2 discussion E2–3
+76. Mel BW. 1993. Synaptic integration in an excitable dendritic tree. J. Neurophysiol. 70: 1086– 101
+77. Mel BW. 1994. Information processing in dendritic trees. Neural Comput. 6: 1031– 85
+78. Migliore M, Shepherd GM. 2002. Emerging rules for the distributions of active dendritic conductances. Nat. Rev. Neurosci. 3: 362– 70
+79. Milojkovic BA, Radojicic MS, Antic SD. 2005a. A strict correlation between dendritic and somatic plateau depolarizations in the rat prefrontal cortex pyramidal neurons. J. Neurosci. 25: 3940– 51
+80. Milojkovic BA, Radojicic MS, Goldman-Rakic PS, Antic SD. 2004. Burst generation in rat pyramidal neurones by regenerative potentials elicited in a restricted part of the basilar dendritic tree. J. Physiol. 558: 193– 211
+81. Milojkovic BA, Wuskell JP, Loew LM, Antic SD. 2005b. Initiation of sodium spikelets in basal dendrites of neocortical pyramidal neurons. J. Membr. Biol. 208: 155– 69
+82. Milojkovic BA, Zhou WL, Antic SD. 2007. Voltage and calcium transients in basal dendrites of the rat prefrontal cortex. J. Physiol. 585: Pt. 2 447– 68
+83. Mirsky JS, Nadkarni PM, Healy MD, Miller PL, Shepherd GM. 1998. Database tools for integrating and searching membrane property data correlated with neuronal morphology. J. Neurosci. Methods 82: 105– 21
+84. Myme CI, Sugino K, Turrigiano GG, Nelson SB. 2003. The NMDA-to-AMPA ratio at synapses onto layer 2/3 pyramidal neurons is conserved across prefrontal and visual cortices. J. Neurophysiol. 90: 771– 79
+85. Nevian T, Larkum ME, Polsky A, Schiller J. 2007. Properties of basal dendrites of layer 5 pyramidal neurons: a direct patch-clamp recording study. Nat. Neurosci. 10: 206– 14
+86. Ngo-Anh TJ, Bloodgood BL, Lin M, Sabatini BL, Maylie J, Adelman JP. 2005. SK channels and NMDA receptors form a Ca 2+ -mediated feedback loop in dendritic spines. Nat. Neurosci. 8: 642– 49
+87. Nimchinsky EA, Yasuda R, Oertner TG, Svoboda K. 2004. The number of glutamate receptors opened by synaptic stimulation in single hippocampal spines. J. Neurosci. 24: 2054– 64
+88. Palmer LM, Schulz JM, Murphy SC, Ledergerber D, Murayama M, Larkum ME. 2012. The cellular basis of GABA B -mediated interhemispheric inhibition. Science 335: 989– 93
+89. Paoletti P. 2011. Molecular basis of NMDA receptor functional diversity. Eur. J. Neurosci. 33: 1351– 65
+90. Patneau DK, Mayer ML. 1990. Structure-activity relationships for amino acid transmitter candidates acting at N-methyl-D-aspartate and quisqualate receptors. J. Neurosci. 10: 2385– 99
+91. Petreanu L, Mao T, Sternson SM, Svoboda K. 2009. The subcellular organization of neocortical excitatory connections. Nature 457: 1142– 45
+92. Platkiewicz J, Brette R. 2011. Impact of fast sodium channel inactivation on spike threshold dynamics and synaptic integration. PLoS Comput. Biol. 7: e1001129
+93. Poirazi P, Brannon T, Mel BW. 2003. Pyramidal neuron as two-layer neural network. Neuron 37: 989– 99
+94. Polsky A, Mel B, Schiller J. 2009. Encoding and decoding bursts by NMDA spikes in basal dendrites of layer 5 pyramidal neurons. J. Neurosci. 29: 11891– 903
+95. Polsky A, Mel BW, Schiller J. 2004. Computational subunits in thin dendrites of pyramidal cells. Nat. Neurosci. 7: 621– 27
+96. Popescu G, Robert A, Howe JR, Auerbach A. 2004. Reaction mechanism determines NMDA receptor response to repetitive stimulation. Nature 430: 790– 93
+97. Postlethwaite M, Hennig MH, Steinert JR, Graham BP, Forsythe ID. 2007. Acceleration of AMPA receptor kinetics underlies temperature-dependent changes in synaptic strength at the rat calyx of Held. J. Physiol. 579: 69– 84
+98. Priebe NJ, Ferster D. 2010. Neuroscience: each synapse to its own. Nature 464: 1290– 91
+99. Rall W. 1964. Theoretical significance of dendritic trees for neuronal input-output relations. Neural Theory and Modeling R Reiss 73– 97 Stanford, CA: Stanford Univ. Press
+100. Rall W. 1977. Core conductor theory and cable properties of neurons. Handbook of Physiology, the Nervous System, Cellular Biology of Neurons. Sect. 1. Vol. 1, Part 1, ed. ER Kandel 39– 98 Bethesda, MD: Am. Physiol. Soc.
+101. Rapp M, Yarom Y, Segev I. 1996. Modeling back propagating action potential in weakly excitable dendrites of neocortical pyramidal cells. Proc. Natl. Acad. Sci. USA 93: 11985– 90
+102. Rhodes P. 2006. The properties and implications of NMDA spikes in neocortical pyramidal cells. J. Neurosci. 26: 6704– 15
+103. Rhodes PA. 1999. Functional implications of active currents in the dendrites of pyramidal neurons. Cerebral Cortex 13 PS Ulinski, EG Jones, A Peters 139– 200 New York: Plenum
+104. Rhodes PA, Llinas RR. 2001. Apical tuft input efficacy in layer 5 pyramidal cells from rat visual cortex. J. Physiol. 536: 167– 87
+105. Rinzel J, Rall W. 1974. Transient response in a dendritic neuron model for current injected at one branch. Biophys. J. 14: 759– 90
+106. Sanders H, Berends M, Major G, Goldman MS, Lisman JE. 2013. NMDA and GABA B (KIR) conductances: the “perfect couple” for bistability. J. Neurosci. 33: 424– 29
+107. Schaefer AT, Larkum ME, Sakmann B, Roth A. 2003. Coincidence detection in pyramidal neurons is tuned by their dendritic branching pattern. J. Neurophysiol. 89: 3143– 54
+108. Schiller J, Major G, Koester HJ, Schiller Y. 2000. NMDA spikes in basal dendrites of cortical pyramidal neurons. Nature 404: 285– 89
+109. Schiller J, Schiller Y. 2001. NMDA receptor-mediated dendritic spikes and coincident signal amplification. Curr. Opin. Neurobiol. 11: 343– 48
+110. Schiller J, Schiller Y, Stuart G, Sakmann B. 1997. Calcium action potentials restricted to distal apical dendrites of rat neocortical pyramidal neurons. J. Physiol. 505: Pt. 3 605– 16
+111. Schneggenburger R, Zhou Z, Konnerth A, Neher E. 1993. Fractional contribution of calcium to the cation current through glutamate receptor channels. Neuron 11: 133– 43
+112. Schubert D, Staiger JF, Cho N, Kotter R, Zilles K, Luhmann HJ. 2001. Layer-specific intracolumnar and transcolumnar functional connectivity of layer V pyramidal cells in rat barrel cortex. J. Neurosci. 21: 3580– 92
+113. Schwindt P, Crill W. 1999. Mechanisms underlying burst and regular spiking evoked by dendritic depolarization in layer 5 cortical pyramidal neurons. J. Neurophysiol. 81: 1341– 54
+114. Schwindt PC, Crill WE. 1997. Local and propagated dendritic action potentials evoked by glutamate iontophoresis on rat neocortical pyramidal neurons. J. Neurophysiol. 77: 2466– 83
+115. Self MW, Kooijmans RN, Super H, Lamme VA, Roelfsema PR. 2012. Different glutamate receptors convey feedforward and recurrent processing in macaque V1. Proc. Natl. Acad. Sci. USA 109: 11031– 36
+116. Shu Y, Hasenstaub A, Duque A, Yu Y, McCormick DA. 2006. Modulation of intracortical synaptic potentials by presynaptic somatic membrane potential. Nature 441: 761– 65
+117. Sobczyk A, Svoboda K. 2007. Activity-dependent plasticity of the NMDA-receptor fractional Ca(2+) current. Neuron 53: 17– 24
+118. Spruston N. 2008. Pyramidal neurons: dendritic structure and synaptic integration. Nat. Rev. Neurosci. 9: 206– 21
+119. Spruston N, Jaffe DB, Johnston D. 1994. Dendritic attenuation of synaptic potentials and currents: the role of passive membrane properties. Trends Neurosci. 17: 161– 66
+120. Spruston N, Jonas P, Sakmann B. 1995a. Dendritic glutamate receptor channels in rat hippocampal CA3 and CA1 pyramidal neurons. J. Physiol. 482: Pt. 2 325– 52
+121. Spruston N, Schiller Y, Stuart G, Sakmann B. 1995b. Activity-dependent action-potential invasion and calcium influx into hippocampal CA1 dendrites. Science 268: 297– 300
+122. Stafstrom CE, Schwindt PC, Crill WE. 1984. Cable properties of layer V neurons from cat sensorimotor cortex in vitro. J. Neurophysiol. 52: 278– 89
+123. Stern P, Edwards FA, Sakmann B. 1992. Fast and slow components of unitary EPSCs on stellate cells elicited by focal stimulation in slices of rat visual cortex. J. Physiol. 449: 247– 78
+124. Storm JF. 1990. Potassium currents in hippocampal pyramidal cells. Prog. Brain Res. 83: 161– 87
+125. Stratford K, Mason A, Larkman AU, Major G, Jack JJ. 1989. The modelling of pyramidal neurons in the visual cortex. The Computing Neuron R Durbin, C Miall, G Mitchison 296– 321 Wokingham, UK: Addison-Wesley
+126. Stuart G, Spruston N. 1998. Determinants of voltage attenuation in neocortical pyramidal neuron dendrites. J. Neurosci. 18: 3501– 10
+127. Stuart G, Spruston N, Sakmann B, Häusser M. 1997. Action potential initiation and backpropagation in neurons of the mammalian CNS. Trends Neurosci. 20: 125– 31
+128. Stuart GJ, Sakmann B. 1994. Active propagation of somatic action potentials into neocortical pyramidal cell dendrites. Nature 367: 69– 72
+129. Stuart GJ, Spruston N, Häusser M. 1999. Dendrites New York: Oxford Univ. Press.
+130. Suzuki T, Kodama S, Hoshino C, Izumi T, Miyakawa H. 2008. A plateau potential mediated by the activation of extrasynaptic NMDA receptors in rat hippocampal CA1 pyramidal neurons. Eur. J. Neurosci. 28: 521– 34
+131. Takahashi N, Kitamura K, Matsuo N, Mayford M, Kano M. et al. 2012. Locally synchronized synaptic inputs. Science 335: 353– 56
+132. Tateno T, Harsch A, Robinson HP. 2004. Threshold firing frequency-current relationships of neurons in rat somatosensory cortex: type 1 and type 2 dynamics. J. Neurophysiol. 92: 2283– 94
+133. Trussell LO, Fischbach GD. 1989. Glutamate receptor desensitization and its role in synaptic transmission. Neuron 3: 209– 18
+134. Varga Z, Jia H, Sakmann B, Konnerth A. 2011. Dendritic coding of multiple sensory inputs in single cortical neurons in vivo. Proc. Natl. Acad. Sci. USA 108: 15420– 25
+135. Vyklický L Jr, Benveniste M, Mayer ML. 1990. Modulation of N -methyl-D-aspartic acid receptor desensitization by glycine in mouse cultured hippocampal neurones. J. Physiol. 428: 313– 31
+136. Waters J, Helmchen F. 2006. Background synaptic activity is sparse in neocortex. J. Neurosci. 26: 8267– 77
+137. Wei DS, Mei YA, Bagal A, Kao JP, Thompson SM, Tang CM. 2001. Compartmentalized and binary behavior of terminal dendrites in hippocampal pyramidal neurons. Science 293: 2272– 75
+138. Wilent WB, Contreras D. 2005. Stimulus-dependent changes in spike threshold enhance feature selectivity in rat barrel cortex neurons. J. Neurosci. 25: 2983– 91
+139. Williams SR. 2004. Spatial compartmentalization and functional impact of conductance in pyramidal neurons. Nat. Neurosci. 7: 961– 67
+140. Williams SR, Stuart GJ. 1999. Mechanisms and consequences of action potential burst firing in rat neocortical pyramidal neurons. J. Physiol. 521: 467– 82
+141. Williams SR, Stuart GJ. 2000. Site independence of EPSP time course is mediated by dendritic I-h in neocortical pyramidal neurons. J. Neurophysiol. 83: 3177– 82
+142. Williams SR, Stuart GJ. 2002. Dependence of EPSP efficacy on synapse location in neocortical pyramidal neurons. Science 295: 1907– 10
+143. Williams SR, Stuart GJ. 2003. Role of dendritic synapse location in the control of action potential output. Trends Neurosci. 26: 147– 54
+144. Wong RKS, Prince DA, Basbaum AI. 1979. Intra-dendritic recordings from hippocampal neurons. Proc. Natl. Acad. Sci. USA 76: 986– 90
+145. Xu NL, Harnett MT, Huber D, O'Connor DH, Svoboda K, Magee JC. 2012. Nonlinear dendritic integration of sensory and motor input during an active sensing task. Nature 492: 247– 51
+146. Yamada M, Inanobe A, Kurachi Y. 1998. G protein regulation of potassium ion channels. Pharmacol. Rev. 50: 723– 60
+147. Yu Y, Shu Y, McCormick DA. 2008. Cortical action potential backpropagation explains spike threshold variability and rapid-onset kinetics. J. Neurosci. 28: 7260– 72
+148. Yuan H, Geballe MT, Hansen KB, Traynelis SF. 2008. Structure and function of the NMDA receptor. Structural and Functional Organization of the Synapse JW Hell, MD Ehlers 289– 316 New York: Springer Sci.+Bus. Media
+149. Yuste R, Gutnick MJ, Saar D, Delaney KR, Tank DW. 1994. Ca 2+ accumulations in dendrites of neocortical pyramidal neurons: an apical band and evidence for two functional compartments. Neuron 13: 23– 43
+150. Zhang S, Trussell LO. 1994. Voltage clamp analysis of excitatory synaptic transmission in the avian nucleus magnocellularis. J. Physiol. 480: Pt. 1 123– 36
+151. Zhu JJ. 2000. Maturation of layer 5 neocortical pyramidal neurons: amplifying salient layer 1 and layer 4 inputs by Ca 2+ action potentials in adult rat tuft dendrites. J. Physiol. 526: Pt. 3 571– 87

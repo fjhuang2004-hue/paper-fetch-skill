@@ -95,6 +95,7 @@ runner 默认通过本机 Codex CLI（`codex exec --cd <repo-root> --sandbox wor
    - 人工阅读 `extracted.md`，并写入 `onboarding/reviews/<provider>.yml`：`baseline_markdown_path`、`baseline_markdown_sha256`、`markdown_quality_path`、`markdown_quality_sha256`、`review_notes`、`sample_representative`、`markdown_semantic_reviewed`、`issues`、`assertions`、`fixes`。
    - `markdown-quality.json` 必须为 `review_method: agent_prompt`、`status: pass` 且没有 blocking issue；pending 或 fail 都会阻断 `markdown_semantic_reviewed: true`。
    - 若 manifest 声明 `asset_contract.figures.inline: body`，fresh review 必须把缺少正文 `![Figure ...](...)`、仅有文末 `## Figures` caption 作为 blocking issue；若声明 `download: required`，缺少本地 asset path rewrite 也必须 blocking。
+   - 若文章应有 References，fresh review 必须把 `## References` 下参考文献列表缺少可识别序号或编号标签（如 `[1]`、`1.`、`1)` 或 publisher 原始编号）作为 blocking issue。
    - `check-snapshot` 还会通过默认 Codex CLI 或 `PROVIDER_ONBOARDING_AGENT_CLI` override 重新读取当前 `extracted.md` 并写入 `.paper-fetch-runs/<provider>-markdown-quality-audit/<doi_slug>/attempt-N/fresh-markdown-quality.json`；fresh review 发现 blocking issue 时，即使旧 `markdown-quality.json` 是 pass 也必须失败。
    - full runner 在 `snapshot-expected` 阶段遇到 fresh Markdown quality blocking issue 时，会自动进入 `repair-markdown-quality`，修复后再重新运行 fresh review 和 snapshot gate。
    - `issues` 和 `fixes` 使用带稳定 `id` 的对象；每个 fix 必须引用已有 `issue_ids`，并列出至少一个 provider-local `test_names`。
@@ -122,7 +123,7 @@ runner 默认通过本机 Codex CLI（`codex exec --cd <repo-root> --sandbox wor
     - `PYTHONPATH=src python3 -m pytest tests/unit/test_manifest_bundle_sync.py -q`
     - `PYTHONPATH=src python3 -m pytest tests/unit/test_human_docs_drift.py -q`
     - `python3 scripts/validate_extraction_rules.py`
-    - 对 browser/CDN-risk provider 运行 provider subset live review，例如 `PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_golden_criteria_live_review.py --providers mdpi`
+    - 对未来新增 provider 默认运行一次 provider subset live assets review，例如 `PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_golden_criteria_live_review.py --providers mdpi`；已有 legacy 非风险 provider 可豁免。
     - 维护期或合并前人工巡检 route-source drift 时，可本地手动运行 `PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_provider_drift_report.py --provider <provider> --output .paper-fetch-runs/drift/<provider>.json`；该命令不是 GitHub CI gate。
     - `PYTHONPATH=src python3 -m pytest tests/unit -q`
 13. 文档同步与 merge-ready：

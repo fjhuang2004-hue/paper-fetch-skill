@@ -306,111 +306,111 @@ Using the BS formula with a particular implied volatility, traders obtain a doll
 
 ## References (108 total, showing 108)
 
-- Schinckus C . 2012 Methodological comment on Econophysics review I and II: statistical econophysics and agent-based econophysics . Quant. Finance , 12 , 1189 - 1192 . ( doi:10.1080/14697688.2012.704692 )
-- Chakraborti A , Toke IM , Patriarca M , Abergel F . 2011 Econophysics review: I. Empirical facts . Quant. Finance , 11 , 991 - 1012 . ( doi:10.1080/14697688.2010.539248 )
-- Kirman A . 2002 Reflections on interaction and markets . Quant. Finance , 2 , 322 - 326 . ( doi:10.1088/1469-7688/2/5/602 )
-- Föllmer H , Horst U , Kirman A . 2005 Equilibria in financial markets with heterogeneous agents: a probabilistic perspective . J. Math. Econ. , 41 , 123 - 155 . ( doi:10.1016/j.jmateco.2004.08.001 )
-- Chakraborti A , Toke IM , Patriarca M , Abergel F . 2011 Econophysics review: II. Agent-based models . Quant. Finance , 11 , 1013 - 1041 . ( doi:10.1080/14697688.2010.539249 )
-- Papadimitriou C , Piliouras G . 2018 Game dynamics as the meaning of a game . SIGEcom Exchanges , 16 , 53 - 63 . ( doi:10.1145/3331041.3331048 )
-- Piliouras G , Nieto-Granda C , Christensen HI , Shamma JS . 2014 Persistent patterns: multi-agent learning beyond equilibrium and utility. In Proceedings of the 2014 Int. Conf. on Autonomous Agents and Multi-agent Systems AAMAS ’14, pp. 181–188 .
-- Mai T , Panageas I , Vazirani VV . 2017 Opinion dynamics in networks: convergence, stability and lack of explosion. In 44th Int. Colloquium on Automata, Languages, and Programming (ICALP) .
-- Bacoyannis V , Glukhov V , Jin T , Kochems J , Song DR . 2018 Idiosyncrasies and challenges of data driven learning in electronic trading. In NIPS workshop 2018: Challenges and Opportunities for AI in Financial Services: the Impact of Fairness, Explainability, Accuracy, and Privacy .
-- Ganesh S , Vadori N , Xu M , Zheng H , Reddy P , Veloso M . 2019 Multi-agent simulation for pricing and hedging in a dealer market. In ICML’19 Workshop on AI in Finance .
-- Wei H , Wang Y , Mangu L , Decker K . 2019 Model-based reinforcement learning for predictions and control for limit order books. ( http://arxiv.org/abs/1910.03743 )
-- Malamud S , Rostek M . 2017 Decentralized exchange . Am. Econ. Rev. , 107 , 3320 - 62 . ( doi:10.1257/aer.20140759 )
-- Duffie D . 2011 Dark markets: asset pricing and information transmission in over-the-counter markets . Princeton, NJ : Princeton University Press .
-- Chriss N . 1996 Black Scholes and beyond: option pricing models . New York, NY : McGraw-Hill .
-- Otto M . 2001 Finite arbitrage times and the volatility smile? . Physica A , 299 , 299 - 304 . ( doi:10.1016/S0378-4371(01)00309-0 )
-- Kakushadze Z . 2017 Volatility smile as relativistic effect . Physica A , 475 , 59 - 76 . ( doi:10.1016/j.physa.2017.02.012 )
-- Derman E , Miller MB . 2016 The volatility smile . Hoboken, NJ : John Wiley & Sons .
-- Sornette D . 2014 Physics and financial economics (1776–2014): puzzles, Ising and agent-based models . Rep. Prog. Phys. , 77 , 062001 . ( doi:10.1088/0034-4885/77/6/062001 )
-- Vagnani G . 2009 The Black–Scholes model as a determinant of the implied volatility smile: a simulation study . J. Econ. Behav. Organ. , 72 , 103 - 118 . ( doi:10.1016/j.jebo.2009.05.025 )
-- Liu YF , Zhang W , Xu HC . 2014 Collective behavior and options volatility smile: an agent-based explanation . Econ. Modell. , 39 , 232 - 239 . ( doi:10.1016/j.econmod.2014.03.011 )
-- Li T . 2013 Investors’ heterogeneity and implied volatility smiles . Manage. Sci. , 59 , 2392 - 2412 . ( doi:10.1287/mnsc.2013.1712 )
-- Platen E , Schweizer M . 1998 On feedback effects from hedging derivatives . Math. Finance , 8 , 67 - 84 . ( doi:10.1111/1467-9965.00045 )
-- Challet D . 2016 Regrets, learning and wisdom . Eur. Phys. J. Spec. Top. , 225 , 3137 - 3143 . ( doi:10.1140/epjst/e2016-60122-y )
-- Iori G , Porter J . 2012 Agent-based modelling for financial markets. In Handbook on Computational Economics and Finance . ( doi:10.1093/oxfordhb/9780199844371.013.43 )
-- Sinha S , Chatterjee A , Chakraborti A , Chakrabarti BK . 2010 Econophysics: an introduction . Hoboken, NJ : John Wiley & Sons .
-- Stanley HE , et al . 1996 Anomalous fluctuations in the dynamics of complex systems: from DNA and physiology to econophysics . Physica-Section A , 224 , 302 - 321 . ( doi:10.1016/0378-4371(95)00409-2 )
-- Schinckus C . 2018 Ising model, Econophysics and analogies . Physica A , 508 , 95 - 103 . ( doi:10.1016/j.physa.2018.05.063 )
-- Castellano C , Fortunato S , Loreto V . 2009 Statistical physics of social dynamics . Rev. Mod. Phys. , 81 , 591 . ( doi:10.1103/RevModPhys.81.591 )
-- LeBaron B et al. 2001 A builder’s guide to agent-based financial markets . Quant. Finance , 1 , 254 - 261 . ( doi:10.1088/1469-7688/1/2/307 )
-- Farmer JD , Foley D . 2009 The economy needs agent-based modelling . Nature , 460 , 685 - 686 . ( doi:10.1038/460685a )
-- Samanidou E , Zschischang E , Stauffer D , Lux T . 2007 Agent-based models of financial markets . Rep. Prog. Phys. , 70 , 409 . ( doi:10.1088/0034-4885/70/3/R03 )
-- Lee RW . 2005 Implied volatility: statics, dynamics, and probabilistic interpretation. In Recent advances in applied probability , pp. 241–268. New York, NY: Springer .
-- Jacquier A , Shi F . 2019 The randomized Heston model . SIAM J. Finance Math. , 10 , 89 - 129 . ( doi:10.1137/18M1166420 )
-- Gatheral J , Jaisson T , Rosenbaum M . 2018 Volatility is rough . Quant. Finance , 18 , 933 - 949 . ( doi:10.1080/14697688.2017.1393551 )
-- Ellsberg D . 1961 Risk, ambiguity, and the Savage axioms . Q. J. Econ. , 75 , 643 - 669 . ( doi:10.2307/1884324 )
-- Knight FH . 2012 Risk, uncertainty and profit . Boston, MA : Courier Corporation .
-- Schinckus C . 2009 Economic uncertainty and econophysics . Physica A , 388 , 4415 - 4423 . ( doi:10.1016/j.physa.2009.07.008 )
-- Assa H , Gospodinov N . 2018 Market consistent valuations with financial imperfection . Decis. Econ. Finance , 41 , 65 - 90 . ( doi:10.1007/s10203-018-0207-2 )
-- Cousot L . 2004 Necessary and sufficient conditions for no static arbitrage among European calls . New York University : Courant Institute .
-- Laurent JP , Leisen DP . 2001 Building a consistent pricing model from observed option prices. In Quantitative Analysis In Financial Markets: Collected Papers of the New York University Mathematical Finance Seminar , vol. II, pp. 216–238. World Scientific .
-- Buehler H . 2006 Expensive martingales . Quant. Finance , 6 , 207 - 218 . ( doi:10.1080/14697680600668071 )
-- Duembgen M , Rogers L . 2014 Estimate nothing . Quant. Finance , 14 , 2065 - 2072 . ( doi:10.1080/14697688.2014.951678 )
-- Khrennikova P , Patra S . 2019 Asset trading under non-classical ambiguity and heterogeneous beliefs . Physica A , 521 , 562 - 577 . ( doi:10.1016/j.physa.2019.01.067 )
-- Mykland PA et al. 2003 Financial options and statistical prediction intervals . Ann. Stat. , 31 , 1413 - 1438 . ( doi:10.1214/aos/1065705113 )
-- Cheridito P , Kupper M , Tangpi L . 2017 Duality formulas for robust pricing and hedging in discrete time . SIAM J. Finance Math. , 8 , 738 - 765 . ( doi:10.1137/16M1064088 )
-- Acciaio B , Beiglböck M , Penkner F , Schachermayer W . 2016 A model-free version of the fundamental theorem of asset pricing and the super-replication theorem . Math. Finance , 26 , 233 - 251 . ( doi:10.1111/mafi.12060 )
-- Davis MH . 2016 Model-free methods in valuation and hedging of derivative securities. In The handbook of post crisis financial modeling , pp. 168–189. New York, NY: Springer .
-- Cont R . 2006 Model uncertainty and its impact on the pricing of derivative instruments . Math. Finance , 16 , 519 - 547 . ( doi:10.1111/j.1467-9965.2006.00281.x )
-- Burzoni M , Frittelli M , Maggis M . 2016 Universal arbitrage aggregator in discrete-time markets under uncertainty . Finance Stoch. , 20 , 1 - 50 . ( doi:10.1007/s00780-015-0283-x )
-- Wissner-Gross AD , Freer CE . 2010 Relativistic statistical arbitrage . Phys. Rev. E , 82 , 056104 . ( doi:10.1103/PhysRevE.82.056104 )
-- Buchanan M . 2015 Physics in finance: trading at the speed of light . Nature , 518 , 161 - 163 . ( doi:10.1038/518161a )
-- Gu GF , Xiong X , Ren F , Zhou WX , Zhang W . 2013 The position profiles of order cancellations in an emerging stock market . J. Stat. Mech: Theory Exp. , 2013 , P04027 . ( doi:10.1088/1742-5468/2013/04/P04027 )
-- Yoshimura Y , Okuda H , Chen Y . 2020 A mathematical formulation of order cancellation for the agent-based modelling of financial markets . Physica A , 538 , 122507 . ( doi:10.1016/j.physa.2019.122507 )
-- Eisler Z , Bouchaud JP , Kockelkoren J . 2012 The price impact of order book events: market orders, limit orders and cancellations . Quant. Finance , 12 , 1395 - 1419 . ( doi:10.1080/14697688.2010.528444 )
-- Hkazla J , Jadbabaie A , Mossel E , Rahimian MA . 2019 Reasoning in Bayesian opinion exchange networks is PSPACE-hard. In Conf. on Learning Theory , pp. 1614–1648. http://proceedings.mlr.press/v99/hazla19a.html .
-- Mossel E , Sly A , Tamuz O . 2014 Asymptotic learning on Bayesian social networks . Probab. Theory Relat. Fields , 158 , 127 - 157 . ( doi:10.1007/s00440-013-0479-y )
-- Banerjee AV . 1992 A simple model of herd behavior . Q. J. Econ. , 107 , 797 - 817 . ( doi:10.2307/2118364 )
-- Bikhchandani S , Hirshleifer D , Welch I . 1992 A theory of fads, fashion, custom, and cultural change as informational cascades . J. Pol. Econ. , 100 , 992 - 1026 . ( doi:10.1086/261849 )
-- Smith L , Sørensen P . 2000 Pathological outcomes of observational learning . Econometrica , 68 , 371 - 398 . ( doi:10.1111/1468-0262.00113 )
-- Chandrasekhar AG , Larreguy H , Xandri JP . 2019 Testing models of social learning on networks: evidence from two experiments . Econometrica , 88 , 1 - 32 . ( doi:10.3982/ecta14407 )
-- Becker J , Brackbill D , Centola D . 2017 Network dynamics of social influence in the wisdom of crowds . Proc. Natl Acad. Sci. USA , 114 , E5070 - E5076 . ( doi:10.1073/pnas.1621512114 )
-- Fudenberg D , Levine DK . 1998 The theory of learning in games , vol. 2 . Cambridge, MA : MIT Press .
-- Kalai E , Lehrer E . 1994 Weak and strong merging of opinions . J. Math. Econ. , 23 , 73 - 86 . ( doi:10.1016/0304-4068(94)90037-X )
-- DeGroot MH . 1974 Reaching a consensus . J. Am. Stat. Assoc. , 69 , 118 - 121 . ( doi:10.1080/01621459.1974.10480137 )
-- Masuda N , Porter MA , Lambiotte R . 2017 Random walks and diffusion on networks . Phys. Rep. , 716 , 1 - 58 . ( doi:10.1016/j.physrep.2017.07.007 )
-- Acemoglu D , Ozdaglar A . 2011 Opinion dynamics and learning in social networks . Dyn. Games Appl. , 1 , 3 - 49 . ( doi:10.1007/s13235-010-0004-1 )
-- Golub B , Sadler E . 2016 Learning in social networks. In The Oxford Handbook of the Economics of Networks . Oxford, UK: Oxford University Press .
-- Noorazar H . 2020 Recent advances in opinion propagation dynamics: a 2020 Survey . Eur. Phys. J. Plus , 135 , 521 . ( doi:10.1140/epjp/s13360-020-00541-2 )
-- Salinelli E , Tomarelli F . 2014 In Discrete dynamical systems: one-step scalar equations , pp. 85–124. Cham, Switzerland: Springer International Publishing .
-- Mizuno T , Nakano T , Takayasu M , Takayasu H . 2004 Traders’ strategy with price feedbacks in financial market . Physica A , 344 , 330 - 334 . ( doi:10.1016/j.physa.2004.06.145 )
-- Mizuno T , Kurihara S , Takayasu M , Takayasu H . 2003 Analysis of high-resolution foreign exchange data of USD-JPY for 13 years . Physica A , 324 , 296 - 302 . ( doi:10.1016/S0378-4371(02)01881-2 )
-- Horn RA , Johnson CR . 2012 Matrix analysis , (2nd edn) . New York, NY : Cambridge University Press .
-- Diaconis P , Freedman D . 1999 Iterated random functions . SIAM Rev. , 41 , 45 - 76 . ( doi:10.1137/S0036144598338446 )
-- Crisanti A , Paladin G , Vulpiani A . 2012 Products of random matrices: in statistical physics , vol. 104 . Heidelberg, Germany : Springer Science & Business Media .
-- Bruneau L , Joye A , Merkli M . 2010 Infinite products of random matrices and repeated interaction dynamics. In Annales de l’IHP Probabilités et statistiques , vol. 46, pp. 442–464 .
-- Garnerone S , de Oliveira TR , Zanardi P . 2010 Typicality in random matrix product states . Phys. Rev. A , 81 , 032336 . ( doi:10.1103/PhysRevA.81.032336 )
-- Tahbaz-Salehi A , Jadbabaie A . 2008 A necessary and sufficient condition for consensus over random networks . IEEE Trans. Autom. Control , 53 , 791 - 795 . ( doi:10.1109/TAC.2008.917743 )
-- Askarzadeh Z , Fu R , Halder A , Chen Y , Georgiou TT . 2019 Stability theory of stochastic models in opinion dynamics . IEEE Trans. Autom. Control , 65 , 522 - 533 . ( doi:10.1109/TAC.2019.2912490 )
-- Guéant O . 2016 The financial mathematics of market liquidity: from optimal execution to market making , vol. 33 . Boca Raton, FL : CRC Press .
-- Bouchaud JP , Bonart J , Donier J , Gould M . 2018 Trades, quotes and prices: financial markets under the microscope . Cambridge, UK : Cambridge University Press .
-- Carr P , Madan DB . 2005 A note on sufficient conditions for no arbitrage . Finance Res. Lett. , 2 , 125 - 130 . ( doi:10.1016/j.frl.2005.04.005 )
-- Gatheral J , Jacquier A . 2014 Arbitrage-free SVI volatility surfaces . Quant. Finance , 14 , 59 - 71 . ( doi:10.1080/14697688.2013.819986 )
-- Tehranchi MR . 2016 Uniform bounds for Black–Scholes implied volatility . SIAM J. Finance Math. , 7 , 893 - 916 . ( doi:10.1137/14095248X )
-- Assa H , Pouralizadeh M , Badamchizadeh A . 2019 Sound deposit insurance pricing using a machine learning approach . Risks , 7 , 45 . ( doi:10.3390/risks7020045 )
-- Roper M . 2010 Arbitrage free implied volatility surfaces. preprint . https://talus.maths.usyd.edu.au/u/pubs/publist/preprints/2010/roper-9.pdf .
-- Rogers L , Tehranchi M . 2010 Can the implied volatility surface move by parallel shifts? . Finance Stoch. , 14 , 235 - 248 . ( doi:10.1007/s00780-008-0081-9 )
-- Delbaen F , Schachermayer W . 2006 The mathematics of arbitrage . New York, NY : Springer Science & Business Media .
-- Ellersgaard S , Jönsson M , Poulsen R . 2017 The fundamental theorem of derivative trading-exposition, extensions and experiments . Quant. Finance , 17 , 515 - 529 . ( doi:10.1080/14697688.2016.1222078 )
-- Budhiraja A , Pal Majumder A . 2015 Long time results for a weakly interacting particle system in discrete time . Stoch. Anal. Appl. , 33 , 429 - 463 . ( doi:10.1080/07362994.2014.1003434 )
-- Carmona R , Delarue F . 2018 Probabilistic theory of mean field games with applications. I , vol. 83 . Probability Theory and Stochastic Modelling . Cham, Switzerland : Springer .
-- Boers N , Pickl P . 2016 On mean field limits for dynamical systems . J. Stat. Phys. , 164 , 1 - 16 . ( doi:10.1007/s10955-015-1351-5 )
-- Kolarijani MAS , Proskurnikov AV , Esfahani PM . In press. Macroscopic noisy bounded confidence models with distributed radical opinions . IEEE Trans. Autom. Control . ( doi:10.1109/TAC.2020.2994284 )
-- Jabin PE , Motsch S . 2014 Clustering and asymptotic behavior in opinion formation . J. Differ. Equ. , 257 , 4165 - 4187 . ( doi:10.1016/j.jde.2014.08.005 )
-- Popescu I , Vaidya T . 2019 Averaging plus Learning in financial markets. ( http://arxiv.org/abs/1904.08131 )
-- DeMarzo P , Kremer I , Mansour Y . 2006 Online trading algorithms and robust option pricing. In Proc. of the 38th Annual ACM Symp. on Theory of Computing , pp. 477–486. ACM .
-- Abernethy J , Frongillo RM , Wibisono A . 2012 Minimax option pricing meets Black-Scholes in the limit. In Proc. of the 44th Annual ACM Symp. on Theory of Computing , pp. 1029–1040. ACM .
-- Abernethy J , Bartlett PL , Frongillo R , Wibisono A . 2013 How to hedge an option against an adversary: Black-Scholes pricing is minimax optimal. In Advances in neural information processing systems (eds MI Jordan, Y Lecun, SA Solla), pp. 2346–2354 . Cambridge, MA : MIT Press .
-- Ayache E , Henrotte P , Nassar S , Wang X . 2004 Can anyone solve the smile problem. In The best of Wilmott , p. 229 .
-- Kamal M , Gatheral J . 2010 Implied volatility surface. In Encyclopedia of quantitative finance , vol. 2, pp. 926–930. Hoboken, NJ: Wiley .
-- Kyprianou A , Schoutens W , Wilmott P . 2006 Exotic option pricing and advanced Lévy models . Hoboken, NJ : John Wiley & Sons .
-- Schweizer M , Wissel J . 2008 Arbitrage-free market models for option prices: the multi-strike case . Finance Stoch. , 12 , 469 - 505 . ( doi:10.1007/s00780-008-0068-6 )
-- Mossel E , Tamuz O . 2017 Opinion exchange dynamics . Probab. Surv. , 14 , 155 - 204 . ( doi:10.1214/14-PS230 )
-- Nadtochiy S , Obłój J . 2017 Robust trading of implied skew . Int. J. Theor. Appl. Finance , 20 , 1750008 . ( doi:10.1142/S021902491750008X )
-- Davis MH , Hobson DG . 2007 The range of traded option prices . Math. Finance , 17 , 1 - 14 . ( doi:10.1111/j.1467-9965.2007.00291.x )
-- Shafer G , Vovk V . 2019 Game-theoretic foundations for probability and finance , vol. 455 . Hoboken, NJ : John Wiley & Sons .
-- Jarrow RA . 2018 Continuous-time asset pricing theory . New York, NY : Springer .
-- Buehler H , Gonon L , Teichmann J , Wood B . 2019 Deep hedging . Quant. Finance , 19 , 1271 - 1291 . ( doi:10.1080/14697688.2019.1571683 )
-- Vaidya T , Murguia C , Piliouras G . 2020 Learning agents in Black–Scholes financial markets. Dryad Digital Repository . ( doi:10.5061/dryad.prr4xgxjg )
+1. Schinckus C . 2012 Methodological comment on Econophysics review I and II: statistical econophysics and agent-based econophysics . Quant. Finance , 12 , 1189 - 1192 . ( doi:10.1080/14697688.2012.704692 )
+2. Chakraborti A , Toke IM , Patriarca M , Abergel F . 2011 Econophysics review: I. Empirical facts . Quant. Finance , 11 , 991 - 1012 . ( doi:10.1080/14697688.2010.539248 )
+3. Kirman A . 2002 Reflections on interaction and markets . Quant. Finance , 2 , 322 - 326 . ( doi:10.1088/1469-7688/2/5/602 )
+4. Föllmer H , Horst U , Kirman A . 2005 Equilibria in financial markets with heterogeneous agents: a probabilistic perspective . J. Math. Econ. , 41 , 123 - 155 . ( doi:10.1016/j.jmateco.2004.08.001 )
+5. Chakraborti A , Toke IM , Patriarca M , Abergel F . 2011 Econophysics review: II. Agent-based models . Quant. Finance , 11 , 1013 - 1041 . ( doi:10.1080/14697688.2010.539249 )
+6. Papadimitriou C , Piliouras G . 2018 Game dynamics as the meaning of a game . SIGEcom Exchanges , 16 , 53 - 63 . ( doi:10.1145/3331041.3331048 )
+7. Piliouras G , Nieto-Granda C , Christensen HI , Shamma JS . 2014 Persistent patterns: multi-agent learning beyond equilibrium and utility. In Proceedings of the 2014 Int. Conf. on Autonomous Agents and Multi-agent Systems AAMAS ’14, pp. 181–188 .
+8. Mai T , Panageas I , Vazirani VV . 2017 Opinion dynamics in networks: convergence, stability and lack of explosion. In 44th Int. Colloquium on Automata, Languages, and Programming (ICALP) .
+9. Bacoyannis V , Glukhov V , Jin T , Kochems J , Song DR . 2018 Idiosyncrasies and challenges of data driven learning in electronic trading. In NIPS workshop 2018: Challenges and Opportunities for AI in Financial Services: the Impact of Fairness, Explainability, Accuracy, and Privacy .
+10. Ganesh S , Vadori N , Xu M , Zheng H , Reddy P , Veloso M . 2019 Multi-agent simulation for pricing and hedging in a dealer market. In ICML’19 Workshop on AI in Finance .
+11. Wei H , Wang Y , Mangu L , Decker K . 2019 Model-based reinforcement learning for predictions and control for limit order books. ( http://arxiv.org/abs/1910.03743 )
+12. Malamud S , Rostek M . 2017 Decentralized exchange . Am. Econ. Rev. , 107 , 3320 - 62 . ( doi:10.1257/aer.20140759 )
+13. Duffie D . 2011 Dark markets: asset pricing and information transmission in over-the-counter markets . Princeton, NJ : Princeton University Press .
+14. Chriss N . 1996 Black Scholes and beyond: option pricing models . New York, NY : McGraw-Hill .
+15. Otto M . 2001 Finite arbitrage times and the volatility smile? . Physica A , 299 , 299 - 304 . ( doi:10.1016/S0378-4371(01)00309-0 )
+16. Kakushadze Z . 2017 Volatility smile as relativistic effect . Physica A , 475 , 59 - 76 . ( doi:10.1016/j.physa.2017.02.012 )
+17. Derman E , Miller MB . 2016 The volatility smile . Hoboken, NJ : John Wiley & Sons .
+18. Sornette D . 2014 Physics and financial economics (1776–2014): puzzles, Ising and agent-based models . Rep. Prog. Phys. , 77 , 062001 . ( doi:10.1088/0034-4885/77/6/062001 )
+19. Vagnani G . 2009 The Black–Scholes model as a determinant of the implied volatility smile: a simulation study . J. Econ. Behav. Organ. , 72 , 103 - 118 . ( doi:10.1016/j.jebo.2009.05.025 )
+20. Liu YF , Zhang W , Xu HC . 2014 Collective behavior and options volatility smile: an agent-based explanation . Econ. Modell. , 39 , 232 - 239 . ( doi:10.1016/j.econmod.2014.03.011 )
+21. Li T . 2013 Investors’ heterogeneity and implied volatility smiles . Manage. Sci. , 59 , 2392 - 2412 . ( doi:10.1287/mnsc.2013.1712 )
+22. Platen E , Schweizer M . 1998 On feedback effects from hedging derivatives . Math. Finance , 8 , 67 - 84 . ( doi:10.1111/1467-9965.00045 )
+23. Challet D . 2016 Regrets, learning and wisdom . Eur. Phys. J. Spec. Top. , 225 , 3137 - 3143 . ( doi:10.1140/epjst/e2016-60122-y )
+24. Iori G , Porter J . 2012 Agent-based modelling for financial markets. In Handbook on Computational Economics and Finance . ( doi:10.1093/oxfordhb/9780199844371.013.43 )
+25. Sinha S , Chatterjee A , Chakraborti A , Chakrabarti BK . 2010 Econophysics: an introduction . Hoboken, NJ : John Wiley & Sons .
+26. Stanley HE , et al . 1996 Anomalous fluctuations in the dynamics of complex systems: from DNA and physiology to econophysics . Physica-Section A , 224 , 302 - 321 . ( doi:10.1016/0378-4371(95)00409-2 )
+27. Schinckus C . 2018 Ising model, Econophysics and analogies . Physica A , 508 , 95 - 103 . ( doi:10.1016/j.physa.2018.05.063 )
+28. Castellano C , Fortunato S , Loreto V . 2009 Statistical physics of social dynamics . Rev. Mod. Phys. , 81 , 591 . ( doi:10.1103/RevModPhys.81.591 )
+29. LeBaron B et al. 2001 A builder’s guide to agent-based financial markets . Quant. Finance , 1 , 254 - 261 . ( doi:10.1088/1469-7688/1/2/307 )
+30. Farmer JD , Foley D . 2009 The economy needs agent-based modelling . Nature , 460 , 685 - 686 . ( doi:10.1038/460685a )
+31. Samanidou E , Zschischang E , Stauffer D , Lux T . 2007 Agent-based models of financial markets . Rep. Prog. Phys. , 70 , 409 . ( doi:10.1088/0034-4885/70/3/R03 )
+32. Lee RW . 2005 Implied volatility: statics, dynamics, and probabilistic interpretation. In Recent advances in applied probability , pp. 241–268. New York, NY: Springer .
+33. Jacquier A , Shi F . 2019 The randomized Heston model . SIAM J. Finance Math. , 10 , 89 - 129 . ( doi:10.1137/18M1166420 )
+34. Gatheral J , Jaisson T , Rosenbaum M . 2018 Volatility is rough . Quant. Finance , 18 , 933 - 949 . ( doi:10.1080/14697688.2017.1393551 )
+35. Ellsberg D . 1961 Risk, ambiguity, and the Savage axioms . Q. J. Econ. , 75 , 643 - 669 . ( doi:10.2307/1884324 )
+36. Knight FH . 2012 Risk, uncertainty and profit . Boston, MA : Courier Corporation .
+37. Schinckus C . 2009 Economic uncertainty and econophysics . Physica A , 388 , 4415 - 4423 . ( doi:10.1016/j.physa.2009.07.008 )
+38. Assa H , Gospodinov N . 2018 Market consistent valuations with financial imperfection . Decis. Econ. Finance , 41 , 65 - 90 . ( doi:10.1007/s10203-018-0207-2 )
+39. Cousot L . 2004 Necessary and sufficient conditions for no static arbitrage among European calls . New York University : Courant Institute .
+40. Laurent JP , Leisen DP . 2001 Building a consistent pricing model from observed option prices. In Quantitative Analysis In Financial Markets: Collected Papers of the New York University Mathematical Finance Seminar , vol. II, pp. 216–238. World Scientific .
+41. Buehler H . 2006 Expensive martingales . Quant. Finance , 6 , 207 - 218 . ( doi:10.1080/14697680600668071 )
+42. Duembgen M , Rogers L . 2014 Estimate nothing . Quant. Finance , 14 , 2065 - 2072 . ( doi:10.1080/14697688.2014.951678 )
+43. Khrennikova P , Patra S . 2019 Asset trading under non-classical ambiguity and heterogeneous beliefs . Physica A , 521 , 562 - 577 . ( doi:10.1016/j.physa.2019.01.067 )
+44. Mykland PA et al. 2003 Financial options and statistical prediction intervals . Ann. Stat. , 31 , 1413 - 1438 . ( doi:10.1214/aos/1065705113 )
+45. Cheridito P , Kupper M , Tangpi L . 2017 Duality formulas for robust pricing and hedging in discrete time . SIAM J. Finance Math. , 8 , 738 - 765 . ( doi:10.1137/16M1064088 )
+46. Acciaio B , Beiglböck M , Penkner F , Schachermayer W . 2016 A model-free version of the fundamental theorem of asset pricing and the super-replication theorem . Math. Finance , 26 , 233 - 251 . ( doi:10.1111/mafi.12060 )
+47. Davis MH . 2016 Model-free methods in valuation and hedging of derivative securities. In The handbook of post crisis financial modeling , pp. 168–189. New York, NY: Springer .
+48. Cont R . 2006 Model uncertainty and its impact on the pricing of derivative instruments . Math. Finance , 16 , 519 - 547 . ( doi:10.1111/j.1467-9965.2006.00281.x )
+49. Burzoni M , Frittelli M , Maggis M . 2016 Universal arbitrage aggregator in discrete-time markets under uncertainty . Finance Stoch. , 20 , 1 - 50 . ( doi:10.1007/s00780-015-0283-x )
+50. Wissner-Gross AD , Freer CE . 2010 Relativistic statistical arbitrage . Phys. Rev. E , 82 , 056104 . ( doi:10.1103/PhysRevE.82.056104 )
+51. Buchanan M . 2015 Physics in finance: trading at the speed of light . Nature , 518 , 161 - 163 . ( doi:10.1038/518161a )
+52. Gu GF , Xiong X , Ren F , Zhou WX , Zhang W . 2013 The position profiles of order cancellations in an emerging stock market . J. Stat. Mech: Theory Exp. , 2013 , P04027 . ( doi:10.1088/1742-5468/2013/04/P04027 )
+53. Yoshimura Y , Okuda H , Chen Y . 2020 A mathematical formulation of order cancellation for the agent-based modelling of financial markets . Physica A , 538 , 122507 . ( doi:10.1016/j.physa.2019.122507 )
+54. Eisler Z , Bouchaud JP , Kockelkoren J . 2012 The price impact of order book events: market orders, limit orders and cancellations . Quant. Finance , 12 , 1395 - 1419 . ( doi:10.1080/14697688.2010.528444 )
+55. Hkazla J , Jadbabaie A , Mossel E , Rahimian MA . 2019 Reasoning in Bayesian opinion exchange networks is PSPACE-hard. In Conf. on Learning Theory , pp. 1614–1648. http://proceedings.mlr.press/v99/hazla19a.html .
+56. Mossel E , Sly A , Tamuz O . 2014 Asymptotic learning on Bayesian social networks . Probab. Theory Relat. Fields , 158 , 127 - 157 . ( doi:10.1007/s00440-013-0479-y )
+57. Banerjee AV . 1992 A simple model of herd behavior . Q. J. Econ. , 107 , 797 - 817 . ( doi:10.2307/2118364 )
+58. Bikhchandani S , Hirshleifer D , Welch I . 1992 A theory of fads, fashion, custom, and cultural change as informational cascades . J. Pol. Econ. , 100 , 992 - 1026 . ( doi:10.1086/261849 )
+59. Smith L , Sørensen P . 2000 Pathological outcomes of observational learning . Econometrica , 68 , 371 - 398 . ( doi:10.1111/1468-0262.00113 )
+60. Chandrasekhar AG , Larreguy H , Xandri JP . 2019 Testing models of social learning on networks: evidence from two experiments . Econometrica , 88 , 1 - 32 . ( doi:10.3982/ecta14407 )
+61. Becker J , Brackbill D , Centola D . 2017 Network dynamics of social influence in the wisdom of crowds . Proc. Natl Acad. Sci. USA , 114 , E5070 - E5076 . ( doi:10.1073/pnas.1621512114 )
+62. Fudenberg D , Levine DK . 1998 The theory of learning in games , vol. 2 . Cambridge, MA : MIT Press .
+63. Kalai E , Lehrer E . 1994 Weak and strong merging of opinions . J. Math. Econ. , 23 , 73 - 86 . ( doi:10.1016/0304-4068(94)90037-X )
+64. DeGroot MH . 1974 Reaching a consensus . J. Am. Stat. Assoc. , 69 , 118 - 121 . ( doi:10.1080/01621459.1974.10480137 )
+65. Masuda N , Porter MA , Lambiotte R . 2017 Random walks and diffusion on networks . Phys. Rep. , 716 , 1 - 58 . ( doi:10.1016/j.physrep.2017.07.007 )
+66. Acemoglu D , Ozdaglar A . 2011 Opinion dynamics and learning in social networks . Dyn. Games Appl. , 1 , 3 - 49 . ( doi:10.1007/s13235-010-0004-1 )
+67. Golub B , Sadler E . 2016 Learning in social networks. In The Oxford Handbook of the Economics of Networks . Oxford, UK: Oxford University Press .
+68. Noorazar H . 2020 Recent advances in opinion propagation dynamics: a 2020 Survey . Eur. Phys. J. Plus , 135 , 521 . ( doi:10.1140/epjp/s13360-020-00541-2 )
+69. Salinelli E , Tomarelli F . 2014 In Discrete dynamical systems: one-step scalar equations , pp. 85–124. Cham, Switzerland: Springer International Publishing .
+70. Mizuno T , Nakano T , Takayasu M , Takayasu H . 2004 Traders’ strategy with price feedbacks in financial market . Physica A , 344 , 330 - 334 . ( doi:10.1016/j.physa.2004.06.145 )
+71. Mizuno T , Kurihara S , Takayasu M , Takayasu H . 2003 Analysis of high-resolution foreign exchange data of USD-JPY for 13 years . Physica A , 324 , 296 - 302 . ( doi:10.1016/S0378-4371(02)01881-2 )
+72. Horn RA , Johnson CR . 2012 Matrix analysis , (2nd edn) . New York, NY : Cambridge University Press .
+73. Diaconis P , Freedman D . 1999 Iterated random functions . SIAM Rev. , 41 , 45 - 76 . ( doi:10.1137/S0036144598338446 )
+74. Crisanti A , Paladin G , Vulpiani A . 2012 Products of random matrices: in statistical physics , vol. 104 . Heidelberg, Germany : Springer Science & Business Media .
+75. Bruneau L , Joye A , Merkli M . 2010 Infinite products of random matrices and repeated interaction dynamics. In Annales de l’IHP Probabilités et statistiques , vol. 46, pp. 442–464 .
+76. Garnerone S , de Oliveira TR , Zanardi P . 2010 Typicality in random matrix product states . Phys. Rev. A , 81 , 032336 . ( doi:10.1103/PhysRevA.81.032336 )
+77. Tahbaz-Salehi A , Jadbabaie A . 2008 A necessary and sufficient condition for consensus over random networks . IEEE Trans. Autom. Control , 53 , 791 - 795 . ( doi:10.1109/TAC.2008.917743 )
+78. Askarzadeh Z , Fu R , Halder A , Chen Y , Georgiou TT . 2019 Stability theory of stochastic models in opinion dynamics . IEEE Trans. Autom. Control , 65 , 522 - 533 . ( doi:10.1109/TAC.2019.2912490 )
+79. Guéant O . 2016 The financial mathematics of market liquidity: from optimal execution to market making , vol. 33 . Boca Raton, FL : CRC Press .
+80. Bouchaud JP , Bonart J , Donier J , Gould M . 2018 Trades, quotes and prices: financial markets under the microscope . Cambridge, UK : Cambridge University Press .
+81. Carr P , Madan DB . 2005 A note on sufficient conditions for no arbitrage . Finance Res. Lett. , 2 , 125 - 130 . ( doi:10.1016/j.frl.2005.04.005 )
+82. Gatheral J , Jacquier A . 2014 Arbitrage-free SVI volatility surfaces . Quant. Finance , 14 , 59 - 71 . ( doi:10.1080/14697688.2013.819986 )
+83. Tehranchi MR . 2016 Uniform bounds for Black–Scholes implied volatility . SIAM J. Finance Math. , 7 , 893 - 916 . ( doi:10.1137/14095248X )
+84. Assa H , Pouralizadeh M , Badamchizadeh A . 2019 Sound deposit insurance pricing using a machine learning approach . Risks , 7 , 45 . ( doi:10.3390/risks7020045 )
+85. Roper M . 2010 Arbitrage free implied volatility surfaces. preprint . https://talus.maths.usyd.edu.au/u/pubs/publist/preprints/2010/roper-9.pdf .
+86. Rogers L , Tehranchi M . 2010 Can the implied volatility surface move by parallel shifts? . Finance Stoch. , 14 , 235 - 248 . ( doi:10.1007/s00780-008-0081-9 )
+87. Delbaen F , Schachermayer W . 2006 The mathematics of arbitrage . New York, NY : Springer Science & Business Media .
+88. Ellersgaard S , Jönsson M , Poulsen R . 2017 The fundamental theorem of derivative trading-exposition, extensions and experiments . Quant. Finance , 17 , 515 - 529 . ( doi:10.1080/14697688.2016.1222078 )
+89. Budhiraja A , Pal Majumder A . 2015 Long time results for a weakly interacting particle system in discrete time . Stoch. Anal. Appl. , 33 , 429 - 463 . ( doi:10.1080/07362994.2014.1003434 )
+90. Carmona R , Delarue F . 2018 Probabilistic theory of mean field games with applications. I , vol. 83 . Probability Theory and Stochastic Modelling . Cham, Switzerland : Springer .
+91. Boers N , Pickl P . 2016 On mean field limits for dynamical systems . J. Stat. Phys. , 164 , 1 - 16 . ( doi:10.1007/s10955-015-1351-5 )
+92. Kolarijani MAS , Proskurnikov AV , Esfahani PM . In press. Macroscopic noisy bounded confidence models with distributed radical opinions . IEEE Trans. Autom. Control . ( doi:10.1109/TAC.2020.2994284 )
+93. Jabin PE , Motsch S . 2014 Clustering and asymptotic behavior in opinion formation . J. Differ. Equ. , 257 , 4165 - 4187 . ( doi:10.1016/j.jde.2014.08.005 )
+94. Popescu I , Vaidya T . 2019 Averaging plus Learning in financial markets. ( http://arxiv.org/abs/1904.08131 )
+95. DeMarzo P , Kremer I , Mansour Y . 2006 Online trading algorithms and robust option pricing. In Proc. of the 38th Annual ACM Symp. on Theory of Computing , pp. 477–486. ACM .
+96. Abernethy J , Frongillo RM , Wibisono A . 2012 Minimax option pricing meets Black-Scholes in the limit. In Proc. of the 44th Annual ACM Symp. on Theory of Computing , pp. 1029–1040. ACM .
+97. Abernethy J , Bartlett PL , Frongillo R , Wibisono A . 2013 How to hedge an option against an adversary: Black-Scholes pricing is minimax optimal. In Advances in neural information processing systems (eds MI Jordan, Y Lecun, SA Solla), pp. 2346–2354 . Cambridge, MA : MIT Press .
+98. Ayache E , Henrotte P , Nassar S , Wang X . 2004 Can anyone solve the smile problem. In The best of Wilmott , p. 229 .
+99. Kamal M , Gatheral J . 2010 Implied volatility surface. In Encyclopedia of quantitative finance , vol. 2, pp. 926–930. Hoboken, NJ: Wiley .
+100. Kyprianou A , Schoutens W , Wilmott P . 2006 Exotic option pricing and advanced Lévy models . Hoboken, NJ : John Wiley & Sons .
+101. Schweizer M , Wissel J . 2008 Arbitrage-free market models for option prices: the multi-strike case . Finance Stoch. , 12 , 469 - 505 . ( doi:10.1007/s00780-008-0068-6 )
+102. Mossel E , Tamuz O . 2017 Opinion exchange dynamics . Probab. Surv. , 14 , 155 - 204 . ( doi:10.1214/14-PS230 )
+103. Nadtochiy S , Obłój J . 2017 Robust trading of implied skew . Int. J. Theor. Appl. Finance , 20 , 1750008 . ( doi:10.1142/S021902491750008X )
+104. Davis MH , Hobson DG . 2007 The range of traded option prices . Math. Finance , 17 , 1 - 14 . ( doi:10.1111/j.1467-9965.2007.00291.x )
+105. Shafer G , Vovk V . 2019 Game-theoretic foundations for probability and finance , vol. 455 . Hoboken, NJ : John Wiley & Sons .
+106. Jarrow RA . 2018 Continuous-time asset pricing theory . New York, NY : Springer .
+107. Buehler H , Gonon L , Teichmann J , Wood B . 2019 Deep hedging . Quant. Finance , 19 , 1271 - 1291 . ( doi:10.1080/14697688.2019.1571683 )
+108. Vaidya T , Murguia C , Piliouras G . 2020 Learning agents in Black–Scholes financial markets. Dryad Digital Repository . ( doi:10.5061/dryad.prr4xgxjg )

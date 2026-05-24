@@ -132,6 +132,8 @@ def test_markdown_contract_structure_fixture() -> None:
     markdown = _render_markdown_for_fixture(HTML_DOI)
     assert "## Abstract" in markdown
     assert "## References" in markdown
+    assert re.search(r"(?m)^1\. Shah D, Yang B, Kriegman S", markdown)
+    assert not re.search(r"(?m)^- Shah D, Yang B, Kriegman S", markdown)
     assert "Article metrics loading..." not in markdown
     assert "Download as PowerPoint" not in markdown
 
@@ -184,6 +186,10 @@ def test_markdown_contract_references_fixture() -> None:
     # markdown-review: purpose=references doi=10.1146/annurev-environ-102511-084654
     markdown = _render_markdown_for_fixture(REFERENCES_DOI)
     assert "## References" in markdown
+    assert re.search(r"(?m)^1\. Gladwell M\. 2000\.", markdown)
+    assert re.search(r"(?m)^2\. Grodzins M\. 1957\.", markdown)
+    assert "Gladwell M. 1. 2000" not in markdown
+    assert not re.search(r"(?m)^- Gladwell M\.", markdown)
     assert "Reference" in markdown
     assert "Google Scholar" not in markdown
     assert "Related Articles from Annual Reviews" not in markdown

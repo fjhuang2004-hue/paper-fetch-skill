@@ -7,7 +7,7 @@ fixtures:
   purpose: structure
   doi: 10.1098/rsta.2019.0558
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rsta.2019.0558/extracted.md
-  baseline_markdown_sha256: 50f2ad90c97793ef16d07b35495f3c45145f49ab07e7eeef6b43ed23274e4c05
+  baseline_markdown_sha256: 1de454fb857adcdc6c0caf6649ab518cfc07fcfb7c5b68ea9e2179909164dace
   review_notes: Semantic review completed against committed fixture evidence.
   sample_representative: true
   markdown_semantic_reviewed: true
@@ -21,12 +21,12 @@ fixtures:
   - must not match (?m)^- Figure$
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rsta.2019.0558/markdown-quality.json
-  markdown_quality_sha256: 33344e04eb97cc07b72d4cc87471dcaefad5cbc63dfa5eb176d3dd0928a14990
+  markdown_quality_sha256: d88f7bf666e60b1095d3cf8317239cb37f3e97956558011e026e10ea864cb2c6
 - fixture: tests/fixtures/golden_criteria/10.1098_rspb.2020.0097
   purpose: table
   doi: 10.1098/rspb.2020.0097
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rspb.2020.0097/extracted.md
-  baseline_markdown_sha256: 1269a65232a80bdd807e8e915997e5966b0eb58aeb95df550109052df73e2227
+  baseline_markdown_sha256: 5afeb1a51409cf054c67859d19a7b5fb61ecfa00732298f7c2254e8849b87464
   review_notes: Semantic review completed against committed fixture evidence.
   sample_representative: true
   markdown_semantic_reviewed: true
@@ -39,12 +39,12 @@ fixtures:
   - must match (?m)^\|.+\|$
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rspb.2020.0097/markdown-quality.json
-  markdown_quality_sha256: ee6d42a123ef82b6cf653961924f5750ac2322ea9d628710b23f818f16b45e50
+  markdown_quality_sha256: 557dfcdc1458c6a22173209d0d24f808d2f1bffa58fab9f59ee41b1139a85d03
 - fixture: tests/fixtures/golden_criteria/10.1098_rsos.201188
   purpose: formula
   doi: 10.1098/rsos.201188
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rsos.201188/extracted.md
-  baseline_markdown_sha256: 4f2ff982c21504ed0456f9201f3572af8c612e6d50235f8bbbf888e0a6ef4499
+  baseline_markdown_sha256: 3abbec52939b823c61f7429ae1d973839e852a3347fc0fa707b1d8b0b372f844
   review_notes: Semantic review completed against committed fixture evidence.
   sample_representative: true
   markdown_semantic_reviewed: true
@@ -57,12 +57,12 @@ fixtures:
   - must match (?:\$|Equation|BS)
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rsos.201188/markdown-quality.json
-  markdown_quality_sha256: b546c82286d8d33fbedfd073539a65a3470eea2755243b2d1fbd9e01a197dfd8
+  markdown_quality_sha256: dfc622e95528796841d33f4b39d5f6579c45462d5375d1a025ed1b7009858570
 - fixture: tests/fixtures/golden_criteria/10.1098_rsos.150470
   purpose: figure
   doi: 10.1098/rsos.150470
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rsos.150470/extracted.md
-  baseline_markdown_sha256: 53e6785f72134c65c7746924added6da447dcf7000db89047cd0dd57a04cdf54
+  baseline_markdown_sha256: bb726758017cba9233eb729396c84ecf892f2d2ded7403e0c351fb6319acc9f9
   review_notes: Semantic review completed against committed fixture evidence.
   sample_representative: true
   markdown_semantic_reviewed: true
@@ -77,12 +77,12 @@ fixtures:
   - must match (?:figure|figures 1)
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rsos.150470/markdown-quality.json
-  markdown_quality_sha256: 5186da0347eb067f5a80c2f8d8a957e84e50b4d79ada3cf13f61db2c381df531
+  markdown_quality_sha256: 579daf24e057a53f69fbd167f3e9051b715e2cd812bb577c88a1d8a216cfec27
 - fixture: tests/fixtures/golden_criteria/10.1098_rsif.2019.0334
   purpose: supplementary
   doi: 10.1098/rsif.2019.0334
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rsif.2019.0334/extracted.md
-  baseline_markdown_sha256: 4051c5a89eb50f0b5790d1edf0a06031abeeb41d5edf942da16193e994d3c381
+  baseline_markdown_sha256: 0045878d6324cd38544430b52e264558528c626e7daa59f7e6824e853b9f82d7
   review_notes: Semantic review completed against committed fixture evidence.
   sample_representative: true
   markdown_semantic_reviewed: true
@@ -94,12 +94,12 @@ fixtures:
   - must not include Article navigation
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rsif.2019.0334/markdown-quality.json
-  markdown_quality_sha256: f31bdedbfc6c8887f5faa96f29b5cce38745d3dddad8b12eb28bc971236bcc20
+  markdown_quality_sha256: d6fcc48f9e7f6dccd301bea227ff39ea190b8d41c908e408c4f701a3fc80588b
 - fixture: tests/fixtures/golden_criteria/10.1098_rsos.201200
   purpose: references
   doi: 10.1098/rsos.201200
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rsos.201200/extracted.md
-  baseline_markdown_sha256: 01df27c50d617b1e2871b50b8b7c03334824717500182780cabb58b136c3fde2
+  baseline_markdown_sha256: a01459bc62ff1ef476e4a8ed3ac7fbaf27338cf8efb2f4883d5cde836895e9b6
   review_notes: Semantic review completed against committed fixture evidence.
   sample_representative: true
   markdown_semantic_reviewed: true
@@ -111,7 +111,7 @@ fixtures:
   - must not include Download citation
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rsos.201200/markdown-quality.json
-  markdown_quality_sha256: 9103baf36f8f55777e3b58a9004baec0b3f3aab4431b80389276227357d0d3e3
+  markdown_quality_sha256: 76541f9eab2cd92280b301fbb2a3ac3b0416d59ef7b66580b6917ffb8cc49f9a
 - fixture: tests/fixtures/golden_criteria/10.1098_rsta.2020.0108
   purpose: pdf_fallback
   doi: 10.1098/rsta.2020.0108

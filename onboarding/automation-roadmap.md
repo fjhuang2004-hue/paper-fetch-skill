@@ -95,13 +95,13 @@ python3 scripts/onboard_from_manifests.py repair-markdown-quality \
 
 ## Live 策略
 
-- browser/CDN-risk provider 默认需要 provider subset live review，例如：
+- 未来新增 provider 默认需要一次 provider subset live assets review；已有 legacy 非风险 provider 可豁免。例如：
 
 ```bash
 PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_golden_criteria_live_review.py --providers mdpi
 ```
 
-- runner 的 `provider-local-acceptance` 会在 `_provider_requires_live_review()` 为 true 时包含 live review command。
+- runner 的 `provider-local-acceptance` 会在 `_provider_requires_live_review()` 为 true 时包含 live review command；新增 provider 默认 true，legacy 非风险 provider 例外。
 - live review 必须比较 `FetchEnvelope.source` 与 manifest `route_sources`，并复用 `markdown_contract` 做自动内容 / 噪声分类。
 - 维护期 route-source drift 使用手动本地命令，不接 GitHub CI：
 

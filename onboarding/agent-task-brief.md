@@ -166,7 +166,8 @@ acceptance:
     - python3 scripts/onboard_from_manifests.py check-cleaning-proposal --provider mdpi
     - python3 scripts/propose_cleaning_chain.py --provider mdpi --check-contract
   live_review:
-    required_for_browser_or_cdn_risk: true
+    required_for_provider_acceptance: true
+    policy: Future providers default to one provider subset live assets review; legacy non-risk providers are exempt.
     command: PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_golden_criteria_live_review.py --providers mdpi
     source_contract: provider_manifest.route_sources
     markdown_contract: provider_manifest.markdown_contract
@@ -235,7 +236,7 @@ no_commit: true
 - `acceptance.pytest` must contain `tests/unit/test_provider_route_contract.py`.
 - `acceptance.grep_must_be_empty` must contain central provider-logic grep checks.
 - `acceptance.cleaning_contract_gate` must contain proposal freshness and `--check-contract` commands.
-- `acceptance.live_review` must declare whether provider subset live review is required for browser/CDN risk and must point to `route_sources` plus `markdown_contract`.
+- `acceptance.live_review` must declare whether provider subset live assets review is required for provider-local acceptance and must point to `route_sources` plus `markdown_contract`.
 - `files_allowed_to_modify` may include the current provider manifest only for the `manifest_adjustment_policy` exception.
 - `files_must_not_modify` must include shared docs, known provider index, and central provider logic files.
 - `manifest_adjustment_policy` must only allow current-provider `markdown_contract.<purpose>` edits when recovering from `MARKDOWN_CONTRACT_DRIFT`; routing, fixtures, access policy, probe, and unrelated manifest fields remain forbidden.

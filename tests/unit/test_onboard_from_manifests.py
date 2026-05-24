@@ -213,7 +213,11 @@ def test_start_provider_dry_run_writes_dag_and_worker_briefs(tmp_path: Path) -> 
         "python3 scripts/propose_cleaning_chain.py --provider mdpi --check-contract",
     ]
     assert implement_brief["acceptance"]["live_review"] == {
-        "required_for_browser_or_cdn_risk": True,
+        "required_for_provider_acceptance": True,
+        "policy": (
+            "Future providers default to one provider subset live assets review; "
+            "legacy non-risk providers are exempt."
+        ),
         "command": (
             "PAPER_FETCH_RUN_LIVE=1 python3 "
             "scripts/run_golden_criteria_live_review.py --providers mdpi"
@@ -544,6 +548,50 @@ def test_verify_plan_uses_existing_tool_interfaces(tmp_path: Path) -> None:
         "--providers",
         "mdpi",
     ] in local_acceptance_commands
+
+
+def test_live_review_policy_defaults_to_future_providers_and_exempts_legacy_non_risk() -> None:
+    module = load_script_module("onboard_from_manifests")
+
+    future_live_command = [
+        "PAPER_FETCH_RUN_LIVE=1",
+        "python3",
+        "scripts/run_golden_criteria_live_review.py",
+        "--providers",
+        "futurepublisher",
+    ]
+    mdpi_live_command = [
+        "PAPER_FETCH_RUN_LIVE=1",
+        "python3",
+        "scripts/run_golden_criteria_live_review.py",
+        "--providers",
+        "mdpi",
+    ]
+    springer_live_command = [
+        "PAPER_FETCH_RUN_LIVE=1",
+        "python3",
+        "scripts/run_golden_criteria_live_review.py",
+        "--providers",
+        "springer",
+    ]
+
+    assert future_live_command in module._verify_commands(
+        "futurepublisher",
+        "provider-local-acceptance",
+    )
+    assert mdpi_live_command in module._verify_commands(
+        "mdpi",
+        "provider-local-acceptance",
+    )
+    assert springer_live_command not in module._verify_commands(
+        "springer",
+        "provider-local-acceptance",
+    )
+    assert future_live_command not in module._verify_commands(
+        "futurepublisher",
+        "provider-local-acceptance",
+        include_live=False,
+    )
 
 
 def test_written_state_matches_schema(tmp_path: Path) -> None:

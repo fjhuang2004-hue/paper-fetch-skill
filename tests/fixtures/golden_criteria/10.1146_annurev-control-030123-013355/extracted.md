@@ -278,124 +278,124 @@ Copyright © 2025 by the author(s).
 
 ## References (121 total, showing 121)
 
-- Shah D, Yang B, Kriegman S, Levin M, Bongard J, Kramer-Bottiglio R. 2021.. Shape changing robots: bioinspiration, simulation, and physical realization.. Adv. Mater. 33: ( 19 ): 2002882
-- Seo J, Paik J, Yim M. 2019.. Modular reconfigurable robotics.. Annu. Rev. Control Robot. Auton. Syst. 2:: 63 – 88
-- Belke CH, Holdcroft K, Sigrist A, Paik J. 2023.. Morphological flexibility in robotic systems through physical polygon meshing.. Nat. Mach. Intell. 5: ( 6 ): 669 – 75
-- Modes CD, Bhattacharya K, Warner M. 2011.. Gaussian curvature from flat elastica sheets.. Proc. R. Soc. A 467: ( 2128 ): 1121 – 40
-- Shepherd RF, Ilievski F, Choi W, Morin SA, Stokes AA, et al. 2011.. Multigait soft robot.. PNAS 108: ( 51 ): 20400 – 403
-- Tolley MT, Shepherd RF, Mosadegh B, Galloway KC, Wehner M, et al. 2014.. A resilient, untethered soft robot.. Soft Robot. 1: ( 3 ): 213 – 23
-- Rus D, Tolley MT. 2015.. Design, fabrication and control of soft robots.. Nature 521: ( 7553 ): 467 – 75
-- Rich SI, Wood RJ, Majidi C. 2018.. Untethered soft robotics.. Nat. Electron. 1: ( 2 ): 102 – 12
-- Shah DS, Powers JP, Tilton LG, Kriegman S, Bongard J, Kramer-Bottiglio R. 2021.. A soft robot that adapts to environments through shape change.. Nat. Mach. Intell. 3: ( 1 ): 51 – 59. Correction. 2024. Nat. Mach. Intell. 6(4):493
-- Baines R, Fish F, Bongard J, Kramer-Bottiglio R. 2024.. Robots that evolve on demand.. Nat. Rev. Mater. 9: ( 11 ): 822 35
-- Wharton P, You TL, Jenkinson GP, Diteesawat RS, Le NH, et al. 2023.. Tetraflex: a multigait soft robot for object transportation in confined environments.. IEEE Robot. Autom. Lett. 8: ( 8 ): 5007 – 14
-- Steltz E, Mozeika A, Rodenberg N, Brown E, Jaeger HM. 2009.. JSEL: jamming skin enabled locomotion.. In 2009 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 5672 – 77. Piscataway, NJ:: IEEE
-- Kim T, Lee S, Chang S, Hwang S, Park YL. 2023.. Environmental adaptability of legged robots with cutaneous inflation and sensation.. Adv. Intell. Syst. 5: ( 11 ): 2300172
-- Zhakypov Z, Mori K, Hosoda K, Paik J. 2019.. Designing minimal and scalable insect-inspired multi-locomotion millirobots.. Nature 571: ( 7765 ): 381 – 86
-- McEvoy MA, Correll N. 2018.. Shape-changing materials using variable stiffness and distributed control.. Soft Robot. 5: ( 6 ): 737 – 47
-- Stella F, Santina CD, Hughes J. 2023.. Soft robot shape estimation with IMUs leveraging PCC kinematics for drift filtering.. IEEE Robot. Autom. Lett. 9: ( 2 ): 1945 – 52
-- Yang X, Zhou Y, Zhao H, Huang W, Wang Y, et al. 2023.. Morphing matter: from mechanical principles to robotic applications.. Soft Sci. 3: ( 4 ): 38
-- Pikul JH, Li S, Bai H, Hanlon RT, Cohen I, Shepherd RF. 2017.. Stretchable surfaces with programmable 3D texture morphing for synthetic camouflaging skins.. Science 358: ( 6360 ): 210 – 14
-- Siéfert E, Reyssat E, Bico J, Roman B. 2018.. Bio-inspired pneumatic shape-morphing elastomers.. Nat. Mater. 18: ( 1 ): 24 – 28
-- Devlin MR, Liu T, Zhu M, Usevitch NS, Colonnese N, Memar AH. 2023.. Soft, modular, shape-changing displays with hyperelastic bubble arrays.. In 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 5101 – 6. Piscataway, NJ:: IEEE
-- Hanuhov T, Cohen N. 2023.. Design principles for 3D-printed thermally activated shape-morphing structures.. Int. J. Mech. Sci. 262:: 108716
-- Zhang K, Zhou Y, Zhang J, Liu Q, Hanenberg C, et al. 2024.. Shape morphing of hydrogels by harnessing enzyme enabled mechanoresponse.. Nat. Commun. 15: ( 1 ): 249
-- Johnson K, Arroyos V, Ferran A, Villanueva R, Yin D, et al. 2023.. Solar-powered shape-changing origami microfliers.. Sci. Robot. 8: ( 82 ): eadg4276
-- Lin HT, Leisk GG, Trimmer B. 2011.. GoQBot: a caterpillar-inspired soft-bodied rolling robot.. Bioinspir. Biomim. 6: ( 2 ): 026007
-- Sun J, Lerner E, Tighe B, Middlemist C, Zhao J. 2023.. Embedded shape morphing for morphologically adaptive robots.. Nat. Commun. 14: ( 1 ): 6023
-- Baines R, Patiballa SK, Booth J, Ramirez L, Sipple T, et al. 2022.. Multi-environment robotic transitions through adaptive morphogenesis.. Nature 610: ( 7931 ): 283 – 89
-- Shah DS, Yuen MC, Tilton LG, Yang EJ, Kramer-Bottiglio R. 2019.. Morphing robots using robotic skins that sculpt clay.. IEEE Robot. Autom. Lett. 4: ( 2 ): 2204 – 11
-- Sun J, Zhao J. 2019.. An adaptive walking robot with reconfigurable mechanisms using shape morphing joints.. IEEE Robot. Autom. Lett. 4: ( 2 ): 724 – 31
-- Nygaard TF, Martin CP, Torresen J, Glette K, Howard D. 2021.. Real-world embodied AI through a morphologically adaptive quadruped robot.. Nat. Mach. Intell. 3: ( 5 ): 410 – 19
-- Jeong J, Kim I, Choi Y, Lim S, Kim S, et al. 2023.. Spikebot: a multigait tensegrity robot with linearly extending struts.. Soft Robot. 11: ( 2 ): 207 – 17
-- Hwang D, Barron EJ, Tahidul Haque AB, Bartlett MD. 2022.. Shape morphing mechanical metamaterials through reversible plasticity.. Sci. Robot. 7: ( 63 ): 2171
-- Wilcox BT, Joyce J, Bartlett MD. 2024.. Rapid and reversible morphing to enable multifunctionality in robots.. Adv. Intell. Syst. https://doi.org/10.1002/aisy.202300694
-- Lee DY, Kim SR, Kim JS, Park JJ, Cho KJ. 2017.. Origami wheel transformer: a variable-diameter wheel drive robot using an origami structure.. Soft Robot. 4: ( 2 ): 163 – 80
-- Yoon H, Kim SG, Park I, Heo J, Kim HS, Seo TW. 2024.. 2 DOF transformable wheel design based on geared 8 bar parallel linkage mechanism.. Sci. Rep. 14: ( 1 ): 379
-- Baines R, Freeman S, Fish F, Kramer-Bottiglio R. 2020.. Variable stiffness morphing limb for amphibious legged robots inspired by chelonian environmental adaptations.. Bioinspir. Biomim. 15: ( 2 ): 025002
-- White EL, Yuen MC, Case JC, Kramer RK. 2017.. Low-cost, facile, and scalable manufacturing of capacitive sensors for soft systems.. Adv. Mater. Technol. 2: ( 9 ): 1700072
-- Johnson WR, Agrawala A, Huang X, Booth J, Kramer-Bottiglio R. 2022.. Sensor tendons for soft robot shape estimation.. In 2022 IEEE Sensors. Piscataway, NJ:: IEEE. https://doi.org/10.1109/SENSORS52175.2022.9967136
-- Sanchez-Botero L, Agrawala A, Kramer-Bottiglio R. 2023.. Stretchable, breathable, and washable fabric sensor for human motion monitoring.. Adv. Mater. Technol. 8: ( 17 ): 2300378
-- Shih B, Shah D, Li J, Thuruthel TG, Park YL, et al. 2020.. Electronic skins and machine learning for intelligent soft robots.. Sci. Robot. 5: ( 41 ): 9239
-- Thuruthel TG, Shih B, Laschi C, Tolley MT. 2019.. Soft robot perception using embedded soft sensors and recurrent neural networks.. Sci. Robot. 4: ( 26 ): 1488
-- Baines R, Zuliani F, Chennoufi N, Joshi S, Kramer-Bottiglio R, Paik J. 2023.. Multi-modal deformation and temperature sensing for context-sensitive machines.. Nat. Commun. 14: ( 1 ): 7499
-- Chen F, Song Z, Chen S, Gu G, Zhu X. 2023.. Morphological design for pneumatic soft actuators and robots with desired deformation behavior.. IEEE Trans. Robot. 39: ( 6 ): 4408 – 28
-- Mengaldo G, Renda F, Brunton SL, Bächer M, Calisti M, et al. 2022.. A concise guide to modelling the physics of embodied intelligence in soft robotics.. Nat. Rev. Phys. 4: ( 9 ): 595 – 610
-- Tairych A, Anderson IA. 2019.. Capacitive stretch sensing for robotic skins.. Soft Robot. 6: ( 3 ): 389 – 98
-- Shintake J, Piskarev E, Jeong SH, Floreano D. 2018.. Ultrastretchable strain sensors using carbon black-filled elastomer composites and comparison of capacitive versus resistive sensors.. Adv. Mater. Technol. 3: ( 3 ): 1700284
-- Tapia J, Knoop E, Mutný M, Otaduy MA, Bächer M. 2020.. MakeSense: automated sensor design for proprioceptive soft robots.. Soft Robot. 7: ( 3 ): 332 – 45
-- Li L, Xue M, Xu T, Liu Y, Yuan Y, Lin Z. 2023.. Intelligent soft self-twisted shape sensor.. Phys. Lett. A 492:: 129219
-- Galloway KC, Chen Y, Templeton E, Rife B, Godage IS, Barth EJ. 2019.. Fiber optic shape sensing for soft robotics.. Soft Robot. 6: ( 5 ): 671 – 84
-- Wang F, Jiang Q, Li J. 2023.. Shape sensing for continuum robots using FBG sensors array considering bending and twisting.. IEEE Sens. J. 24: ( 2 ): 1546 – 54
-- Van Meerbeek IM, De Sa CM, Shepherd RF. 2018.. Soft optoelectronic sensory foams with proprioception.. Sci. Robot. 3: ( 24 ): eaau248
-- Ju H, Cha B, Rus D, Lee J. 2023.. Closed-loop soft robot control frameworks with coordinated policies based on reinforcement learning and proprioceptive self-sensing.. Adv. Funct. Mater. 33: ( 51 ): 2304642
-- McEvoy MA, Correll N. 2015.. Materials that couple sensing, actuation, computation, and communication.. Science 347: ( 6228 ): 1261689
-- Hoshi T, Shinoda H. 2008.. 3D shape measuring sheet utilizing gravitational and geomagnetic fields.. In 2008 SICE Annual Conference, pp. 915 – 20. Madrid:: SICE
-- Hermanis A, Cacurs R, Greitans M. 2016.. Acceleration and magnetic sensor network for shape sensing.. IEEE Sens. J. 16: ( 5 ): 1271 – 80
-- Zhou Z, Chen P, Lu Y, Cui Q, Pan D, et al. 2023.. 3D deformation capture via a configurable self-sensing IMU sensor network.. Proc. ACM Interact. Mob. Wearable Ubiquitous Technol. 7: ( 1 ): 42
-- Stanko T, Hahmann S, Bonneau GP, Saguin-Sprynski N. 2017.. Shape from sensors: curve networks on surfaces from 3D orientations.. Comput. Graph. 66:: 74 – 84
-- Shah D, Woodman SJ, Sanchez-Botero L, Liu S, Kramer-Bottiglio R. 2023.. Stretchable shape-sensing sheets.. Adv. Intell. Syst. 5: ( 12 ): 2300343
-- Sprynski N, Szafran N, Lacolle B, Biard L. 2008.. Surface reconstruction via geodesic interpolation.. Comput.-Aided Des. 40: ( 4 ): 480 – 92
-- Huard M, Sprynski N, Szafran N, Biard L. 2013.. Reconstruction of quasi developable surfaces from ribbon curves.. Numer. Algorithms 63: ( 3 ): 483 – 506
-- Huard M, Farouki RT, Sprynski N, Biard L. 2014.. C2 interpolation of spatial data subject to arc-length constraints using Pythagorean–hodograph quintic splines.. Graph. Models 76: ( 1 ): 30 – 42
-- Saguin-Sprynski N, Jouanet L, Lacolle B, Biard L. 2014.. Surfaces reconstruction via inertial sensors for monitoring.. e-J. Nondestr. Test. 20: ( 2 ): 702 – 9
-- Hu Y, Yan Y, Efstratiou C, Vela-Orte D. 2021.. Quantitative shape measurement of an inflatable rubber dam using an array of inertial measurement units.. IEEE Trans. Instrum. Meas. 70:: 9506310
-- Rendl C, Kim D, Fanello S, Parzer P, Rhemann C, et al. 2014.. FlexSense: a transparent self-sensing deformable surface.. In UIST '14: Proceedings of the 27th Annual ACM Symposium on User Interface Software and Technology, pp. 129 – 38. New York:: ACM
-- Mittendorfer P, Dean E, Cheng G. 2014.. 3D spatial self-organization of a modular artificial skin.. In 2014 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 3969 – 74. Piscataway, NJ:: IEEE
-- Woodman SJ, Agrawala A, Kramer-Bottiglio R. 2023.. Stretchable shape-sensing ribbons.. In 2023 IEEE SENSORS. Piscataway, NJ:: IEEE. https://doi.org/10.1109/SENSORS56945.2023.10325035
-- Lun TLT, Wang K, Ho JD, Lee KH, Sze KY, Kwok KW. 2019.. Real-time surface shape sensing for soft and flexible structures using fiber Bragg gratings.. IEEE Robot. Autom. Lett. 4: ( 2 ): 1454 – 61
-- Soleimani M, Dingley G, Semaj E, Petrou M. 2023.. Shape self-sensing with mutual inductance sensor array.. IEEE Sens. J. 23: ( 20 ): 25234 – 41
-- Ledezma FD, Haddadin S. 2023.. Machine learning–driven self-discovery of the robot body morphology.. Sci. Robot. 8: ( 85 ): 972
-- Shannon CE. 1949.. Communication in the presence of noise.. Proc. IRE 37: ( 1 ): 10 – 21
-- Stokes AA, Shepherd RF, Morin SA, Ilievski F, Whitesides GM. 2014.. A hybrid combining hard and soft robots.. Soft Robot. 1: ( 1 ): 70 – 74
-- Hao T, Xiao H, Ji M, Liu Y, Liu S. 2023.. Integrated and intelligent soft robots.. IEEE Access 11:: 99862 – 77
-- Preston DJ, Rothemund P, Jiang HJ, Nemitz MP, Rawson J, et al. 2019.. Digital logic for soft devices.. PNAS 116: ( 16 ): 7750 – 59
-- Rothemund P, Ainla A, Belding L, Preston DJ, Kurihara S, et al. 2018.. A soft, bistable valve for autonomous control of soft actuators.. Sci. Robot. 3: ( 16 ): eaar7986
-- Conrad S, Teichmann J, Auth P, Knorr N, Ulrich K, et al. 2024.. 3D-printed digital pneumatic logic for the control of soft robotic actuators.. Sci. Robot. 9: ( 86 ): eadh4060
-- Drotman D, Jadhav S, Sharp D, Chan C, Tolley MT. 2021.. Electronics-free pneumatic circuits for controlling soft-legged robots.. Sci. Robot. 6: ( 51 ): 2627
-- Toepke MW, Abhyankar VV, Beebe DJ. 2007.. Microfluidic logic gates and timers.. Lab Chip 7: ( 11 ): 1449 – 53
-- Prakash M, Gershenfeld N. 2007.. Microfluidic bubble logic.. Science 315: ( 5813 ): 832 – 35
-- El Helou C, Buskohl PR, Tabor CE, Harne RL. 2021.. Digital logic gates in soft, conductive mechanical metamaterials.. Nat. Commun. 12: ( 1 ): 1633
-- Rogers JA, Someya T, Huang Y. 2010.. Materials and mechanics for stretchable electronics.. Science 327: ( 5973 ): 1603 – 7
-- Reis Carneiro M, Majidi C, Tavakoli M. 2023.. Gallium-based liquid–solid biphasic conductors for soft electronics.. Adv. Funct. Mater. 33: ( 41 ): 2306453
-- Dickey MD. 2017.. Stretchable and soft electronics using liquid metals.. Adv. Mater. 29: ( 27 ): 1606425
-- Ozutemiz KB, Majidi C, Ozdoganlar OB. 2022.. Scalable manufacturing of liquid metal circuits.. Adv. Mater. Technol. 7: ( 11 ): 2200295
-- Bai H, Hu Z, Rogers JA. 2023.. Hybrid materials approaches for bioelectronics.. MRS Bull. 48: ( 11 ): 1125 – 39
-- Huang Z, Hao Y, Li Y, Hu H, Wang C, et al. 2018.. Three-dimensional integrated stretchable electronics.. Nat. Electron. 1: ( 8 ): 473 – 80
-- Liu ZF, Fang S, Moura FA, Ding JN, Jiang N, et al. 2015.. Hierarchically buckled sheath-core fibers for superelastic electronics, sensors, and muscles.. Science 349: ( 6246 ): 400 – 4
-- Eristoff S, Nasab AM, Huang X, Kramer-Bottiglio R. 2023.. Liquid metal + x: a review of multiphase composites containing liquid metal and other (x) fillers.. Adv. Funct. Mater. 34: ( 31 ): 2309529
-- Kazem N, Hellebrekers T, Majidi C. 2017.. Soft multifunctional composites and emulsions with liquid metals.. Adv. Mater. 29: ( 27 ): 1605985
-- Daalkhaijav U, Yirmibesoglu OD, Walker S, Mengüç Y. 2018.. Rheological modification of liquid metal for additive manufacturing of stretchable electronics.. Adv. Mater. Technol. 3: ( 4 ): 1700351
-- Liu S, Shah DS, Kramer-Bottiglio R. 2021.. Highly stretchable multilayer electronic circuits using biphasic gallium-indium.. Nat. Mater. 20: ( 6 ): 851 – 58
-- Sanchez-Botero L, Shah DS, Kramer-Bottiglio R. 2022.. Are liquid metals bulk conductors?. Adv. Mater. 34: ( 26 ): 2109427
-- Chen S, Fan S, Qi J, Xiong Z, Qiao Z, et al. 2023.. Ultrahigh strain-insensitive integrated hybrid electronics using highly stretchable bilayer liquid metal based conductor.. Adv. Mater. 35: ( 5 ): 2208569
-- Pan C, Kumar K, Li J, Markvicka EJ, Herman PR, et al. 2018.. Visually imperceptible liquid-metal circuits for transparent, stretchable electronics with direct laser writing.. Adv. Mater. 30: ( 12 ): 1706937
-- Zrnic D, Swatik DS. 1969.. On the resistivity and surface tension of the eutectic alloy of gallium and indium.. J. Less Common Met. 18: ( 1 ): 67 – 68
-- Lopes PA, Santos BC, de Almeida AT, Tavakoli M. 2021.. Reversible polymer-gel transition for ultra-stretchable chip-integrated circuits through self-soldering and self-coating and self-healing.. Nat. Commun. 12: ( 1 ): 4666
-- Valentine AD, Busbee TA, Boley JW, Raney JR, Chortos A, et al. 2017.. Hybrid 3D printing of soft electronics.. Adv. Mater. 29: ( 40 ): 1703817
-- Reis Carneiro M, de Almeida AT, Tavakoli M, Majidi C. 2023.. Recyclable thin-film soft electronics for smart packaging and e-skins.. Adv. Sci. 10: ( 26 ): 2301673
-- Hellebrekers T, Ozutemiz KB, Yin J, Majidi C. 2018.. Liquid metal-microelectronics integration for a sensorized soft robot skin.. In 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 5924 – 29. Piscataway, NJ:: IEEE
-- Lopes PA, Fernandes DF, Silva AF, Marques DG, De Almeida AT, et al. 2021.. Bi-phasic Ag–In–Ga-embedded elastomer inks for digitally printed, ultra-stretchable, multi-layer electronics.. ACS Appl. Mater. Interfaces 13: ( 12 ): 14552 – 61
-- Kim S, Yoo D, Lim J, Kim J. 2024.. Simple and effective patterning method of liquid-metal-infused sponge electrode for fabricating 3D stretchable electronics.. Adv. Mater. Technol. 9: ( 14 ): 2301589
-- Ozutemiz KB, Wissman J, Ozdoganlar OB, Majidi C. 2018.. EGaIn–metal interfacing for liquid metal circuitry and microelectronics integration.. Adv. Mater. Interfaces 5: ( 10 ): 1701596
-- Xie Z, Yuan F, Liu J, Tian L, Chen B, et al. 2023.. Octopus-inspired sensorized soft arm for environmental interaction.. Sci. Robot. 8: ( 84 ): eadh7582
-- Woodman SJ, Shah DS, Landesberg M, Agrawala A, Kramer-Bottiglio R. 2024.. Stretchable Arduinos embedded in soft robots.. Sci. Robot. 9: ( 94 ): eadn6844
-- Lee B, Cho H, Moon S, Ko Y, Ryu YS, et al. 2023.. Omnidirectional printing of elastic conductors for three-dimensional stretchable electronics.. Nat. Electron 6: ( 4 ): 307 – 18
-- Tavakoli M, Lopes PA, Hajalilou A, Silva AF, Reis Carneiro M, et al. 2022.. 3R electronics: scalable fabrication of resilient, repairable, and recyclable soft-matter electronics.. Adv. Mater. 34: ( 31 ): 2203266
-- Song S, Hong H, Kim KY, Kim KK, Kim J, et al. 2023.. Photothermal lithography for realizing a stretchable multilayer electronic circuit using a laser.. ACS Nano 17: ( 21 ): 21443 – 54
-- Lee DH, Lim T, Pyeon J, Park H, Lee SW, et al. 2024.. Self-mixed biphasic liquid metal composite with ultra-high stretchability and strain-insensitivity for neuromorphic circuits.. Adv. Mater. 36: ( 16 ): 2310956
-- Li G, Zhang M, Liu S, Yuan M, Wu J, et al. 2023.. Three-dimensional flexible electronics using solidified liquid metal with regulated plasticity.. Nat. Electron. 6: ( 2 ): 154 – 63
-- Tang L, Yang S, Zhang K, Jiang X, Tang L, et al. 2022.. Skin electronics from biocompatible in situ welding enabled by intrinsically sticky conductors.. Adv. Sci. 9: ( 23 ): 2202043
-- Yin J, Hellebrekers T, Majidi C. 2020.. Closing the loop with liquid-metal sensing skin for autonomous soft robot gripping.. In 2020 3rd IEEE International Conference on Soft Robotics, pp. 661 – 67. Piscataway, NJ:: IEEE
-- Zu W, Ohm Y, Carneiro MR, Vinciguerra M, Tavakoli M, Majidi C. 2022.. A comparative study of silver microflakes in digitally printable liquid metal embedded elastomer inks for stretchable electronics.. Adv. Mater. Technol. 7: ( 12 ): 2200534
-- Wang J, Sarkar D, Suo J, Chortos A. 2024.. Harnessing deep learning of point clouds for inverse control of 3D shape morphing.. arXiv:2401.15219 [cs.RO]
-- Shetab-Bushehri M, Aranda M, Mezouar Y, Ozgur E. 2024.. Lattice-based shape tracking and servoing of elastic objects.. IEEE Trans. Robot. 40:: 364 – 81
-- Li M, Pal A, Aghakhani A, Pena-Francesch A, Sitti M. 2021.. Soft actuators for real-world applications.. Nat. Rev. Mater. 7: ( 3 ): 235 – 49
-- Manti M, Cacucciolo V, Cianchetti M. 2016.. Stiffening in soft robotics: a review of the state of the art.. IEEE Robot. Autom. Mag. 23: ( 3 ): 93 – 106
-- Gao M, Meng Y, Shen C, Pei Q. 2022.. Stiffness variable polymers comprising phase-changing side-chains: material syntheses and application explorations.. Adv. Mater. 34: ( 21 ): 2109798
-- Levine DJ, Turner KT, Pikul JH. 2021.. Materials with electroprogrammable stiffness.. Adv. Mater. 33: ( 35 ): 2007952
-- Chi Y, Li Y, Zhao Y, Hong Y, Tang Y, et al. 2022.. Bistable and multistable actuators for soft robots: structures, materials, and functionalities.. Adv. Mater. 34: ( 19 ): 2110384
-- Della Santina C, Duriez C, Rus D. 2023.. Model-based control of soft robots: a survey of the state of the art and open challenges.. IEEE Control Syst. 43: ( 3 ): 30 – 65
-- Wang J, Chortos A. 2022.. Control strategies for soft robot systems.. Adv. Intell. Syst. 4: ( 5 ): 2100165
-- Guo Y, Liu L, Liu Y, Leng J. 2021.. Review of dielectric elastomer actuators and their applications in soft robots.. Adv. Intell. Syst. 3: ( 10 ): 2000282
-- El-Atab N, Mishra RB, Al-Modaf F, Joharji L, Alsharif AA, et al. 2020.. Soft actuators for soft robotic applications: a review.. Adv. Intell. Syst. 2: ( 10 ): 2000128
+1. Shah D, Yang B, Kriegman S, Levin M, Bongard J, Kramer-Bottiglio R. 2021.. Shape changing robots: bioinspiration, simulation, and physical realization.. Adv. Mater. 33: ( 19 ): 2002882
+2. Seo J, Paik J, Yim M. 2019.. Modular reconfigurable robotics.. Annu. Rev. Control Robot. Auton. Syst. 2:: 63 – 88
+3. Belke CH, Holdcroft K, Sigrist A, Paik J. 2023.. Morphological flexibility in robotic systems through physical polygon meshing.. Nat. Mach. Intell. 5: ( 6 ): 669 – 75
+4. Modes CD, Bhattacharya K, Warner M. 2011.. Gaussian curvature from flat elastica sheets.. Proc. R. Soc. A 467: ( 2128 ): 1121 – 40
+5. Shepherd RF, Ilievski F, Choi W, Morin SA, Stokes AA, et al. 2011.. Multigait soft robot.. PNAS 108: ( 51 ): 20400 – 403
+6. Tolley MT, Shepherd RF, Mosadegh B, Galloway KC, Wehner M, et al. 2014.. A resilient, untethered soft robot.. Soft Robot. 1: ( 3 ): 213 – 23
+7. Rus D, Tolley MT. 2015.. Design, fabrication and control of soft robots.. Nature 521: ( 7553 ): 467 – 75
+8. Rich SI, Wood RJ, Majidi C. 2018.. Untethered soft robotics.. Nat. Electron. 1: ( 2 ): 102 – 12
+9. Shah DS, Powers JP, Tilton LG, Kriegman S, Bongard J, Kramer-Bottiglio R. 2021.. A soft robot that adapts to environments through shape change.. Nat. Mach. Intell. 3: ( 1 ): 51 – 59. Correction. 2024. Nat. Mach. Intell. 6(4):493
+10. Baines R, Fish F, Bongard J, Kramer-Bottiglio R. 2024.. Robots that evolve on demand.. Nat. Rev. Mater. 9: ( 11 ): 822 35
+11. Wharton P, You TL, Jenkinson GP, Diteesawat RS, Le NH, et al. 2023.. Tetraflex: a multigait soft robot for object transportation in confined environments.. IEEE Robot. Autom. Lett. 8: ( 8 ): 5007 – 14
+12. Steltz E, Mozeika A, Rodenberg N, Brown E, Jaeger HM. 2009.. JSEL: jamming skin enabled locomotion.. In 2009 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 5672 – 77. Piscataway, NJ:: IEEE
+13. Kim T, Lee S, Chang S, Hwang S, Park YL. 2023.. Environmental adaptability of legged robots with cutaneous inflation and sensation.. Adv. Intell. Syst. 5: ( 11 ): 2300172
+14. Zhakypov Z, Mori K, Hosoda K, Paik J. 2019.. Designing minimal and scalable insect-inspired multi-locomotion millirobots.. Nature 571: ( 7765 ): 381 – 86
+15. McEvoy MA, Correll N. 2018.. Shape-changing materials using variable stiffness and distributed control.. Soft Robot. 5: ( 6 ): 737 – 47
+16. Stella F, Santina CD, Hughes J. 2023.. Soft robot shape estimation with IMUs leveraging PCC kinematics for drift filtering.. IEEE Robot. Autom. Lett. 9: ( 2 ): 1945 – 52
+17. Yang X, Zhou Y, Zhao H, Huang W, Wang Y, et al. 2023.. Morphing matter: from mechanical principles to robotic applications.. Soft Sci. 3: ( 4 ): 38
+18. Pikul JH, Li S, Bai H, Hanlon RT, Cohen I, Shepherd RF. 2017.. Stretchable surfaces with programmable 3D texture morphing for synthetic camouflaging skins.. Science 358: ( 6360 ): 210 – 14
+19. Siéfert E, Reyssat E, Bico J, Roman B. 2018.. Bio-inspired pneumatic shape-morphing elastomers.. Nat. Mater. 18: ( 1 ): 24 – 28
+20. Devlin MR, Liu T, Zhu M, Usevitch NS, Colonnese N, Memar AH. 2023.. Soft, modular, shape-changing displays with hyperelastic bubble arrays.. In 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 5101 – 6. Piscataway, NJ:: IEEE
+21. Hanuhov T, Cohen N. 2023.. Design principles for 3D-printed thermally activated shape-morphing structures.. Int. J. Mech. Sci. 262:: 108716
+22. Zhang K, Zhou Y, Zhang J, Liu Q, Hanenberg C, et al. 2024.. Shape morphing of hydrogels by harnessing enzyme enabled mechanoresponse.. Nat. Commun. 15: ( 1 ): 249
+23. Johnson K, Arroyos V, Ferran A, Villanueva R, Yin D, et al. 2023.. Solar-powered shape-changing origami microfliers.. Sci. Robot. 8: ( 82 ): eadg4276
+24. Lin HT, Leisk GG, Trimmer B. 2011.. GoQBot: a caterpillar-inspired soft-bodied rolling robot.. Bioinspir. Biomim. 6: ( 2 ): 026007
+25. Sun J, Lerner E, Tighe B, Middlemist C, Zhao J. 2023.. Embedded shape morphing for morphologically adaptive robots.. Nat. Commun. 14: ( 1 ): 6023
+26. Baines R, Patiballa SK, Booth J, Ramirez L, Sipple T, et al. 2022.. Multi-environment robotic transitions through adaptive morphogenesis.. Nature 610: ( 7931 ): 283 – 89
+27. Shah DS, Yuen MC, Tilton LG, Yang EJ, Kramer-Bottiglio R. 2019.. Morphing robots using robotic skins that sculpt clay.. IEEE Robot. Autom. Lett. 4: ( 2 ): 2204 – 11
+28. Sun J, Zhao J. 2019.. An adaptive walking robot with reconfigurable mechanisms using shape morphing joints.. IEEE Robot. Autom. Lett. 4: ( 2 ): 724 – 31
+29. Nygaard TF, Martin CP, Torresen J, Glette K, Howard D. 2021.. Real-world embodied AI through a morphologically adaptive quadruped robot.. Nat. Mach. Intell. 3: ( 5 ): 410 – 19
+30. Jeong J, Kim I, Choi Y, Lim S, Kim S, et al. 2023.. Spikebot: a multigait tensegrity robot with linearly extending struts.. Soft Robot. 11: ( 2 ): 207 – 17
+31. Hwang D, Barron EJ, Tahidul Haque AB, Bartlett MD. 2022.. Shape morphing mechanical metamaterials through reversible plasticity.. Sci. Robot. 7: ( 63 ): 2171
+32. Wilcox BT, Joyce J, Bartlett MD. 2024.. Rapid and reversible morphing to enable multifunctionality in robots.. Adv. Intell. Syst. https://doi.org/10.1002/aisy.202300694
+33. Lee DY, Kim SR, Kim JS, Park JJ, Cho KJ. 2017.. Origami wheel transformer: a variable-diameter wheel drive robot using an origami structure.. Soft Robot. 4: ( 2 ): 163 – 80
+34. Yoon H, Kim SG, Park I, Heo J, Kim HS, Seo TW. 2024.. 2 DOF transformable wheel design based on geared 8 bar parallel linkage mechanism.. Sci. Rep. 14: ( 1 ): 379
+35. Baines R, Freeman S, Fish F, Kramer-Bottiglio R. 2020.. Variable stiffness morphing limb for amphibious legged robots inspired by chelonian environmental adaptations.. Bioinspir. Biomim. 15: ( 2 ): 025002
+36. White EL, Yuen MC, Case JC, Kramer RK. 2017.. Low-cost, facile, and scalable manufacturing of capacitive sensors for soft systems.. Adv. Mater. Technol. 2: ( 9 ): 1700072
+37. Johnson WR, Agrawala A, Huang X, Booth J, Kramer-Bottiglio R. 2022.. Sensor tendons for soft robot shape estimation.. In 2022 IEEE Sensors. Piscataway, NJ:: IEEE. https://doi.org/10.1109/SENSORS52175.2022.9967136
+38. Sanchez-Botero L, Agrawala A, Kramer-Bottiglio R. 2023.. Stretchable, breathable, and washable fabric sensor for human motion monitoring.. Adv. Mater. Technol. 8: ( 17 ): 2300378
+39. Shih B, Shah D, Li J, Thuruthel TG, Park YL, et al. 2020.. Electronic skins and machine learning for intelligent soft robots.. Sci. Robot. 5: ( 41 ): 9239
+40. Thuruthel TG, Shih B, Laschi C, Tolley MT. 2019.. Soft robot perception using embedded soft sensors and recurrent neural networks.. Sci. Robot. 4: ( 26 ): 1488
+41. Baines R, Zuliani F, Chennoufi N, Joshi S, Kramer-Bottiglio R, Paik J. 2023.. Multi-modal deformation and temperature sensing for context-sensitive machines.. Nat. Commun. 14: ( 1 ): 7499
+42. Chen F, Song Z, Chen S, Gu G, Zhu X. 2023.. Morphological design for pneumatic soft actuators and robots with desired deformation behavior.. IEEE Trans. Robot. 39: ( 6 ): 4408 – 28
+43. Mengaldo G, Renda F, Brunton SL, Bächer M, Calisti M, et al. 2022.. A concise guide to modelling the physics of embodied intelligence in soft robotics.. Nat. Rev. Phys. 4: ( 9 ): 595 – 610
+44. Tairych A, Anderson IA. 2019.. Capacitive stretch sensing for robotic skins.. Soft Robot. 6: ( 3 ): 389 – 98
+45. Shintake J, Piskarev E, Jeong SH, Floreano D. 2018.. Ultrastretchable strain sensors using carbon black-filled elastomer composites and comparison of capacitive versus resistive sensors.. Adv. Mater. Technol. 3: ( 3 ): 1700284
+46. Tapia J, Knoop E, Mutný M, Otaduy MA, Bächer M. 2020.. MakeSense: automated sensor design for proprioceptive soft robots.. Soft Robot. 7: ( 3 ): 332 – 45
+47. Li L, Xue M, Xu T, Liu Y, Yuan Y, Lin Z. 2023.. Intelligent soft self-twisted shape sensor.. Phys. Lett. A 492:: 129219
+48. Galloway KC, Chen Y, Templeton E, Rife B, Godage IS, Barth EJ. 2019.. Fiber optic shape sensing for soft robotics.. Soft Robot. 6: ( 5 ): 671 – 84
+49. Wang F, Jiang Q, Li J. 2023.. Shape sensing for continuum robots using FBG sensors array considering bending and twisting.. IEEE Sens. J. 24: ( 2 ): 1546 – 54
+50. Van Meerbeek IM, De Sa CM, Shepherd RF. 2018.. Soft optoelectronic sensory foams with proprioception.. Sci. Robot. 3: ( 24 ): eaau248
+51. Ju H, Cha B, Rus D, Lee J. 2023.. Closed-loop soft robot control frameworks with coordinated policies based on reinforcement learning and proprioceptive self-sensing.. Adv. Funct. Mater. 33: ( 51 ): 2304642
+52. McEvoy MA, Correll N. 2015.. Materials that couple sensing, actuation, computation, and communication.. Science 347: ( 6228 ): 1261689
+53. Hoshi T, Shinoda H. 2008.. 3D shape measuring sheet utilizing gravitational and geomagnetic fields.. In 2008 SICE Annual Conference, pp. 915 – 20. Madrid:: SICE
+54. Hermanis A, Cacurs R, Greitans M. 2016.. Acceleration and magnetic sensor network for shape sensing.. IEEE Sens. J. 16: ( 5 ): 1271 – 80
+55. Zhou Z, Chen P, Lu Y, Cui Q, Pan D, et al. 2023.. 3D deformation capture via a configurable self-sensing IMU sensor network.. Proc. ACM Interact. Mob. Wearable Ubiquitous Technol. 7: ( 1 ): 42
+56. Stanko T, Hahmann S, Bonneau GP, Saguin-Sprynski N. 2017.. Shape from sensors: curve networks on surfaces from 3D orientations.. Comput. Graph. 66:: 74 – 84
+57. Shah D, Woodman SJ, Sanchez-Botero L, Liu S, Kramer-Bottiglio R. 2023.. Stretchable shape-sensing sheets.. Adv. Intell. Syst. 5: ( 12 ): 2300343
+58. Sprynski N, Szafran N, Lacolle B, Biard L. 2008.. Surface reconstruction via geodesic interpolation.. Comput.-Aided Des. 40: ( 4 ): 480 – 92
+59. Huard M, Sprynski N, Szafran N, Biard L. 2013.. Reconstruction of quasi developable surfaces from ribbon curves.. Numer. Algorithms 63: ( 3 ): 483 – 506
+60. Huard M, Farouki RT, Sprynski N, Biard L. 2014.. C2 interpolation of spatial data subject to arc-length constraints using Pythagorean–hodograph quintic splines.. Graph. Models 76: ( 1 ): 30 – 42
+61. Saguin-Sprynski N, Jouanet L, Lacolle B, Biard L. 2014.. Surfaces reconstruction via inertial sensors for monitoring.. e-J. Nondestr. Test. 20: ( 2 ): 702 – 9
+62. Hu Y, Yan Y, Efstratiou C, Vela-Orte D. 2021.. Quantitative shape measurement of an inflatable rubber dam using an array of inertial measurement units.. IEEE Trans. Instrum. Meas. 70:: 9506310
+63. Rendl C, Kim D, Fanello S, Parzer P, Rhemann C, et al. 2014.. FlexSense: a transparent self-sensing deformable surface.. In UIST '14: Proceedings of the 27th Annual ACM Symposium on User Interface Software and Technology, pp. 129 – 38. New York:: ACM
+64. Mittendorfer P, Dean E, Cheng G. 2014.. 3D spatial self-organization of a modular artificial skin.. In 2014 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 3969 – 74. Piscataway, NJ:: IEEE
+65. Woodman SJ, Agrawala A, Kramer-Bottiglio R. 2023.. Stretchable shape-sensing ribbons.. In 2023 IEEE SENSORS. Piscataway, NJ:: IEEE. https://doi.org/10.1109/SENSORS56945.2023.10325035
+66. Lun TLT, Wang K, Ho JD, Lee KH, Sze KY, Kwok KW. 2019.. Real-time surface shape sensing for soft and flexible structures using fiber Bragg gratings.. IEEE Robot. Autom. Lett. 4: ( 2 ): 1454 – 61
+67. Soleimani M, Dingley G, Semaj E, Petrou M. 2023.. Shape self-sensing with mutual inductance sensor array.. IEEE Sens. J. 23: ( 20 ): 25234 – 41
+68. Ledezma FD, Haddadin S. 2023.. Machine learning–driven self-discovery of the robot body morphology.. Sci. Robot. 8: ( 85 ): 972
+69. Shannon CE. 1949.. Communication in the presence of noise.. Proc. IRE 37: ( 1 ): 10 – 21
+70. Stokes AA, Shepherd RF, Morin SA, Ilievski F, Whitesides GM. 2014.. A hybrid combining hard and soft robots.. Soft Robot. 1: ( 1 ): 70 – 74
+71. Hao T, Xiao H, Ji M, Liu Y, Liu S. 2023.. Integrated and intelligent soft robots.. IEEE Access 11:: 99862 – 77
+72. Preston DJ, Rothemund P, Jiang HJ, Nemitz MP, Rawson J, et al. 2019.. Digital logic for soft devices.. PNAS 116: ( 16 ): 7750 – 59
+73. Rothemund P, Ainla A, Belding L, Preston DJ, Kurihara S, et al. 2018.. A soft, bistable valve for autonomous control of soft actuators.. Sci. Robot. 3: ( 16 ): eaar7986
+74. Conrad S, Teichmann J, Auth P, Knorr N, Ulrich K, et al. 2024.. 3D-printed digital pneumatic logic for the control of soft robotic actuators.. Sci. Robot. 9: ( 86 ): eadh4060
+75. Drotman D, Jadhav S, Sharp D, Chan C, Tolley MT. 2021.. Electronics-free pneumatic circuits for controlling soft-legged robots.. Sci. Robot. 6: ( 51 ): 2627
+76. Toepke MW, Abhyankar VV, Beebe DJ. 2007.. Microfluidic logic gates and timers.. Lab Chip 7: ( 11 ): 1449 – 53
+77. Prakash M, Gershenfeld N. 2007.. Microfluidic bubble logic.. Science 315: ( 5813 ): 832 – 35
+78. El Helou C, Buskohl PR, Tabor CE, Harne RL. 2021.. Digital logic gates in soft, conductive mechanical metamaterials.. Nat. Commun. 12: ( 1 ): 1633
+79. Rogers JA, Someya T, Huang Y. 2010.. Materials and mechanics for stretchable electronics.. Science 327: ( 5973 ): 1603 – 7
+80. Reis Carneiro M, Majidi C, Tavakoli M. 2023.. Gallium-based liquid–solid biphasic conductors for soft electronics.. Adv. Funct. Mater. 33: ( 41 ): 2306453
+81. Dickey MD. 2017.. Stretchable and soft electronics using liquid metals.. Adv. Mater. 29: ( 27 ): 1606425
+82. Ozutemiz KB, Majidi C, Ozdoganlar OB. 2022.. Scalable manufacturing of liquid metal circuits.. Adv. Mater. Technol. 7: ( 11 ): 2200295
+83. Bai H, Hu Z, Rogers JA. 2023.. Hybrid materials approaches for bioelectronics.. MRS Bull. 48: ( 11 ): 1125 – 39
+84. Huang Z, Hao Y, Li Y, Hu H, Wang C, et al. 2018.. Three-dimensional integrated stretchable electronics.. Nat. Electron. 1: ( 8 ): 473 – 80
+85. Liu ZF, Fang S, Moura FA, Ding JN, Jiang N, et al. 2015.. Hierarchically buckled sheath-core fibers for superelastic electronics, sensors, and muscles.. Science 349: ( 6246 ): 400 – 4
+86. Eristoff S, Nasab AM, Huang X, Kramer-Bottiglio R. 2023.. Liquid metal + x: a review of multiphase composites containing liquid metal and other (x) fillers.. Adv. Funct. Mater. 34: ( 31 ): 2309529
+87. Kazem N, Hellebrekers T, Majidi C. 2017.. Soft multifunctional composites and emulsions with liquid metals.. Adv. Mater. 29: ( 27 ): 1605985
+88. Daalkhaijav U, Yirmibesoglu OD, Walker S, Mengüç Y. 2018.. Rheological modification of liquid metal for additive manufacturing of stretchable electronics.. Adv. Mater. Technol. 3: ( 4 ): 1700351
+89. Liu S, Shah DS, Kramer-Bottiglio R. 2021.. Highly stretchable multilayer electronic circuits using biphasic gallium-indium.. Nat. Mater. 20: ( 6 ): 851 – 58
+90. Sanchez-Botero L, Shah DS, Kramer-Bottiglio R. 2022.. Are liquid metals bulk conductors?. Adv. Mater. 34: ( 26 ): 2109427
+91. Chen S, Fan S, Qi J, Xiong Z, Qiao Z, et al. 2023.. Ultrahigh strain-insensitive integrated hybrid electronics using highly stretchable bilayer liquid metal based conductor.. Adv. Mater. 35: ( 5 ): 2208569
+92. Pan C, Kumar K, Li J, Markvicka EJ, Herman PR, et al. 2018.. Visually imperceptible liquid-metal circuits for transparent, stretchable electronics with direct laser writing.. Adv. Mater. 30: ( 12 ): 1706937
+93. Zrnic D, Swatik DS. 1969.. On the resistivity and surface tension of the eutectic alloy of gallium and indium.. J. Less Common Met. 18: ( 1 ): 67 – 68
+94. Lopes PA, Santos BC, de Almeida AT, Tavakoli M. 2021.. Reversible polymer-gel transition for ultra-stretchable chip-integrated circuits through self-soldering and self-coating and self-healing.. Nat. Commun. 12: ( 1 ): 4666
+95. Valentine AD, Busbee TA, Boley JW, Raney JR, Chortos A, et al. 2017.. Hybrid 3D printing of soft electronics.. Adv. Mater. 29: ( 40 ): 1703817
+96. Reis Carneiro M, de Almeida AT, Tavakoli M, Majidi C. 2023.. Recyclable thin-film soft electronics for smart packaging and e-skins.. Adv. Sci. 10: ( 26 ): 2301673
+97. Hellebrekers T, Ozutemiz KB, Yin J, Majidi C. 2018.. Liquid metal-microelectronics integration for a sensorized soft robot skin.. In 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 5924 – 29. Piscataway, NJ:: IEEE
+98. Lopes PA, Fernandes DF, Silva AF, Marques DG, De Almeida AT, et al. 2021.. Bi-phasic Ag–In–Ga-embedded elastomer inks for digitally printed, ultra-stretchable, multi-layer electronics.. ACS Appl. Mater. Interfaces 13: ( 12 ): 14552 – 61
+99. Kim S, Yoo D, Lim J, Kim J. 2024.. Simple and effective patterning method of liquid-metal-infused sponge electrode for fabricating 3D stretchable electronics.. Adv. Mater. Technol. 9: ( 14 ): 2301589
+100. Ozutemiz KB, Wissman J, Ozdoganlar OB, Majidi C. 2018.. EGaIn–metal interfacing for liquid metal circuitry and microelectronics integration.. Adv. Mater. Interfaces 5: ( 10 ): 1701596
+101. Xie Z, Yuan F, Liu J, Tian L, Chen B, et al. 2023.. Octopus-inspired sensorized soft arm for environmental interaction.. Sci. Robot. 8: ( 84 ): eadh7582
+102. Woodman SJ, Shah DS, Landesberg M, Agrawala A, Kramer-Bottiglio R. 2024.. Stretchable Arduinos embedded in soft robots.. Sci. Robot. 9: ( 94 ): eadn6844
+103. Lee B, Cho H, Moon S, Ko Y, Ryu YS, et al. 2023.. Omnidirectional printing of elastic conductors for three-dimensional stretchable electronics.. Nat. Electron 6: ( 4 ): 307 – 18
+104. Tavakoli M, Lopes PA, Hajalilou A, Silva AF, Reis Carneiro M, et al. 2022.. 3R electronics: scalable fabrication of resilient, repairable, and recyclable soft-matter electronics.. Adv. Mater. 34: ( 31 ): 2203266
+105. Song S, Hong H, Kim KY, Kim KK, Kim J, et al. 2023.. Photothermal lithography for realizing a stretchable multilayer electronic circuit using a laser.. ACS Nano 17: ( 21 ): 21443 – 54
+106. Lee DH, Lim T, Pyeon J, Park H, Lee SW, et al. 2024.. Self-mixed biphasic liquid metal composite with ultra-high stretchability and strain-insensitivity for neuromorphic circuits.. Adv. Mater. 36: ( 16 ): 2310956
+107. Li G, Zhang M, Liu S, Yuan M, Wu J, et al. 2023.. Three-dimensional flexible electronics using solidified liquid metal with regulated plasticity.. Nat. Electron. 6: ( 2 ): 154 – 63
+108. Tang L, Yang S, Zhang K, Jiang X, Tang L, et al. 2022.. Skin electronics from biocompatible in situ welding enabled by intrinsically sticky conductors.. Adv. Sci. 9: ( 23 ): 2202043
+109. Yin J, Hellebrekers T, Majidi C. 2020.. Closing the loop with liquid-metal sensing skin for autonomous soft robot gripping.. In 2020 3rd IEEE International Conference on Soft Robotics, pp. 661 – 67. Piscataway, NJ:: IEEE
+110. Zu W, Ohm Y, Carneiro MR, Vinciguerra M, Tavakoli M, Majidi C. 2022.. A comparative study of silver microflakes in digitally printable liquid metal embedded elastomer inks for stretchable electronics.. Adv. Mater. Technol. 7: ( 12 ): 2200534
+111. Wang J, Sarkar D, Suo J, Chortos A. 2024.. Harnessing deep learning of point clouds for inverse control of 3D shape morphing.. arXiv:2401.15219 [cs.RO]
+112. Shetab-Bushehri M, Aranda M, Mezouar Y, Ozgur E. 2024.. Lattice-based shape tracking and servoing of elastic objects.. IEEE Trans. Robot. 40:: 364 – 81
+113. Li M, Pal A, Aghakhani A, Pena-Francesch A, Sitti M. 2021.. Soft actuators for real-world applications.. Nat. Rev. Mater. 7: ( 3 ): 235 – 49
+114. Manti M, Cacucciolo V, Cianchetti M. 2016.. Stiffening in soft robotics: a review of the state of the art.. IEEE Robot. Autom. Mag. 23: ( 3 ): 93 – 106
+115. Gao M, Meng Y, Shen C, Pei Q. 2022.. Stiffness variable polymers comprising phase-changing side-chains: material syntheses and application explorations.. Adv. Mater. 34: ( 21 ): 2109798
+116. Levine DJ, Turner KT, Pikul JH. 2021.. Materials with electroprogrammable stiffness.. Adv. Mater. 33: ( 35 ): 2007952
+117. Chi Y, Li Y, Zhao Y, Hong Y, Tang Y, et al. 2022.. Bistable and multistable actuators for soft robots: structures, materials, and functionalities.. Adv. Mater. 34: ( 19 ): 2110384
+118. Della Santina C, Duriez C, Rus D. 2023.. Model-based control of soft robots: a survey of the state of the art and open challenges.. IEEE Control Syst. 43: ( 3 ): 30 – 65
+119. Wang J, Chortos A. 2022.. Control strategies for soft robot systems.. Adv. Intell. Syst. 4: ( 5 ): 2100165
+120. Guo Y, Liu L, Liu Y, Leng J. 2021.. Review of dielectric elastomer actuators and their applications in soft robots.. Adv. Intell. Syst. 3: ( 10 ): 2000282
+121. El-Atab N, Mishra RB, Al-Modaf F, Joharji L, Alsharif AA, et al. 2020.. Soft actuators for soft robotic applications: a review.. Adv. Intell. Syst. 2: ( 10 ): 2000128

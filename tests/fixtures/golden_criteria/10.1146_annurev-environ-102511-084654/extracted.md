@@ -328,184 +328,184 @@ West Antarctic ice sheet
 
 ## References (181 total, showing 181)
 
-- Gladwell M. 1. 2000. The Tipping Point: How Little Things Can Make a Big Difference New York: Little Brown 304
-- Grodzins M. 2. 1957. Metropolitan segregation. Sci. Am. 197: 33– 41
-- Lenton TM, Held H, Kriegler E, Hall J, Lucht W. 3. et al. 2008. Tipping elements in the Earth's climate system. Proc. Natl. Acad. Sci. USA 105: 1786– 93
-- Lenton TM. 4. 2011. Early warning of climate tipping points. Nat. Clim. Change 1: 201– 9
-- Scheffer M, Bacompte J, Brock WA, Brovkin V, Carpenter SR. 5. et al. 2009. Early warning signals for critical transitions. Nature 461: 53– 59
-- Scheffer M, Carpenter SR, Lenton TM, Bascompte J, Brock W. 6. et al. 2012. Anticipating critical transitions. Science 338: 344– 48
-- Stommel H. 7. 1961. Thermohaline convection with two stable regimes of flow. Tellus 13: 224– 30
-- Budyko MI. 8. 1968. The effect of solar radiation variations on the climate of the earth. Tellus 21: 611– 19
-- Sellers WD. 9. 1969. A global climate model based on the energy balance of the earth-atmosphere system. J. Appl. Meteorol. 8: 386– 400
-- Lewontin RC. 10. 1969. The meaning of stability. Diversity and Stability in Ecological Systems, Brookhaven Symp. Biol. 22: 13– 24
-- Holling CS. 11. 1973. Resilience and stability of ecological systems. Annu. Rev. Ecol. Syst. 4: 1– 23
-- May RM. 12. 1977. Thresholds and breakpoints in ecosystems with a multiplicity of stable states. Nature 269: 471– 77
-- Scheffer M, Carpenter S, Foley JA, Folke C, Walker B. 13. 2001. Catastrophic shifts in ecosystems. Nature 413: 591– 96
-- Folke C, Carpenter S, Walker B, Scheffer M, Elmqvist T. 14. et al. 2004. Regime shifts, resilience, and biodiversity in ecosystem management. Annu. Rev. Ecol. Evol. Syst. 35: 557– 81
-- Beisner BE, Haydon DT, Cuddington K. 15. 2003. Alternative stable states in ecology. Front. Ecol. Environ. 1: 376– 82
-- Scheffer M, Carpenter SR. 16. 2003. Catastrophic regime shifts in ecosystems: linking theory to observation. Trends Ecol. Evol. 18: 648– 56
-- Schröder A, Persson L, De Roos AM. 17. 2005. Direct experimental evidence for alternative stable states: a review. Oikos 110: 3– 19
-- Gordon LJ, Peterson GD, Bennett EM. 18. 2008. Agricultural modifications of hydrological flows create ecological surprises. Trends Ecol. Evol. 23: 211– 19
-- Alley RB, Marotzke J, Nordhaus WD, Overpeck JT, Peteet DM. 19. et al. 2003. Abrupt climate change. Science 299: 2005– 10
-- Lenton TM. 20. 2012. Future climate surprises. The Future of the World's Climate A Henderson-Sellers, K McGuffie 489– 507 Oxford: Elsevier
-- Levermann A, Bamber JL, Drijfhout SS, Ganopolski A, Haeberli W. 21. et al. 2012. Potential climatic transitions with profound impact on Europe: review of the current state of six ‘tipping elements of the climate system.’. Clim. Change 110: 845– 78
-- Viles HA, Naylor LA, Carter NEA, Chaput D. 22. 2008. Biogeomorphological disturbance regimes: progress in linking ecological and geomorphological systems. Earth Surf. Process. Landf. 33: 1419– 35
-- Kirkby M. 23. 1995. Modelling the links between vegetation and landforms. Geomorphology 13: 319– 35
-- Phillips JD. 24. 2006. Evolutionary geomorphology: thresholds and nonlinearity in landform response to environmental change. Hydrol. Earth Syst. Sci. 10: 731– 42
-- Handoh IC, Lenton TM. 25. 2003. Periodic mid-Cretaceous oceanic anoxic events linked by oscillations of the phosphorus and oxygen biogeochemical cycles. Glob. Biogeochem. Cycles 17: 1092
-- Ozaki K, Tajima S, Tajika E. 26. 2011. Conditions required for oceanic anoxia/euxinia: constraints from a one-dimensional ocean biogeochemical cycle model. Earth Planet. Sci. Lett. 304: 270– 79
-- Lenton TM. 27. 2013. What early warning systems are there for environmental shocks?. Environ. Sci. Policy 27: S60– 75
-- Poincaré H. 28. 1885. Sur l'équilibre d'une masse fluide animée d'un mouvement de rotation. Acta Math. 7: 259– 380
-- Zeeman EC. 29. 1976. Catastrophe theory. Sci. Am. 4: 65– 83
-- Pascual M, Guichard F. 30. 2005. Criticality and disturbance in spatial ecological systems. Trends Ecol. Evol. 20: 88– 95
-- Dodds PS, Watts DJ. 31. 2005. A generalized model of social and biological contagion. J. Theor. Biol. 232: 587– 604
-- Thompson JMT, Sieber J. 32. 2011. Predicting climate tipping as a noisy bifurcation: a review. Int. J. Bifurc. Chaos 21: 399– 423
-- Kuehn C. 33. 2011. A mathematical framework for critical transitions: bifurcations, fast-slow systems and stochastic dynamics. Phys. D: Nonlinear Phenom. 240: 1020– 35
-- Ditlevsen PD, Johnsen SJ. 34. 2010. Tipping points: early warning and wishful thinking. Geophys. Res. Lett. 37: L19703
-- Horsthemke W, Lefever R. 35. 1984. Noise-Induced Transitions: Theory and Applications in Physics, Chemistry, and Biology New York: Springer-Verlag
-- Ashwin P, Wieczorek S, Vitolo R, Cox PM. 36. 2012. Tipping points in open systems: bifurcation, noise-induced and rate-dependent examples in the climate system. Philos. Trans. R. Soc. A 370: 1166– 84
-- Paine RT, Tegner MJ, Johnson EA. 37. 1998. Compounded perturbations yield ecological surprises. Ecosystems 1: 535– 45
-- Harley CDG, Paine RT. 38. 2009. Contingencies and compounded rare perturbations dictate sudden distributional shifts during periods of gradual climate change. Proc. Natl. Acad. Sci. USA 106: 11172– 76
-- Livina VN, Kwasniok F, Lenton TM. 39. 2010. Potential analysis reveals changing number of climate states during the last 60 kyr. Clim. Past 6: 77– 82
-- Kwasniok F, Lohmann G. 40. 2009. Deriving dynamical models from paleoclimatic records: application to glacial millennial-scale climate variability. Phys. Rev. E 80: 066104
-- Wang R, Dearing JA, Langdon PG, Zhang E, Yang X. 41. et al. 2012. Flickering gives early warning signals of a critical transition to a eutrophic lake state. Nature 492: 419– 22
-- Livina VN, Kwasniok F, Lohmann G, Kantelhardt JW, Lenton TM. 42. 2011. Changing climate states and stability: from Pliocene to present. Clim. Dyn. 37: 2437– 53
-- Wieczorek S, Ashwin P, Luke CM, Cox PM. 43. 2011. Excitability in ramped systems: the compost-bomb instability. Proc. R. Soc. A 467: 1243– 69
-- Scheffer M, Nes E, Holmgren M, Hughes T. 44. 2008. Pulse-driven loss of top-down control: the critical-rate hypothesis. Ecosystems 11: 226– 37
-- Levermann A, Born A. 45. 2007. Bistability of the Atlantic subpolar gyre in a coarse-resolution climate model. Geophys. Res. Lett. 34: L24605
-- Watson AJ, Lovelock JE. 46. 1983. Biological homeostasis of the global environment: the parable of Daisyworld. Tellus 35B: 284– 89
-- Staver AC, Archibald S, Levin SA. 47. 2011. The global extent and determinants of savanna and forest as alternative biome states. Science 334: 230– 32
-- Hirota M, Holmgren M, van Nes EH, Scheffer M. 48. 2011. Global resilience of tropical forest and savanna to critical transitions. Science 334: 232– 35
-- Carpenter SR, Ludwig D, Brock WA. 49. 1999. Management of eutrophication for lakes subject to potentially irreversible change. Ecol. Appl. 9: 751– 71
-- Marani M, D'Alpaos A, Lanzoni S, Carniello L, Rinaldo A. 50. 2010. The importance of being coupled: stable states and catastrophic shifts in tidal biomorphodynamics. J. Geophys. Res. 115: F04004
-- van de Koppel J, Herman PMJ, Thoolen P, Heip CHR. 51. 2001. Do alternate stable states occur in natural ecosystems? Evidence from a tidal flat. Ecology 82: 3449– 61
-- Nelson GH, Smith FE, Slobodkin LB. 52. 1960. Community structure, population control, and competition. Am. Nat. 94: 421– 25
-- Pace ML, Cole JJ, Carpenter SR, Kitchell JF. 53. 1999. Trophic cascades revealed in diverse ecosystems. Trends Ecol. Evol. 14: 483– 88
-- Phillips GL, Eminson D, Moss B. 54. 1978. A mechanism to account for macrophyte decline in progressively eutrophicated freshwaters. Aquat. Bot. 4: 103– 26
-- Scheffer M, van Nes EH. 55. 2007. Shallow lakes theory revisited: various alternative regimes driven by climate, nutrients, depth and lake size. Hydrobiologia 584: 455– 66
-- Paramor OAL, Hughes RG. 56. 2004. The effects of bioturbation and herbivory by the polychaete Nereis diversicolor on loss of saltmarsh in south-east England. J. Appl. Ecol. 41: 449– 63
-- Jefferies RL, Jano AP, Abraham KF. 57. 2006. A biotic agent promotes large-scale catastrophic change in the coastal marshes of Hudson Bay. J. Ecol. 94: 234– 42
-- Silliman BR, van de Koppel J, Bertness MD, Stanton LE, Mendelssohn IA. 58. 2005. Drought, snails, and large-scale die-off of southern U.S. salt marshes. Science 310: 1803– 6
-- Lenton TM, Watson AJ. 59. 2011. Revolutions that Made the Earth Oxford: Oxford Univ. Press
-- Lovelock JE. 60. 1965. A physical basis for life detection experiments. Nature 207: 568– 70
-- Williams HTP, Lenton TM. 61. 2007. The Flask model: emergence of nutrient-recycling microbial ecosystems and their disruption by environment-altering ‘rebel’ organisms. Oikos 116: 1087– 105
-- Williams HTP, Lenton TM. 62. 2010. Evolutionary regime shifts in simulated ecosystems. Oikos 119: 1887– 99
-- Goldblatt C, Lenton TM, Watson AJ. 63. 2006. Bistability of atmospheric oxygen and the great oxidation. Nature 443: 683– 86
-- Claire MW, Catling DC, Zahnle KJ. 64. 2006. Biogeochemical modelling of the rise in atmospheric oxygen. Geobiology 4: 239– 69
-- Hyde WT, Crowley TJ, Baum SK, Peltier WR. 65. 2000. Neoproterozoic ‘Snowball Earth’ simulations with a coupled climate/ice-sheet model. Nature 405: 425– 29
-- Peltier WR, Liu Y, Crowley JW. 66. 2007. Snowball Earth prevention by dissolved organic carbon re-mineralization. Nature 450: 813– 18
-- Butterfield NJ. 67. 2011. Animals and the invention of the Phanerozoic Earth system. Trends Ecol. Evol. 26: 81– 87
-- Berendse F, Scheffer M. 68. 2009. The angiosperm radiation revisited, an ecological explanation for Darwin's ‘abominable mystery.’. Ecol. Lett. 12: 865– 72
-- Feild TS, Brodribb TJ, Iglesias A, Chatelet DS, Baresch A. 69. et al. 2011. Fossil evidence for Cretaceous escalation in angiosperm leaf vein evolution. Proc. Natl. Acad. Sci. USA 108: 8363– 66
-- Bond WJ, Midgley JJ. 70. 2012. Fire and the angiosperm revolutions. Int. J. Plant Sci. 173: 569– 83
-- Svensen H, Planke S, Malthe-Sorenssen A, Jamtveit B, Myklebust R. 71. et al. 2004. Release of methane from a volcanic basin as a mechanism for initial Eocene global warming. Nature 429: 542– 45
-- Archer D, Buffett B, Brovkin V. 72. 2009. Ocean methane hydrates as a slow tipping point in the global carbon cycle. Proc. Natl. Acad. Sci. USA 106: 20596– 601
-- Lunt DJ, Ridgwell A, Sluijs A, Zachos J, Hunter S, Haywood A. 73. 2011. A model for orbital pacing of methane hydrate destabilization during the Palaeogene. Nat. Geosci. 4: 775– 78
-- DeConto RM, Pollard D. 74. 2003. Rapid Cenozoic glaciation of Antarctica induced by declining atmospheric CO 2. Nature 421: 245– 49
-- Saltzman B. 75. 2002. Dynamical Paleoclimatology London: Academic
-- Dakos V, Scheffer M, van Nes EH, Brovkin V, Petoukhov V, Held H. 76. 2008. Slowing down as an early warning signal for abrupt climate change. Proc. Natl. Acad. Sci. USA 105: 14308– 12
-- Scheiter S, Higgins SI, Osborne CP, Bradshaw C, Lunt D. 77. et al. 2012. Fire and fire-adapted vegetation promoted C 4 expansion in the late Miocene. New Phytol. 195: 653– 66
-- Crucifix M. 78. 2012. Oscillators and relaxation phenomena in Pleistocene climate theory. Philos. Trans. R. Soc. A 370: 1140– 65
-- Lunt DJ, Foster GL, Haywood AM, Stone EJ. 79. 2008. Late Pliocene Greenland glaciation controlled by a decline in atmospheric CO 2 levels. Nature 454: 1102– 5
-- Robinson A, Calov R, Ganopolski A. 80. 2012. Multistability and critical thresholds of the Greenland ice sheet. Nat. Clim. Change 2: 429– 32
-- Donges JF, Donner RV, Trauth MH, Marwan N, Schellnhuber H-J, Kurths J. 81. 2011. Nonlinear detection of paleoclimate-variability transitions possibly related to human evolution. Proc. Natl. Acad. Sci. USA 108: 20422– 27
-- Paillard D. 82. 1998. The timing of the Pleistocene glaciations from a simple multiple-state climate model. Nature 391: 378– 81
-- Paillard D, Parrenin F. 83. 2004. The Antarctic ice sheet and the triggering of deglaciations. Earth Planet. Sci. Lett. 227: 263– 71
-- Gildor H, Tziperman E. 84. 2000. Sea ice as the glacial cycles' climate switch: role of seasonal and orbital forcing. Paleoceanography 15: 605– 15
-- Pollard D, DeConto RM. 85. 2009. Modelling West Antarctic ice sheet growth and collapse through the past five million years. Nature 458: 329– 32
-- Naish T, Powell R, Levy R, Wilson G, Scherer R. 86. et al. 2009. Obliquity-paced Pliocene West Antarctic ice sheet oscillations. Nature 458: 322– 28
-- Schoof C. 87. 2007. Ice sheet grounding line dynamics: steady states, stability, and hysteresis. J. Geophys. Res. 112: F03S28
-- Burns SJ, Fleitmann D, Matter A, Kramers J, Al-Subbary AA. 88. 2003. Indian Ocean climate and an absolute chronology over Dansgaard/Oeschger events 9 to 13. Science 301: 1365– 67
-- Wang Y, Cheng H, Edwards RL, Kong X, Shao X. 89. et al. 2008. Millennial- and orbital-scale changes in the East Asian monsoon over the past 224,000 years. Nature 451: 1090– 93
-- Levermann A, Schewe J, Petoukhov V, Held H. 90. 2009. Basic mechanism for abrupt monsoon transitions. Proc. Natl. Acad. Sci. USA 106: 20572– 77
-- Zickfeld K, Knopf B, Petoukhov V, Schellnhuber HJ. 91. 2005. Is the Indian summer monsoon stable against global change?. Geophys. Res. Lett. 32: L15707
-- Colin de Verdiere A. 92. 2006. Bifurcation structure of thermohaline millennial oscillations. J. Clim. 19: 5777– 95
-- Cimatoribus AA, Drijfhout SS, Livina V, van der Schrier G. 93. 2013. Dansgaard-Oeschger events: bifurcation points in the climate system. Clim. Past Discuss. 8: 323– 33
-- Steffensen JP, Andersen KK, Bigler M, Clausen HB, Dahl-Jensen D. 94. et al. 2008. High-resolution Greenland ice core data show abrupt climate change happens in few years. Science 321: 680– 84
-- Livina VN, Lenton TM. 95. 2007. A modified method for detecting incipient bifurcations in a dynamical system. Geophys. Res. Lett. 34: L03712
-- Lenton TM, Livina VN, Dakos V, Scheffer M. 96. 2012. Climate bifurcation during the last deglaciation?. Clim. Past 8: 1127– 39
-- Gupta AK, Anderson DM, Overpeck JT. 97. 2003. Abrupt changes in the Asian southwest monsoon during the Holocene and their links to the North Atlantic Ocean. Nature 431: 354– 57
-- deMenocal P, Oritz J, Guilderson T, Adkins J, Sarnthein M. 98. et al. 2000. Abrupt onset and termination of the African Humid Period: rapid climate responses to gradual insolation forcing. Quat. Sci. Rev. 19: 347– 61
-- Claussen M, Kubatzki C, Brovkin V, Ganopolski A, Hoelzmann P, Pachur H-J. 99. 1999. Simulation of an abrupt change in Saharan vegetation in the mid-Holocene. Geophys. Res. Lett. 26: 2037– 40
-- Claussen M, Gayler V. 100. 1997. The greening of the Sahara during the mid-Holocene: Results of an interactive atmosphere-biome model. Glob. Ecol. Biogeogr. Lett. 6: 369– 77
-- Charney JG. 101. 1975. Dynamics of deserts and drought in the Sahel. Q. J. R. Meteorol. Soc. 101: 193– 202
-- Charney J, Stone PH, Quirk WJ. 102. 1975. Drought in the Sahara: a biogeophysical feedback mechanism. Science 187: 434– 35
-- Renssen H, Brovkin V, Fichefet T, Goosse H. 103. 2003. Holocene climate instability during the termination of the African Humid Period. Geophys. Res. Lett. 30: 1184
-- Liu Z, Wang Y, Gallimore R, Gasse F, Johnson T. 104. et al. 2007. Simulating the transient evolution and abrupt change of northern Africa atmosphere-ocean-terrestrial ecosystem in the Holocene. Quat. Sci. Rev. 26: 1818– 37
-- Kröpelin S, Verschuren D, Lézine A-M, Eggermont H, Cocquyt C. 105. et al. 2008. Climate-driven ecosystem succession in the Sahara: the past 6000 years. Science 320: 765– 68
-- Kuper R, Kröpelin S. 106. 2006. Climate-controlled Holocene occupation in the Sahara: motor of Africa's evolution. Science 313: 803– 7
-- Williams JW, Blois JL, Shuman BN. 107. 2011. Extrinsic and intrinsic forcing of abrupt ecological change: case studies from the late Quaternary. J. Ecol. 99: 664– 77
-- Guttal V, Jayaprakash C. 108. 2008. Changing skewness: an early warning signal of regime shifts in ecosystems. Ecol. Lett. 11: 450– 60
-- Miller G, Mangan J, Pollard D, Thompson S, Felzer B, Magee J. 109. 2005. Sensitivity of the Australian monsoon to insolation and vegetation: implications for human impact on continental moisture balance. Geology 33: 65– 68
-- Zimov SA, Chuprynin VI, Oreshko AP, Chapin III FS, Reynolds JF, Chapin MC. 110. 1995. Steppe-tundra transition: a herbivore-driven biome shift at the end of the Pleistocene. Am. Nat. 146: 765– 94
-- Janssen Marco A, Kohler Timothy A, Scheffer M. 111. 2003. Sunk-cost effects and vulnerability to collapse in ancient societies. Curr. Anthropol. 44: 722– 28
-- Barnosky AD, Hadly EA, Bascompte J, Berlow EL, Brown JH. 112. et al. 2012. Approaching a state shift in Earth's biosphere. Nature 486: 52– 58
-- Kriegler E, Hall JW, Held H, Dawson R, Schellnhuber HJ. 113. 2009. Imprecise probability assessment of tipping points in the climate system. Proc. Natl. Acad. Sci. USA 106: 5041– 46
-- Drijfhout SS, Weber SL, van der Swaluw E. 114. 2011. The stability of the MOC as diagnosed from model projections for pre-industrial, present and future climates. Clim. Dyn. 37: 1575– 86
-- Hawkins E, Smith RS, Allison LC, Gregory JM, Woollings TJ. 115. et al. 2011. Bistability of the Atlantic overturning circulation in a global climate model and links to ocean freshwater transport. Geophys. Res. Lett. 38: L10605
-- Ridley J, Gregory J, Huybrechts P, Lowe J. 116. 2010. Thresholds for irreversible decline of the Greenland ice sheet. Clim. Dyn. 35: 1065– 73
-- NEEM Community Memb 2013. Eemian interglacial reconstructed from a Greenland folded ice core. Nature 493: 489– 94
-- Yeh S-W, Kug J-S, Dewitte B, Kwon M-H, Kirtman BP, Jin F-F. 118. 2009. El Niño in a changing climate. Nature 461: 511– 14
-- Collins M, An S-I, Cai W, Ganachaud A, Guilyardi E. 119. et al. 2010. The impact of global warming on the tropical Pacific Ocean and El Niño. Nat. Geosci. 3: 391– 97
-- Latif M, Keenlyside NS. 120. 2009. El Niño/Southern Oscillation response to global warming. Proc. Natl. Acad. Sci. USA 106: 20578– 83
-- Bollasina MA, Ming Y, Ramaswamy V. 121. 2011. Anthropogenic aerosols and the weakening of the south Asian summer monsoon. Science 334: 502– 5
-- Ramanathan V, Chung C, Kim D, Bettge T, Buja L. 122. et al. 2005. Atmospheric brown clouds: impacts on south Asian climate and hydrological cycle. Proc. Natl. Acad. Sci. USA 102: 5326– 33
-- Tietsche S, Notz D, Jungclaus JH, Marotzke J. 123. 2011. Recovery mechanisms of Arctic summer sea ice. Geophys. Res. Lett. 38: L02707
-- Eisenman I, Wettlaufer JS. 124. 2009. Nonlinear threshold behavior during the loss of Arctic sea ice. Proc. Natl. Acad. Sci. USA 106: 28– 32
-- Abbot DS, Silber M, Pierrehumbert RT. 125. 2011. Bifurcations leading to summer Arctic sea ice loss. J. Geophys. Res. 116: D19120
-- Livina VN, Lenton TM. 126. 2013. A recent tipping point in the Arctic sea-ice cover: abrupt and persistent increase in the seasonal cycle since 2007. Cryosphere 7: 275– 86
-- Francis JA, Vavrus SJ. 127. 2012. Evidence linking Arctic amplification to extreme weather in mid-latitudes. Geophys. Res. Lett. 39: L06801
-- Claussen M. 128. 1998. On multiple solutions of the atmosphere-vegetation system in present-day climate. Glob. Change Biol. 4: 549– 59
-- Patricola CM, Cook KH. 129. 2008. Atmosphere/vegetation feedbacks: a mechanism for abrupt climate change over northern Africa. J. Geophys. Res. Atmos. 113: D18102
-- Claussen M, Brovkin V, Ganopolski A, Kubatzki C, Petoukhov V. 130. 2003. Climate change in northern Africa: the past is not the future. Clim. Change 57: 99– 118
-- Ornstein L, Aleinov I, Rind D. 131. 2009. Irrigated afforestation of the Sahara and Australian Outback to end global warming. Clim. Change 97: 409– 37
-- Hagos SM, Cook KH. 132. 2007. Dynamics of the west African monsoon jump. J. Clim. 20: 5264– 84
-- Chang P, Zhang R, Hazeleger W, Wen C, Wan X. 133. et al. 2008. Oceanic link between abrupt change in the North Atlantic Ocean and the African monsoon. Nat. Geosci. 1: 444– 48
-- Cook KH, Vizy EK. 134. 2006. Coupled model simulations of the west African monsoon system: twentieth- and twenty-first-century simulations. J. Clim. 19: 3681– 703
-- Klausmeier CA. 135. 1999. Regular and irregular patterns in semiarid vegetation. Science 284: 1826– 28
-- Scheffer M, Holmgren M, Brovkin V, Claussen M. 136. 2005. Synergy between small- and large-scale feedbacks of vegetation on the water cycle. Glob. Change Biol. 11: 1003– 12
-- Dekker SC, Rietkerk MAX, Bierkens MFP. 137. 2007. Coupling microscale vegetation-soil water and macroscale vegetation-precipitation feedbacks in semiarid ecosystems. Glob. Change Biol. 13: 671– 78
-- Janssen RHH, Meinders MBJ, van Nes EH, Scheffer M. 138. 2008. Microscale vegetation-soil feedback boosts hysteresis in a regional vegetation-climate system. Glob. Change Biol. 14: 1104– 12
-- Rietkerk M, Brovkin V, van Bodegom PM, Claussen M, Dekker SC. 139. et al. 2011. Local ecosystem feedbacks and critical transitions in the climate. Ecol. Complex. 8: 223– 28
-- Schlesinger WH. 140. 1990. Biological feedbacks in global desertification. Science 247: 1043– 48
-- Tsoar H. 141. 2005. Sand dunes mobility and stability in relation to climate. Phys. A: Stat. Mech. Appl. 357: 50– 56
-- Thomas DSG, Knight M, Wiggs GFS. 142. 2005. Remobilization of southern African desert dune systems by twenty-first century global warming. Nature 435: 1218– 21
-- Holdo RM, Sinclair ARE, Dobson AP, Metzger KL, Bolker BM. 143. et al. 2009. A disease-mediated trophic cascade in the Serengeti and its implications for ecosystem C. PLoS Biol. 7: e1000210
-- Higgins SI, Scheiter S. 144. 2012. Atmospheric CO 2 forces abrupt vegetation shifts locally, but not globally. Nature 488: 209– 12
-- Salati E, Vose PB. 145. 1984. Amazon Basin: a system in equilibrium. Science 225: 129– 38
-- Oyama MD, Nobre CA. 146. 2003. A new climate-vegetation equilibrium state for tropical South America. Geophys. Res. Lett. 30: 2199
-- Vecchi GA, Soden BJ, Wittenberg AT, Held IM, Leetmaa A, Harrison MJ. 147. 2006. Weakening of tropical Pacific atmospheric circulation due to anthropogenic forcing. Nature 441: 73– 76
-- White A, Cannell MGR, Friend AD. 148. 1999. Climate change impacts on ecosystems and the terrestrial carbon sink: a new assessment. Glob. Environ. Change 9: S21– 30
-- Cox PM, Betts RA, Collins M, Harris PP, Huntingford C, Jones CD. 149. 2004. Amazonian forest dieback under climate-carbon cycle projections for the 21st century. Theor. Appl. Climatol. 78: 137– 56
-- Cox PM, Betts RA, Jones CD, Spall SA, Totterdell IJ. 150. 2000. Acceleration of global warming due to carbon-cycle feedbacks in a coupled climate model. Nature 408: 184– 87
-- Cook KH, Vizy EK. 151. 2008. Effects of twenty-first-century climate change on the Amazon rain forest. J. Clim. 21: 542– 60
-- Malhi Y, Aragao LEOC, Galbraith D, Huntingford C, Fisher R. 152. et al. 2009. Exploring the likelihood and mechanism of a climate-change-induced dieback of the Amazon rainforest. Proc. Natl. Acad. Sci. USA 106: 20610– 15
-- Pueyo S, De Alencastro Graça PML, Barbosa RI, Cots R, Cardona E, Fearnside PM. 153. 2010. Testing for criticality in ecosystem dynamics: the case of Amazonian rainforest and savanna fire. Ecol. Lett. 13: 793– 802
-- Scheffer M, Hirota M, Holmgren M, van Nes EH, Chapin FS. 154. 2012. Thresholds for boreal biome transitions. Proc. Natl. Acad. Sci. USA 109: 21384– 89
-- Chapin FS, Callaghan TV, Bergeron Y, Fukuda M, Johnstone JF. 155. et al. 2004. Global change and the boreal forest: thresholds, shifting states or gradual change?. AMBIO 33: 361– 65
-- Zinck RD, Pascual M, Grimm V. 156. 2011. Understanding shifts in wildfire regimes as emergent threshold phenomena. Am. Nat. 178: E149– 61
-- Raffa KF, Aukema BH, Bentz BJ, Carroll AL, Hicke JA. 157. et al. 2008. Cross-scale drivers of natural disturbances prone to anthropogenic amplification: the dynamics of bark beetle eruptions. BioScience 58: 501– 17
-- Kurz WA, Dymond CC, Stinson G, Rampley GJ, Neilson ET. 158. et al. 2008. Mountain pine beetle and forest carbon feedback to climate change. Nature 452: 987– 90
-- Kurz WA, Stinson G, Rampley GJ, Dymond CC, Neilson ET. 159. 2008. Risk of natural disturbances makes future contribution of Canada's forests to the global carbon cycle highly uncertain. Proc. Natl. Acad. Sci. USA 105: 1551– 55
-- Peng C, Ma Z, Lei X, Zhu Q, Chen H. 160. et al. 2011. A drought-induced pervasive increase in tree mortality across Canada's boreal forests. Nat. Clim. Change 1: 467– 71
-- Lucht W, Schaphoff S, Erbrecht T, Heyder U, Cramer W. 161. 2006. Terrestrial vegetation redistribution and carbon balance under climate change. Carbon Balance Manag. 1: 6
-- Bellwood DR, Hughes TP, Folke C, Nystrom M. 162. 2004. Confronting the coral reef crisis. Nature 429: 827– 33
-- Drake JM, Griffen BD. 163. 2010. Early warning signals of extinction in deteriorating environments. Nature 467: 456– 59
-- Veraart AJ, Faassen EJ, Dakos V, van Nes EH, Lurling M, Scheffer M. 164. 2012. Recovery rates reflect distance to a tipping point in a living system. Nature 481: 357– 59
-- Dai L, Vorselen D, Korolev KS, Gore J. 165. 2012. Generic indicators for loss of resilience before a tipping point leading to population collapse. Science 336: 1175– 77
-- Carpenter SR, Cole JJ, Pace ML, Batt R, Brock WA. 166. et al. 2011. Early warnings of regime shifts: a whole-ecosystem experiment. Science 332: 1079– 82
-- Boettiger C, Hastings A. 167. 2012. Quantifying limits to detection of early warning for critical transitions. J. R. Soc. Interface. 9: 2527– 39
-- Boettiger C, Hastings A. 168. 2012. Early warning signals and the prosecutor's fallacy. Proc. R. Soc. B 279: 4734– 39
-- Biggs R, Carpenter SR, Brock WA. 169. 2009. Turning back from the brink: detecting an impending regime shift in time to avert it. Proc. Natl. Acad. Sci. USA 106: 826– 31
-- Lenton TM, Vaughan NE. 170. 2009. The radiative forcing potential of different climate geoengineering options. Atmos. Chem. Phys. 9: 5539– 61
-- Marten G, Gregory R, Morrison B, Suutari A, Nuñez D. 171. 2012. The EcoTipping Points Project http://www.ecotippingpoints.org/
-- Marten GG. 172. 2005. Environmental tipping points: a new paradigm for restoring ecological security. J. Policy Stud. 20: 75– 87
-- Horan RD, Fenichel EP, Drury KLS, Lodge DM. 173. 2012. Managing ecological thresholds in coupled environmental-human systems. Proc. Natl. Acad. Sci. USA 108: 7333– 38
-- Haywood JM, Jones A, Bellouin N, Stephenson DB. 174. 2013. Asymmetric forcing from stratospheric aerosols impacts Sahelian rainfall. Nat. Clim. Change. 3: 660– 65
-- Thagard P, Verbeurgt K. 175. 1998. Coherence as constraint satisfaction. Cogn. Sci. 22: 1– 24
-- Thagard P, Findlay SD. 176. 2011. Changing minds about climate change: belief revision, coherence, and emotion. Belief Revision Meets Philosophy of Science EJ Olsson, S Enqvist 329– 45 Berlin: Springer
-- Feinberg M, Willer R. 177. 2011. Apocalypse soon? Dire messages reduce belief in global warming by contradicting just-world beliefs. Psychol. Sci. 22: 34– 38
-- Heal G, Kunreuther H. 178. 2012. Tipping climate negotiations. Climate Change and Common Sense: Essays in Honour of Tom Schelling RW Hahn, A Ulph, pp. 50–60 Oxford: Oxford Univ. Press
-- Barrett S, Dannenberg A. 179. 2012. Climate negotiations under scientific uncertainty. Proc. Natl. Acad. Sci. USA 109: 17372– 76
-- Edenhofer O, Lessman K, Kemfert C, Grubb M, Köhler J. 180. 2006. Induced technological-change: exploring its implications for the economics of atmospheric stabilization: synthesis report from the innovation modeling comparison project. Energy J.: Endog. Technol. Change Econ. Atmos. Stab. Spec. Issue: 57– 108
-- Lenton TM, von Bloh W. 181. 2001. Biotic feedback extends the life span of the biosphere. Geophys. Res. Lett. 28: 1715– 18
+1. Gladwell M. 2000. The Tipping Point: How Little Things Can Make a Big Difference New York: Little Brown 304
+2. Grodzins M. 1957. Metropolitan segregation. Sci. Am. 197: 33– 41
+3. Lenton TM, Held H, Kriegler E, Hall J, Lucht W. et al. 2008. Tipping elements in the Earth's climate system. Proc. Natl. Acad. Sci. USA 105: 1786– 93
+4. Lenton TM. 2011. Early warning of climate tipping points. Nat. Clim. Change 1: 201– 9
+5. Scheffer M, Bacompte J, Brock WA, Brovkin V, Carpenter SR. et al. 2009. Early warning signals for critical transitions. Nature 461: 53– 59
+6. Scheffer M, Carpenter SR, Lenton TM, Bascompte J, Brock W. et al. 2012. Anticipating critical transitions. Science 338: 344– 48
+7. Stommel H. 1961. Thermohaline convection with two stable regimes of flow. Tellus 13: 224– 30
+8. Budyko MI. 1968. The effect of solar radiation variations on the climate of the earth. Tellus 21: 611– 19
+9. Sellers WD. 1969. A global climate model based on the energy balance of the earth-atmosphere system. J. Appl. Meteorol. 8: 386– 400
+10. Lewontin RC. 1969. The meaning of stability. Diversity and Stability in Ecological Systems, Brookhaven Symp. Biol. 22: 13– 24
+11. Holling CS. 1973. Resilience and stability of ecological systems. Annu. Rev. Ecol. Syst. 4: 1– 23
+12. May RM. 1977. Thresholds and breakpoints in ecosystems with a multiplicity of stable states. Nature 269: 471– 77
+13. Scheffer M, Carpenter S, Foley JA, Folke C, Walker B. 2001. Catastrophic shifts in ecosystems. Nature 413: 591– 96
+14. Folke C, Carpenter S, Walker B, Scheffer M, Elmqvist T. et al. 2004. Regime shifts, resilience, and biodiversity in ecosystem management. Annu. Rev. Ecol. Evol. Syst. 35: 557– 81
+15. Beisner BE, Haydon DT, Cuddington K. 2003. Alternative stable states in ecology. Front. Ecol. Environ. 1: 376– 82
+16. Scheffer M, Carpenter SR. 2003. Catastrophic regime shifts in ecosystems: linking theory to observation. Trends Ecol. Evol. 18: 648– 56
+17. Schröder A, Persson L, De Roos AM. 2005. Direct experimental evidence for alternative stable states: a review. Oikos 110: 3– 19
+18. Gordon LJ, Peterson GD, Bennett EM. 2008. Agricultural modifications of hydrological flows create ecological surprises. Trends Ecol. Evol. 23: 211– 19
+19. Alley RB, Marotzke J, Nordhaus WD, Overpeck JT, Peteet DM. et al. 2003. Abrupt climate change. Science 299: 2005– 10
+20. Lenton TM. 2012. Future climate surprises. The Future of the World's Climate A Henderson-Sellers, K McGuffie 489– 507 Oxford: Elsevier
+21. Levermann A, Bamber JL, Drijfhout SS, Ganopolski A, Haeberli W. et al. 2012. Potential climatic transitions with profound impact on Europe: review of the current state of six ‘tipping elements of the climate system.’. Clim. Change 110: 845– 78
+22. Viles HA, Naylor LA, Carter NEA, Chaput D. 2008. Biogeomorphological disturbance regimes: progress in linking ecological and geomorphological systems. Earth Surf. Process. Landf. 33: 1419– 35
+23. Kirkby M. 1995. Modelling the links between vegetation and landforms. Geomorphology 13: 319– 35
+24. Phillips JD. 2006. Evolutionary geomorphology: thresholds and nonlinearity in landform response to environmental change. Hydrol. Earth Syst. Sci. 10: 731– 42
+25. Handoh IC, Lenton TM. 2003. Periodic mid-Cretaceous oceanic anoxic events linked by oscillations of the phosphorus and oxygen biogeochemical cycles. Glob. Biogeochem. Cycles 17: 1092
+26. Ozaki K, Tajima S, Tajika E. 2011. Conditions required for oceanic anoxia/euxinia: constraints from a one-dimensional ocean biogeochemical cycle model. Earth Planet. Sci. Lett. 304: 270– 79
+27. Lenton TM. 2013. What early warning systems are there for environmental shocks?. Environ. Sci. Policy 27: S60– 75
+28. Poincaré H. 1885. Sur l'équilibre d'une masse fluide animée d'un mouvement de rotation. Acta Math. 7: 259– 380
+29. Zeeman EC. 1976. Catastrophe theory. Sci. Am. 4: 65– 83
+30. Pascual M, Guichard F. 2005. Criticality and disturbance in spatial ecological systems. Trends Ecol. Evol. 20: 88– 95
+31. Dodds PS, Watts DJ. 2005. A generalized model of social and biological contagion. J. Theor. Biol. 232: 587– 604
+32. Thompson JMT, Sieber J. 2011. Predicting climate tipping as a noisy bifurcation: a review. Int. J. Bifurc. Chaos 21: 399– 423
+33. Kuehn C. 2011. A mathematical framework for critical transitions: bifurcations, fast-slow systems and stochastic dynamics. Phys. D: Nonlinear Phenom. 240: 1020– 35
+34. Ditlevsen PD, Johnsen SJ. 2010. Tipping points: early warning and wishful thinking. Geophys. Res. Lett. 37: L19703
+35. Horsthemke W, Lefever R. 1984. Noise-Induced Transitions: Theory and Applications in Physics, Chemistry, and Biology New York: Springer-Verlag
+36. Ashwin P, Wieczorek S, Vitolo R, Cox PM. 2012. Tipping points in open systems: bifurcation, noise-induced and rate-dependent examples in the climate system. Philos. Trans. R. Soc. A 370: 1166– 84
+37. Paine RT, Tegner MJ, Johnson EA. 1998. Compounded perturbations yield ecological surprises. Ecosystems 1: 535– 45
+38. Harley CDG, Paine RT. 2009. Contingencies and compounded rare perturbations dictate sudden distributional shifts during periods of gradual climate change. Proc. Natl. Acad. Sci. USA 106: 11172– 76
+39. Livina VN, Kwasniok F, Lenton TM. 2010. Potential analysis reveals changing number of climate states during the last 60 kyr. Clim. Past 6: 77– 82
+40. Kwasniok F, Lohmann G. 2009. Deriving dynamical models from paleoclimatic records: application to glacial millennial-scale climate variability. Phys. Rev. E 80: 066104
+41. Wang R, Dearing JA, Langdon PG, Zhang E, Yang X. et al. 2012. Flickering gives early warning signals of a critical transition to a eutrophic lake state. Nature 492: 419– 22
+42. Livina VN, Kwasniok F, Lohmann G, Kantelhardt JW, Lenton TM. 2011. Changing climate states and stability: from Pliocene to present. Clim. Dyn. 37: 2437– 53
+43. Wieczorek S, Ashwin P, Luke CM, Cox PM. 2011. Excitability in ramped systems: the compost-bomb instability. Proc. R. Soc. A 467: 1243– 69
+44. Scheffer M, Nes E, Holmgren M, Hughes T. 2008. Pulse-driven loss of top-down control: the critical-rate hypothesis. Ecosystems 11: 226– 37
+45. Levermann A, Born A. 2007. Bistability of the Atlantic subpolar gyre in a coarse-resolution climate model. Geophys. Res. Lett. 34: L24605
+46. Watson AJ, Lovelock JE. 1983. Biological homeostasis of the global environment: the parable of Daisyworld. Tellus 35B: 284– 89
+47. Staver AC, Archibald S, Levin SA. 2011. The global extent and determinants of savanna and forest as alternative biome states. Science 334: 230– 32
+48. Hirota M, Holmgren M, van Nes EH, Scheffer M. 2011. Global resilience of tropical forest and savanna to critical transitions. Science 334: 232– 35
+49. Carpenter SR, Ludwig D, Brock WA. 1999. Management of eutrophication for lakes subject to potentially irreversible change. Ecol. Appl. 9: 751– 71
+50. Marani M, D'Alpaos A, Lanzoni S, Carniello L, Rinaldo A. 2010. The importance of being coupled: stable states and catastrophic shifts in tidal biomorphodynamics. J. Geophys. Res. 115: F04004
+51. van de Koppel J, Herman PMJ, Thoolen P, Heip CHR. 2001. Do alternate stable states occur in natural ecosystems? Evidence from a tidal flat. Ecology 82: 3449– 61
+52. Nelson GH, Smith FE, Slobodkin LB. 1960. Community structure, population control, and competition. Am. Nat. 94: 421– 25
+53. Pace ML, Cole JJ, Carpenter SR, Kitchell JF. 1999. Trophic cascades revealed in diverse ecosystems. Trends Ecol. Evol. 14: 483– 88
+54. Phillips GL, Eminson D, Moss B. 1978. A mechanism to account for macrophyte decline in progressively eutrophicated freshwaters. Aquat. Bot. 4: 103– 26
+55. Scheffer M, van Nes EH. 2007. Shallow lakes theory revisited: various alternative regimes driven by climate, nutrients, depth and lake size. Hydrobiologia 584: 455– 66
+56. Paramor OAL, Hughes RG. 2004. The effects of bioturbation and herbivory by the polychaete Nereis diversicolor on loss of saltmarsh in south-east England. J. Appl. Ecol. 41: 449– 63
+57. Jefferies RL, Jano AP, Abraham KF. 2006. A biotic agent promotes large-scale catastrophic change in the coastal marshes of Hudson Bay. J. Ecol. 94: 234– 42
+58. Silliman BR, van de Koppel J, Bertness MD, Stanton LE, Mendelssohn IA. 2005. Drought, snails, and large-scale die-off of southern U.S. salt marshes. Science 310: 1803– 6
+59. Lenton TM, Watson AJ. 2011. Revolutions that Made the Earth Oxford: Oxford Univ. Press
+60. Lovelock JE. 1965. A physical basis for life detection experiments. Nature 207: 568– 70
+61. Williams HTP, Lenton TM. 2007. The Flask model: emergence of nutrient-recycling microbial ecosystems and their disruption by environment-altering ‘rebel’ organisms. Oikos 116: 1087– 105
+62. Williams HTP, Lenton TM. 2010. Evolutionary regime shifts in simulated ecosystems. Oikos 119: 1887– 99
+63. Goldblatt C, Lenton TM, Watson AJ. 2006. Bistability of atmospheric oxygen and the great oxidation. Nature 443: 683– 86
+64. Claire MW, Catling DC, Zahnle KJ. 2006. Biogeochemical modelling of the rise in atmospheric oxygen. Geobiology 4: 239– 69
+65. Hyde WT, Crowley TJ, Baum SK, Peltier WR. 2000. Neoproterozoic ‘Snowball Earth’ simulations with a coupled climate/ice-sheet model. Nature 405: 425– 29
+66. Peltier WR, Liu Y, Crowley JW. 2007. Snowball Earth prevention by dissolved organic carbon re-mineralization. Nature 450: 813– 18
+67. Butterfield NJ. 2011. Animals and the invention of the Phanerozoic Earth system. Trends Ecol. Evol. 26: 81– 87
+68. Berendse F, Scheffer M. 2009. The angiosperm radiation revisited, an ecological explanation for Darwin's ‘abominable mystery.’. Ecol. Lett. 12: 865– 72
+69. Feild TS, Brodribb TJ, Iglesias A, Chatelet DS, Baresch A. et al. 2011. Fossil evidence for Cretaceous escalation in angiosperm leaf vein evolution. Proc. Natl. Acad. Sci. USA 108: 8363– 66
+70. Bond WJ, Midgley JJ. 2012. Fire and the angiosperm revolutions. Int. J. Plant Sci. 173: 569– 83
+71. Svensen H, Planke S, Malthe-Sorenssen A, Jamtveit B, Myklebust R. et al. 2004. Release of methane from a volcanic basin as a mechanism for initial Eocene global warming. Nature 429: 542– 45
+72. Archer D, Buffett B, Brovkin V. 2009. Ocean methane hydrates as a slow tipping point in the global carbon cycle. Proc. Natl. Acad. Sci. USA 106: 20596– 601
+73. Lunt DJ, Ridgwell A, Sluijs A, Zachos J, Hunter S, Haywood A. 2011. A model for orbital pacing of methane hydrate destabilization during the Palaeogene. Nat. Geosci. 4: 775– 78
+74. DeConto RM, Pollard D. 2003. Rapid Cenozoic glaciation of Antarctica induced by declining atmospheric CO 2. Nature 421: 245– 49
+75. Saltzman B. 2002. Dynamical Paleoclimatology London: Academic
+76. Dakos V, Scheffer M, van Nes EH, Brovkin V, Petoukhov V, Held H. 2008. Slowing down as an early warning signal for abrupt climate change. Proc. Natl. Acad. Sci. USA 105: 14308– 12
+77. Scheiter S, Higgins SI, Osborne CP, Bradshaw C, Lunt D. et al. 2012. Fire and fire-adapted vegetation promoted C 4 expansion in the late Miocene. New Phytol. 195: 653– 66
+78. Crucifix M. 2012. Oscillators and relaxation phenomena in Pleistocene climate theory. Philos. Trans. R. Soc. A 370: 1140– 65
+79. Lunt DJ, Foster GL, Haywood AM, Stone EJ. 2008. Late Pliocene Greenland glaciation controlled by a decline in atmospheric CO 2 levels. Nature 454: 1102– 5
+80. Robinson A, Calov R, Ganopolski A. 2012. Multistability and critical thresholds of the Greenland ice sheet. Nat. Clim. Change 2: 429– 32
+81. Donges JF, Donner RV, Trauth MH, Marwan N, Schellnhuber H-J, Kurths J. 2011. Nonlinear detection of paleoclimate-variability transitions possibly related to human evolution. Proc. Natl. Acad. Sci. USA 108: 20422– 27
+82. Paillard D. 1998. The timing of the Pleistocene glaciations from a simple multiple-state climate model. Nature 391: 378– 81
+83. Paillard D, Parrenin F. 2004. The Antarctic ice sheet and the triggering of deglaciations. Earth Planet. Sci. Lett. 227: 263– 71
+84. Gildor H, Tziperman E. 2000. Sea ice as the glacial cycles' climate switch: role of seasonal and orbital forcing. Paleoceanography 15: 605– 15
+85. Pollard D, DeConto RM. 2009. Modelling West Antarctic ice sheet growth and collapse through the past five million years. Nature 458: 329– 32
+86. Naish T, Powell R, Levy R, Wilson G, Scherer R. et al. 2009. Obliquity-paced Pliocene West Antarctic ice sheet oscillations. Nature 458: 322– 28
+87. Schoof C. 2007. Ice sheet grounding line dynamics: steady states, stability, and hysteresis. J. Geophys. Res. 112: F03S28
+88. Burns SJ, Fleitmann D, Matter A, Kramers J, Al-Subbary AA. 2003. Indian Ocean climate and an absolute chronology over Dansgaard/Oeschger events 9 to 13. Science 301: 1365– 67
+89. Wang Y, Cheng H, Edwards RL, Kong X, Shao X. et al. 2008. Millennial- and orbital-scale changes in the East Asian monsoon over the past 224,000 years. Nature 451: 1090– 93
+90. Levermann A, Schewe J, Petoukhov V, Held H. 2009. Basic mechanism for abrupt monsoon transitions. Proc. Natl. Acad. Sci. USA 106: 20572– 77
+91. Zickfeld K, Knopf B, Petoukhov V, Schellnhuber HJ. 2005. Is the Indian summer monsoon stable against global change?. Geophys. Res. Lett. 32: L15707
+92. Colin de Verdiere A. 2006. Bifurcation structure of thermohaline millennial oscillations. J. Clim. 19: 5777– 95
+93. Cimatoribus AA, Drijfhout SS, Livina V, van der Schrier G. 2013. Dansgaard-Oeschger events: bifurcation points in the climate system. Clim. Past Discuss. 8: 323– 33
+94. Steffensen JP, Andersen KK, Bigler M, Clausen HB, Dahl-Jensen D. et al. 2008. High-resolution Greenland ice core data show abrupt climate change happens in few years. Science 321: 680– 84
+95. Livina VN, Lenton TM. 2007. A modified method for detecting incipient bifurcations in a dynamical system. Geophys. Res. Lett. 34: L03712
+96. Lenton TM, Livina VN, Dakos V, Scheffer M. 2012. Climate bifurcation during the last deglaciation?. Clim. Past 8: 1127– 39
+97. Gupta AK, Anderson DM, Overpeck JT. 2003. Abrupt changes in the Asian southwest monsoon during the Holocene and their links to the North Atlantic Ocean. Nature 431: 354– 57
+98. deMenocal P, Oritz J, Guilderson T, Adkins J, Sarnthein M. et al. 2000. Abrupt onset and termination of the African Humid Period: rapid climate responses to gradual insolation forcing. Quat. Sci. Rev. 19: 347– 61
+99. Claussen M, Kubatzki C, Brovkin V, Ganopolski A, Hoelzmann P, Pachur H-J. 1999. Simulation of an abrupt change in Saharan vegetation in the mid-Holocene. Geophys. Res. Lett. 26: 2037– 40
+100. Claussen M, Gayler V. 1997. The greening of the Sahara during the mid-Holocene: Results of an interactive atmosphere-biome model. Glob. Ecol. Biogeogr. Lett. 6: 369– 77
+101. Charney JG. 1975. Dynamics of deserts and drought in the Sahel. Q. J. R. Meteorol. Soc. 101: 193– 202
+102. Charney J, Stone PH, Quirk WJ. 1975. Drought in the Sahara: a biogeophysical feedback mechanism. Science 187: 434– 35
+103. Renssen H, Brovkin V, Fichefet T, Goosse H. 2003. Holocene climate instability during the termination of the African Humid Period. Geophys. Res. Lett. 30: 1184
+104. Liu Z, Wang Y, Gallimore R, Gasse F, Johnson T. et al. 2007. Simulating the transient evolution and abrupt change of northern Africa atmosphere-ocean-terrestrial ecosystem in the Holocene. Quat. Sci. Rev. 26: 1818– 37
+105. Kröpelin S, Verschuren D, Lézine A-M, Eggermont H, Cocquyt C. et al. 2008. Climate-driven ecosystem succession in the Sahara: the past 6000 years. Science 320: 765– 68
+106. Kuper R, Kröpelin S. 2006. Climate-controlled Holocene occupation in the Sahara: motor of Africa's evolution. Science 313: 803– 7
+107. Williams JW, Blois JL, Shuman BN. 2011. Extrinsic and intrinsic forcing of abrupt ecological change: case studies from the late Quaternary. J. Ecol. 99: 664– 77
+108. Guttal V, Jayaprakash C. 2008. Changing skewness: an early warning signal of regime shifts in ecosystems. Ecol. Lett. 11: 450– 60
+109. Miller G, Mangan J, Pollard D, Thompson S, Felzer B, Magee J. 2005. Sensitivity of the Australian monsoon to insolation and vegetation: implications for human impact on continental moisture balance. Geology 33: 65– 68
+110. Zimov SA, Chuprynin VI, Oreshko AP, Chapin III FS, Reynolds JF, Chapin MC. 1995. Steppe-tundra transition: a herbivore-driven biome shift at the end of the Pleistocene. Am. Nat. 146: 765– 94
+111. Janssen Marco A, Kohler Timothy A, Scheffer M. 2003. Sunk-cost effects and vulnerability to collapse in ancient societies. Curr. Anthropol. 44: 722– 28
+112. Barnosky AD, Hadly EA, Bascompte J, Berlow EL, Brown JH. et al. 2012. Approaching a state shift in Earth's biosphere. Nature 486: 52– 58
+113. Kriegler E, Hall JW, Held H, Dawson R, Schellnhuber HJ. 2009. Imprecise probability assessment of tipping points in the climate system. Proc. Natl. Acad. Sci. USA 106: 5041– 46
+114. Drijfhout SS, Weber SL, van der Swaluw E. 2011. The stability of the MOC as diagnosed from model projections for pre-industrial, present and future climates. Clim. Dyn. 37: 1575– 86
+115. Hawkins E, Smith RS, Allison LC, Gregory JM, Woollings TJ. et al. 2011. Bistability of the Atlantic overturning circulation in a global climate model and links to ocean freshwater transport. Geophys. Res. Lett. 38: L10605
+116. Ridley J, Gregory J, Huybrechts P, Lowe J. 2010. Thresholds for irreversible decline of the Greenland ice sheet. Clim. Dyn. 35: 1065– 73
+117. NEEM Community Memb 2013. Eemian interglacial reconstructed from a Greenland folded ice core. Nature 493: 489– 94
+118. Yeh S-W, Kug J-S, Dewitte B, Kwon M-H, Kirtman BP, Jin F-F. 2009. El Niño in a changing climate. Nature 461: 511– 14
+119. Collins M, An S-I, Cai W, Ganachaud A, Guilyardi E. et al. 2010. The impact of global warming on the tropical Pacific Ocean and El Niño. Nat. Geosci. 3: 391– 97
+120. Latif M, Keenlyside NS. 2009. El Niño/Southern Oscillation response to global warming. Proc. Natl. Acad. Sci. USA 106: 20578– 83
+121. Bollasina MA, Ming Y, Ramaswamy V. 2011. Anthropogenic aerosols and the weakening of the south Asian summer monsoon. Science 334: 502– 5
+122. Ramanathan V, Chung C, Kim D, Bettge T, Buja L. et al. 2005. Atmospheric brown clouds: impacts on south Asian climate and hydrological cycle. Proc. Natl. Acad. Sci. USA 102: 5326– 33
+123. Tietsche S, Notz D, Jungclaus JH, Marotzke J. 2011. Recovery mechanisms of Arctic summer sea ice. Geophys. Res. Lett. 38: L02707
+124. Eisenman I, Wettlaufer JS. 2009. Nonlinear threshold behavior during the loss of Arctic sea ice. Proc. Natl. Acad. Sci. USA 106: 28– 32
+125. Abbot DS, Silber M, Pierrehumbert RT. 2011. Bifurcations leading to summer Arctic sea ice loss. J. Geophys. Res. 116: D19120
+126. Livina VN, Lenton TM. 2013. A recent tipping point in the Arctic sea-ice cover: abrupt and persistent increase in the seasonal cycle since 2007. Cryosphere 7: 275– 86
+127. Francis JA, Vavrus SJ. 2012. Evidence linking Arctic amplification to extreme weather in mid-latitudes. Geophys. Res. Lett. 39: L06801
+128. Claussen M. 1998. On multiple solutions of the atmosphere-vegetation system in present-day climate. Glob. Change Biol. 4: 549– 59
+129. Patricola CM, Cook KH. 2008. Atmosphere/vegetation feedbacks: a mechanism for abrupt climate change over northern Africa. J. Geophys. Res. Atmos. 113: D18102
+130. Claussen M, Brovkin V, Ganopolski A, Kubatzki C, Petoukhov V. 2003. Climate change in northern Africa: the past is not the future. Clim. Change 57: 99– 118
+131. Ornstein L, Aleinov I, Rind D. 2009. Irrigated afforestation of the Sahara and Australian Outback to end global warming. Clim. Change 97: 409– 37
+132. Hagos SM, Cook KH. 2007. Dynamics of the west African monsoon jump. J. Clim. 20: 5264– 84
+133. Chang P, Zhang R, Hazeleger W, Wen C, Wan X. et al. 2008. Oceanic link between abrupt change in the North Atlantic Ocean and the African monsoon. Nat. Geosci. 1: 444– 48
+134. Cook KH, Vizy EK. 2006. Coupled model simulations of the west African monsoon system: twentieth- and twenty-first-century simulations. J. Clim. 19: 3681– 703
+135. Klausmeier CA. 1999. Regular and irregular patterns in semiarid vegetation. Science 284: 1826– 28
+136. Scheffer M, Holmgren M, Brovkin V, Claussen M. 2005. Synergy between small- and large-scale feedbacks of vegetation on the water cycle. Glob. Change Biol. 11: 1003– 12
+137. Dekker SC, Rietkerk MAX, Bierkens MFP. 2007. Coupling microscale vegetation-soil water and macroscale vegetation-precipitation feedbacks in semiarid ecosystems. Glob. Change Biol. 13: 671– 78
+138. Janssen RHH, Meinders MBJ, van Nes EH, Scheffer M. 2008. Microscale vegetation-soil feedback boosts hysteresis in a regional vegetation-climate system. Glob. Change Biol. 14: 1104– 12
+139. Rietkerk M, Brovkin V, van Bodegom PM, Claussen M, Dekker SC. et al. 2011. Local ecosystem feedbacks and critical transitions in the climate. Ecol. Complex. 8: 223– 28
+140. Schlesinger WH. 1990. Biological feedbacks in global desertification. Science 247: 1043– 48
+141. Tsoar H. 2005. Sand dunes mobility and stability in relation to climate. Phys. A: Stat. Mech. Appl. 357: 50– 56
+142. Thomas DSG, Knight M, Wiggs GFS. 2005. Remobilization of southern African desert dune systems by twenty-first century global warming. Nature 435: 1218– 21
+143. Holdo RM, Sinclair ARE, Dobson AP, Metzger KL, Bolker BM. et al. 2009. A disease-mediated trophic cascade in the Serengeti and its implications for ecosystem C. PLoS Biol. 7: e1000210
+144. Higgins SI, Scheiter S. 2012. Atmospheric CO 2 forces abrupt vegetation shifts locally, but not globally. Nature 488: 209– 12
+145. Salati E, Vose PB. 1984. Amazon Basin: a system in equilibrium. Science 225: 129– 38
+146. Oyama MD, Nobre CA. 2003. A new climate-vegetation equilibrium state for tropical South America. Geophys. Res. Lett. 30: 2199
+147. Vecchi GA, Soden BJ, Wittenberg AT, Held IM, Leetmaa A, Harrison MJ. 2006. Weakening of tropical Pacific atmospheric circulation due to anthropogenic forcing. Nature 441: 73– 76
+148. White A, Cannell MGR, Friend AD. 1999. Climate change impacts on ecosystems and the terrestrial carbon sink: a new assessment. Glob. Environ. Change 9: S21– 30
+149. Cox PM, Betts RA, Collins M, Harris PP, Huntingford C, Jones CD. 2004. Amazonian forest dieback under climate-carbon cycle projections for the 21st century. Theor. Appl. Climatol. 78: 137– 56
+150. Cox PM, Betts RA, Jones CD, Spall SA, Totterdell IJ. 2000. Acceleration of global warming due to carbon-cycle feedbacks in a coupled climate model. Nature 408: 184– 87
+151. Cook KH, Vizy EK. 2008. Effects of twenty-first-century climate change on the Amazon rain forest. J. Clim. 21: 542– 60
+152. Malhi Y, Aragao LEOC, Galbraith D, Huntingford C, Fisher R. et al. 2009. Exploring the likelihood and mechanism of a climate-change-induced dieback of the Amazon rainforest. Proc. Natl. Acad. Sci. USA 106: 20610– 15
+153. Pueyo S, De Alencastro Graça PML, Barbosa RI, Cots R, Cardona E, Fearnside PM. 2010. Testing for criticality in ecosystem dynamics: the case of Amazonian rainforest and savanna fire. Ecol. Lett. 13: 793– 802
+154. Scheffer M, Hirota M, Holmgren M, van Nes EH, Chapin FS. 2012. Thresholds for boreal biome transitions. Proc. Natl. Acad. Sci. USA 109: 21384– 89
+155. Chapin FS, Callaghan TV, Bergeron Y, Fukuda M, Johnstone JF. et al. 2004. Global change and the boreal forest: thresholds, shifting states or gradual change?. AMBIO 33: 361– 65
+156. Zinck RD, Pascual M, Grimm V. 2011. Understanding shifts in wildfire regimes as emergent threshold phenomena. Am. Nat. 178: E149– 61
+157. Raffa KF, Aukema BH, Bentz BJ, Carroll AL, Hicke JA. et al. 2008. Cross-scale drivers of natural disturbances prone to anthropogenic amplification: the dynamics of bark beetle eruptions. BioScience 58: 501– 17
+158. Kurz WA, Dymond CC, Stinson G, Rampley GJ, Neilson ET. et al. 2008. Mountain pine beetle and forest carbon feedback to climate change. Nature 452: 987– 90
+159. Kurz WA, Stinson G, Rampley GJ, Dymond CC, Neilson ET. 2008. Risk of natural disturbances makes future contribution of Canada's forests to the global carbon cycle highly uncertain. Proc. Natl. Acad. Sci. USA 105: 1551– 55
+160. Peng C, Ma Z, Lei X, Zhu Q, Chen H. et al. 2011. A drought-induced pervasive increase in tree mortality across Canada's boreal forests. Nat. Clim. Change 1: 467– 71
+161. Lucht W, Schaphoff S, Erbrecht T, Heyder U, Cramer W. 2006. Terrestrial vegetation redistribution and carbon balance under climate change. Carbon Balance Manag. 1: 6
+162. Bellwood DR, Hughes TP, Folke C, Nystrom M. 2004. Confronting the coral reef crisis. Nature 429: 827– 33
+163. Drake JM, Griffen BD. 2010. Early warning signals of extinction in deteriorating environments. Nature 467: 456– 59
+164. Veraart AJ, Faassen EJ, Dakos V, van Nes EH, Lurling M, Scheffer M. 2012. Recovery rates reflect distance to a tipping point in a living system. Nature 481: 357– 59
+165. Dai L, Vorselen D, Korolev KS, Gore J. 2012. Generic indicators for loss of resilience before a tipping point leading to population collapse. Science 336: 1175– 77
+166. Carpenter SR, Cole JJ, Pace ML, Batt R, Brock WA. et al. 2011. Early warnings of regime shifts: a whole-ecosystem experiment. Science 332: 1079– 82
+167. Boettiger C, Hastings A. 2012. Quantifying limits to detection of early warning for critical transitions. J. R. Soc. Interface. 9: 2527– 39
+168. Boettiger C, Hastings A. 2012. Early warning signals and the prosecutor's fallacy. Proc. R. Soc. B 279: 4734– 39
+169. Biggs R, Carpenter SR, Brock WA. 2009. Turning back from the brink: detecting an impending regime shift in time to avert it. Proc. Natl. Acad. Sci. USA 106: 826– 31
+170. Lenton TM, Vaughan NE. 2009. The radiative forcing potential of different climate geoengineering options. Atmos. Chem. Phys. 9: 5539– 61
+171. Marten G, Gregory R, Morrison B, Suutari A, Nuñez D. 2012. The EcoTipping Points Project http://www.ecotippingpoints.org/
+172. Marten GG. 2005. Environmental tipping points: a new paradigm for restoring ecological security. J. Policy Stud. 20: 75– 87
+173. Horan RD, Fenichel EP, Drury KLS, Lodge DM. 2012. Managing ecological thresholds in coupled environmental-human systems. Proc. Natl. Acad. Sci. USA 108: 7333– 38
+174. Haywood JM, Jones A, Bellouin N, Stephenson DB. 2013. Asymmetric forcing from stratospheric aerosols impacts Sahelian rainfall. Nat. Clim. Change. 3: 660– 65
+175. Thagard P, Verbeurgt K. 1998. Coherence as constraint satisfaction. Cogn. Sci. 22: 1– 24
+176. Thagard P, Findlay SD. 2011. Changing minds about climate change: belief revision, coherence, and emotion. Belief Revision Meets Philosophy of Science EJ Olsson, S Enqvist 329– 45 Berlin: Springer
+177. Feinberg M, Willer R. 2011. Apocalypse soon? Dire messages reduce belief in global warming by contradicting just-world beliefs. Psychol. Sci. 22: 34– 38
+178. Heal G, Kunreuther H. 2012. Tipping climate negotiations. Climate Change and Common Sense: Essays in Honour of Tom Schelling RW Hahn, A Ulph, pp. 50–60 Oxford: Oxford Univ. Press
+179. Barrett S, Dannenberg A. 2012. Climate negotiations under scientific uncertainty. Proc. Natl. Acad. Sci. USA 109: 17372– 76
+180. Edenhofer O, Lessman K, Kemfert C, Grubb M, Köhler J. 2006. Induced technological-change: exploring its implications for the economics of atmospheric stabilization: synthesis report from the innovation modeling comparison project. Energy J.: Endog. Technol. Change Econ. Atmos. Stab. Spec. Issue: 57– 108
+181. Lenton TM, von Bloh W. 2001. Biotic feedback extends the life span of the biosphere. Geophys. Res. Lett. 28: 1715– 18

@@ -229,61 +229,61 @@ For access to specimens in their care, we thank Loïc Costeur (NMB), Silvan Thü
 
 ## References (58 total, showing 58)
 
-- Baur G . 1888 Osteologische Notizen über Reptilien (Fortsetzung II) . Zool. Anz. 11 , 417 – 424 .
-- Zittel KA . 1889 Handbuch der Palaeontologie, §1: Palaeozoologie, Volume 3, Vertebrata, Shipment 3: Reptilia . München, Germany : R. Oldenbourg .
-- Dollo L . 1886 Première note sur les chéloniens du Bruxellien (éocène moyen) de la Belgique . Bull. Mus. R. Hist. Nat. Belg. 4 , 75 – 96 .
-- Gaffney ES , Meylan PA . 1988 A phylogeny of turtles . In The phylogeny and classification of the tetrapods (ed. MJ Benton) , pp. 157 – 219 . Oxford, UK : Clarendon Press .
-- Gaffney ES . 1996 The postcranial morphology of Meiolania platyceps and a review of the Meiolaniidae . Bull. Am. Mus. Nat. Hist. 229 , 1 – 166 .
-- Lapparent de Broin F , de Lange-Badré B , Dutrieux M . 1996 Nouvelles découvertes de tortues dans le Jurassique supérieur du Lot (France) et examen du taxon Plesiochelyidae . Rev. Paléobiol. 15 , 533 – 570 .
-- Hirayama R , Brinkman DB , Danilov IG . 2000 Distribution and biogeography of non-marine Cretaceous turtles . Russ. J. Herpetol. 7 , 181 – 198 .
-- Gaffney ES , Rich TH , Vickers-Rich P , Constantine A , Vacca R , Kool L . 2007 Chubutemys , a new eucryptodiran turtle from the Early Cretaceous of Argentina, and the relationships of the Meiolaniidae . Am. Mus. Novit. 3599 , 1 – 35 . ( doi:10.1206/0003-0082(2007)3599[1:CANETF]2.0.CO;2 )
-- Joyce WG . 2007 Phylogenetic relationships of Mesozoic turtles . Bull. Peabody Mus. Nat. Hist. 48 , 3 – 102 . ( doi:10.3374/0079-032X(2007)48[3:PROMT]2.0.CO;2 )
-- Sterli J . 2010 Phylogenetic relationships among extinct and extant turtles: the position of Pleurodira and the effects of the fossils on rooting crown-group turtles . Contrib. Zool. 79 , 93 – 106 .
-- Anquetin J . 2012 Reassessment of the phylogenetic interrelationships of basal turtles (Testudinata) . J. Syst. Palaeontol. 10 , 3 – 45 . ( doi:10.1080/14772019.2011.558928 )
-- Rabi M , Zhou C-F , Wings O , Ge S , Joyce WG . 2013 A new xinjiangchelyid turtle from the Middle Jurassic of Xinjiang, China and the evolution of the basipterygoid process in Mesozoic turtles . BMC Evol. Biol. 13 , 203 . ( doi:10.1186/1471-2148-13-203 )
-- Anquetin J , Püntener C , Billon-Bruyat J-P . 2015 Portlandemys gracilis n. sp., a new coastal marine turtle from the Late Jurassic of Porrentruy (Switzerland) and a reconsideration of plesiochelyid cranial anatomy . PLoS ONE 10 , e0129193 . ( doi:10.1371/journal.pone.0129193 )
-- Rütimeyer L . 1873 Die fossilen Schildkröten von Solothurn und der übrigen Juraformation . Neue Denkschr. Allg. Schweiz. Naturforschenden Ges. 25 , 1 – 185 .
-- Bräm H . 1965 Die Schildkröten aus dem oberen Jura (Malm) der Gegend von Solothurn . Schweiz. Paläontol. Abh. 83 , 1 – 190 .
-- Meyer CA . 1994 Depositional environment and paleoecology of the Solothurn Turtle Limestone (Kimmeridgian, Northern Switzerland) . Geobios 16 , 227 – 236 . ( doi:10.1016/S0016-6995(94)80038-3 )
-- Anquetin J , Püntener C , Billon-Bruyat J-P . 2014 A taxonomic review of the Late Jurassic eucryptodiran turtles from the Jura Mountains (Switzerland and France) . PeerJ 2 , e369 . ( doi:10.7717/peerj.369 )
-- Marty D , Billon-Bruyat J-P . 2009 Field-trip to the excavations in the Late Jurassic along the future Transjurane highway near Porrentruy (Canton Jura, NW Switzerland): dinosaur tracks, marine vertebrates and invertebrates. In Abstracts and Field Guides, 5th Int. Symp. on Lithographic Limestone and Plattenkalk, Actes 2009 bis de la Société jurassienne d’émulation (eds J-P Billon-Bruyat, D Marty, L Costeur, CA Meyer, B Thüring), pp. 94–129. Porrentruy, Switzerland .
-- Püntener C , Billon-Bruyat J-P , Bocat L , Berger J-P , Joyce WG . 2014 Taxonomy and phylogeny of the turtle Tropidemys langii Rütimeyer, 1873 based on new specimens from the Kimmeridgian of the Swiss Jura Mountains . J. Vertebr. Paleontol. 34 , 353 – 374 . ( doi:10.1080/02724634.2013.804412 )
-- Püntener C , Anquetin J , Billon-Bruyat J-P . 2015 Thalassemys bruntrutana n. sp., a new coastal marine turtle from the Late Jurassic of Porrentruy (Switzerland), and the paleobiogeography of the Thalassemydidae . PeerJ 3 , e1282 . ( doi:10.7717/peerj.1282 )
-- Maack GA . 1869 Die bis jetzt bekannten fossilen Schildkröten und die im oberen Jura bei Kelheim (Bayern) und Hannover neu aufgefundenen ältesten Arten derselben . Palaeontographica 18 , 193 – 338 .
-- Oertel W . 1915 Beiträge zur Kenntnis der oberjurassischen Schildkrötengattung Hydropelta . Cent. Für Mineral. Geol. Paläontol. 1915 , 336 – 348 .
-- Oertel W . 1924 Die Schildkrotenfauna des nordwestdeutschen oberen Jura . Paläontol. Z. 6 , 43 – 79 . ( doi:10.1007/BF03041532 )
-- Benton MJ , Spencer PS . 1995 Fossil reptiles of Great Britain . London, UK : Chapman and Hall .
-- Lydekker R . 1889 Catalogue of the fossil reptilia and amphibia in the British Museum (natural history). Part III, the order Chelonia . London, UK : Trustees of the British Museum .
-- Seeley HG . 1869 Index to the fossil remains of Aves, Ornithosauria, and Reptilia, from the Secondary system of strata arranged in the Woodwardian Museum of the University of Cambridge . Cambridge, UK : Deighton, Bell, and Co .
-- Seeley HG . 1875 Note on Pelobatochelys blakii and other vertebrate fossils exhibited by the Rev. J. F. Blake in illustration of his paper on Kimmeridge Clay . Q. J. Geol. Soc. 31 , 234 – 237 . ( doi:10.1144/GSL.JGS.1875.031.01-04.16 )
-- Andrews CW . 1921 On a new chelonian from the Kimmeridge Clay of Swindon . Ann. Mag. Nat. Hist. Ser. 9 7 , 145 – 153 .
-- Pérez-García A . 2015 Revision of the British record of Tropidemys (Testudines, Plesiochelyidae) and recognition of its presence in the Late Jurassic of Portugal . J. Iber. Geol. 41 , 11 – 20 . ( doi:10.5209/rev_JIGE.2015.v41.n1.48651 )
-- Pérez-García A . 2015 Largest shell of a basal eucryptodiran turtle reveals Late Jurassic Thalassemys hugii in the British record . C.R. Palevol. 14 , 555 – 561 . ( doi:10.1016/j.crpv.2015.06.003 )
-- Pictet F-J , Humbert A . 1857 Description d’une émyde nouvelle ( Emys Etalloni ) du terrain jurassique supérieur des environs de St-Claude . In Matériaux pour la paléontologie suisse, Première série ( ed. F-J Pictet ), pp. 1 – 10 . Genève, Switzerland : J. Kessmann .
-- Gaffney ES . 1975 A taxonomic revision of the Jurassic turtles Portlandemys and Plesiochelys . Am. Mus. Novit. 2574 , 1 – 19 .
-- Parsons TS , Williams EE . 1961 Two Jurassic turtle skulls: a morphological study . Bull. Mus. Comp. Zool. 125 , 43 – 107 .
-- Gaffney ES . 1976 Cranial morphology of the European Jurassic turtles Portlandemys and Plesiochelys . Bull. Am. Mus. Nat. Hist. 157 , 487 – 544 .
-- Rieppel O . 1980 The skull of the Upper Jurassic cryptodire turtle Thalassemys , with a reconsideration of the chelonian braincase . Palaeontogr. Abt. A 171 , 105 – 140 .
-- Pérez-García A . 2015 New data on the poorly-known Late Jurassic turtles Thalassemys and Enaliochelys and description of a new basal eucryptodiran taxon . J. Iber. Geol. 41 , 21 – 30 . ( doi:10.5209/rev_JIGE.2015.v41.n1.48652 )
-- Gaffney ES . 1972 An illustrated glossary of turtle skull nomenclature . Am. Mus. Novit. 2486 , 1 – 33 .
-- Gaffney ES . 1979 Comparative cranial morphology of recent and fossil turtles . Bull. Am. Mus. Nat. Hist. 164 , 65 – 376 .
-- Portis A . 1878 Ueber fossile Schildkröten aus dem Kimmeridge von Hannover . Palaeontographica 25 , 125 – 140 .
-- Karl H-V , Gröning E , Brauckmann C . 2012 Revision of Tropidemys seebachi Portis, 1878 (Testudines: Eucryptodira) from the Kimmeridgian (Late Jurassic) of Hannover (northwestern Germany) . Stud. Palaeocheloniologica 4 , 11 – 24 .
-- Zangerl R . 1969 The turtle shell . In Biology of the reptilia, vol. 1, morphology A ( eds C Gans, AA Bellairs, TS Parsons ), pp. 311 – 339 . London, UK : Academic Press .
-- Mallison H , Wings O . 2014 Photogrammetry in paleontology—a practical guide . J. Paleontol. Tech. 12 , 1 – 30 .
-- Batsch AJGC . 1788 Versuch einer Anleitung, zur Kenntniß und Geschichte der Thiere und Mineralien . Jena, Germany : Akademische Buchhandlung .
-- Gaffney ES . 1975 Solnhofia parsonsi , a new cryptodiran turtle from the Late Jurassic of Europe . Am. Mus. Novit. 2576 , 1 – 22 .
-- Anquetin J , Deschamps S , Claude J . 2014 The rediscovery and redescription of the holotype of the Late Jurassic turtle Plesiochelys etalloni . PeerJ 2 , e258 . ( doi:10.7717/peerj.258 )
-- Werneburg I . 2011 The cranial musculature of turtles . Palaeontol. Electron. 14 , p15A.
-- von Meyer H. . 1864 Parachelys Eichstättensis aus dem lithographischen Schiefer von Eichstätt . Palaeontographica 11 , 289 – 295 .
-- Meyer CA . 1989 Der Lebens- und Ablagerungsraum der Solothurner Schildkrötenkalke . Heft Mitteilungen Naturforschenden Ges. Kantons Soloth. 34 , 187 – 197 .
-- Joyce WG , Parham JF , Gauthier JA . 2004 Developing a protocol for the conversion of rank-based taxon names to phylogenetically defined clade names, as exemplified by turtles . J. Paleontol. 78 , 989 – 1013 . ( doi:10.1666/0022-3360(2004)078<0989:DAPFTC>2.0.CO;2 )
-- Delair JB . 1958 The Mesozoic reptiles of Dorset. Part one . Proc. Dorset Nat. Hist. Archaeol. Soc. 79 , 47 – 72 .
-- Kuhn O . 1964 Pt. 107, Testudines . In Fossilium catalogus, vol. 1, Animalia ( ed. F Westphal ), pp. 1 – 299 . Den Haag, The Netherlands : Dr W. Junk .
-- Pérez-García A . 2012 High diversity of pancryptodiran turtles in the Lower Cretaceous of Europe . Cretac. Res. 36 , 67 – 82 . ( doi:10.1016/j.cretres.2012.02.004 )
-- Pérez-García A , Murelaga X . 2012 Larachelus morla , gen. et sp. nov., a new member of the little-known European Early Cretaceous record of stem cryptodiran turtles . J. Vertebr. Paleontol. 32 , 1293 – 1302 . ( doi:10.1080/02724634.2012.694592 )
-- Pérez-García A , Gasulla JM , Ortega F . 2014 A new turtle species of Brodiechelys from the Early Cretaceous of Spain: systematic and palaeobiogeographic implications . Acta Palaeontol. Pol. 59 , 333 – 342 . ( doi:10.4202/app.2012.0059 )
-- Etches S , Clarke J . 1999 Steve Etches Kimmeridge collection: illustrated catalogue . Published privately by J. Clarke. Available from 65 Oak Mount Road, Chandlers Ford, Hampshire SO53 2LJ, UK .
-- Sauvage Hé . 1902 Recherches sur les vertébrés du Kimméridgien supérieur de Fumel (Lot-et-Garonne) . Mém. Société Géologique Fr. Paléontol. 25 , 1 – 32 .
-- Cuny G , Buffetaut E , Cappetta H , Martin M , Mazin J-M , Rose J-M . 1991 Nouveaux restes de vertébrés du Jurassique terminal du Boulonnais (Nord de la France) . Neues Jahrb. Für Geol. Paläontol. Abh. 180 , 323 – 347 .
-- Joyce WG . 2015 Schildkröten (Testudines) . In Solnhofen. Ein Fenster in die Jurazeit (eds Arratia G , Schultze H-P , Tischlinger H , Viohl G ), pp. 415 – 421 . München, Germany : Verlag Dr. Friedrich Pfeil .
+1. Baur G . 1888 Osteologische Notizen über Reptilien (Fortsetzung II) . Zool. Anz. 11 , 417 – 424 .
+2. Zittel KA . 1889 Handbuch der Palaeontologie, §1: Palaeozoologie, Volume 3, Vertebrata, Shipment 3: Reptilia . München, Germany : R. Oldenbourg .
+3. Dollo L . 1886 Première note sur les chéloniens du Bruxellien (éocène moyen) de la Belgique . Bull. Mus. R. Hist. Nat. Belg. 4 , 75 – 96 .
+4. Gaffney ES , Meylan PA . 1988 A phylogeny of turtles . In The phylogeny and classification of the tetrapods (ed. MJ Benton) , pp. 157 – 219 . Oxford, UK : Clarendon Press .
+5. Gaffney ES . 1996 The postcranial morphology of Meiolania platyceps and a review of the Meiolaniidae . Bull. Am. Mus. Nat. Hist. 229 , 1 – 166 .
+6. Lapparent de Broin F , de Lange-Badré B , Dutrieux M . 1996 Nouvelles découvertes de tortues dans le Jurassique supérieur du Lot (France) et examen du taxon Plesiochelyidae . Rev. Paléobiol. 15 , 533 – 570 .
+7. Hirayama R , Brinkman DB , Danilov IG . 2000 Distribution and biogeography of non-marine Cretaceous turtles . Russ. J. Herpetol. 7 , 181 – 198 .
+8. Gaffney ES , Rich TH , Vickers-Rich P , Constantine A , Vacca R , Kool L . 2007 Chubutemys , a new eucryptodiran turtle from the Early Cretaceous of Argentina, and the relationships of the Meiolaniidae . Am. Mus. Novit. 3599 , 1 – 35 . ( doi:10.1206/0003-0082(2007)3599[1:CANETF]2.0.CO;2 )
+9. Joyce WG . 2007 Phylogenetic relationships of Mesozoic turtles . Bull. Peabody Mus. Nat. Hist. 48 , 3 – 102 . ( doi:10.3374/0079-032X(2007)48[3:PROMT]2.0.CO;2 )
+10. Sterli J . 2010 Phylogenetic relationships among extinct and extant turtles: the position of Pleurodira and the effects of the fossils on rooting crown-group turtles . Contrib. Zool. 79 , 93 – 106 .
+11. Anquetin J . 2012 Reassessment of the phylogenetic interrelationships of basal turtles (Testudinata) . J. Syst. Palaeontol. 10 , 3 – 45 . ( doi:10.1080/14772019.2011.558928 )
+12. Rabi M , Zhou C-F , Wings O , Ge S , Joyce WG . 2013 A new xinjiangchelyid turtle from the Middle Jurassic of Xinjiang, China and the evolution of the basipterygoid process in Mesozoic turtles . BMC Evol. Biol. 13 , 203 . ( doi:10.1186/1471-2148-13-203 )
+13. Anquetin J , Püntener C , Billon-Bruyat J-P . 2015 Portlandemys gracilis n. sp., a new coastal marine turtle from the Late Jurassic of Porrentruy (Switzerland) and a reconsideration of plesiochelyid cranial anatomy . PLoS ONE 10 , e0129193 . ( doi:10.1371/journal.pone.0129193 )
+14. Rütimeyer L . 1873 Die fossilen Schildkröten von Solothurn und der übrigen Juraformation . Neue Denkschr. Allg. Schweiz. Naturforschenden Ges. 25 , 1 – 185 .
+15. Bräm H . 1965 Die Schildkröten aus dem oberen Jura (Malm) der Gegend von Solothurn . Schweiz. Paläontol. Abh. 83 , 1 – 190 .
+16. Meyer CA . 1994 Depositional environment and paleoecology of the Solothurn Turtle Limestone (Kimmeridgian, Northern Switzerland) . Geobios 16 , 227 – 236 . ( doi:10.1016/S0016-6995(94)80038-3 )
+17. Anquetin J , Püntener C , Billon-Bruyat J-P . 2014 A taxonomic review of the Late Jurassic eucryptodiran turtles from the Jura Mountains (Switzerland and France) . PeerJ 2 , e369 . ( doi:10.7717/peerj.369 )
+18. Marty D , Billon-Bruyat J-P . 2009 Field-trip to the excavations in the Late Jurassic along the future Transjurane highway near Porrentruy (Canton Jura, NW Switzerland): dinosaur tracks, marine vertebrates and invertebrates. In Abstracts and Field Guides, 5th Int. Symp. on Lithographic Limestone and Plattenkalk, Actes 2009 bis de la Société jurassienne d’émulation (eds J-P Billon-Bruyat, D Marty, L Costeur, CA Meyer, B Thüring), pp. 94–129. Porrentruy, Switzerland .
+19. Püntener C , Billon-Bruyat J-P , Bocat L , Berger J-P , Joyce WG . 2014 Taxonomy and phylogeny of the turtle Tropidemys langii Rütimeyer, 1873 based on new specimens from the Kimmeridgian of the Swiss Jura Mountains . J. Vertebr. Paleontol. 34 , 353 – 374 . ( doi:10.1080/02724634.2013.804412 )
+20. Püntener C , Anquetin J , Billon-Bruyat J-P . 2015 Thalassemys bruntrutana n. sp., a new coastal marine turtle from the Late Jurassic of Porrentruy (Switzerland), and the paleobiogeography of the Thalassemydidae . PeerJ 3 , e1282 . ( doi:10.7717/peerj.1282 )
+21. Maack GA . 1869 Die bis jetzt bekannten fossilen Schildkröten und die im oberen Jura bei Kelheim (Bayern) und Hannover neu aufgefundenen ältesten Arten derselben . Palaeontographica 18 , 193 – 338 .
+22. Oertel W . 1915 Beiträge zur Kenntnis der oberjurassischen Schildkrötengattung Hydropelta . Cent. Für Mineral. Geol. Paläontol. 1915 , 336 – 348 .
+23. Oertel W . 1924 Die Schildkrotenfauna des nordwestdeutschen oberen Jura . Paläontol. Z. 6 , 43 – 79 . ( doi:10.1007/BF03041532 )
+24. Benton MJ , Spencer PS . 1995 Fossil reptiles of Great Britain . London, UK : Chapman and Hall .
+25. Lydekker R . 1889 Catalogue of the fossil reptilia and amphibia in the British Museum (natural history). Part III, the order Chelonia . London, UK : Trustees of the British Museum .
+26. Seeley HG . 1869 Index to the fossil remains of Aves, Ornithosauria, and Reptilia, from the Secondary system of strata arranged in the Woodwardian Museum of the University of Cambridge . Cambridge, UK : Deighton, Bell, and Co .
+27. Seeley HG . 1875 Note on Pelobatochelys blakii and other vertebrate fossils exhibited by the Rev. J. F. Blake in illustration of his paper on Kimmeridge Clay . Q. J. Geol. Soc. 31 , 234 – 237 . ( doi:10.1144/GSL.JGS.1875.031.01-04.16 )
+28. Andrews CW . 1921 On a new chelonian from the Kimmeridge Clay of Swindon . Ann. Mag. Nat. Hist. Ser. 9 7 , 145 – 153 .
+29. Pérez-García A . 2015 Revision of the British record of Tropidemys (Testudines, Plesiochelyidae) and recognition of its presence in the Late Jurassic of Portugal . J. Iber. Geol. 41 , 11 – 20 . ( doi:10.5209/rev_JIGE.2015.v41.n1.48651 )
+30. Pérez-García A . 2015 Largest shell of a basal eucryptodiran turtle reveals Late Jurassic Thalassemys hugii in the British record . C.R. Palevol. 14 , 555 – 561 . ( doi:10.1016/j.crpv.2015.06.003 )
+31. Pictet F-J , Humbert A . 1857 Description d’une émyde nouvelle ( Emys Etalloni ) du terrain jurassique supérieur des environs de St-Claude . In Matériaux pour la paléontologie suisse, Première série ( ed. F-J Pictet ), pp. 1 – 10 . Genève, Switzerland : J. Kessmann .
+32. Gaffney ES . 1975 A taxonomic revision of the Jurassic turtles Portlandemys and Plesiochelys . Am. Mus. Novit. 2574 , 1 – 19 .
+33. Parsons TS , Williams EE . 1961 Two Jurassic turtle skulls: a morphological study . Bull. Mus. Comp. Zool. 125 , 43 – 107 .
+34. Gaffney ES . 1976 Cranial morphology of the European Jurassic turtles Portlandemys and Plesiochelys . Bull. Am. Mus. Nat. Hist. 157 , 487 – 544 .
+35. Rieppel O . 1980 The skull of the Upper Jurassic cryptodire turtle Thalassemys , with a reconsideration of the chelonian braincase . Palaeontogr. Abt. A 171 , 105 – 140 .
+36. Pérez-García A . 2015 New data on the poorly-known Late Jurassic turtles Thalassemys and Enaliochelys and description of a new basal eucryptodiran taxon . J. Iber. Geol. 41 , 21 – 30 . ( doi:10.5209/rev_JIGE.2015.v41.n1.48652 )
+37. Gaffney ES . 1972 An illustrated glossary of turtle skull nomenclature . Am. Mus. Novit. 2486 , 1 – 33 .
+38. Gaffney ES . 1979 Comparative cranial morphology of recent and fossil turtles . Bull. Am. Mus. Nat. Hist. 164 , 65 – 376 .
+39. Portis A . 1878 Ueber fossile Schildkröten aus dem Kimmeridge von Hannover . Palaeontographica 25 , 125 – 140 .
+40. Karl H-V , Gröning E , Brauckmann C . 2012 Revision of Tropidemys seebachi Portis, 1878 (Testudines: Eucryptodira) from the Kimmeridgian (Late Jurassic) of Hannover (northwestern Germany) . Stud. Palaeocheloniologica 4 , 11 – 24 .
+41. Zangerl R . 1969 The turtle shell . In Biology of the reptilia, vol. 1, morphology A ( eds C Gans, AA Bellairs, TS Parsons ), pp. 311 – 339 . London, UK : Academic Press .
+42. Mallison H , Wings O . 2014 Photogrammetry in paleontology—a practical guide . J. Paleontol. Tech. 12 , 1 – 30 .
+43. Batsch AJGC . 1788 Versuch einer Anleitung, zur Kenntniß und Geschichte der Thiere und Mineralien . Jena, Germany : Akademische Buchhandlung .
+44. Gaffney ES . 1975 Solnhofia parsonsi , a new cryptodiran turtle from the Late Jurassic of Europe . Am. Mus. Novit. 2576 , 1 – 22 .
+45. Anquetin J , Deschamps S , Claude J . 2014 The rediscovery and redescription of the holotype of the Late Jurassic turtle Plesiochelys etalloni . PeerJ 2 , e258 . ( doi:10.7717/peerj.258 )
+46. Werneburg I . 2011 The cranial musculature of turtles . Palaeontol. Electron. 14 , p15A.
+47. von Meyer H. . 1864 Parachelys Eichstättensis aus dem lithographischen Schiefer von Eichstätt . Palaeontographica 11 , 289 – 295 .
+48. Meyer CA . 1989 Der Lebens- und Ablagerungsraum der Solothurner Schildkrötenkalke . Heft Mitteilungen Naturforschenden Ges. Kantons Soloth. 34 , 187 – 197 .
+49. Joyce WG , Parham JF , Gauthier JA . 2004 Developing a protocol for the conversion of rank-based taxon names to phylogenetically defined clade names, as exemplified by turtles . J. Paleontol. 78 , 989 – 1013 . ( doi:10.1666/0022-3360(2004)078<0989:DAPFTC>2.0.CO;2 )
+50. Delair JB . 1958 The Mesozoic reptiles of Dorset. Part one . Proc. Dorset Nat. Hist. Archaeol. Soc. 79 , 47 – 72 .
+51. Kuhn O . 1964 Pt. 107, Testudines . In Fossilium catalogus, vol. 1, Animalia ( ed. F Westphal ), pp. 1 – 299 . Den Haag, The Netherlands : Dr W. Junk .
+52. Pérez-García A . 2012 High diversity of pancryptodiran turtles in the Lower Cretaceous of Europe . Cretac. Res. 36 , 67 – 82 . ( doi:10.1016/j.cretres.2012.02.004 )
+53. Pérez-García A , Murelaga X . 2012 Larachelus morla , gen. et sp. nov., a new member of the little-known European Early Cretaceous record of stem cryptodiran turtles . J. Vertebr. Paleontol. 32 , 1293 – 1302 . ( doi:10.1080/02724634.2012.694592 )
+54. Pérez-García A , Gasulla JM , Ortega F . 2014 A new turtle species of Brodiechelys from the Early Cretaceous of Spain: systematic and palaeobiogeographic implications . Acta Palaeontol. Pol. 59 , 333 – 342 . ( doi:10.4202/app.2012.0059 )
+55. Etches S , Clarke J . 1999 Steve Etches Kimmeridge collection: illustrated catalogue . Published privately by J. Clarke. Available from 65 Oak Mount Road, Chandlers Ford, Hampshire SO53 2LJ, UK .
+56. Sauvage Hé . 1902 Recherches sur les vertébrés du Kimméridgien supérieur de Fumel (Lot-et-Garonne) . Mém. Société Géologique Fr. Paléontol. 25 , 1 – 32 .
+57. Cuny G , Buffetaut E , Cappetta H , Martin M , Mazin J-M , Rose J-M . 1991 Nouveaux restes de vertébrés du Jurassique terminal du Boulonnais (Nord de la France) . Neues Jahrb. Für Geol. Paläontol. Abh. 180 , 323 – 347 .
+58. Joyce WG . 2015 Schildkröten (Testudines) . In Solnhofen. Ein Fenster in die Jurazeit (eds Arratia G , Schultze H-P , Tischlinger H , Viohl G ), pp. 415 – 421 . München, Germany : Verlag Dr. Friedrich Pfeil .

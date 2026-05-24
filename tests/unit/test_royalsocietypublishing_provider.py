@@ -284,6 +284,8 @@ def test_markdown_contract_structure_fixture() -> None:
     assert "RF Government Act No. 211" in markdown
     assert "Bootstrap methods: another look at the jackknife" in markdown
     assert "A new optimizer using particle swarm theory" in markdown
+    assert re.search(r"(?m)^1\. Niederer SA", markdown)
+    assert not re.search(r"(?m)^- Niederer SA", markdown)
     assert not re.search(r"(?m)^- Efron B\\s*\\.?\\s*1992\\s*$", markdown)
     assert not re.search(r"(?m)^- Eberhart R, Kennedy J\\s*\\.?\\s*1995\\s*$", markdown)
     assert "creativecommons" not in markdown.lower()
@@ -332,6 +334,8 @@ def test_markdown_contract_formula_fixture() -> None:
     assert "Open figure viewer" not in markdown
     assert "Download slide" not in markdown
     assert "javascript:;" not in markdown
+    assert re.search(r"(?m)^1\. Schinckus C", markdown)
+    assert not re.search(r"(?m)^- Schinckus C", markdown)
     assert re.search("(?:\\$|Equation|BS)", markdown)
 
 
@@ -368,6 +372,9 @@ def test_markdown_contract_references_fixture() -> None:
     # markdown-review: purpose=references doi=10.1098/rsos.201200
     markdown = _render_markdown_for_fixture("10.1098/rsos.201200")
     assert "## References" in markdown
+    assert re.search(r"(?m)^1\. Wright PA", markdown)
+    assert re.search(r"(?m)^2\. Zimmer AM", markdown)
+    assert not re.search(r"(?m)^- Wright PA", markdown)
     assert "Reference" in markdown
     assert "Google Scholar" not in markdown
     assert "Download citation" not in markdown

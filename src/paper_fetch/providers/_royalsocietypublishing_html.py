@@ -105,6 +105,9 @@ _BROKEN_REFERENCE_TABLE_ROW_RE = re.compile(r"^\|\s*\[\s*\|")
 _MARKDOWN_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _INLINE_MATH_SPAN_RE = re.compile(r"\$[^$\n]+\$")
 _DISPLAY_EQUATION_RE = re.compile(r"(Equation(?:\s+\d+(?:\.\d+)*)?:\s+\$[^$\n]+\$)")
+_REFERENCE_LEADING_LABEL_RE = re.compile(
+    r"^\s*(?:\[\d+[A-Za-z]?\]|\d+[A-Za-z]?[.)])\s+"
+)
 
 
 @dataclass(frozen=True)
@@ -379,6 +382,14 @@ def _parse_citation_reference(value: str) -> dict[str, Any] | None:
     }
 
 
+def _number_reference(reference: Mapping[str, Any], index: int) -> dict[str, Any]:
+    numbered = dict(reference)
+    raw = normalize_text(str(numbered.get("raw") or ""))
+    raw = _REFERENCE_LEADING_LABEL_RE.sub("", raw).strip()
+    numbered["raw"] = f"{index}. {raw}" if raw else ""
+    return numbered
+
+
 def citation_references_from_metadata(metadata: Mapping[str, Any]) -> list[dict[str, Any]]:
     references: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -390,7 +401,7 @@ def citation_references_from_metadata(metadata: Mapping[str, Any]) -> list[dict[
         if not key or key in seen:
             continue
         seen.add(key)
-        references.append(reference)
+        references.append(_number_reference(reference, len(references) + 1))
     return references
 
 
@@ -429,7 +440,7 @@ def html_references_from_ref_list(html_text: str) -> list[dict[str, Any]]:
         if not key or key in seen:
             continue
         seen.add(key)
-        references.append(reference)
+        references.append(_number_reference(reference, len(references) + 1))
     return references
 
 

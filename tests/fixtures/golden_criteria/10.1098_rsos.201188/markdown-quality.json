@@ -7,10 +7,10 @@
   "prompt_path": "tests/fixtures/golden_criteria/10.1098_rsos.201188/markdown-quality-prompt.md",
   "provider": "royalsocietypublishing",
   "review_method": "agent_prompt",
-  "reviewed_at": "2026-05-23T10:00:00Z",
+  "reviewed_at": "2026-05-24T06:39:01Z",
   "reviewed_by": "codex",
   "sample_id": "10.1098_rsos.201188",
   "schema_version": 2,
-  "source_markdown_sha256": "4f2ff982c21504ed0456f9201f3572af8c612e6d50235f8bbbf888e0a6ef4499",
+  "source_markdown_sha256": "3abbec52939b823c61f7429ae1d973839e852a3347fc0fa707b1d8b0b372f844",
   "status": "pass"
 }

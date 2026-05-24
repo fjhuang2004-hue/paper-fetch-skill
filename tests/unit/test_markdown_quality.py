@@ -36,6 +36,7 @@ def test_prompt_contains_review_task_paths_contract_and_semantic_risks() -> None
     assert "asset_contract.figures.purposes" in prompt
     assert "Broken tables" in prompt
     assert "References" in prompt
+    assert "missing recognizable numbering or labels" in prompt
 
 
 def test_fresh_prompt_requires_rereading_current_extracted_markdown() -> None:
@@ -52,6 +53,7 @@ def test_fresh_prompt_requires_rereading_current_extracted_markdown() -> None:
     assert "Fixture purpose: `formula`" in prompt
     assert BASE["markdown_path"] in prompt
     assert '"fresh_review": true' in prompt
+    assert "unnumbered/unlabeled references when references are expected" in prompt
 
 
 def test_pending_pass_and_fail_report_schema_validation() -> None:

@@ -120,6 +120,9 @@ _REFERENCE_LINK_LABELS = {
     "[pubmed]",
     "[web of science]",
 }
+_REFERENCE_LEADING_LABEL_RE = re.compile(
+    r"^\s*(?:\[\d+[A-Za-z]?\]|\d+[A-Za-z]?[.)])\s+"
+)
 _HEADING_RE = re.compile(r"^(#{2,6})\s+(.+?)\s*$")
 _PUNCT_SPACE_RE = re.compile(r"\s+([,.;:])")
 _TABLE_BLOCK_CLASS = "annualreviews-markdown-table"
@@ -470,6 +473,15 @@ def _normalize_tables(container: Tag) -> None:
         _replace_with_markdown_table(table, table)
 
 
+def _normalize_references(container: Tag) -> None:
+    for label in list(container.select(".citation-label")):
+        if isinstance(label, Tag):
+            label.decompose()
+    for node in list(container.select("span.references")):
+        if isinstance(node, Tag) and node.find(("ol", "ul")) is not None:
+            node.name = "div"
+
+
 def _cleaned_article_html(
     html_text: str,
     source_url: str,
@@ -486,6 +498,7 @@ def _cleaned_article_html(
     _normalize_section_headings(cleaned)
     _normalize_figures(cleaned, source_url)
     _normalize_tables(cleaned)
+    _normalize_references(cleaned)
     _remove_noise_nodes(cleaned)
 
     title = extract_page_title(html_text)
@@ -592,8 +605,11 @@ def extract_references(html_text: str) -> list[dict[str, Any]]:
             for item in list(ref.select(selector)):
                 if isinstance(item, Tag):
                     item.decompose()
+        for item in list(ref.select(".citation-label")):
+            if isinstance(item, Tag):
+                item.decompose()
         raw = normalize_text(ref.get_text(" ", strip=True))
-        raw = re.sub(r"^\d+\.\s*", "", raw).strip()
+        raw = _REFERENCE_LEADING_LABEL_RE.sub("", raw).strip()
         raw = _PUNCT_SPACE_RE.sub(r"\1", raw)
         if not raw:
             continue
@@ -604,7 +620,14 @@ def extract_references(html_text: str) -> list[dict[str, Any]]:
         seen.add(key)
         title = _node_text(ref.select_one(".reference-article-title")) or None
         year = _node_text(ref.select_one(".reference-year")) or None
-        references.append({"raw": raw, "title": title, "year": year, "doi": doi})
+        references.append(
+            {
+                "raw": f"{len(references) + 1}. {raw}",
+                "title": title,
+                "year": year,
+                "doi": doi,
+            }
+        )
     return references
 
 

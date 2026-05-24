@@ -34,7 +34,7 @@ This file defines machine-verifiable merge-ready gates for AI/coordinator provid
 - `PYTHONPATH=src python3 -m pytest tests/unit/test_golden_corpus_adapters.py tests/unit/test_provider_benchmark_samples.py tests/devtools/test_golden_criteria_live.py -q`
 - `python3 scripts/validate_extraction_rules.py`
 - `manifest_sync_back.py` is the only writer for `extraction_hints` and `success_criteria` sync-back fields.
-- New provider integration must be synchronized through the provider fact sources: register a golden corpus adapter when golden replay fixtures exist, expose MCP provider status through the bundle-derived catalog, keep benchmark samples covered for official providers, and let live review support derive from provider capabilities.
+- New provider integration must be synchronized through the provider fact sources: register a golden corpus adapter when golden replay fixtures exist, expose MCP provider status through the bundle-derived catalog, keep benchmark samples covered for official providers, and default provider-local acceptance to one provider subset live assets review unless the provider is an existing legacy non-risk exemption.
 - Shared integration runs after provider implementation and before snapshot generation; coordinator-owned changes must be traced to manifest facts, bundle sync-back, fixture replay, or provider-local test evidence.
 - Local operator acceptance may use `python3 scripts/onboard_from_manifests.py run-checks --provider <provider> --all-local`; this command does not trigger GitHub CI.
 - Full local orchestration may use `python3 scripts/onboard_from_manifests.py run --manifest onboarding/manifests/<provider>.yml --until merge-ready`; worker dispatch must go only through the resolved local dispatcher: default `codex exec` or `PROVIDER_ONBOARDING_AGENT_CLI` operator override.
@@ -52,11 +52,12 @@ This file defines machine-verifiable merge-ready gates for AI/coordinator provid
 - Provider-local tests include at least one positive Markdown assertion and at least one negative site-chrome / access-noise / boilerplate assertion.
 - For `asset_contract.figures.inline: body`, `extracted.md` must include a body Markdown image before References/Figures/Supplementary tail sections; a caption-only `## Figures` section is blocking.
 - For `asset_contract.figures.download: required`, provider-local tests must include marker `asset-download-contract: provider=<provider>` and assert actual local file path/bytes plus asset result state.
+- When references are expected, the `## References` list must retain recognizable reference numbers or labels such as `[1]`, `1.`, `1)`, or publisher-native labels; unnumbered/unlabeled reference lists are blocking.
 - Worker completion summary is secondary; acceptance uses `onboarding/reviews/<provider>.yml` as the durable source.
 
 ## Live Review Gates
 
-- Browser/CDN-risk providers run provider subset live review, for example `PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_golden_criteria_live_review.py --providers mdpi`.
+- Future providers run one provider subset live assets review by default during provider-local acceptance, for example `PAPER_FETCH_RUN_LIVE=1 python3 scripts/run_golden_criteria_live_review.py --providers mdpi`; existing legacy non-risk providers may be exempt.
 - Live review validates `FetchEnvelope.source` against manifest `route_sources`; silent degradation from an expected HTML/XML source to PDF fallback is an acceptance issue unless that sample is explicitly a fallback sample.
 - Live review reuses manifest `markdown_contract` positive and negative assertions to auto-classify content-missing and noise-leak issues before manual semantic signoff.
 

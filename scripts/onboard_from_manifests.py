@@ -134,6 +134,17 @@ CENTRAL_PROVIDER_LOGIC_PATHS = [
     "src/paper_fetch/quality/html_signals.py",
     "src/paper_fetch/quality/html_availability.py",
 ]
+LEGACY_LIVE_REVIEW_EXEMPT_PROVIDERS = frozenset(
+    {
+        "arxiv",
+        "copernicus",
+        "crossref",
+        "elsevier",
+        "ieee",
+        "royalsocietypublishing",
+        "springer",
+    }
+)
 SHARED_MARKDOWN_REPAIR_SCOPES = {
     "table": [
         "src/paper_fetch/extraction/markdown_render.py",
@@ -2099,7 +2110,11 @@ def build_implementation_brief(
                 f"python3 scripts/propose_cleaning_chain.py --provider {provider_name} --check-contract",
             ],
             "live_review": {
-                "required_for_browser_or_cdn_risk": _provider_requires_live_review(provider_name),
+                "required_for_provider_acceptance": _provider_requires_live_review(provider_name),
+                "policy": (
+                    "Future providers default to one provider subset live assets review; "
+                    "legacy non-risk providers are exempt."
+                ),
                 "command": (
                     "PAPER_FETCH_RUN_LIVE=1 python3 "
                     f"scripts/run_golden_criteria_live_review.py --providers {provider_name}"
@@ -2369,19 +2384,18 @@ def _failed_steps(provider_state: dict[str, Any]) -> list[str]:
 
 
 def _provider_requires_live_review(provider: str) -> bool:
+    provider_name = _provider_slug(provider)
     manifest_path = _repo_root() / default_manifest_path(provider)
     if not manifest_path.exists():
-        return provider == "mdpi"
+        return provider_name not in LEGACY_LIVE_REVIEW_EXEMPT_PROVIDERS
     try:
         manifest = _read_manifest(manifest_path)
     except ToolError:
-        return provider == "mdpi"
+        return provider_name not in LEGACY_LIVE_REVIEW_EXEMPT_PROVIDERS
     probe = manifest.get("probe") if isinstance(manifest.get("probe"), dict) else {}
-    return (
-        provider == "mdpi"
-        or bool(probe.get("requires_browser_runtime"))
-        or bool(probe.get("requires_playwright"))
-    )
+    if bool(probe.get("requires_browser_runtime")) or bool(probe.get("requires_playwright")):
+        return True
+    return provider_name not in LEGACY_LIVE_REVIEW_EXEMPT_PROVIDERS
 
 
 def _manifest_path_for_provider(provider: str) -> Path:
@@ -2575,7 +2589,6 @@ def _verify_commands(provider: str, task: str, *, include_live: bool = True) -> 
                 "-q",
             ]
         ],
-        SNAPSHOT_EXPECTED_STEP: _snapshot_expected_commands(provider_name),
         "manifest-sync-back": [
             [
                 "python3",
@@ -2669,6 +2682,8 @@ def _verify_commands(provider: str, task: str, *, include_live: bool = True) -> 
             ]
         ],
     }
+    if task == SNAPSHOT_EXPECTED_STEP:
+        return _snapshot_expected_commands(provider_name)
     if include_live and task == "provider-local-acceptance" and _provider_requires_live_review(provider_name):
         command_map["provider-local-acceptance"].append(
             [
