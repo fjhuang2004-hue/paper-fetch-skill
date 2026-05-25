@@ -152,6 +152,110 @@ def extract_jats_metadata(
     return metadata
 
 
+def _render_inline_child_without_tail(child: ET.Element) -> str:
+    tail = child.tail
+    child.tail = None
+    try:
+        rendered = render_inline_text(child, skip_local_names=JATS_BLOCK_LOCAL_NAMES)
+    finally:
+        child.tail = tail
+    local_name = xml_local_name(child.tag)
+    if local_name == "italic" and rendered:
+        return f"*{rendered}*"
+    if local_name == "bold" and rendered:
+        return f"**{rendered}**"
+    if local_name == "sub" and rendered:
+        return f"<sub>{rendered}</sub>"
+    if local_name == "sup" and rendered:
+        return f"<sup>{rendered}</sup>"
+    return rendered
+
+
+def _flush_paragraph_parts(lines: list[str], parts: list[str]) -> None:
+    text = normalize_text("".join(parts))
+    parts.clear()
+    if text:
+        lines.extend([text, ""])
+
+
+def _append_embedded_block(
+    node: ET.Element,
+    *,
+    lines: list[str],
+    source_url: str,
+    assets: list[dict[str, Any]],
+    table_entries: list[dict[str, Any]],
+    formula_renders: list[FormulaRenderResult],
+) -> bool:
+    local_name = xml_local_name(node.tag)
+    if local_name == "fig":
+        entry = _figure_entry(node, source_url)
+        if entry is not None:
+            assets.append(entry)
+            if entry.get("link"):
+                lines.extend(render_figure_block(entry))
+        return True
+    if local_name in {"table-wrap", "table"}:
+        entry, _lossy = _table_entry(node)
+        if entry is not None:
+            table_entries.append(entry)
+            assets.append(entry)
+            lines.extend(render_table_block(entry))
+        return True
+    if local_name == "disp-formula":
+        result = render_display_formula_result(node, source_url=source_url)
+        if result.lines:
+            formula_renders.append(result)
+            entry = _formula_asset_entry(result)
+            if entry is not None:
+                assets.append(entry)
+            lines.extend(result.lines)
+        return True
+    if local_name == "list":
+        list_type = normalize_text(str(node.get("list-type") or "")).lower()
+        lines.extend(_render_list(node, ordered=list_type in {"order", "ordered", "decimal"}))
+        return True
+    return False
+
+
+def _render_paragraph_block(
+    paragraph: ET.Element,
+    *,
+    source_url: str,
+    assets: list[dict[str, Any]],
+    table_entries: list[dict[str, Any]],
+    formula_renders: list[FormulaRenderResult],
+) -> list[str]:
+    embedded_blocks = {
+        id(child)
+        for child in iter_children(paragraph)
+        if xml_local_name(child.tag) in JATS_BLOCK_LOCAL_NAMES
+    }
+    if not embedded_blocks:
+        text = render_inline_text(paragraph, skip_local_names=JATS_BLOCK_LOCAL_NAMES)
+        return [text, ""] if text else []
+
+    lines: list[str] = []
+    paragraph_parts: list[str] = [paragraph.text or ""]
+    for child in iter_children(paragraph):
+        if id(child) in embedded_blocks:
+            _flush_paragraph_parts(lines, paragraph_parts)
+            _append_embedded_block(
+                child,
+                lines=lines,
+                source_url=source_url,
+                assets=assets,
+                table_entries=table_entries,
+                formula_renders=formula_renders,
+            )
+        else:
+            paragraph_parts.append(_render_inline_child_without_tail(child))
+        if child.tail:
+            paragraph_parts.append(child.tail)
+    _flush_paragraph_parts(lines, paragraph_parts)
+    return lines
+
+
 def _render_blocks(
     parent: ET.Element | None,
     *,
@@ -184,34 +288,15 @@ def _render_blocks(
             lines.extend(child_lines)
             continue
         if local_name == "p":
-            text = render_inline_text(child, skip_local_names=JATS_BLOCK_LOCAL_NAMES)
-            if text:
-                lines.extend([text, ""])
-            for nested in iter_children(child):
-                nested_name = xml_local_name(nested.tag)
-                if nested_name == "fig":
-                    entry = _figure_entry(nested, source_url)
-                    if entry is not None:
-                        assets.append(entry)
-                        if entry.get("link"):
-                            lines.extend(render_figure_block(entry))
-                    continue
-                if nested_name in {"table-wrap", "table"}:
-                    entry, _lossy = _table_entry(nested)
-                    if entry is not None:
-                        table_entries.append(entry)
-                        assets.append(entry)
-                        lines.extend(render_table_block(entry))
-                    continue
-                if nested_name == "disp-formula":
-                    result = render_display_formula_result(nested)
-                    if result.lines:
-                        formula_renders.append(result)
-                        lines.extend(result.lines)
-                    continue
-                if nested_name == "list":
-                    list_type = normalize_text(str(nested.get("list-type") or "")).lower()
-                    lines.extend(_render_list(nested, ordered=list_type in {"order", "ordered", "decimal"}))
+            lines.extend(
+                _render_paragraph_block(
+                    child,
+                    source_url=source_url,
+                    assets=assets,
+                    table_entries=table_entries,
+                    formula_renders=formula_renders,
+                )
+            )
             continue
         if local_name == "fig":
             entry = _figure_entry(child, source_url)
@@ -230,10 +315,14 @@ def _render_blocks(
                 lines.extend(render_table_block(entry))
             continue
         if local_name == "disp-formula":
-            result = render_display_formula_result(child)
-            if result.lines:
-                formula_renders.append(result)
-                lines.extend(result.lines)
+            _append_embedded_block(
+                child,
+                lines=lines,
+                source_url=source_url,
+                assets=assets,
+                table_entries=table_entries,
+                formula_renders=formula_renders,
+            )
             continue
         if local_name == "list":
             list_type = normalize_text(str(child.get("list-type") or "")).lower()
@@ -264,6 +353,26 @@ def _render_blocks(
             )
         )
     return lines
+
+
+def _formula_asset_entry(result: FormulaRenderResult) -> dict[str, Any] | None:
+    image_url = normalize_text(str(result.image_url or ""))
+    if not image_url:
+        return None
+    label = normalize_text(str(result.label or ""))
+    heading = f"Formula {label}" if label else "Formula"
+    key = image_url or heading
+    return {
+        "kind": "formula",
+        "key": key,
+        "anchor_key": key,
+        "heading": heading,
+        "caption": "",
+        "link": image_url,
+        "original_url": image_url,
+        "section": "body",
+        "render_state": "inline",
+    }
 
 
 def _note_heading(node: ET.Element) -> str:

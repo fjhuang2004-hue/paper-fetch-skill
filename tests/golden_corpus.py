@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 import tempfile
 from typing import Any
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -15,6 +14,7 @@ from paper_fetch.extraction.html.parsing import choose_parser
 from paper_fetch.extraction.html.semantics import collect_html_section_hints
 from paper_fetch.extraction.html._metadata import merge_html_metadata, parse_html_metadata
 from paper_fetch.http import HttpTransport
+from paper_fetch.models import article_from_markdown
 from paper_fetch.publisher_identity import normalize_doi
 from paper_fetch.providers import (
     _pnas_html,
@@ -36,11 +36,13 @@ from paper_fetch.providers import (
     ams as ams_provider,
     annualreviews as annualreviews_provider,
     mdpi as mdpi_provider,
+    plos as plos_provider,
     royalsocietypublishing as royalsocietypublishing_provider,
     springer as springer_provider,
     _springer_html as springer_html,
     wiley as wiley_provider,
 )
+from paper_fetch.providers._article_markdown_jats import parse_jats_xml
 from paper_fetch.providers.ieee import IeeeClient
 from paper_fetch.quality.html_availability import assess_html_fulltext_availability
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
@@ -288,10 +290,7 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
     )
     downloaded_assets = (
         _downloaded_annualreviews_body_assets(fixture, list(extraction.get("extracted_assets") or []))
-        if (
-            fixture.provider == "annualreviews"
-            and str(fixture.sample.get("purpose") or "") == "figure"
-        )
+        if fixture.provider == "annualreviews"
         else []
     )
     raw_payload = RawFulltextPayload(
@@ -317,21 +316,17 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
     return client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
 
 
-_FIXTURE_PNG_BYTES = (
-    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
-    b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
-    b"\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\xf8\x0f\x00\x01\x01\x01\x00"
-    b"\x18\xdd\x8d\xb0\x00\x00\x00\x00IEND\xaeB`\x82"
-)
-
-
 def _downloaded_annualreviews_body_assets(
     fixture: GoldenCorpusFixture,
     extracted_assets: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     downloaded: list[dict[str, Any]] = []
     assets_dir = golden_criteria_asset(fixture.doi, "body_assets")
-    assets_dir.mkdir(parents=True, exist_ok=True)
+    if not assets_dir.is_dir():
+        return downloaded
+    local_asset_paths = sorted(assets_dir.glob("annualreviews-figure-*"))
+    if not local_asset_paths:
+        return downloaded
     figure_index = 0
     for item in extracted_assets:
         if str(item.get("kind") or "").lower() != "figure":
@@ -347,17 +342,16 @@ def _downloaded_annualreviews_body_assets(
         if not asset_url:
             continue
         figure_index += 1
-        suffix = Path(urlparse(asset_url).path).suffix or ".png"
-        asset_path = assets_dir / f"annualreviews-figure-{figure_index}{suffix}"
-        if not asset_path.exists():
-            asset_path.write_bytes(_FIXTURE_PNG_BYTES)
+        if figure_index > len(local_asset_paths):
+            break
+        asset_path = local_asset_paths[figure_index - 1]
         downloaded_asset = dict(item)
         downloaded_asset.update(
             {
                 "path": golden_criteria_repo_path(asset_path),
                 "download_url": asset_url,
                 "source_url": asset_url,
-                "content_type": "image/png",
+                "content_type": "image/gif" if asset_path.suffix.lower() == ".gif" else "image/png",
                 "download_tier": "full_size",
                 "downloaded_bytes": asset_path.stat().st_size,
             }
@@ -551,10 +545,6 @@ def _build_royalsocietypublishing_article(fixture: GoldenCorpusFixture):
             final_url=fixture.source_url,
             pdf_bytes=body,
         )
-        prepared_pdf = royalsocietypublishing_provider.prepare_pdf_fallback_markdown(
-            pdf_result.markdown_text,
-            metadata,
-        )
         raw_payload = RawFulltextPayload(
             provider="royalsocietypublishing",
             source_url=fixture.source_url,
@@ -565,17 +555,9 @@ def _build_royalsocietypublishing_article(fixture: GoldenCorpusFixture):
                 source_url=fixture.source_url,
                 content_type=fixture.content_type or "application/pdf",
                 body=body,
-                markdown_text=prepared_pdf.markdown_text,
-                merged_metadata=prepared_pdf.metadata,
-                diagnostics={
-                    "pdf_fallback": {
-                        "fixture": "golden_corpus",
-                        "reference_count": len(prepared_pdf.references),
-                    },
-                    "extraction": {
-                        "abstract_sections": prepared_pdf.abstract_sections,
-                    },
-                },
+                markdown_text=pdf_result.markdown_text,
+                merged_metadata=metadata,
+                diagnostics={"pdf_fallback": {"fixture": "golden_corpus"}},
                 reason="Loaded Royal Society Publishing PDF fallback golden fixture.",
             ),
             trace=trace_from_markers(
@@ -584,7 +566,7 @@ def _build_royalsocietypublishing_article(fixture: GoldenCorpusFixture):
                     "fulltext:royalsocietypublishing_pdf_fallback_ok",
                 ]
             ),
-            merged_metadata=prepared_pdf.metadata,
+            merged_metadata=metadata,
             warnings=[
                 "Full text was extracted from Royal Society Publishing PDF fallback after the HTML route was not usable.",
             ],
@@ -623,6 +605,104 @@ def _build_royalsocietypublishing_article(fixture: GoldenCorpusFixture):
         merged_metadata=extraction.metadata,
     )
     return client.to_article_model(extraction.metadata, raw_payload)
+
+
+def _build_plos_article(fixture: GoldenCorpusFixture):
+    metadata = _base_metadata(fixture)
+    body = fixture.raw_path.read_bytes()
+    if fixture.route_kind == "pdf_fallback":
+        pdf_result = pdf_fetch_result_from_bytes(
+            artifact_dir=None,
+            source_url=fixture.source_url,
+            final_url=fixture.source_url,
+            pdf_bytes=body,
+        )
+        return article_from_markdown(
+            source="plos_pdf",
+            metadata=metadata,
+            doi=fixture.doi,
+            markdown_text=pdf_result.markdown_text,
+            trace=trace_from_markers(
+                ["fulltext:plos_xml_fail", "fulltext:plos_pdf_fallback_ok"]
+            ),
+            warnings=[
+                "Full text was extracted from PLOS PDF fallback after the XML route was not used.",
+            ],
+        )
+
+    extraction = parse_jats_xml(
+        body,
+        source_url=fixture.source_url,
+        base_metadata=metadata,
+    )
+    if extraction is None:
+        raise ValueError(f"PLOS fixture is not parseable JATS XML: {fixture.doi}")
+    article_metadata = dict(extraction.metadata)
+    if extraction.references:
+        article_metadata["references"] = list(extraction.references)
+    downloaded_assets = _downloaded_plos_body_assets(fixture, list(extraction.assets))
+    assets = (
+        plos_provider._merge_assets(extraction.assets, downloaded_assets)
+        if downloaded_assets
+        else extraction.assets
+    )
+    return article_from_markdown(
+        source="plos_xml",
+        metadata=article_metadata,
+        doi=normalize_doi(str(article_metadata.get("doi") or fixture.doi)),
+        markdown_text=extraction.markdown_text,
+        abstract_sections=extraction.abstract_sections,
+        assets=assets,
+        trace=trace_from_markers(["fulltext:plos_xml_ok"]),
+        semantic_losses=extraction.semantic_losses,
+    )
+
+
+def _downloaded_plos_body_assets(
+    fixture: GoldenCorpusFixture,
+    extracted_assets: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    downloaded: list[dict[str, Any]] = []
+    assets_dir = golden_criteria_asset(fixture.doi, "body_assets")
+    if not assets_dir.is_dir():
+        return downloaded
+    local_asset_paths = sorted(assets_dir.glob("*.png"))
+    if not local_asset_paths:
+        return downloaded
+    local_assets_by_stem = {path.stem.lower(): path for path in local_asset_paths}
+    for item in extracted_assets:
+        kind = str(item.get("kind") or "").lower()
+        if kind not in {"figure", "formula"}:
+            continue
+        if str(item.get("section") or "body").lower() not in {"", "body"}:
+            continue
+        asset_id = plos_provider._doi_asset_id(
+            str(item.get("link") or item.get("original_url") or item.get("url") or "")
+        )
+        if not asset_id:
+            continue
+        asset_stem = asset_id.split("journal.", 1)[-1].lower()
+        asset_path = local_assets_by_stem.get(asset_stem)
+        if asset_path is None:
+            continue
+        downloaded_asset = dict(item)
+        image_url = (
+            plos_provider._plos_formula_image_url(asset_id)
+            if kind == "formula"
+            else plos_provider._plos_figure_image_url(asset_id)
+        )
+        downloaded_asset.update(
+            {
+                "path": golden_criteria_repo_path(asset_path),
+                "download_url": image_url,
+                "source_url": image_url,
+                "content_type": "image/png",
+                "download_tier": "full_size",
+                "downloaded_bytes": asset_path.stat().st_size,
+            }
+        )
+        downloaded.append(downloaded_asset)
+    return downloaded
 
 
 def _load_arxiv_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
@@ -886,6 +966,10 @@ def _lightweight_royalsocietypublishing_summary(fixture: GoldenCorpusFixture) ->
     return _article_model_positive_summary(_build_royalsocietypublishing_article(fixture), fixture)
 
 
+def _lightweight_plos_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
+    return _article_model_positive_summary(_build_plos_article(fixture), fixture)
+
+
 def lightweight_positive_summary_from_fixture(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     return golden_corpus_adapter(fixture.provider).lightweight_summary(fixture)
 
@@ -1111,6 +1195,29 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1098/rsta.2019.0558",
+            representative_count_fields=("sections", "abstract_sections", "body_sections"),
+        )
+    )
+    register_golden_corpus_adapter(
+        GoldenCorpusAdapter(
+            provider="plos",
+            build_article=_build_plos_article,
+            lightweight_summary=_lightweight_plos_summary,
+            primary_contract=ProviderGoldenContract(
+                route_kind="xml",
+                content_prefix=("application/xml", "text/xml"),
+                source="plos_xml",
+                primary_marker="fulltext:plos_xml_ok",
+            ),
+            fallback_contracts={
+                "pdf_fallback": ProviderGoldenContract(
+                    route_kind="pdf_fallback",
+                    content_prefix="application/pdf",
+                    source="plos_pdf",
+                    primary_marker="fulltext:plos_pdf_fallback_ok",
+                ),
+            },
+            representative_doi="10.1371/journal.pone.0263725",
             representative_count_fields=("sections", "abstract_sections", "body_sections"),
         )
     )

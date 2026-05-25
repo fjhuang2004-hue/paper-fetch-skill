@@ -183,6 +183,8 @@ structure:
 - `access_gate`
 - `empty_shell`
 
+`pdf_fallback` 样本选择必须先证明该 DOI 能稳定覆盖真实 PDF fallback：公开证据能定位 PDF 链接或 PDF payload，后续 capture 能拿到真实 PDF bytes，且不是 HTML wrapper、challenge page、access page 或错误页。多个候选都满足这些条件且证据强度接近时，可以把 legacy/archive 覆盖作为 tie-breaker，优先考虑 2000 年以前或 publisher 早期数字化文章；但不能为了年份偏好选择 OCR / 扫描文本质量差、docserver 不稳定、访问策略不确定，或不代表该 provider fallback 行为的样本。若选择这类老文章，`evidence_reason` 应说明其 legacy PDF route 价值。
+
 `structure`、`figure`、`references` 在 draft 状态也必须有 DOI。其他 purpose 找不到样本时允许 `doi: null`，但 `evidence_reason` 必须说明搜索失败原因。
 `table`、`formula`、`supplementary` 即使为 null，也必须通过 `fixtures.discovery_proof` 证明搜索充分。
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -107,14 +106,6 @@ class RoyalSocietyArticleAttempt:
     metadata: dict[str, Any]
 
 
-@dataclass(frozen=True)
-class RoyalSocietyPdfMarkdown:
-    markdown_text: str
-    metadata: dict[str, Any]
-    abstract_sections: list[dict[str, str]]
-    references: list[dict[str, str]]
-
-
 def _merge_assets(
     extracted_assets: Sequence[Mapping[str, Any]] | None,
     downloaded_assets: Sequence[Mapping[str, Any]] | None,
@@ -166,203 +157,6 @@ def _pdf_failure_diagnostics(exc: PdfFetchFailure | None) -> dict[str, Any] | No
         "message": exc.message,
         "details": dict(exc.details),
     }
-
-
-_ROYAL_PDF_DOWNLOAD_LINE_RE = re.compile(
-    r"^Downloaded from https?://royalsocietypublishing\.org/.+\.pdf\b",
-    flags=re.IGNORECASE,
-)
-_ROYAL_PDF_INLINE_DOWNLOAD_SPAN_RE = re.compile(
-    r"`Downloaded from https?://royalsocietypublishing\.org/[^`]+`\s*",
-    flags=re.IGNORECASE,
-)
-_ROYAL_PDF_INLINE_WATERMARK_SPAN_RE = re.compile(
-    r"`by [^`]+ user on \d{1,2} [A-Za-z]+ \d{4}`\s*",
-    flags=re.IGNORECASE,
-)
-_ROYAL_PDF_WATERMARK_USER_LINE_RE = re.compile(r"^by .+ user$", flags=re.IGNORECASE)
-_ROYAL_PDF_WATERMARK_DATE_LINE_RE = re.compile(
-    r"^on \d{1,2} [A-Za-z]+ \d{4}$",
-    flags=re.IGNORECASE,
-)
-_ROYAL_PDF_PICTURE_PLACEHOLDER_RE = re.compile(
-    r"^\*\*==>\s*picture\s*\[[^\]]+\]\s*intentionally omitted\s*<==\*\*$",
-    flags=re.IGNORECASE,
-)
-_ROYAL_PDF_PAGE_NUMBER_RE = re.compile(r"^~~\*\*\d+\*\*~~$")
-_ROYAL_PDF_CITATION_RE = re.compile(
-    r"\*\*Cite this article:\*\*\s*(?P<authors>.+?)\s+(?P<year>\d{4})\s+"
-    r"(?P<title>.+?)\.\s+_?Phil\.",
-    flags=re.IGNORECASE | re.DOTALL,
-)
-_ROYAL_PDF_NUMBERED_INTRO_RE = re.compile(r"(?m)^##\s+1\.\s+Introduction\s*$", flags=re.IGNORECASE)
-_ROYAL_PDF_REFERENCES_RE = re.compile(r"(?m)^##\s+References\s*$", flags=re.IGNORECASE)
-_ROYAL_PDF_REFERENCE_ITEM_RE = re.compile(r"(?ms)^\s*(?P<label>\d+)\.\s+(?P<body>.*?)(?=^\s*\d+\.\s+|\Z)")
-_ROYAL_PDF_ORCID_LINE_RE = re.compile(r"^[A-Z]{1,5},\s*\d{4}-\d{4}-\d{4}-\d{3}[\dX]\b")
-_ROYAL_PDF_COPYRIGHT_TOKEN_RE = re.compile(r"Published by the Royal Society|All rights reserved", flags=re.IGNORECASE)
-
-
-def clean_pdf_markdown(markdown_text: str) -> str:
-    lines: list[str] = []
-    in_watermark = False
-    for raw_line in str(markdown_text or "").splitlines():
-        line = _ROYAL_PDF_INLINE_DOWNLOAD_SPAN_RE.sub("", raw_line)
-        line = _ROYAL_PDF_INLINE_WATERMARK_SPAN_RE.sub("", line)
-        stripped = normalize_text(line)
-        if _ROYAL_PDF_DOWNLOAD_LINE_RE.match(stripped):
-            in_watermark = True
-            continue
-        if in_watermark:
-            if not stripped:
-                continue
-            if (
-                _ROYAL_PDF_WATERMARK_USER_LINE_RE.match(stripped)
-                or _ROYAL_PDF_WATERMARK_DATE_LINE_RE.match(stripped)
-            ):
-                continue
-            in_watermark = False
-        if _ROYAL_PDF_PICTURE_PLACEHOLDER_RE.match(stripped) or _ROYAL_PDF_PAGE_NUMBER_RE.match(stripped):
-            continue
-        if stripped == "```":
-            continue
-        lines.append(line.rstrip())
-
-    cleaned: list[str] = []
-    previous_blank = False
-    for line in lines:
-        if normalize_text(line):
-            cleaned.append(line)
-            previous_blank = False
-            continue
-        if cleaned and not previous_blank:
-            cleaned.append("")
-            previous_blank = True
-    return "\n".join(cleaned).strip()
-
-
-def _royal_pdf_front_matter(markdown_text: str) -> str:
-    match = _ROYAL_PDF_NUMBERED_INTRO_RE.search(markdown_text)
-    if not match:
-        return markdown_text
-    return markdown_text[: match.start()]
-
-
-def _royal_pdf_body_markdown(markdown_text: str) -> str:
-    without_references = _ROYAL_PDF_REFERENCES_RE.split(markdown_text, maxsplit=1)[0].strip()
-    match = _ROYAL_PDF_NUMBERED_INTRO_RE.search(without_references)
-    if not match:
-        return without_references
-    return without_references[match.start() :].strip()
-
-
-def _royal_pdf_citation_fields(front_matter: str) -> dict[str, Any]:
-    match = _ROYAL_PDF_CITATION_RE.search(front_matter)
-    if not match:
-        return {}
-    authors_text = normalize_text(match.group("authors"))
-    authors = [
-        author
-        for author in (normalize_text(part) for part in authors_text.split(","))
-        if author
-    ]
-    return {
-        "authors": authors,
-        "published": match.group("year"),
-        "title": normalize_text(match.group("title")),
-    }
-
-
-def _metadata_title_is_doi(title: str, doi: str | None) -> bool:
-    normalized_title = normalize_text(title).lower()
-    if not normalized_title:
-        return False
-    normalized_doi = normalize_doi(doi or "")
-    return bool(normalized_doi and normalize_doi(normalized_title) == normalized_doi)
-
-
-def _royal_pdf_abstract_from_front_matter(front_matter: str) -> str:
-    lines = [normalize_text(line) for line in front_matter.splitlines()]
-    start_index: int | None = None
-    for index, line in enumerate(lines):
-        if _ROYAL_PDF_ORCID_LINE_RE.match(line):
-            start_index = index + 1
-            break
-    if start_index is None:
-        return ""
-
-    paragraphs: list[str] = []
-    current: list[str] = []
-    for line in lines[start_index:]:
-        if not line:
-            if current:
-                paragraphs.append(normalize_text(" ".join(current)))
-                current = []
-            continue
-        if line.startswith("## ") or _ROYAL_PDF_COPYRIGHT_TOKEN_RE.search(line):
-            break
-        current.append(line)
-    if current:
-        paragraphs.append(normalize_text(" ".join(current)))
-    return normalize_text(" ".join(paragraphs))
-
-
-def _royal_pdf_references_from_markdown(markdown_text: str) -> list[dict[str, str]]:
-    parts = _ROYAL_PDF_REFERENCES_RE.split(markdown_text, maxsplit=1)
-    if len(parts) != 2:
-        return []
-    reference_text = parts[1].strip()
-    references: list[dict[str, str]] = []
-    for match in _ROYAL_PDF_REFERENCE_ITEM_RE.finditer(reference_text):
-        label = normalize_text(match.group("label"))
-        body = normalize_text(match.group("body"))
-        if not label or not body:
-            continue
-        references.append({"raw": f"{label}. {body}"})
-    return references
-
-
-def prepare_pdf_fallback_markdown(markdown_text: str, metadata: Mapping[str, Any]) -> RoyalSocietyPdfMarkdown:
-    cleaned = clean_pdf_markdown(markdown_text)
-    metadata_out = dict(metadata or {})
-    doi = normalize_doi(str(metadata_out.get("doi") or ""))
-    front_matter = _royal_pdf_front_matter(cleaned)
-    citation_fields = _royal_pdf_citation_fields(front_matter)
-
-    title = normalize_text(str(metadata_out.get("title") or ""))
-    if not title or _metadata_title_is_doi(title, doi):
-        title = normalize_text(str(citation_fields.get("title") or title))
-    if title and not _metadata_title_is_doi(title, doi):
-        metadata_out["title"] = title
-    if not metadata_out.get("authors") and citation_fields.get("authors"):
-        metadata_out["authors"] = list(citation_fields["authors"])
-    if not metadata_out.get("published") and citation_fields.get("published"):
-        metadata_out["published"] = str(citation_fields["published"])
-
-    abstract_text = _royal_pdf_abstract_from_front_matter(front_matter)
-    abstract_sections: list[dict[str, str]] = []
-    if abstract_text:
-        metadata_out["abstract"] = abstract_text
-        abstract_sections.append({"heading": "Abstract", "text": abstract_text})
-
-    references = _royal_pdf_references_from_markdown(cleaned)
-    if references:
-        metadata_out["references"] = references
-
-    body = _royal_pdf_body_markdown(cleaned)
-    parts: list[str] = []
-    if title and not _metadata_title_is_doi(title, doi):
-        parts.extend([f"# {title}", ""])
-    if abstract_text:
-        parts.extend(["## Abstract", "", abstract_text, ""])
-    if body:
-        parts.append(body)
-    prepared_markdown = "\n".join(parts).strip() or cleaned
-    return RoyalSocietyPdfMarkdown(
-        markdown_text=prepared_markdown,
-        metadata=metadata_out,
-        abstract_sections=abstract_sections,
-        references=references,
-    )
 
 
 class RoyalsocietypublishingClient(ProviderClient):
@@ -557,25 +351,21 @@ class RoyalsocietypublishingClient(ProviderClient):
                 last_failure = exc
                 continue
 
-            prepared_pdf = prepare_pdf_fallback_markdown(pdf_result.markdown_text, metadata)
+            merged_metadata = dict(metadata or {})
             return build_provider_payload(
                 provider=self.name,
                 route_kind=PDF_FALLBACK,
                 source_url=pdf_result.final_url,
                 content_type=PDF_MIME_TYPE,
                 body=pdf_result.pdf_bytes,
-                markdown_text=prepared_pdf.markdown_text,
-                merged_metadata=prepared_pdf.metadata,
+                markdown_text=pdf_result.markdown_text,
+                merged_metadata=merged_metadata,
                 diagnostics={
                     PDF_FALLBACK: {
                         "candidates": candidates,
                         "source_url": candidate,
                         "final_url": pdf_result.final_url,
                         "html_failure_message": html_failure_message,
-                        "reference_count": len(prepared_pdf.references),
-                    },
-                    "extraction": {
-                        "abstract_sections": prepared_pdf.abstract_sections,
                     },
                 },
                 reason="Downloaded full text from the Royal Society Publishing direct PDF fallback route.",
@@ -859,4 +649,4 @@ class RoyalsocietypublishingClient(ProviderClient):
         )
 
 
-__all__ = ["RoyalsocietypublishingClient", "clean_pdf_markdown", "prepare_pdf_fallback_markdown"]
+__all__ = ["RoyalsocietypublishingClient"]

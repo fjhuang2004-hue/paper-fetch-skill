@@ -14,10 +14,12 @@
 - `onboarding/runbook.md` 是不同使用场景的入口索引，说明从零实现、已有 manifest 继续、查漏补缺、单 DOI quality repair 和 blocked state 恢复该用哪条命令。
 - `scripts/capture_fixture.py --from-manifest <manifest> --all` 批量捕获所有 non-null DOI sample 和 `extra_fixtures`，自动跳过 null DOI purpose，并用 structured JSON error code 报告不可用样本。
 - `scripts/capture_fixture.py --from-manifest <manifest> --all --auto-via --fail-fast` 是 coordinator capture 默认入口，按 manifest probe 和 access review 选择 `http` / `browser`。
+- `scripts/onboard_from_manifests.py summarize --provider <name> --format json --output onboarding/fixture-evidence/<name>.json` 生成 fixture 阶段证据总表，汇总每个 purpose 的 DOI、confidence、observed signals、evidence URL/reason、本地 raw / extracted / quality artifact 路径、discovery proof 和人工审核状态。
 - `scripts/scaffold_provider.py --from-manifest --merge-existing=safe` 负责从 manifest 生成 provider-owned skeleton；已有输出时复用安全内容或返回 JSON merge plan 和 diff preview。
 - `scripts/bootstrap_review_artifact.py --provider <name> --manifest <path>` 生成 Markdown review 草稿，但不会把最终语义审查自动签为 true。
-- `scripts/backfill_access_reviews.py --all --write` 为已实现但缺少 access review 的 provider 生成 blocked 草稿；草稿不是批准，`status: approved` 和 `may_continue: true` 仍只能由 operator 写入。
+- `scripts/backfill_access_reviews.py --all --write` 为已实现但缺少 access review 的 provider 生成 blocked 草稿；`--provider <name> --domain <domain> [--doi-prefix <prefix>] --write` 可为尚未登记的新 provider 生成 seed 草稿；草稿不是批准，`status: approved` 和 `may_continue: true` 仍只能由 operator 写入。
 - `scripts/propose_cleaning_chain.py --provider <name> --write` 基于已提交 fixture 生成 `cleaning-chain-proposals/<name>.yml`，用于 capture 后、implement 前的清洗候选、contract delta、过度清洗探针和 token 冲突检查。
+  PLOS 这类 access review 已批准 JATS XML 但 runtime provider 尚未实现的 onboarding fixture，可在 proposal / snapshot 阶段复用 shared JATS renderer 和离线 golden replay adapter 生成 production-style baseline；runtime provider 注册仍留到实现收口阶段。
 - `scripts/manifest_sync_back.py --provider <name> --manifest <path> --sync-docs` 是 `extraction_hints`、`success_criteria` 和 manifest docs facts 自动同步入口。
 - `scripts/onboard_from_manifests.py diagnose`、`resume-blocked` 和 `summarize` 读取 coordinator state，分别提供 blocked 分诊、受控续跑和 operator digest；它们不会批准 access review、解决 challenge 或触发 GitHub CI。
 - `scripts/run_provider_drift_report.py` 是本地手动 route-source drift report 入口；真实 live run 必须显式设置 `PAPER_FETCH_RUN_LIVE=1`，不接 CI。

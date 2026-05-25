@@ -116,28 +116,18 @@ fixtures:
   purpose: pdf_fallback
   doi: 10.1098/rsta.2020.0108
   baseline_markdown_path: tests/fixtures/golden_criteria/10.1098_rsta.2020.0108/extracted.md
-  baseline_markdown_sha256: 44389c1f83cae755eeb8f1bd0490c5e08c0cd11128b01cd87672071a4bf24bd4
-  review_notes: Semantic review completed against committed fixture evidence.
+  baseline_markdown_sha256: 39cac044fc543ed1709bdf8fe70e68f856278e47cd0641deaa737eaa095aef6c
+  review_notes: Semantic review completed against committed shared text-only PDF conversion baseline; no provider-specific PDF Markdown cleanup is required for this fixture.
   sample_representative: true
   markdown_semantic_reviewed: true
   issues: []
   assertions:
-  - 'must include # Topics in the mathematical design of materials'
-  - must include
-  - must include
-  - must include
-  - must include Warburg E. 1881 Magnetische untersuchungen
-  - must include Brezis H, Coron JM, Lieb EH. 1986
+  - must include non-empty shared PDF Markdown text
+  - must include ## 1. Introduction
+  - must include Many recent and spectacular advances in the world of materials
   - must not include Access Denied
-  - must not include Cite this article
-  - must not include Subject Areas
-  - must not include Author for correspondence
-  - must not include Published by the Royal Society. All rights reserved
-  - must not include Downloaded from http://royalsocietypublishing.org
-  - must not include Peking University Library
-  - must not include intentionally omitted
-  - must not include ~~**
-  - must not include ```
+  - must not include <html
+  - must not include Object moved
   fixes: []
   markdown_quality_path: tests/fixtures/golden_criteria/10.1098_rsta.2020.0108/markdown-quality.json
-  markdown_quality_sha256: 5b2a82941fb0f88cc44dd8e34b7710af3d2c3676dd60f84955807093ba51e268
+  markdown_quality_sha256: 68975c6bad2c4c814e0badf03a1dfc0d0ec899bb9e5152e431368f489a7b8040

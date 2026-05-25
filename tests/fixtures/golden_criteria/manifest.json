@@ -2811,6 +2811,179 @@
         "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/markdown-quality-prompt.md",
         "markdown-quality.json": "tests/fixtures/golden_criteria/10.1146_annurev-neuro-062111-150343/markdown-quality.json"
       }
+    },
+    "10.1371_journal.pone.0015338": {
+      "doi": "10.1371/journal.pone.0015338",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0015338&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:20Z",
+      "purpose": "figure",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/markdown-quality.json",
+        "body_assets/pone.0015338.e001.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.e001.png",
+        "body_assets/pone.0015338.e002.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.e002.png",
+        "body_assets/pone.0015338.e003.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.e003.png",
+        "body_assets/pone.0015338.e004.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.e004.png",
+        "body_assets/pone.0015338.g001.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g001.png",
+        "body_assets/pone.0015338.g002.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g002.png",
+        "body_assets/pone.0015338.g003.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g003.png",
+        "body_assets/pone.0015338.g004.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g004.png",
+        "body_assets/pone.0015338.g005.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g005.png",
+        "body_assets/pone.0015338.g006.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g006.png",
+        "body_assets/pone.0015338.g007.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g007.png",
+        "body_assets/pone.0015338.g008.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g008.png",
+        "body_assets/pone.0015338.g009.png": "tests/fixtures/golden_criteria/10.1371_journal.pone.0015338/body_assets/pone.0015338.g009.png"
+      }
+    },
+    "10.1371_journal.pone.0126635": {
+      "doi": "10.1371/journal.pone.0126635",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0126635&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:22Z",
+      "purpose": "formula",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pone.0126635/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0126635/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0126635/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0126635/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0126635/markdown-quality.json"
+      }
+    },
+    "10.1371_journal.pbio.0040298": {
+      "doi": "10.1371/journal.pbio.0040298",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosbiology/article/file?id=10.1371/journal.pbio.0040298&type=printable",
+      "fetched_at": "2026-05-24T12:13:23Z",
+      "purpose": "pdf_fallback",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "application/pdf",
+      "route_kind": "pdf_fallback",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.pdf": "tests/fixtures/golden_criteria/10.1371_journal.pbio.0040298/original.pdf",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pbio.0040298/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pbio.0040298/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pbio.0040298/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pbio.0040298/markdown-quality.json"
+      }
+    },
+    "10.1371_journal.pone.0026949": {
+      "doi": "10.1371/journal.pone.0026949",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0026949&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:26Z",
+      "purpose": "references",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pone.0026949/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0026949/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0026949/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0026949/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0026949/markdown-quality.json"
+      }
+    },
+    "10.1371_journal.pone.0263725": {
+      "doi": "10.1371/journal.pone.0263725",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0263725&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:54Z",
+      "purpose": "structure",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "application/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pone.0263725/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0263725/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0263725/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0263725/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0263725/markdown-quality.json"
+      }
+    },
+    "10.1371_journal.pone.0218513": {
+      "doi": "10.1371/journal.pone.0218513",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0218513&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:55Z",
+      "purpose": "supplementary",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "application/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pone.0218513/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0218513/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0218513/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0218513/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0218513/markdown-quality.json"
+      }
+    },
+    "10.1371_journal.pone.0304873": {
+      "doi": "10.1371/journal.pone.0304873",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0304873&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:57Z",
+      "purpose": "table",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "application/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pone.0304873/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0304873/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0304873/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pone.0304873/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pone.0304873/markdown-quality.json"
+      }
+    },
+    "10.1371_journal.pcbi.1003118": {
+      "doi": "10.1371/journal.pcbi.1003118",
+      "publisher": "plos",
+      "source_url": "https://journals.plos.org/ploscompbiol/article/file?id=10.1371/journal.pcbi.1003118&type=manuscript",
+      "fetched_at": "2026-05-24T12:13:58Z",
+      "purpose": "structure",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/xml",
+      "route_kind": "xml",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.xml": "tests/fixtures/golden_criteria/10.1371_journal.pcbi.1003118/original.xml",
+        "expected.json": "tests/fixtures/golden_criteria/10.1371_journal.pcbi.1003118/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1371_journal.pcbi.1003118/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1371_journal.pcbi.1003118/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1371_journal.pcbi.1003118/markdown-quality.json"
+      }
     }
   },
   "tests": [

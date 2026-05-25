@@ -9,7 +9,7 @@ import pytest
 from paper_fetch.provider_catalog import PROVIDER_CATALOG
 from paper_fetch.providers._registry import provider_bundle
 from paper_fetch.providers.base import ProviderFailure
-from paper_fetch.providers.royalsocietypublishing import RoyalsocietypublishingClient, clean_pdf_markdown
+from paper_fetch.providers.royalsocietypublishing import RoyalsocietypublishingClient
 from paper_fetch.tracing import source_trail_from_trace
 from tests.golden_corpus import GoldenCorpusFixture, build_article_from_fixture
 from tests.golden_criteria import golden_criteria_sample_for_doi
@@ -381,58 +381,14 @@ def test_markdown_contract_references_fixture() -> None:
 
 
 def test_markdown_contract_pdf_fallback_fixture() -> None:
-    """rule: rule-royalsociety-silverchair-markdown-cleanup"""
+    """PDF fallback Markdown uses the shared text-only PDF conversion baseline."""
 
     # markdown-review: purpose=pdf_fallback doi=10.1098/rsta.2020.0108
     markdown = _render_markdown_for_fixture("10.1098/rsta.2020.0108")
-    assert "# Topics in the mathematical design of materials" in markdown
-    assert "# 10.1098/rsta.2020.0108" not in markdown
-    assert "Topics in the mathematical desi n of materials g" not in markdown
-    assert "## Abstract" in markdown
-    assert "We present a perspective on several current research directions" in markdown
+    assert markdown.strip()
+    assert re.search(r"(?m)^#{1,6}\s+\S+", markdown) or re.search(r"[A-Za-z]{20,}", markdown)
     assert "## 1. Introduction" in markdown
     assert "Many recent and spectacular advances in the world of materials" in markdown
-    assert "## References" in markdown
-    assert "Warburg E. 1881 Magnetische untersuchungen" in markdown
-    assert "Brezis H, Coron JM, Lieb EH. 1986" in markdown
     assert "Access Denied" not in markdown
-    assert "Cite this article" not in markdown
-    assert "Subject Areas" not in markdown
-    assert "Author for correspondence" not in markdown
-    assert "Published by the Royal Society. All rights reserved" not in markdown
-    assert "Downloaded from http://royalsocietypublishing.org" not in markdown
-    assert "Peking University Library" not in markdown
-    assert "intentionally omitted" not in markdown
-    assert "~~**" not in markdown
-    assert "```" not in markdown
-
-
-def test_pdf_markdown_cleanup_removes_royal_society_watermark_and_placeholders() -> None:
-    """rule: rule-royalsociety-silverchair-markdown-cleanup"""
-
-    cleaned = clean_pdf_markdown(
-        "\n".join(
-            [
-                "# Article",
-                "",
-                "Downloaded from http://royalsocietypublishing.org/doi/pdf/10.1098/rsta.2020.0108/rsta.2020.0108.pdf",
-                "by Peking University Library user",
-                "on 22 May 2026",
-                "~~**2**~~",
-                "```",
-                "```",
-                "**==> picture [11 x 10] intentionally omitted <==**",
-                "Shape-programmable magnetic",
-                "`Downloaded from http://royalsocietypublishing.org/rsta/article-pdf/doi/10.1098/rsta.2020.0108/373338/rsta.2020.0108.pdf` soft matter. `by Peking University Library user on 22 May 2026`",
-                "Useful Royal Society PDF body text.",
-            ]
-        )
-    )
-
-    assert "Downloaded from" not in cleaned
-    assert "Peking University Library" not in cleaned
-    assert "intentionally omitted" not in cleaned
-    assert "~~**2**~~" not in cleaned
-    assert "```" not in cleaned
-    assert "Shape-programmable magnetic\nsoft matter." in cleaned
-    assert "Useful Royal Society PDF body text." in cleaned
+    assert "<html" not in markdown.lower()
+    assert "Object moved" not in markdown

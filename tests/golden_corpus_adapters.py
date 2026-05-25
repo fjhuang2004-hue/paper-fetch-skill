@@ -10,7 +10,7 @@ from typing import Any
 @dataclass(frozen=True)
 class ProviderGoldenContract:
     route_kind: str
-    content_prefix: str
+    content_prefix: str | tuple[str, ...]
     source: str
     primary_marker: str
 

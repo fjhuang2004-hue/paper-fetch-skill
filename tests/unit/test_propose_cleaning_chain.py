@@ -100,6 +100,51 @@ def test_markdown_baseline_uses_provider_golden_adapter(monkeypatch, tmp_path: P
     assert calls == [("body", "full_text")]
 
 
+def test_plos_xml_baseline_uses_shared_jats_renderer(tmp_path: Path) -> None:
+    raw_path = tmp_path / "original.xml"
+    raw_path.write_text(
+        """<?xml version="1.0" encoding="utf-8"?>
+<article xmlns:mml="http://www.w3.org/1998/Math/MathML">
+  <front>
+    <journal-meta><journal-title-group><journal-title>PLOS Test</journal-title></journal-title-group></journal-meta>
+    <article-meta>
+      <article-id pub-id-type="doi">10.1371/journal.pone.test</article-id>
+      <title-group><article-title>PLOS JATS Fixture</article-title></title-group>
+      <contrib-group><contrib contrib-type="author"><name><surname>Curie</surname><given-names>Marie</given-names></name></contrib></contrib-group>
+      <abstract><p>This abstract comes from JATS.</p></abstract>
+    </article-meta>
+  </front>
+  <body>
+    <sec><title>Results</title><p>Body text proves the XML route.</p></sec>
+  </body>
+  <back><ref-list><ref id="r1"><mixed-citation>Reference text.</mixed-citation></ref></ref-list></back>
+</article>
+""",
+        encoding="utf-8",
+    )
+
+    markdown, source = cleaning._render_markdown_baseline(
+        "10.1371/journal.pone.test",
+        tmp_path,
+        raw_path,
+        fixture_sample={
+            "publisher": "plos",
+            "doi": "10.1371/journal.pone.test",
+            "source_url": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.test&type=manuscript",
+            "content_type": "text/xml",
+            "route_kind": "xml",
+            "fixture_family": "golden",
+            "assets": {},
+        },
+        sample_id="plos-test",
+    )
+
+    assert source == "paper_fetch.providers._article_markdown_jats:plos_manifest_fixture"
+    assert "PLOS JATS Fixture" in markdown
+    assert "This abstract comes from JATS" in markdown
+    assert "Body text proves the XML route" in markdown
+
+
 def test_ieee_landing_only_fallback_fixtures_render_provider_managed_baselines() -> None:
     manifest = yaml.safe_load(
         (REPO_ROOT / "onboarding" / "manifests" / "ieee.yml").read_text(

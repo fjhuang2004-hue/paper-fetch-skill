@@ -6,6 +6,9 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+- Add PLOS public JATS XML provider manifest and fixture evidence for XML, PDF fallback, tables, formulas, figures, supplementary materials, and references.
+- Follow PLOS signed figure-image redirects during asset downloads and refresh the PLOS figure golden replay with local `body_assets` Markdown rewrites.
+- Render PLOS graphic-only JATS formulas as inline formula image assets instead of `Formula unavailable` placeholders.
 ## 1.7.0 - 2026-05-24
 
 ### Added

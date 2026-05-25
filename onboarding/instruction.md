@@ -62,7 +62,7 @@ runner 默认通过本机 Codex CLI（`codex exec --cd <repo-root> --sandbox wor
    - `PYTHONPATH=src python3 scripts/onboard_from_manifests.py start --provider <provider> --domain <domain> --dry-run --output-dir .paper-fetch-runs/<provider>-onboarding`
    - 检查 DAG 顺序和 generated briefs。
 3. 编写或修复 manifest：
-   - 若缺少 `onboarding/access-reviews/<provider>.yml`，可用 `python3 scripts/backfill_access_reviews.py --provider <provider> --write` 生成 blocked 草稿；草稿不等于批准，operator 仍需补齐合法访问、allowed runtime、禁止行为、challenge 策略、临时站点策略并改为 `may_continue: true`。
+   - 若缺少 `onboarding/access-reviews/<provider>.yml`，已登记 provider 可用 `python3 scripts/backfill_access_reviews.py --provider <provider> --write` 生成 blocked 草稿；尚未登记的新 provider 需要显式种子，例如 `python3 scripts/backfill_access_reviews.py --provider <provider> --domain <domain> --doi-prefix <doi-prefix> --write`。草稿不等于批准，operator 仍需补齐合法访问、allowed runtime、禁止行为、challenge 策略、临时站点策略并改为 `may_continue: true`。
    - 如需单独检查 discovery 输入，运行 `python3 scripts/onboard_from_manifests.py prepare-discovery --provider <provider> --domain <domain> --doi-prefix <doi-prefix> --output-dir .paper-fetch-runs/<provider>-onboarding`；离线预检或单测使用 `--no-network`。
    - 可用 `python3 scripts/onboard_from_manifests.py inspect-discovery --manifest onboarding/manifests/<provider>.yml --evidence-pack .paper-fetch-runs/<provider>-onboarding/discovery/evidence-pack.json` 查看候选、低置信度 purpose 和 proof 缺口。
    - 填 `routing`、`main_path`、`route_contract`、`markdown_contract`、`asset_profile`、`asset_contract`、`supplementary_scope`、`probe`、`fixtures.doi_samples`、`fixtures.discovery_proof` 和 docs fact base。
@@ -137,6 +137,7 @@ runner 默认通过本机 Codex CLI（`codex exec --cd <repo-root> --sandbox wor
 - route success 不只看 HTTP 200；必须满足 `route_contract`。
 - HTML/XML/PDF wrapper、access gate、challenge、empty shell 和 abstract-only 不得误判 fulltext。
 - PDF fallback 必须拒绝 HTML wrapper；text-only fallback 必须标记资产跳过。
+- `pdf_fallback` Markdown 统一由 shared `pymupdf4llm` 转换产生；provider 只负责 PDF 获取、真 PDF 校验、source/route/warning/asset text-only 标记，不得添加 provider-owned PDF Markdown cleanup、front matter reconstruction、watermark removal 或 reference extraction。
 - `asset_profile=none/body/all` 语义稳定；supplementary 只能来自明确 scope。
 - Figure asset contract 必须落到正文内联和下载两层：`![Figure ...](...)` 出现在正文首次引用或 caption block 附近，下载后最终 Markdown 使用本地相对 asset path，不靠文末 `## Figures` caption bullet 通过。
 - `ProviderMetadata` 是 provider / metadata adapter 产出的可选字段 `TypedDict`，用于 metadata merge、routing probe 和文章构建前的元数据传递；它不是新的 runtime payload 容器。Provider 对外 override 签名必须保持 `Mapping[str, Any]` 兼容，只在内部构造、合并或局部收窄时使用 `ProviderMetadata`。

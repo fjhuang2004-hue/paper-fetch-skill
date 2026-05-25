@@ -18,6 +18,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "ElsevierClient": (".elsevier", "ElsevierClient"),
     "IeeeClient": (".ieee", "IeeeClient"),
     "PnasClient": (".pnas", "PnasClient"),
+    "PlosClient": (".plos", "PlosClient"),
     "ScienceClient": (".science", "ScienceClient"),
     "SpringerClient": (".springer", "SpringerClient"),
     "WileyClient": (".wiley", "WileyClient"),

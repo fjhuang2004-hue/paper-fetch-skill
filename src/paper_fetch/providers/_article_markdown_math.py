@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
+import urllib.parse
 import xml.etree.ElementTree as ET
 
+from ..markdown.images import render_markdown_image
 from ..formula.convert import convert_mathml_element_to_latex, normalize_latex_macros
 from ._article_markdown_xml import (
     child_text,
@@ -15,6 +17,8 @@ from ._article_markdown_xml import (
     xml_local_name,
 )
 
+XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
+
 
 @dataclass
 class FormulaRenderResult:
@@ -22,6 +26,7 @@ class FormulaRenderResult:
     fallback_kind: str | None = None
     note: str | None = None
     label: str | None = None
+    image_url: str | None = None
 
 
 def render_tex_math(element: ET.Element | None) -> str:
@@ -182,7 +187,17 @@ def render_inline_formula(element: ET.Element | None) -> str:
     return normalize_compact_text("".join(element.itertext()))
 
 
-def render_display_formula_result(element: ET.Element | None) -> FormulaRenderResult:
+def formula_graphic_url(element: ET.Element | None, *, source_url: str = "") -> str:
+    graphic = first_descendant(element, "graphic")
+    if graphic is None:
+        return ""
+    href = normalize_compact_text(str(graphic.get(XLINK_HREF) or graphic.get("href") or ""))
+    if not href:
+        return ""
+    return urllib.parse.urljoin(source_url, href)
+
+
+def render_display_formula_result(element: ET.Element | None, *, source_url: str = "") -> FormulaRenderResult:
     if element is None:
         return FormulaRenderResult(lines=[])
 
@@ -207,6 +222,12 @@ def render_display_formula_result(element: ET.Element | None) -> FormulaRenderRe
         if expression:
             fallback_kind = "fallback"
             note = "Formula used the publisher tex-math fallback."
+    image_url = ""
+    if not expression:
+        image_url = formula_graphic_url(element, source_url=source_url)
+        if image_url:
+            fallback_kind = "fallback"
+            note = "Formula used the publisher formula image fallback."
     if not expression:
         expression = normalize_compact_text(render_literal_inline_text(element, skip_local_names={"label"}))
         if expression:
@@ -226,7 +247,9 @@ def render_display_formula_result(element: ET.Element | None) -> FormulaRenderRe
     lines: list[str] = []
     if label:
         lines.extend([label, ""])
-    if fallback_kind == "missing":
+    if image_url:
+        lines.extend([render_markdown_image("formula", label or "Formula", image_url), ""])
+    elif fallback_kind == "missing":
         lines.extend([expression, ""])
     else:
         lines.extend(["$$", expression, "$$", ""])
@@ -237,4 +260,5 @@ def render_display_formula_result(element: ET.Element | None) -> FormulaRenderRe
         fallback_kind=fallback_kind,
         note=note,
         label=normalize_compact_text(label),
+        image_url=image_url or None,
     )

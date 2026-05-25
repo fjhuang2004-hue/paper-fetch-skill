@@ -15,7 +15,7 @@
 - fixture capture 对 `HTTP_FORBIDDEN`、`HTTP_RATE_LIMITED`、`CHALLENGE_DETECTED` 可在 access review 允许 browser runtime 时自动 retry 到 browser route；否则返回 structured JSON。
 - `scripts/scaffold_provider.py --from-manifest --merge-existing=safe` 复用相同内容，保留完整已有 provider 文件，并继续生成 fixture/capture/scaffold summary。
 - `scripts/bootstrap_review_artifact.py` 从 manifest non-null fixtures 和 `extra_fixtures` 生成 review 草稿，填入 `extracted.md` 路径/sha256、agent-authored `markdown-quality.json` 路径/sha256、manifest assertions 和初始问题分类；pending quality report 会进入草稿 issue。
-- `scripts/backfill_access_reviews.py --all --write` 可为已实现 provider 回填 blocked access review 草稿；草稿只来自 manifest、known-providers、bundle capabilities 和本地 fixture evidence。
+- `scripts/backfill_access_reviews.py --all --write` 可为已实现 provider 回填 blocked access review 草稿；`--provider <name> --domain <domain> [--doi-prefix <prefix>] --write` 可为尚未登记的新 provider 生成 seed 草稿。已实现 provider 草稿只来自 manifest、known-providers、bundle capabilities 和本地 fixture evidence；seed 草稿只来自显式 provider/domain/DOI prefix 输入，仍不批准 access。
 - `scripts/onboard_from_manifests.py run` 会在 `capture-fixtures` 后固定执行 `propose-cleaning-chain`，调用 `scripts/propose_cleaning_chain.py --provider <provider> --write` 生成 compact proposal 和 full evidence。
 - `scripts/onboard_from_manifests.py diagnose` 可只读分诊 blocked state；`resume-blocked --dry-run` 只输出续跑计划；非 dry-run 只在 retryable failure 且 access review 已批准、无 operator-only blocker 时复用现有 runner 续跑。
 - `scripts/onboard_from_manifests.py summarize --provider <provider>` 可从 state、manifest、access review、review artifact 和真实 run records 合成 JSON/Markdown operator digest。

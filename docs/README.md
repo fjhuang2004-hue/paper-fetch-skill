@@ -181,7 +181,7 @@
 
 - golden criteria live review 的 `stage_timings` 包含 `fetch_seconds`、`materialize_seconds`、`total_seconds`、`resolve_seconds`、`metadata_seconds`、`fulltext_seconds`、`asset_seconds`、`formula_seconds`、`render_seconds`。
 - 每个 sample 的 `http_cache_stats` 表示该 sample 执行前后差值；最终汇总日志仍可查看 `HttpTransport.cache_stats_snapshot()` 的累计快照。
-- live runner supported provider 包含 `elsevier`、`springer`、`wiley`、`science`、`pnas`、`ieee`、`arxiv`、`ams`、`mdpi`、`copernicus`；arXiv、MDPI 与 Copernicus 路径和资产语义见 [`providers.md`](providers.md)。
+- live runner supported provider 包含 `elsevier`、`springer`、`wiley`、`science`、`pnas`、`ieee`、`arxiv`、`ams`、`mdpi`、`copernicus`、`plos`；arXiv、MDPI、Copernicus 与 PLOS 路径和资产语义见 [`providers.md`](providers.md)。
 
 ## 一句话阅读建议
 

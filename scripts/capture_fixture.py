@@ -424,6 +424,44 @@ def _fixture_path(root: Path, slug: str, purpose: str, content_type: str) -> Pat
     return root / "tests" / "fixtures" / "golden_criteria" / slug / filename
 
 
+def _fixture_path_from_entry(root: Path, entry: dict[str, Any]) -> Path | None:
+    assets = entry.get("assets") if isinstance(entry.get("assets"), dict) else {}
+    for name in ("original.pdf", "original.xml", "original.html", "raw.html", "article.html"):
+        value = assets.get(name)
+        if isinstance(value, str) and value:
+            path = root / value
+            if path.exists():
+                return path
+    for value in assets.values():
+        if isinstance(value, str) and value:
+            path = root / value
+            if path.exists():
+                return path
+    return None
+
+
+def _planned_content_type_from_manifest(purpose: str, sample: dict[str, Any] | None) -> str:
+    if purpose == "pdf_fallback":
+        return "application/pdf"
+    if not sample:
+        return "text/html"
+    evidence_url = normalize_text(str(sample.get("evidence_url") or "")).lower()
+    observed_signals = {
+        normalize_text(str(signal)).lower()
+        for signal in sample.get("observed_signals") or []
+    }
+    if (
+        "jats_xml" in observed_signals
+        or "xml_body_sections" in observed_signals
+        or "type=manuscript" in evidence_url
+        or evidence_url.endswith(".xml")
+    ):
+        return "application/xml"
+    if "pdf_fallback" in observed_signals or "type=printable" in evidence_url:
+        return "application/pdf"
+    return "text/html"
+
+
 def _manifest_entry(
     *,
     doi: str,
@@ -872,18 +910,25 @@ def capture_fixture(args: argparse.Namespace) -> dict[str, Any]:
     slug = doi_slug(doi)
     provider = provider or infer_provider_from_doi(doi) or "unknown"
     source_url = _manifest_evidence_url(manifest.sample if manifest else None) or f"https://doi.org/{doi}"
-    reuse_content_type = "application/pdf" if purpose == "pdf_fallback" else "text/html"
-    reuse_fixture_path = _fixture_path(root, slug, purpose, reuse_content_type)
     manifest_path = root / "tests" / "fixtures" / "golden_criteria" / "manifest.json"
     fixture_manifest = _load_manifest(manifest_path)
     samples = fixture_manifest["samples"]
+    existing_entry = samples.get(slug) if isinstance(samples.get(slug), dict) else {}
+    planned_content_type = (
+        str(existing_entry.get("content_type") or "")
+        or _planned_content_type_from_manifest(purpose, manifest.sample if manifest else None)
+    )
+    reuse_fixture_path = (
+        _fixture_path_from_entry(root, existing_entry)
+        if isinstance(existing_entry, dict)
+        else None
+    ) or _fixture_path(root, slug, purpose, planned_content_type)
     if (
         not args.force
         and not args.dry_run
         and slug in samples
         and reuse_fixture_path.exists()
     ):
-        existing_entry = samples.get(slug) if isinstance(samples.get(slug), dict) else {}
         summary = {
             "status": "OK",
             "reused": True,
@@ -892,11 +937,11 @@ def capture_fixture(args: argparse.Namespace) -> dict[str, Any]:
             "fixture_path": reuse_fixture_path.relative_to(root).as_posix(),
             "manifest_sample_id": slug,
             "manifest_entry": existing_entry,
-            "content_type": existing_entry.get("content_type") or reuse_content_type,
+            "content_type": existing_entry.get("content_type") or planned_content_type,
             "bytes": reuse_fixture_path.stat().st_size,
-            "route": existing_entry.get("route_kind") or _extension_for(reuse_content_type, purpose),
+            "route": existing_entry.get("route_kind") or _extension_for(planned_content_type, purpose),
             "capture_route": "reused",
-            "route_kind": existing_entry.get("route_kind") or _extension_for(reuse_content_type, purpose),
+            "route_kind": existing_entry.get("route_kind") or _extension_for(planned_content_type, purpose),
             "purpose": purpose,
             "provider": provider,
         }
@@ -911,7 +956,7 @@ def capture_fixture(args: argparse.Namespace) -> dict[str, Any]:
 
     fetched_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     if args.dry_run:
-        content_type = "text/html"
+        content_type = planned_content_type
         body = b""
         final_url = source_url
         route = _select_capture_route(args, manifest=manifest)

@@ -36,6 +36,7 @@
 | `copernicus` | 依赖 Crossref merge + landing metadata | `landing HTML / DOI-derived URL -> NLM/JATS XML -> direct HTTP PDF -> metadata fallback` | XML 路线支持 `none` / `body` / `all`；PDF fallback 当前 text-only | 强 | 开放获取 direct HTTP 路线，不需要登录态或本地浏览器运行时；XML 成功公开为 `copernicus_xml`，PDF fallback 公开为 `copernicus_pdf` |
 | `royalsocietypublishing` | Direct DOI HTML metadata merge | `direct HTTP DOI HTML -> direct HTTP PDF -> metadata fallback` | HTML 路线支持 `none` / `body` / `all`；PDF fallback 当前 text-only | 强 | Royal Society Publishing 通过 `10.1098/` DOI 和 `royalsocietypublishing.org` 路由；HTML 成功公开为 `royalsocietypublishing_html`，PDF fallback 公开为 `royalsocietypublishing_pdf`；显式不把 `citation_xml_url` 当作 XML/JATS 路线 |
 | `annualreviews` | 依赖 Crossref routing | `CloakBrowser landing/full-text HTML -> seeded-browser PDF -> provider-managed abstract_only -> metadata fallback` | HTML 路线支持 `none` / `body` / `all`；PDF fallback 当前 text-only | 中 | Annual Reviews 通过 `10.1146/` DOI 和 `annualreviews.org` 域名路由，排除 Knowable Magazine / 非 article 样本；HTML 成功公开为 `annualreviews_html`，PDF fallback 公开为 `annualreviews_pdf`；需要 Playwright/browser runtime |
+| `plos` | 依赖 Crossref routing | `public JATS XML -> direct HTTP PDF -> metadata fallback` | XML 路线支持 `none` / `body` / `all`；PDF fallback 当前 text-only | 强 | PLOS 通过 `10.1371/` DOI prefix 和 `journals.plos.org` 路由；XML 成功公开为 `plos_xml`，PDF fallback 公开为 `plos_pdf`；按 access review 不把 HTML 作为全文路线 |
 
 说明：
 
@@ -51,7 +52,7 @@
 - `geography` live runner 默认按 provider 轮转执行，保持单家样本顺序不变。
 - `run_geography_live_report.py`、`export_geography_issue_artifacts.py`、`group_geography_issue_artifacts.py` 都属于 repo-local internal tooling：不新增 console script，不作为 MCP surface，对外产品面不变。
 - geography live/report/export/group 仍受 `PAPER_FETCH_RUN_LIVE=1` 的 opt-in 边界保护；未启用 live 环境时，对应测试应稳定 skip。
-- golden criteria live review 产物写入 `live-downloads/golden-criteria-review/`，由 [`../scripts/run_golden_criteria_live_review.py`](../scripts/run_golden_criteria_live_review.py) 生成；每条结果保留兼容的 `elapsed_seconds`，并新增 `stage_timings.fetch_seconds` / `materialize_seconds` / `total_seconds` / `resolve_seconds` / `metadata_seconds` / `fulltext_seconds` / `asset_seconds` / `formula_seconds` / `render_seconds`，同时在 `http_cache_stats` 中记录该 sample 相对执行前的 cache delta。`elsevier`、`springer`、`wiley`、`science`、`pnas`、`ieee`、`arxiv`、`ams`、`mdpi` 和 `copernicus` 都纳入 supported provider 轮转，`provider-status.json` 会包含这些 provider 的本地诊断。`10.1016/S1575-1813(18)30261-4` 这类预期 metadata-only 样本，以及当前不支持的 TandF / Sage 样本，应通过 manifest 的 expected outcome 标记为 `skipped`，不进入 provider bug 修复队列。IEEE golden live 样本面向具备合法 IEEE Xplore 授权上下文的机器，预期为 `fulltext`；降级成 metadata-only、blocked fetch 或非 PDF payload 应作为 `live_fetch_blocked` 问题进入修复队列。
+- golden criteria live review 产物写入 `live-downloads/golden-criteria-review/`，由 [`../scripts/run_golden_criteria_live_review.py`](../scripts/run_golden_criteria_live_review.py) 生成；每条结果保留兼容的 `elapsed_seconds`，并新增 `stage_timings.fetch_seconds` / `materialize_seconds` / `total_seconds` / `resolve_seconds` / `metadata_seconds` / `fulltext_seconds` / `asset_seconds` / `formula_seconds` / `render_seconds`，同时在 `http_cache_stats` 中记录该 sample 相对执行前的 cache delta。`elsevier`、`springer`、`wiley`、`science`、`pnas`、`ieee`、`arxiv`、`ams`、`mdpi`、`copernicus` 和 `plos` 都纳入 supported provider 轮转，`provider-status.json` 会包含这些 provider 的本地诊断。`10.1016/S1575-1813(18)30261-4` 这类预期 metadata-only 样本，以及当前不支持的 TandF / Sage 样本，应通过 manifest 的 expected outcome 标记为 `skipped`，不进入 provider bug 修复队列。IEEE golden live 样本面向具备合法 IEEE Xplore 授权上下文的机器，预期为 `fulltext`；降级成 metadata-only、blocked fetch 或非 PDF payload 应作为 `live_fetch_blocked` 问题进入修复队列。
 
 ### Copernicus
 
@@ -81,6 +82,29 @@ resolve DOI / landing URL
 - Golden corpus 覆盖 8 篇现代 XML 主路径样本，以及 4 篇早期 abstract-only XML 落到 PDF text-only fallback 的样本。
 - `probe_status()` 只做本地能力说明，返回 direct XML/PDF fallback ready，不探测远端 Copernicus 站点。
 - Copernicus 同时提供 OAI-PMH；它适合批量或补充发现，不作为单篇 DOI 的首个必需网络步骤。
+
+### PLOS
+
+`plos` 已接入当前 runtime，默认语义是 `fulltext_first`。PLOS 文章主路线使用公开 JATS XML，不需要登录态、机构授权或本地浏览器运行时。
+
+固定主路径：
+
+```text
+resolve DOI / landing URL
+-> DOI journal code 推导 journals.plos.org 路径
+-> public JATS XML -> Markdown
+-> direct HTTP PDF text-only fallback
+-> metadata-only fallback
+```
+
+实现细节：
+
+- 路由信号来自 `journals.plos.org`、`ProviderSpec.domain_suffixes=("plos.org",)`、Crossref publisher alias `Public Library of Science (PLoS)`，以及 DOI prefix `10.1371/`。
+- XML URL 使用 DOI journal code 推导 PLOS journal path，例如 `journal.pone` -> `plosone`、`journal.pbio` -> `plosbiology`、`journal.pcbi` -> `ploscompbiol`，并请求 `article/file?id={doi}&type=manuscript`。
+- XML 成功时公开 `source="plos_xml"`，source trail 为 `fulltext:plos_xml_ok`；XML 不可用或返回 HTML wrapper 时继续尝试 printable PDF，成功时公开 `source="plos_pdf"`。
+- XML renderer 复用 `paper_fetch.providers._article_markdown_jats` 的通用 JATS 层覆盖标题、作者、摘要、正文 section、图表 caption、MathML display formula、references 和 supplementary links。
+- `asset_profile=body` 默认下载正文 figure 和 graphic-only formula image；`asset_profile=all` 额外尝试下载 supplementary files。PLOS 的 `info:doi/...g001` figure 链接会解析为 `article/figure/image?size=large&id=...`，`info:doi/...e001` formula 链接会解析为 `article/file?id=...&type=thumbnail`，并跟随 PLOS 返回的签名图片重定向保存真实 PNG 后再改写 Markdown 本地路径。PDF fallback 只返回 text-only Markdown，并通过 artifact warning 与 `download:plos_assets_skipped_text_only` 标记跳过资产。
+- PLOS 没有 provider-owned HTML fallback；XML 和 PDF 都不可用时直接进入 metadata-only fallback。
 
 ### MDPI
 
@@ -208,6 +232,7 @@ domain > publisher > DOI fallback
   - `ieee`
   - `arxiv`
   - `copernicus`
+  - `plos`
   - `crossref`
 
 ## 抓取瀑布与回退语义
@@ -232,7 +257,7 @@ resolve
 
 - 系统会先尽可能拿到 Crossref metadata。
 - `elsevier` 和 `arxiv` 会参加 provider metadata probe；`arxiv` 通过项目内部 Atom API client 调用官方 arXiv API，获取 title、authors、abstract、published、categories、arXiv DOI、abs URL 和 PDF URL。
-- `springer`、`wiley`、`science`、`pnas`、`ams`、`mdpi`、`ieee`、`copernicus` 在 `probe_official_provider()` 和 `has_fulltext()` 中都只依赖 Crossref / landing-page / DOI 信号，不再调用 publisher metadata API。
+- `springer`、`wiley`、`science`、`pnas`、`ams`、`mdpi`、`ieee`、`copernicus`、`plos` 在 `probe_official_provider()` 和 `has_fulltext()` 中都只依赖 Crossref / landing-page / DOI 信号，不再调用 publisher metadata API。
 - 最终会合并 primary / secondary metadata，统一生成正文抓取需要的元数据。
 
 ### 3. provider 全文主路径
@@ -321,14 +346,20 @@ resolve
   - PDF 候选优先来自 landing meta/link，最后使用 DOI 形态推导的 `.pdf` URL；如果 PDF payload 不是可抽取文本的真实全文，继续降级 metadata-only。
   - PDF fallback 只返回 text-only Markdown。
   - 成功时公开 `source="copernicus_xml"` 或 `source="copernicus_pdf"`。
+- `plos`
+  - 固定顺序是 `public JATS XML -> direct HTTP PDF fallback -> metadata-only`。
+  - XML/PDF URL 由 DOI journal code 推导 PLOS journal path，下载都走 direct HTTP，不需要本地浏览器运行时或登录态。
+  - XML 成功必须解析为 JATS `article`，HTML wrapper、challenge、空 payload 或没有正文/摘要/参考文献的 XML 都会失败并继续 PDF fallback。
+  - PDF fallback 只返回 text-only Markdown。
+  - 成功时公开 `source="plos_xml"` 或 `source="plos_pdf"`。
 
 ### 4. abstract-only / metadata-only fallback
 
-如果命中了 `elsevier`、`springer`、`wiley`、`science`、`pnas`、`ams`、`mdpi`、`ieee`、`arxiv`、`copernicus` 之一：
+如果命中了 `elsevier`、`springer`、`wiley`、`science`、`pnas`、`ams`、`mdpi`、`ieee`、`arxiv`、`copernicus`、`plos` 之一：
 
 - 系统只会走该 provider 自己管理的 fulltext waterfall
 - provider 主链不可用或返回 `None` 后直接进入 metadata-only fallback
-- `springer` / `wiley` / `science` / `pnas` / `ams` / `ieee` 如果只能确认摘要级内容，会返回 provider 自己的 `abstract_only` 结果，而不是再绕去通用 HTML；`mdpi`、`arxiv`、`copernicus` 与 `elsevier` 保持一致，HTML/XML/PDF 都不可用时进入通用 metadata-only fallback
+- `springer` / `wiley` / `science` / `pnas` / `ams` / `ieee` 如果只能确认摘要级内容，会返回 provider 自己的 `abstract_only` 结果，而不是再绕去通用 HTML；`mdpi`、`arxiv`、`copernicus`、`plos` 与 `elsevier` 保持一致，HTML/XML/PDF 都不可用时进入通用 metadata-only fallback
 
 如果没有命中这些 official provider：
 
@@ -340,7 +371,7 @@ resolve
 如果 provider 主链已经拿到 fulltext HTML：
 
 - provider fetch result 组装层会在构造 `ArticleModel` 前自动触发 HTML -> Markdown
-- `springer`、`wiley`、`science`、`pnas`、`ams`、`mdpi`、`ieee`、`arxiv` 会优先复用各自 provider 专用的 HTML 解析器；`copernicus` 只在 XML 主路径使用专用 XML 解析器
+- `springer`、`wiley`、`science`、`pnas`、`ams`、`mdpi`、`ieee`、`arxiv` 会优先复用各自 provider 专用的 HTML 解析器；`copernicus` 和 `plos` 只在 XML 主路径使用专用 XML 解析器
 - 通用 HTML 转换只作为“已确认 fulltext HTML 但 provider 没有提供 Markdown”的兜底，不会变成任意 URL 的全文 fallback
 
 如果没有可返回的 provider `abstract_only` 结果，而 `strategy.allow_metadata_only_fallback=true`：
@@ -416,6 +447,11 @@ resolve
   - XML 成功轨迹是 `fulltext:copernicus_xml_ok`
   - XML 不可用时先保留 `fulltext:copernicus_xml_fail`，再尝试 `fulltext:copernicus_pdf_fallback_ok`
   - PDF fallback 公开为 `copernicus_pdf`，XML 主路径公开为 `copernicus_xml`
+- `plos`
+  - provider 自管 `public JATS XML -> direct HTTP PDF -> metadata fallback`
+  - XML 成功轨迹是 `fulltext:plos_xml_ok`
+  - XML 不可用时先保留 `fulltext:plos_xml_fail`，再尝试 `fulltext:plos_pdf_fallback_ok`
+  - PDF fallback 公开为 `plos_pdf`，XML 主路径公开为 `plos_xml`
 
 因此：
 
@@ -428,6 +464,7 @@ resolve
 - 对 `ieee` 来说，系统始终按内部 `landing metadata / article number -> direct REST HTML -> clean-browser HTML -> direct HTTP PDF fallback -> seeded-browser PDF fallback -> abstract/metadata fallback` waterfall 执行
 - 对 `arxiv` 来说，系统始终按内部 `arXiv ID 解析 -> arXiv official HTML -> direct HTTP PDF fallback -> metadata fallback` waterfall 执行；metadata enrichment 只在主链外补充字段
 - 对 `copernicus` 来说，系统始终按内部 `landing HTML -> NLM/JATS XML -> direct HTTP PDF fallback -> metadata fallback` waterfall 执行
+- 对 `plos` 来说，系统始终按内部 `public JATS XML -> direct HTTP PDF fallback -> metadata fallback` waterfall 执行
 
 ## 默认输出策略
 
@@ -445,7 +482,7 @@ CLI、Python API、MCP 当前统一采用这些默认值：
 
 - `null` / omitted
   - 使用 provider default
-  - `springer` / `wiley` / `science` / `pnas` / `ams` / `ieee` / `copernicus` 默认等价于 `body`
+  - `springer` / `wiley` / `science` / `pnas` / `ams` / `ieee` / `copernicus` / `plos` 默认等价于 `body`
   - 其他默认等价于 `none`
 - `none`
   - 不下载本地资产
@@ -465,7 +502,7 @@ CLI、Python API、MCP 当前统一采用这些默认值：
 #### PDF fallback 的 text-only 边界
 
 - PDF fallback 当前不下载资产。
-- 适用 provider：`elsevier`、`springer`、`ieee`、`arxiv`、`copernicus`、`wiley`、`science`、`pnas`、`ams`。
+- 适用 provider：`elsevier`、`springer`、`ieee`、`arxiv`、`copernicus`、`plos`、`wiley`、`science`、`pnas`、`ams`。
 - 即使 `asset_profile=body|all`，这些 PDF / ePDF fallback 也只返回 text-only Markdown。
 - 共享 PDF Markdown 转换会拒绝明显过短或主要由 IEEE 授权页脚组成的结果。
 - PDF 内有大量透明文本层时，会用 PyMuPDF legacy transparent-text 路径二次转换。
@@ -624,7 +661,7 @@ CLI 主输出、artifact 与命令组合的用户语义见 [`cli.md`](cli.md)；
 这些字段最适合拿来判断结果质量和来源：
 
 - `source`
-  - 粗粒度公开来源，如 `elsevier_xml`、`elsevier_pdf`、`springer_html`、`springer_pdf`、`wiley_browser`、`science`、`pnas`、`ams_html`、`ams_pdf`、`ieee_html`、`ieee_pdf`、`arxiv_html`、`arxiv_pdf`、`copernicus_xml`、`copernicus_pdf`、`crossref_meta`、`metadata_only`
+  - 粗粒度公开来源，如 `elsevier_xml`、`elsevier_pdf`、`springer_html`、`springer_pdf`、`wiley_browser`、`science`、`pnas`、`ams_html`、`ams_pdf`、`ieee_html`、`ieee_pdf`、`arxiv_html`、`arxiv_pdf`、`copernicus_xml`、`copernicus_pdf`、`plos_xml`、`plos_pdf`、`crossref_meta`、`metadata_only`
 - `has_fulltext`
   - 最终抓取瀑布后的 verdict
 - `warnings`

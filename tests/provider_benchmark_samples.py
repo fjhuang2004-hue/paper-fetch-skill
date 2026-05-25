@@ -177,6 +177,18 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         fixture_name=golden_criteria_fixture("10.1146/annurev-control-030123-013355", "original.html"),
         fixture_kind="html",
     ),
+    "plos": ProviderBenchmarkSample(
+        provider="plos",
+        doi="10.1371/journal.pone.0263725",
+        year=2022,
+        title="Social media usage to share information in communication journals",
+        landing_url="https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0263725",
+        expected_source="plos_xml",
+        accepted_live_source_trail_groups=(("fulltext:plos_xml_ok",),),
+        required_env=("CROSSREF_MAILTO",),
+        fixture_name=golden_criteria_fixture("10.1371/journal.pone.0263725", "original.xml"),
+        fixture_kind="xml",
+    ),
 }
 
 

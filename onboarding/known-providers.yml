@@ -51,3 +51,7 @@ providers:
     display_source: annualreviews_html
     status: implemented
     manifest_path: onboarding/manifests/annualreviews.yml
+  - name: plos
+    display_source: plos_xml
+    status: implemented
+    manifest_path: onboarding/manifests/plos.yml

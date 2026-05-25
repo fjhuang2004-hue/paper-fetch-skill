@@ -900,6 +900,7 @@ def test_validate_manifest_runs_pre_and_targeted_autofix(
 
 
 def test_run_checks_emits_structured_failure_for_missing_access_review(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
     result = subprocess.run(
         [
             sys.executable,
@@ -910,7 +911,7 @@ def test_run_checks_emits_structured_failure_for_missing_access_review(tmp_path:
             "--task",
             "operator-access-preflight",
             "--state",
-            str(tmp_path / "state.json"),
+            str(state_path),
         ],
         check=False,
         cwd=REPO_ROOT,
@@ -922,6 +923,45 @@ def test_run_checks_emits_structured_failure_for_missing_access_review(tmp_path:
     payload = json.loads(result.stderr)
     assert payload["code"] == "ACCESS_REVIEW_NOT_FOUND"
     assert payload["retryable"] is False
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    failure = state["providers"]["newpub"]["runs"]["operator-access-preflight"]["failure"]
+    assert failure["code"] == "ACCESS_REVIEW_NOT_FOUND"
+    assert failure["structured_error"]["code"] == "ACCESS_REVIEW_NOT_FOUND"
+
+
+def test_run_access_preflight_failure_is_diagnosable(tmp_path: Path) -> None:
+    state_path = tmp_path / "state.json"
+    output_dir = tmp_path / "run"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "run",
+            "--provider",
+            "newpub",
+            "--domain",
+            "example.org",
+            "--until",
+            "operator-access-preflight",
+            "--state",
+            str(state_path),
+            "--output-dir",
+            str(output_dir),
+        ],
+        check=False,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+    diagnosis_result = run_cli("diagnose", "--provider", "newpub", "--state", str(state_path))
+    diagnosis = json.loads(diagnosis_result.stdout)["providers"][0]
+
+    assert result.returncode != 0
+    assert json.loads(result.stderr)["code"] == "ACCESS_REVIEW_NOT_FOUND"
+    assert diagnosis["failure"]["task"] == "operator-access-preflight"
+    assert diagnosis["failure"]["code"] == "ACCESS_REVIEW_NOT_FOUND"
+    assert diagnosis["operator_required"] is True
 
 
 def test_check_cleaning_proposal_detects_stale_digest(tmp_path: Path) -> None:
@@ -1272,6 +1312,13 @@ def test_summarize_outputs_json_and_markdown_without_fabricated_passes(tmp_path:
     assert payload["status"] == "blocked"
     assert payload["access_review"]["status"] == "approved"
     assert payload["fixture_coverage"]
+    assert "confidence" in payload["fixture_coverage"][0]
+    assert "observed_signals" in payload["fixture_coverage"][0]
+    assert "evidence_url" in payload["fixture_coverage"][0]
+    assert "raw_path" in payload["fixture_coverage"][0]
+    assert "extracted_markdown_path" in payload["fixture_coverage"][0]
+    assert "markdown_quality_status" in payload["fixture_coverage"][0]
+    assert "proof_status" in payload["fixture_coverage"][0]
     assert payload["markdown_quality_repairs"][0]["issue_ids"] == ["broken-table"]
     assert diagnosis["recent_markdown_quality_repair"]["status"] == "failed"
     assert payload["run_checks"][0]["result"] == "failed"

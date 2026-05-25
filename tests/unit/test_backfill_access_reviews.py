@@ -193,3 +193,65 @@ def test_backfill_write_skips_existing_review_unless_forced(tmp_path: Path) -> N
     assert draft["provider"] == "wiley"
     assert draft["status"] == "blocked"
     assert draft["may_continue"] is False
+
+
+def test_backfill_write_can_seed_new_provider_draft(tmp_path: Path) -> None:
+    _write_minimal_onboarding_root(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--provider",
+            "plos",
+            "--domain",
+            "journals.plos.org",
+            "--doi-prefix",
+            "10.1371",
+            "--write",
+            "--repo-root",
+            str(tmp_path),
+        ],
+        check=True,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+
+    payload = json.loads(result.stdout)
+    results = {item["provider"]: item for item in payload["results"]}
+    written = tmp_path / "onboarding" / "access-reviews" / "plos.yml"
+    draft = yaml.safe_load(written.read_text(encoding="utf-8"))
+
+    assert results["plos"]["action"] == "written"
+    assert draft["provider"] == "plos"
+    assert draft["status"] == "blocked"
+    assert draft["may_continue"] is False
+    assert draft["legal_access"]["mode"] == "blocked"
+    assert draft["allowed_runtimes"] == ["http"]
+    assert any("not listed" in item for item in draft["legal_access"]["evidence"])
+    assert any("journals.plos.org" in item for item in draft["legal_access"]["evidence"])
+    assert any("10.1371/" in item for item in draft["legal_access"]["evidence"])
+
+
+def test_backfill_new_provider_requires_domain(tmp_path: Path) -> None:
+    _write_minimal_onboarding_root(tmp_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--provider",
+            "plos",
+            "--dry-run",
+            "--repo-root",
+            str(tmp_path),
+        ],
+        check=False,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode != 0
+    assert "provide --domain" in result.stderr

@@ -412,6 +412,134 @@ extra_fixtures:
     assert not (tmp_path / "tests").exists()
 
 
+def test_capture_fixture_manifest_dry_run_infers_xml_from_jats_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_script_module("capture_fixture")
+    manifest_path = tmp_path / "plos.yml"
+    manifest_path.write_text(
+        """
+name: plos
+routing:
+  primary: doi_prefix
+  doi_prefixes:
+    - "10.1371/"
+probe:
+  requires_browser_runtime: false
+fixtures:
+  doi_samples:
+    structure:
+      doi: "10.1371/journal.pone.0263725"
+      evidence_url: "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0263725&type=manuscript"
+      evidence_reason: "JATS XML sample."
+      observed_signals:
+        - jats_xml
+        - xml_body_sections
+      confidence: high
+""",
+        encoding="utf-8",
+    )
+
+    class FailingTransport:
+        def request(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+            raise AssertionError("dry-run must not fetch")
+
+    monkeypatch.setattr(module, "HttpTransport", FailingTransport)
+
+    summary = module.capture_fixture(
+        _args(
+            tmp_path,
+            doi=None,
+            provider=None,
+            purpose="structure",
+            from_manifest=str(manifest_path),
+            dry_run=True,
+            auto_via=True,
+        )
+    )
+
+    assert summary["content_type"] == "application/xml"
+    assert summary["route_kind"] == "xml"
+    assert summary["fixture_path"] == (
+        "tests/fixtures/golden_criteria/10.1371_journal.pone.0263725/original.xml"
+    )
+
+
+def test_capture_fixture_reuses_existing_xml_manifest_asset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_script_module("capture_fixture")
+    manifest_path = tmp_path / "plos.yml"
+    doi = "10.1371/journal.pone.0263725"
+    slug = "10.1371_journal.pone.0263725"
+    fixture_path = tmp_path / "tests" / "fixtures" / "golden_criteria" / slug / "original.xml"
+    fixture_path.parent.mkdir(parents=True)
+    fixture_path.write_text("<article />", encoding="utf-8")
+    manifest_path.write_text(
+        f"""
+name: plos
+routing:
+  primary: doi_prefix
+  doi_prefixes:
+    - "10.1371/"
+probe:
+  requires_browser_runtime: false
+fixtures:
+  doi_samples:
+    structure:
+      doi: "{doi}"
+      evidence_url: "https://journals.plos.org/plosone/article/file?id={doi}&type=manuscript"
+      evidence_reason: "JATS XML sample."
+      observed_signals:
+        - jats_xml
+      confidence: high
+""",
+        encoding="utf-8",
+    )
+    fixture_manifest_path = tmp_path / "tests" / "fixtures" / "golden_criteria" / "manifest.json"
+    fixture_manifest_path.write_text(
+        json.dumps(
+            {
+                "samples": {
+                    slug: {
+                        "doi": doi,
+                        "publisher": "plos",
+                        "content_type": "text/xml",
+                        "route_kind": "xml",
+                        "assets": {
+                            "original.xml": fixture_path.relative_to(tmp_path).as_posix()
+                        },
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FailingTransport:
+        def request(self, *_args: object, **_kwargs: object) -> dict[str, object]:
+            raise AssertionError("existing XML fixture should be reused")
+
+    monkeypatch.setattr(module, "HttpTransport", FailingTransport)
+
+    summary = module.capture_fixture(
+        _args(
+            tmp_path,
+            doi=None,
+            provider=None,
+            purpose="structure",
+            from_manifest=str(manifest_path),
+        )
+    )
+
+    assert summary["reused"] is True
+    assert summary["content_type"] == "text/xml"
+    assert summary["route_kind"] == "xml"
+    assert summary["fixture_path"] == fixture_path.relative_to(tmp_path).as_posix()
+
+
 def test_capture_fixture_retries_403_with_browser_placeholder(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

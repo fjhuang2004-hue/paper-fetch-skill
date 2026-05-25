@@ -38,6 +38,7 @@ from paper_fetch.markdown_quality import (  # noqa: E402
 )
 from paper_fetch.metadata.crossref import CrossrefLookupClient  # noqa: E402
 from paper_fetch.publisher_identity import normalize_doi  # noqa: E402
+from paper_fetch.utils import normalize_text  # noqa: E402
 
 
 PROVIDER_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
@@ -3965,6 +3966,31 @@ def _record_run(
     runs[task] = entry
 
 
+def _failure_from_tool_error(
+    exc: ToolError,
+    *,
+    commands: list[list[str]],
+) -> dict[str, Any]:
+    structured = error_payload(
+        exc.code,
+        exc.message,
+        provider=exc.provider,
+        manifest=exc.manifest,
+        task_id=exc.task_id,
+        retryable=exc.retryable,
+        details=exc.details,
+        extras=exc.extras,
+    )
+    return {
+        "code": exc.code,
+        "command": commands[0] if commands else [],
+        "returncode": 1,
+        "stdout_tail": "",
+        "stderr_tail": json.dumps(structured, ensure_ascii=False, sort_keys=True),
+        "structured_error": structured,
+    }
+
+
 def _mark_step_failed(
     state: dict[str, Any],
     provider_state: dict[str, Any],
@@ -4537,9 +4563,20 @@ def _execute_local_task(
     state_path: Path | None = None,
     output_dir: Path | None = None,
 ) -> None:
-    if task in {ACCESS_PREFLIGHT_STEP, DISCOVER_STEP}:
-        validate_access_review(provider)
     manifest_path = str(provider_state.get("manifest") or default_manifest_path(provider))
+    commands = _run_task_commands(provider, task, manifest=manifest_path)
+    if task in {ACCESS_PREFLIGHT_STEP, DISCOVER_STEP}:
+        try:
+            validate_access_review(provider)
+        except ToolError as exc:
+            _record_run(
+                provider_state,
+                task=task,
+                commands=commands,
+                result="failed",
+                failure=_failure_from_tool_error(exc, commands=commands),
+            )
+            raise
     validate_autofix: dict[str, Any] | None = None
     if task == "validate-manifest":
         validate_autofix = _autofix_manifest_for_runner(
@@ -4548,7 +4585,6 @@ def _execute_local_task(
             output_dir=output_dir,
             targeted=False,
         )
-    commands = _run_task_commands(provider, task, manifest=manifest_path)
     for command in commands:
         targeted_autofix: dict[str, Any] | None = None
         completed = _run_env_command(command)
@@ -5189,9 +5225,20 @@ def run_run_checks(args: argparse.Namespace) -> int:
     completed_tasks: list[str] = []
 
     for task in tasks:
-        if task == ACCESS_PREFLIGHT_STEP:
-            validate_access_review(provider)
         commands = _verify_commands(provider, task, include_live=not args.all_local)
+        if task in {ACCESS_PREFLIGHT_STEP, DISCOVER_STEP}:
+            try:
+                validate_access_review(provider)
+            except ToolError as exc:
+                _record_run(
+                    provider_state,
+                    task=task,
+                    commands=commands,
+                    result="failed",
+                    failure=_failure_from_tool_error(exc, commands=commands),
+                )
+                _write_json(state_path, state)
+                raise
         for command in commands:
             completed = _run_env_command(command)
             if _command_failed(command, completed):
@@ -5695,6 +5742,85 @@ def _fixture_path_for_doi(doi: str) -> str | None:
     return _fixture_root_for_sample(sample_id, sample).relative_to(_repo_root()).as_posix()
 
 
+def _fixture_asset_paths_for_doi(doi: str) -> dict[str, Any]:
+    try:
+        golden_manifest = _load_golden_manifest()
+    except ToolError:
+        return {}
+    sample_entry = _golden_sample_for_doi(doi, golden_manifest)
+    if sample_entry is None:
+        return {}
+    _sample_id, sample = sample_entry
+    assets = sample.get("assets") if isinstance(sample.get("assets"), dict) else {}
+    raw_path = None
+    for name in ("original.xml", "original.pdf", "original.html", "raw.html", "article.html"):
+        value = assets.get(name)
+        if isinstance(value, str) and value:
+            raw_path = value
+            break
+    quality_path_value = assets.get("markdown-quality.json")
+    quality_status = None
+    if isinstance(quality_path_value, str) and quality_path_value:
+        quality_path = _repo_root() / quality_path_value
+        if quality_path.is_file():
+            try:
+                quality = json.loads(quality_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                quality_status = "invalid"
+            else:
+                quality_status = quality.get("status") if isinstance(quality, dict) else "invalid"
+        else:
+            quality_status = "missing"
+    return {
+        "raw_path": raw_path,
+        "extracted_markdown_path": assets.get("extracted.md"),
+        "markdown_quality_path": quality_path_value,
+        "markdown_quality_status": quality_status,
+        "expected_json_path": assets.get("expected.json"),
+        "expected_outcome": sample.get("expected_outcome"),
+        "route_kind": sample.get("route_kind"),
+        "content_type": sample.get("content_type"),
+    }
+
+
+def _discovery_proof_summary(
+    manifest_fixtures: dict[str, Any],
+    purpose: str,
+    doi: str | None,
+) -> dict[str, Any] | None:
+    proof_map = (
+        manifest_fixtures.get("discovery_proof")
+        if isinstance(manifest_fixtures.get("discovery_proof"), dict)
+        else {}
+    )
+    proof = proof_map.get(purpose)
+    if not isinstance(proof, dict):
+        return None
+    queries = proof.get("queries") if isinstance(proof.get("queries"), list) else []
+    candidates = proof.get("candidates") if isinstance(proof.get("candidates"), list) else []
+    rejections = proof.get("rejections") if isinstance(proof.get("rejections"), dict) else {}
+    selected_doi = proof.get("selected_doi")
+    evidence_summary = normalize_text(str(proof.get("evidence_summary") or ""))
+    exhausted = proof.get("exhausted")
+    complete = (
+        bool(evidence_summary)
+        and len(queries) >= 3
+        and len(candidates) >= 3
+        and (selected_doi == doi if doi else exhausted is True)
+        and (not doi or selected_doi in candidates)
+        and bool(rejections)
+    )
+    return {
+        "status": "complete" if complete else "needs_review",
+        "queries_count": len(queries),
+        "candidates": candidates,
+        "selected_doi": selected_doi,
+        "rejection_count": len(rejections),
+        "exhausted": exhausted,
+        "evidence_summary": evidence_summary or None,
+    }
+
+
 def _manifest_fixture_summary(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     fixtures: list[dict[str, Any]] = []
     manifest_fixtures = manifest.get("fixtures") if isinstance(manifest.get("fixtures"), dict) else {}
@@ -5707,21 +5833,38 @@ def _manifest_fixture_summary(manifest: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(sample, dict):
             continue
         doi = sample.get("doi")
+        asset_paths = _fixture_asset_paths_for_doi(str(doi)) if doi else {}
+        proof_summary = _discovery_proof_summary(
+            manifest_fixtures,
+            str(purpose),
+            str(doi) if doi else None,
+        )
         item = {
             "purpose": purpose,
             "doi": doi,
+            "confidence": sample.get("confidence"),
+            "observed_signals": sample.get("observed_signals") or [],
+            "evidence_url": sample.get("evidence_url"),
+            "evidence_reason": sample.get("evidence_reason"),
             "fixture_path": _fixture_path_for_doi(str(doi)) if doi else None,
-            "expected_outcome": None,
+            "raw_path": asset_paths.get("raw_path"),
+            "extracted_markdown_path": asset_paths.get("extracted_markdown_path"),
+            "markdown_quality_path": asset_paths.get("markdown_quality_path"),
+            "markdown_quality_status": asset_paths.get("markdown_quality_status"),
+            "expected_json_path": asset_paths.get("expected_json_path"),
+            "expected_outcome": asset_paths.get("expected_outcome"),
+            "route_kind": asset_paths.get("route_kind"),
+            "content_type": asset_paths.get("content_type"),
+            "proof_status": (
+                proof_summary["status"]
+                if proof_summary is not None
+                else "fixture_captured"
+                if doi and asset_paths.get("raw_path")
+                else "human_review_required"
+            ),
+            "discovery_proof": proof_summary,
             "null_reason": None if doi else sample.get("evidence_reason"),
         }
-        if doi:
-            try:
-                golden_manifest = _load_golden_manifest()
-                sample_entry = _golden_sample_for_doi(str(doi), golden_manifest)
-            except ToolError:
-                sample_entry = None
-            if sample_entry is not None:
-                item["expected_outcome"] = sample_entry[1].get("expected_outcome")
         fixtures.append(item)
     extra_fixtures = manifest.get("extra_fixtures")
     if isinstance(extra_fixtures, list):
@@ -5729,12 +5872,30 @@ def _manifest_fixture_summary(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(sample, dict):
                 continue
             doi = sample.get("doi")
+            asset_paths = _fixture_asset_paths_for_doi(str(doi)) if doi else {}
             fixtures.append(
                 {
                     "purpose": sample.get("purpose") or f"extra_fixtures[{index}]",
                     "doi": doi,
+                    "confidence": sample.get("confidence"),
+                    "observed_signals": sample.get("observed_signals") or [],
+                    "evidence_url": sample.get("evidence_url"),
+                    "evidence_reason": sample.get("evidence_reason"),
                     "fixture_path": _fixture_path_for_doi(str(doi)) if doi else None,
-                    "expected_outcome": sample.get("expected_outcome"),
+                    "raw_path": asset_paths.get("raw_path"),
+                    "extracted_markdown_path": asset_paths.get("extracted_markdown_path"),
+                    "markdown_quality_path": asset_paths.get("markdown_quality_path"),
+                    "markdown_quality_status": asset_paths.get("markdown_quality_status"),
+                    "expected_json_path": asset_paths.get("expected_json_path"),
+                    "expected_outcome": asset_paths.get("expected_outcome"),
+                    "route_kind": asset_paths.get("route_kind"),
+                    "content_type": asset_paths.get("content_type"),
+                    "proof_status": (
+                        "extra_fixture_captured"
+                        if doi and asset_paths.get("raw_path")
+                        else "human_review_required"
+                    ),
+                    "discovery_proof": None,
                     "null_reason": None if doi else sample.get("evidence_reason"),
                 }
             )

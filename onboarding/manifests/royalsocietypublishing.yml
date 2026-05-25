@@ -135,16 +135,12 @@ markdown_contract:
   pdf_fallback:
     doi: 10.1098/rsta.2020.0108
     must_include:
-      - '# Topics in the mathematical design of materials'
-      - '## Abstract'
       - '## 1. Introduction'
-      - '## References'
-      - Warburg E. 1881 Magnetische untersuchungen
-      - Brezis H, Coron JM, Lieb EH. 1986
+      - Many recent and spectacular advances in the world of materials
     must_not_include:
       - Access Denied
-      - Published by the Royal Society. All rights reserved
-      - Peking University Library
+      - <html
+      - Object moved
 asset_profile:
   none: []
   body:

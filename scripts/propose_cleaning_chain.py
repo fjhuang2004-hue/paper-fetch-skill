@@ -411,6 +411,60 @@ def _build_arxiv_article_from_fixture(fixture: _ProviderFixtureReplay) -> Any:
     return client.to_article_model(metadata, raw_payload)
 
 
+def _build_plos_article_from_fixture(fixture: _ProviderFixtureReplay) -> Any:
+    from paper_fetch.models import article_from_markdown
+    from paper_fetch.providers._article_markdown_jats import parse_jats_xml
+    from paper_fetch.providers._pdf_common import pdf_fetch_result_from_bytes
+    from paper_fetch.reason_codes import PDF_FALLBACK
+    from paper_fetch.tracing import fulltext_marker, trace_from_markers
+
+    metadata = _load_fixture_provider_metadata(fixture)
+    body = fixture.raw_path.read_bytes()
+    if fixture.route_kind == PDF_FALLBACK or fixture.raw_path.suffix == ".pdf":
+        pdf_result = pdf_fetch_result_from_bytes(
+            artifact_dir=None,
+            source_url=fixture.source_url,
+            final_url=fixture.source_url,
+            pdf_bytes=body,
+        )
+        return article_from_markdown(
+            source="plos_pdf",
+            metadata=metadata,
+            doi=normalize_doi(str(metadata.get("doi") or fixture.doi)) or None,
+            markdown_text=pdf_result.markdown_text,
+            warnings=[
+                "Full text was extracted from PLOS PDF fallback fixture after XML was not used."
+            ],
+            trace=trace_from_markers(
+                [
+                    fulltext_marker("plos", "fail", route="xml"),
+                    fulltext_marker("plos", "ok", route=PDF_FALLBACK),
+                ]
+            ),
+        )
+
+    extraction = parse_jats_xml(
+        body,
+        source_url=fixture.source_url,
+        base_metadata=metadata,
+    )
+    if extraction is None:
+        raise BaselineRenderError(f"PLOS fixture {fixture.sample_id} did not parse as JATS XML")
+    article_metadata = dict(extraction.metadata)
+    if extraction.references:
+        article_metadata["references"] = list(extraction.references)
+    return article_from_markdown(
+        source="plos_xml",
+        metadata=article_metadata,
+        doi=normalize_doi(str(article_metadata.get("doi") or fixture.doi)) or None,
+        markdown_text=extraction.markdown_text,
+        abstract_sections=extraction.abstract_sections,
+        assets=extraction.assets,
+        trace=trace_from_markers([fulltext_marker("plos", "ok", route="xml")]),
+        semantic_losses=extraction.semantic_losses,
+    )
+
+
 def _build_ieee_article_from_fixture(
     fixture: _ProviderFixtureReplay,
     *,
@@ -532,6 +586,12 @@ def _render_markdown_baseline(
         ):
             article, source = _build_ieee_article_from_fixture(fixture, purpose=purpose)
             return article.to_ai_markdown(asset_profile="body", max_tokens="full_text"), source
+        if fixture.provider == "plos" and fixture.raw_path.suffix in {".xml", ".pdf"}:
+            article = _build_plos_article_from_fixture(fixture)
+            return (
+                article.to_ai_markdown(asset_profile="body", max_tokens="full_text"),
+                "paper_fetch.providers._article_markdown_jats:plos_manifest_fixture",
+            )
         if fixture.provider == "arxiv":
             article = _build_arxiv_article_from_fixture(fixture)
         else:
