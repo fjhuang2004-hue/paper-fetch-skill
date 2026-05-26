@@ -6,11 +6,27 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
-- Add Oxford Academic discovery manifest for public HTTP article HTML and validated article-pdf fallback.
-- Fix Oxford Academic HTML extraction to keep Silverchair formula paragraphs intact and render references from visible reference-list text instead of raw `citation_reference` meta keys.
-- Add PLOS public JATS XML provider manifest and fixture evidence for XML, PDF fallback, tables, formulas, figures, supplementary materials, and references.
-- Follow PLOS signed figure-image redirects during asset downloads and refresh the PLOS figure golden replay with local `body_assets` Markdown rewrites.
+## 1.8.0 - 2026-05-26
+
+### Added
+
+- Add PLOS (`plos`) provider routing for `10.1371/` DOI and `journals.plos.org`, using public JATS XML first, direct HTTP PDF fallback, provider-managed metadata fallback, and `plos_xml` / `plos_pdf` sources.
+- Add Oxford Academic (`oxfordacademic`) provider onboarding for public HTTP article HTML, validated article-PDF fallback, `oxfordacademic_html` / `oxfordacademic_pdf` sources, provider manifest, access review, cleaning proposal, and benchmark samples.
+- Add PLOS and Oxford Academic golden corpus coverage with real replay fixtures, expected Markdown summaries, markdown-quality reports, and representative fixtures.
+
+### Changed
+
+- Extend onboarding automation, fixture capture, manifest sync-back, and cleaning-chain proposal tooling for the PLOS and Oxford Academic provider workflows.
+- Refresh provider documentation, extraction-rule evidence, onboarding runbooks, and known-provider manifests for the new providers.
+- Update Royal Society Publishing PDF fallback expected payloads and markdown-quality fixtures after shared PDF rendering cleanup.
+
+### Fixed
+
+- Follow PLOS signed figure-image redirects during asset downloads and rewrite refreshed PLOS figure golden replay Markdown to local `body_assets`.
 - Render PLOS graphic-only JATS formulas as inline formula image assets instead of `Formula unavailable` placeholders.
+- Preserve Oxford Academic Silverchair formula paragraphs and render references from visible reference-list text instead of raw `citation_reference` meta keys.
+- Keep Oxford Academic golden corpus count guards in sync with the new provider fixtures and representative sample.
+
 ## 1.7.0 - 2026-05-24
 
 ### Added

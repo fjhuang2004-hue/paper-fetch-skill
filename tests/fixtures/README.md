@@ -18,7 +18,7 @@ Origin kinds:
 Primary offline baselines:
 
 - `tests/fixtures/golden_criteria/`
-  The canonical positive corpus: rule-test assets, 59-sample golden corpus replays, rule scenarios, and documentation-linked HTML/XML/Markdown samples. The golden corpus includes IEEE real dynamic HTML replays; synthetic IEEE PDF fallback fixtures remain scoped to provider mechanism tests.
+  The canonical positive corpus: rule-test assets, 124-sample golden corpus replays, rule scenarios, and documentation-linked HTML/XML/Markdown samples. The golden corpus includes IEEE real dynamic HTML replays; synthetic IEEE PDF fallback fixtures remain scoped to provider mechanism tests.
 - `tests/fixtures/block/`
   The canonical negative corpus: 16 real paywall / abstract-only captures used by availability and fallback tests.
 - `tests/fixtures/golden_criteria/_scenarios/`
