@@ -13,9 +13,17 @@ from ...models import normalize_markdown_text
 from ...utils import normalize_text
 from .asset_fields import DEFAULT_ASSET_URL_FIELDS
 
-FIGURE_BASENAME_PATTERN = re.compile(r"(?:^|[^a-z])fig(?:ure)?[_-]?0*([A-Za-z]?\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE)
-SHORT_FIGURE_BASENAME_PATTERN = re.compile(r"(?:^|[^a-z])f[_-]?0*([A-Za-z]?\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE)
-MARKDOWN_FIGURE_BLOCK_PATTERN = re.compile(r"^\*\*(Figure\s+\d+[A-Za-z]?\.?)\*\*(?:[\s\S]*)$", flags=re.IGNORECASE)
+FIGURE_BASENAME_PATTERN = re.compile(
+    r"(?:^|[^a-z])fig(?:ure)?[_-]?0*([A-Za-z]?\d+[A-Za-z]?)(?=$|[^a-z0-9])",
+    flags=re.IGNORECASE,
+)
+SHORT_FIGURE_BASENAME_PATTERN = re.compile(
+    r"(?:^|[^a-z])f[_-]?0*([A-Za-z]?\d+[A-Za-z]?)(?=$|[^a-z0-9])", flags=re.IGNORECASE
+)
+MARKDOWN_FIGURE_BLOCK_PATTERN = re.compile(
+    r"^\*\*\s*((?:Fig(?:ure)?\.?)\s+\d+[A-Za-z]?\.?)(?:\s*\*\*|[\s\S]*\*\*$)",
+    flags=re.IGNORECASE,
+)
 MARKDOWN_IMAGE_BLOCK_PATTERN = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)$")
 MARKDOWN_HEADING_PATTERN = re.compile(r"^#{1,6}\s+(.+?)\s*$")
 BODY_FIGURE_REFERENCE_PATTERN = re.compile(
@@ -99,10 +107,14 @@ def canonical_figure_label_from_asset(asset: Mapping[str, Any]) -> str | None:
         if not raw_value:
             continue
         parsed_path = urllib.parse.urlparse(raw_value).path or raw_value
-        basename = normalize_text(os.path.basename(urllib.parse.unquote(parsed_path))).lower()
+        basename = normalize_text(
+            os.path.basename(urllib.parse.unquote(parsed_path))
+        ).lower()
         if not basename:
             continue
-        match = FIGURE_BASENAME_PATTERN.search(basename) or SHORT_FIGURE_BASENAME_PATTERN.search(basename)
+        match = FIGURE_BASENAME_PATTERN.search(
+            basename
+        ) or SHORT_FIGURE_BASENAME_PATTERN.search(basename)
         if match:
             return f"figure {match.group(1).lower()}"
 
@@ -113,7 +125,9 @@ def canonical_figure_label_from_asset(asset: Mapping[str, Any]) -> str | None:
     return None
 
 
-def inline_figure_markdown_entries(figure_assets: list[Mapping[str, Any]] | None) -> list[dict[str, str]]:
+def inline_figure_markdown_entries(
+    figure_assets: list[Mapping[str, Any]] | None,
+) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for asset in figure_assets or []:
         kind = normalize_text(str(asset.get("kind") or "")).lower()
@@ -140,7 +154,8 @@ def inline_figure_markdown_entries(figure_assets: list[Mapping[str, Any]] | None
         entries.append(
             {
                 "url": url,
-                "heading": normalize_text(str(asset.get("heading") or "Figure")) or "Figure",
+                "heading": normalize_text(str(asset.get("heading") or "Figure"))
+                or "Figure",
                 "caption": normalize_text(str(asset.get("caption") or "")),
                 "label_key": canonical_figure_label_from_asset(asset) or "",
                 "aliases": "\n".join(aliases),
@@ -150,7 +165,9 @@ def inline_figure_markdown_entries(figure_assets: list[Mapping[str, Any]] | None
 
 
 def _base_panel_label_key(label_key: str) -> str | None:
-    match = re.fullmatch(r"figure\s+([A-Za-z]?\d+)[A-Za-z]", normalize_text(label_key).lower())
+    match = re.fullmatch(
+        r"figure\s+([A-Za-z]?\d+)[A-Za-z]", normalize_text(label_key).lower()
+    )
     if match is None:
         return None
     return f"figure {match.group(1).lower()}"
@@ -180,7 +197,9 @@ def _body_heading_allows_figure_reference_injection(heading_key: str | None) -> 
     return not NON_BODY_FIGURE_REFERENCE_HEADING_PATTERN.search(heading_key)
 
 
-def _inline_fallback_caption_block(entry: Mapping[str, str], original_markdown_text: str) -> str:
+def _inline_fallback_caption_block(
+    entry: Mapping[str, str], original_markdown_text: str
+) -> str:
     caption = normalize_text(entry.get("caption") or "")
     if not caption or caption in normalize_text(original_markdown_text):
         return ""
@@ -192,7 +211,9 @@ def _inline_fallback_caption_block(entry: Mapping[str, str], original_markdown_t
     caption_body = caption
     if caption_body.lower().startswith(heading.lower()):
         caption_body = caption_body[len(heading) :].lstrip(" .:")
-    return f"**{heading}.** {caption_body}".strip() if caption_body else f"**{heading}.**"
+    return (
+        f"**{heading}.** {caption_body}".strip() if caption_body else f"**{heading}.**"
+    )
 
 
 def inject_inline_figure_links(
@@ -206,7 +227,11 @@ def inject_inline_figure_links(
         return markdown_text
     has_labeled_entries = any(entry.get("label_key") for entry in entries)
 
-    blocks = [normalize_markdown_text(block) for block in re.split(r"\n\s*\n", markdown_text) if normalize_text(block)]
+    blocks = [
+        normalize_markdown_text(block)
+        for block in re.split(r"\n\s*\n", markdown_text)
+        if normalize_text(block)
+    ]
     if not blocks:
         return markdown_text
 
@@ -222,7 +247,9 @@ def inject_inline_figure_links(
         for candidate in normalize_text(entry.get("aliases") or "").split("\n"):
             normalized_candidate = normalize_text(candidate)
             if normalized_candidate:
-                indexed_entries_by_url.setdefault(normalized_candidate, []).append(index)
+                indexed_entries_by_url.setdefault(normalized_candidate, []).append(
+                    index
+                )
 
     def take_entry(index: int) -> dict[str, str] | None:
         nonlocal figure_index
@@ -250,19 +277,24 @@ def inject_inline_figure_links(
                 return entry
         return None
 
-    def take_entry_for_image(alt_text: str | None, url: str | None) -> dict[str, str] | None:
+    def take_entry_for_image(
+        alt_text: str | None, url: str | None
+    ) -> dict[str, str] | None:
         normalized_url = normalize_text(url)
         if normalized_url:
             for index in indexed_entries_by_url.get(normalized_url, []):
                 entry = take_entry(index)
                 if entry is not None:
                     return entry
-        return take_entry_for_label(canonical_figure_label(normalize_text(alt_text or "")))
+        return take_entry_for_label(
+            canonical_figure_label(normalize_text(alt_text or ""))
+        )
 
     caption_label_keys = {
         label_key
         for block in blocks
-        if (match := MARKDOWN_FIGURE_BLOCK_PATTERN.match(normalize_text(block))) is not None
+        if (match := MARKDOWN_FIGURE_BLOCK_PATTERN.match(normalize_text(block)))
+        is not None
         if (label_key := canonical_figure_label(match.group(1).rstrip("."))) is not None
     }
     active_heading_key: str | None = None
@@ -273,10 +305,9 @@ def inject_inline_figure_links(
         current_heading_key = _heading_key(block)
         if current_heading_key is not None:
             active_heading_key = current_heading_key
-            active_heading_allows_injection = (
-                not normalized_block.startswith("# ")
-                and _body_heading_allows_figure_reference_injection(active_heading_key)
-            )
+            active_heading_allows_injection = not normalized_block.startswith(
+                "# "
+            ) and _body_heading_allows_figure_reference_injection(active_heading_key)
             injected.append(block)
             continue
         image_match = MARKDOWN_IMAGE_BLOCK_PATTERN.match(normalized_block)
@@ -288,7 +319,11 @@ def inject_inline_figure_links(
                 continue
             entry = take_entry_for_image(alt_text, current_url)
             if entry is not None:
-                heading = alt_text or normalize_text(entry.get("heading") or "Figure") or "Figure"
+                heading = (
+                    alt_text
+                    or normalize_text(entry.get("heading") or "Figure")
+                    or "Figure"
+                )
                 injected.append(render_markdown_image("figure", heading, entry["url"]))
             else:
                 injected.append(block)

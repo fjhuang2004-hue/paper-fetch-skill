@@ -3182,6 +3182,50 @@
         "browser_final_url_redacted": false,
         "capture_source_url": "https://doi.org/10.1088/1748-9326/aa9f73"
       }
+    },
+    "10.1063_5.0129134": {
+      "doi": "10.1063/5.0129134",
+      "publisher": "aip",
+      "source_url": "https://pubs.aip.org/aip/adv/article/12/12/125205/2820011/On-chip-on-demand-delivery-of-K-for-in-vitro",
+      "fetched_at": "2026-05-27T10:22:34Z",
+      "purpose": "figure",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/html; charset=utf-8",
+      "route_kind": "html",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.html": "tests/fixtures/golden_criteria/10.1063_5.0129134/original.html",
+        "expected.json": "tests/fixtures/golden_criteria/10.1063_5.0129134/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1063_5.0129134/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1063_5.0129134/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1063_5.0129134/markdown-quality.json",
+        "body_assets/m_125205_1_f1.jpeg": "tests/fixtures/golden_criteria/10.1063_5.0129134/body_assets/m_125205_1_f1.jpeg",
+        "body_assets/m_125205_1_f2.jpeg": "tests/fixtures/golden_criteria/10.1063_5.0129134/body_assets/m_125205_1_f2.jpeg",
+        "body_assets/m_125205_1_f3.jpeg": "tests/fixtures/golden_criteria/10.1063_5.0129134/body_assets/m_125205_1_f3.jpeg",
+        "body_assets/m_125205_1_f4.jpeg": "tests/fixtures/golden_criteria/10.1063_5.0129134/body_assets/m_125205_1_f4.jpeg"
+      }
+    },
+    "10.1063_5.0188905": {
+      "doi": "10.1063/5.0188905",
+      "publisher": "aip",
+      "source_url": "https://pubs.aip.org/aip/jap/article/135/8/085105/3266915/Machine-learned-atomic-cluster-expansion",
+      "fetched_at": "2026-05-27T10:22:38Z",
+      "purpose": "formula",
+      "expected_outcome": "fulltext",
+      "fixture_family": "golden",
+      "content_type": "text/html; charset=utf-8",
+      "route_kind": "html",
+      "origin_kind": "real_replay",
+      "usage_kind": "content",
+      "assets": {
+        "original.html": "tests/fixtures/golden_criteria/10.1063_5.0188905/original.html",
+        "expected.json": "tests/fixtures/golden_criteria/10.1063_5.0188905/expected.json",
+        "extracted.md": "tests/fixtures/golden_criteria/10.1063_5.0188905/extracted.md",
+        "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1063_5.0188905/markdown-quality-prompt.md",
+        "markdown-quality.json": "tests/fixtures/golden_criteria/10.1063_5.0188905/markdown-quality.json"
+      }
     }
   },
   "tests": [

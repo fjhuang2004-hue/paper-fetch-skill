@@ -38,6 +38,8 @@ SourceKind = Literal[
     "acs",
     "iop_html",
     "iop_pdf",
+    "aip_html",
+    "aip_pdf",
     "crossref_meta",
 ]
 
@@ -171,7 +173,9 @@ class Quality:
     warnings: list[str] = field(default_factory=list)
     source_trail: list[str] = field(default_factory=list)
     trace: list[TraceEvent] = field(default_factory=list)
-    token_estimate_breakdown: TokenEstimateBreakdown = field(default_factory=TokenEstimateBreakdown)
+    token_estimate_breakdown: TokenEstimateBreakdown = field(
+        default_factory=TokenEstimateBreakdown
+    )
     confidence: QualityConfidence = "low"
     flags: list[str] = field(default_factory=list)
     body_metrics: BodyQualityMetrics = field(default_factory=BodyQualityMetrics)
@@ -194,7 +198,9 @@ class Quality:
         self.body_metrics = coerce_body_quality_metrics(self.body_metrics)
         self.semantic_losses = coerce_semantic_losses(self.semantic_losses)
         self.asset_failures = coerce_asset_failure_diagnostics(self.asset_failures)
-        self.token_estimate_breakdown = coerce_token_estimate_breakdown(self.token_estimate_breakdown)
+        self.token_estimate_breakdown = coerce_token_estimate_breakdown(
+            self.token_estimate_breakdown
+        )
         self.extraction_revision = int(self.extraction_revision or EXTRACTION_REVISION)
         if self.trace and not self.source_trail:
             self.source_trail = source_trail_from_trace(self.trace)
@@ -275,7 +281,9 @@ class FetchEnvelope:
     source_trail: list[str] = field(default_factory=list)
     trace: list[TraceEvent] = field(default_factory=list)
     token_estimate: int = 0
-    token_estimate_breakdown: TokenEstimateBreakdown = field(default_factory=TokenEstimateBreakdown)
+    token_estimate_breakdown: TokenEstimateBreakdown = field(
+        default_factory=TokenEstimateBreakdown
+    )
     quality: Quality = field(default_factory=Quality)
     article: "ArticleModel | None" = None
     markdown: str | None = None
@@ -310,15 +318,24 @@ class FetchEnvelope:
         if self.content_kind != "metadata_only":
             self.quality.content_kind = self.content_kind
         self.quality.has_abstract = self.quality.has_abstract or self.has_abstract
-        self.quality.warnings = _dedupe_strings([*self.quality.warnings, *self.warnings])
-        self.quality.source_trail = _dedupe_strings([*self.quality.source_trail, *self.source_trail])
+        self.quality.warnings = _dedupe_strings(
+            [*self.quality.warnings, *self.warnings]
+        )
+        self.quality.source_trail = _dedupe_strings(
+            [*self.quality.source_trail, *self.source_trail]
+        )
         self.quality.trace = list(self.quality.trace or self.trace)
         if self.trace and not self.quality.trace:
             self.quality.trace = list(self.trace)
         if self.token_estimate and not self.quality.token_estimate:
             self.quality.token_estimate = self.token_estimate
-        if self.token_estimate_breakdown != TokenEstimateBreakdown() and self.quality.token_estimate_breakdown == TokenEstimateBreakdown():
-            self.quality.token_estimate_breakdown = coerce_token_estimate_breakdown(self.token_estimate_breakdown)
+        if (
+            self.token_estimate_breakdown != TokenEstimateBreakdown()
+            and self.quality.token_estimate_breakdown == TokenEstimateBreakdown()
+        ):
+            self.quality.token_estimate_breakdown = coerce_token_estimate_breakdown(
+                self.token_estimate_breakdown
+            )
         self.has_fulltext = self.quality.has_fulltext
         self.content_kind = self.quality.content_kind
         self.has_abstract = self.quality.has_abstract
@@ -337,7 +354,9 @@ class ArticleModel:
     sections: list[Section] = field(default_factory=list)
     references: list[Reference] = field(default_factory=list)
     assets: list[Asset] = field(default_factory=list)
-    quality: Quality = field(default_factory=lambda: Quality(has_fulltext=False, token_estimate=0))
+    quality: Quality = field(
+        default_factory=lambda: Quality(has_fulltext=False, token_estimate=0)
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -349,12 +368,16 @@ class ArticleModel:
         from .quality import apply_quality_assessment, classify_content
         from .sections import first_abstract_text
 
-        abstract_text = first_abstract_text(abstract_text=self.metadata.abstract, sections=self.sections)
+        abstract_text = first_abstract_text(
+            abstract_text=self.metadata.abstract, sections=self.sections
+        )
         if not abstract_text:
             abstract_text = ""
         if abstract_text and not normalize_text(self.metadata.abstract):
             self.metadata.abstract = abstract_text
-        content_kind = classify_content(sections=self.sections, abstract_text=abstract_text)
+        content_kind = classify_content(
+            sections=self.sections, abstract_text=abstract_text
+        )
         self.quality.content_kind = content_kind
         self.quality.has_abstract = bool(abstract_text)
         self.quality.has_fulltext = content_kind == "fulltext"
@@ -399,7 +422,8 @@ class ArticleModel:
         front_matter_block = _build_article_header_block(self)
         lines = list(front_matter_block.lines)
         context = RenderContext(
-            remaining_budget=render_plan.token_budget - front_matter_block.token_estimate,
+            remaining_budget=render_plan.token_budget
+            - front_matter_block.token_estimate,
             warnings=warnings,
         )
         if context.remaining_budget <= 0:
@@ -439,7 +463,10 @@ class ArticleModel:
         append_asset_block_with_budget(
             lines,
             heading=asset_block_heading("Figures", render_plan.figure_assets),
-            item_groups=render_figure_asset_groups(list(render_plan.figure_assets), include_figures=render_plan.include_figures),
+            item_groups=render_figure_asset_groups(
+                list(render_plan.figure_assets),
+                include_figures=render_plan.include_figures,
+            ),
             context=context,
         )
         append_asset_block_with_budget(
@@ -451,7 +478,9 @@ class ArticleModel:
         append_asset_block_with_budget(
             lines,
             heading="Supplementary Materials",
-            item_groups=render_supplementary_asset_groups(list(render_plan.supplementary_assets)),
+            item_groups=render_supplementary_asset_groups(
+                list(render_plan.supplementary_assets)
+            ),
             context=context,
         )
 

@@ -32,14 +32,14 @@
 
 - 支持 DOI、URL 和标题查询。
 - 输出结构化论文元数据、正文 Markdown、引用信息和本地缓存资源。
-- 支持常见 provider 路由，包括 Crossref、arXiv、Elsevier、Springer、Wiley、Science、PNAS、AMS、ACS、IOP、IEEE、MDPI 和 Copernicus。
+- 支持常见 provider 路由，包括 Crossref、arXiv、Elsevier、Springer、Wiley、Science、PNAS、AMS、ACS、IOP、AIP、IEEE、MDPI 和 Copernicus。
 - 在无法取得全文时返回带 warning 的 abstract-only 或 metadata-only 结果。
 
 项目边界：
 
 - 不做主题检索、文献推荐或综述生成。
 - 不绕过付费墙或访问授权；可用性取决于 provider、凭据和本机运行环境。
-- Wiley、Science、PNAS、AMS、ACS、IOP、MDPI 的浏览器路径统一使用 CloakBrowser；IEEE 路线不需要额外 API key，但全文可用性取决于 IEEE Xplore 对当前环境的合法访问上下文。
+- Wiley、Science、PNAS、AMS、ACS、IOP、AIP、MDPI 的浏览器路径统一使用 CloakBrowser；IEEE 路线不需要额外 API key，但全文可用性取决于 IEEE Xplore 对当前环境的合法访问上下文。
 - Provider onboarding 的 AI/coordinator 自动化入口见 [`onboarding/README.md`](onboarding/README.md)，其中的 runner 仍不能代替 access approval、challenge 决策或最终语义审查判断；最终签字由用户确认后通过项目脚本机械写入。
 
 ## 效果展示
@@ -112,7 +112,7 @@ paper-fetch --help
 ```
 如果有输出`usage: cli.py [-h] -`（后略）则安装成功
 
-**4. 开启 Wiley / Science / PNAS / AMS / ACS / IOP / MDPI 浏览器路径**
+**4. 开启 Wiley / Science / PNAS / AMS / ACS / IOP / AIP / MDPI 浏览器路径**
 
 安装器会注册 CloakBrowser 默认 headless 环境，并在 `offline.env` 默认启用普通 Chrome browser UA，降低 AGU/Wiley 页面进入 Cloudflare challenge 的概率。受限环境可在 `offline.env` 中设置 `CLOAKBROWSER_BINARY_PATH` 指向预装浏览器；如果 GUI/WSLg 环境下仍被 challenge，再把 `CLOAKBROWSER_HEADLESS=false`，安装 Linux `.sh` 时使用 `--preset=wslg`，或在 macOS 离线 bundle 中使用 `--preset=headful`。
 Windows 安装器还会设置 `MATHML_TO_LATEX_NODE_BIN` 指向包内 Playwright Node，避免 Codex Desktop 的 WindowsApps/MSIX 内部 `node.exe` 被公式转换 fallback 误用。

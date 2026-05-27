@@ -15,12 +15,24 @@ WILEY_FULL_FIXTURE = golden_criteria_asset("10.1111/gcb.16414", "original.html")
 WILEY_ABBREV_FIXTURE = golden_criteria_asset("10.1111/cas.16395", "original.html")
 WILEY_METHODS_FIXTURE = golden_criteria_asset("10.1111/gcb.16455", "original.html")
 PNAS_FULL_FIXTURE = golden_criteria_asset("10.1073/pnas.2406303121", "original.html")
-PNAS_COMMENTARY_FIXTURE = golden_criteria_asset("10.1073/pnas.2317456120", "commentary.html")
-SCIENCE_FORMULA_FIXTURE = golden_criteria_asset("10.1126/science.adp0212", "original.html")
-SCIENCE_FRONTMATTER_FIXTURE = golden_criteria_asset("10.1126/science.abp8622", "original.html")
-SCIADV_ABF8021_FIXTURE = golden_criteria_asset("10.1126/sciadv.abf8021", "original.html")
-SCIADV_ABG9690_FIXTURE = golden_criteria_asset("10.1126/sciadv.abg9690", "original.html")
-SCIADV_ADM9732_FIXTURE = golden_criteria_asset("10.1126/sciadv.adm9732", "original.html")
+PNAS_COMMENTARY_FIXTURE = golden_criteria_asset(
+    "10.1073/pnas.2317456120", "commentary.html"
+)
+SCIENCE_FORMULA_FIXTURE = golden_criteria_asset(
+    "10.1126/science.adp0212", "original.html"
+)
+SCIENCE_FRONTMATTER_FIXTURE = golden_criteria_asset(
+    "10.1126/science.abp8622", "original.html"
+)
+SCIADV_ABF8021_FIXTURE = golden_criteria_asset(
+    "10.1126/sciadv.abf8021", "original.html"
+)
+SCIADV_ABG9690_FIXTURE = golden_criteria_asset(
+    "10.1126/sciadv.abg9690", "original.html"
+)
+SCIADV_ADM9732_FIXTURE = golden_criteria_asset(
+    "10.1126/sciadv.adm9732", "original.html"
+)
 
 
 class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
@@ -79,7 +91,10 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             "10.1111/gcb.16414",
         )
 
-        self.assertIn("# Contrasting temperature effects on the velocity of early- versus late-stage vegetation green-up in the Northern Hemisphere", markdown)
+        self.assertIn(
+            "# Contrasting temperature effects on the velocity of early- versus late-stage vegetation green-up in the Northern Hemisphere",
+            markdown,
+        )
         self.assertIn("## Abstract", markdown)
         self.assertIn("## 1 INTRODUCTION", markdown)
         self.assertNotIn("Open in figure viewer", markdown)
@@ -98,14 +113,25 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         self.assertIn("## Abbreviations", markdown)
         self.assertIn("AI: artificial intelligence", markdown)
         self.assertIn("LLM: large language model", markdown)
-        self.assertIn("**Table 1.** AI-SaMD approved as a medical device in the field of oncology in Japan (as of May 2024).", markdown)
-        self.assertGreater(markdown.index("## Abbreviations"), markdown.index("## 1 INTRODUCTION"))
-        self.assertGreater(markdown.index("## Abbreviations"), markdown.index("**Table 1.**"))
+        self.assertIn(
+            "**Table 1.** AI-SaMD approved as a medical device in the field of oncology in Japan (as of May 2024).",
+            markdown,
+        )
+        self.assertGreater(
+            markdown.index("## Abbreviations"), markdown.index("## 1 INTRODUCTION")
+        )
+        self.assertGreater(
+            markdown.index("## Abbreviations"), markdown.index("**Table 1.**")
+        )
 
-    def test_wiley_abbreviations_scenario_moves_frontmatter_glossary_after_body(self) -> None:
+    def test_wiley_abbreviations_scenario_moves_frontmatter_glossary_after_body(
+        self,
+    ) -> None:
         """rule: rule-wiley-abbreviations-trailing"""
         markdown, _ = self._extract_fixture_markdown(
-            golden_criteria_scenario_asset("wiley_abbreviations_trailing", "original.html"),
+            golden_criteria_scenario_asset(
+                "wiley_abbreviations_trailing", "original.html"
+            ),
             "https://onlinelibrary.wiley.com/doi/full/10.1111/wiley-abbrev-scenario",
             "wiley",
             "10.1111/wiley-abbrev-scenario",
@@ -115,8 +141,12 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         self.assertIn("**Table 1.** Scenario table.", markdown)
         self.assertIn("## Abbreviations", markdown)
         self.assertIn("AI: artificial intelligence", markdown)
-        self.assertGreater(markdown.index("## Abbreviations"), markdown.index("## 1 INTRODUCTION"))
-        self.assertGreater(markdown.index("## Abbreviations"), markdown.index("**Table 1.**"))
+        self.assertGreater(
+            markdown.index("## Abbreviations"), markdown.index("## 1 INTRODUCTION")
+        )
+        self.assertGreater(
+            markdown.index("## Abbreviations"), markdown.index("**Table 1.**")
+        )
 
     def test_wiley_real_fixture_keeps_methods_subcontent_in_body(self) -> None:
         markdown, _ = self._extract_fixture_markdown(
@@ -131,9 +161,13 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         self.assertIn("three main assessments", markdown)
         self.assertIn("## 3 RESULTS", markdown)
         self.assertNotIn("## Abbreviations", markdown)
-        self.assertLess(markdown.index("## 2 MATERIALS AND METHODS"), markdown.index("## 3 RESULTS"))
+        self.assertLess(
+            markdown.index("## 2 MATERIALS AND METHODS"), markdown.index("## 3 RESULTS")
+        )
 
-    def test_pnas_real_fixture_keeps_significance_and_abstract_before_main_text(self) -> None:
+    def test_pnas_real_fixture_keeps_significance_and_abstract_before_main_text(
+        self,
+    ) -> None:
         markdown, _ = self._extract_fixture_markdown(
             PNAS_FULL_FIXTURE,
             "https://www.pnas.org/doi/full/10.1073/pnas.2406303121",
@@ -145,11 +179,15 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         self.assertIn("## Abstract", markdown)
         self.assertIn("## Main Text", markdown)
         self.assertIn("## Methods", markdown)
-        self.assertLess(markdown.index("## Significance"), markdown.index("## Abstract"))
+        self.assertLess(
+            markdown.index("## Significance"), markdown.index("## Abstract")
+        )
         self.assertLess(markdown.index("## Abstract"), markdown.index("## Main Text"))
         self.assertLess(markdown.index("## Main Text"), markdown.index("## Methods"))
 
-    def test_pnas_real_fixture_preserves_figures_equations_and_heading_trimming(self) -> None:
+    def test_pnas_real_fixture_preserves_figures_equations_and_heading_trimming(
+        self,
+    ) -> None:
         """rule: rule-readable-equation-caption-spacing"""
         markdown, _ = self._extract_fixture_markdown(
             PNAS_FULL_FIXTURE,
@@ -160,14 +198,18 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
 
         self.assertIn("### Data", markdown)
         self.assertNotIn("### Data.", markdown)
-        self.assertNotIn("### The Relationship between Total and Infectious Virus.", markdown)
+        self.assertNotIn(
+            "### The Relationship between Total and Infectious Virus.", markdown
+        )
         self.assertIn("**Equation 1.**", markdown)
         self.assertIn("**Equation 2.**", markdown)
         self.assertIn("$$", markdown)
         self.assertIn("![Figure 1](", markdown)
         self.assertIn("**Figure 1.**", markdown)
         self._assert_equation_blocks_are_normalized(markdown)
-        self.assertNotIn("$$Previously published data were used for this work", markdown)
+        self.assertNotIn(
+            "$$Previously published data were used for this work", markdown
+        )
 
     def test_pnas_real_fixture_renders_table_and_inline_cell_formatting(self) -> None:
         markdown, _ = self._extract_fixture_markdown(
@@ -177,7 +219,10 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             "10.1073/pnas.2406303121",
         )
 
-        self.assertIn("**Table 1.** Estimated population parameters for the DDRCM with humoral immune response", markdown)
+        self.assertIn(
+            "**Table 1.** Estimated population parameters for the DDRCM with humoral immune response",
+            markdown,
+        )
         self._assert_pnas_table_inline_semantics(markdown)
 
     def test_pnas_real_commentary_keeps_headingless_body_flat(self) -> None:
@@ -189,12 +234,20 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             title="Amazon deforestation implications in local/regional climate change",
         )
 
-        self.assertIn("# Amazon deforestation implications in local/regional climate change", markdown)
-        self.assertNotIn("## Amazon deforestation implications in local/regional climate change", markdown)
+        self.assertIn(
+            "# Amazon deforestation implications in local/regional climate change",
+            markdown,
+        )
+        self.assertNotIn(
+            "## Amazon deforestation implications in local/regional climate change",
+            markdown,
+        )
         self.assertNotIn("## Full Text", markdown)
         self.assertNotIn("## Abstract", markdown)
 
-    def test_science_real_fixture_keeps_formula_and_figure_caption_spacing(self) -> None:
+    def test_science_real_fixture_keeps_formula_and_figure_caption_spacing(
+        self,
+    ) -> None:
         markdown, _ = self._extract_fixture_markdown(
             SCIENCE_FORMULA_FIXTURE,
             "https://www.science.org/doi/full/10.1126/science.adp0212",
@@ -205,16 +258,41 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         self._assert_equation_blocks_are_normalized(markdown)
         self.assertRegex(markdown, r"\*\*Equation 1\.\*\*\n\n\$\$\n\\sigma P")
         self.assertRegex(markdown, r"\n\$\$\n\nwhere \*P\* is precipitation")
-        self.assertIn("**Figure 2.** Regional change in daily precipitation variability from 1900 to 2020. Time series", markdown)
+        self.assertIn(
+            "**Figure 2.** Regional change in daily precipitation variability from 1900 to 2020. Time series",
+            markdown,
+        )
         self.assertNotIn("$$where *P* is precipitation", markdown)
         self.assertNotIn("2020.Time series", markdown)
 
-    def test_shared_equation_normalization_handles_real_science_and_pnas_fixtures(self) -> None:
+    def test_shared_equation_normalization_handles_real_science_and_pnas_fixtures(
+        self,
+    ) -> None:
         fixture_specs = (
-            ("10.1126/sciadv.abf8021", SCIADV_ABF8021_FIXTURE, "science", "https://www.science.org/doi/full/10.1126/sciadv.abf8021"),
-            ("10.1126/sciadv.abg9690", SCIADV_ABG9690_FIXTURE, "science", "https://www.science.org/doi/full/10.1126/sciadv.abg9690"),
-            ("10.1126/sciadv.adm9732", SCIADV_ADM9732_FIXTURE, "science", "https://www.science.org/doi/full/10.1126/sciadv.adm9732"),
-            ("10.1073/pnas.2406303121", PNAS_FULL_FIXTURE, "pnas", "https://www.pnas.org/doi/full/10.1073/pnas.2406303121"),
+            (
+                "10.1126/sciadv.abf8021",
+                SCIADV_ABF8021_FIXTURE,
+                "science",
+                "https://www.science.org/doi/full/10.1126/sciadv.abf8021",
+            ),
+            (
+                "10.1126/sciadv.abg9690",
+                SCIADV_ABG9690_FIXTURE,
+                "science",
+                "https://www.science.org/doi/full/10.1126/sciadv.abg9690",
+            ),
+            (
+                "10.1126/sciadv.adm9732",
+                SCIADV_ADM9732_FIXTURE,
+                "science",
+                "https://www.science.org/doi/full/10.1126/sciadv.adm9732",
+            ),
+            (
+                "10.1073/pnas.2406303121",
+                PNAS_FULL_FIXTURE,
+                "pnas",
+                "https://www.pnas.org/doi/full/10.1073/pnas.2406303121",
+            ),
         )
 
         for doi, fixture_path, publisher, source_url in fixture_specs:
@@ -228,7 +306,9 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
 
                 self._assert_equation_blocks_are_normalized(markdown)
 
-    def test_science_real_frontmatter_fixture_preserves_structured_summaries_and_main_text(self) -> None:
+    def test_science_real_frontmatter_fixture_preserves_structured_summaries_and_main_text(
+        self,
+    ) -> None:
         markdown, _ = self._extract_fixture_markdown(
             SCIENCE_FRONTMATTER_FIXTURE,
             "https://www.science.org/doi/full/10.1126/science.abp8622",
@@ -236,7 +316,9 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             "10.1126/science.abp8622",
         )
 
-        self.assertIn("# The drivers and impacts of Amazon forest degradation", markdown)
+        self.assertIn(
+            "# The drivers and impacts of Amazon forest degradation", markdown
+        )
         self.assertIn("## Losing the Amazon", markdown)
         self.assertIn("## Structured Abstract", markdown)
         self.assertIn("## Abstract", markdown)
@@ -245,15 +327,25 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         self.assertIn("log<sub>10</sub>", markdown)
         self.assertIn("CO<sub>2</sub>", markdown)
         self.assertIn("**Box 1.** Defining Amazonia’s degradation regime.", markdown)
-        self.assertIn("**Co-occurrence:** The incidence of different forms of disturbance", markdown)
+        self.assertIn(
+            "**Co-occurrence:** The incidence of different forms of disturbance",
+            markdown,
+        )
         self.assertNotIn("**Figure 2.** Box 1.", markdown)
         self.assertEqual(markdown.count("![Figure 2]("), 1)
         self.assertEqual(markdown.count("**Figure 2.**"), 1)
-        self.assertLess(markdown.index("## Losing the Amazon"), markdown.index("## Structured Abstract"))
-        self.assertLess(markdown.index("## Structured Abstract"), markdown.index("## Abstract"))
+        self.assertLess(
+            markdown.index("## Losing the Amazon"),
+            markdown.index("## Structured Abstract"),
+        )
+        self.assertLess(
+            markdown.index("## Structured Abstract"), markdown.index("## Abstract")
+        )
         self.assertLess(markdown.index("## Abstract"), markdown.index("## Main Text"))
 
-    def test_rewrite_inline_figure_links_prefers_local_paths_for_existing_science_image_blocks(self) -> None:
+    def test_rewrite_inline_figure_links_prefers_local_paths_for_existing_science_image_blocks(
+        self,
+    ) -> None:
         markdown = "\n\n".join(
             [
                 "# Science Figure Example",
@@ -280,9 +372,44 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
         )
 
         self.assertIn("![Figure 1](downloads/science-figure-1.png)", rewritten)
-        self.assertNotIn("![Figure 1](https://www.science.org/images/figure-1.jpg)", rewritten)
+        self.assertNotIn(
+            "![Figure 1](https://www.science.org/images/figure-1.jpg)", rewritten
+        )
 
-    def test_rewrite_inline_figure_links_is_data_driven_for_non_legacy_publisher(self) -> None:
+    def test_rewrite_inline_figure_links_treats_fig_caption_as_existing_caption(
+        self,
+    ) -> None:
+        markdown = "\n\n".join(
+            [
+                "# AIP Figure Example",
+                "## Results",
+                "Narrative paragraph cites Fig. 1 before the image.",
+                "![Figure 1](https://aipp.silverchair-cdn.com/figure-1.jpeg)",
+                "**FIG. 1.** Caption body for the AIP figure.",
+            ]
+        )
+
+        rewritten = rewrite_inline_figure_links(
+            markdown,
+            figure_assets=[
+                {
+                    "kind": "figure",
+                    "heading": "FIG. 1. Caption body for the AIP figure.",
+                    "caption": "FIG. 1. Caption body for the AIP figure.",
+                    "url": "https://aipp.silverchair-cdn.com/figure-1.jpeg",
+                    "path": "downloads/aip-figure-1.jpeg",
+                    "section": "body",
+                }
+            ],
+            publisher="aip",
+        )
+
+        self.assertEqual(rewritten.count("![Figure 1](downloads/aip-figure-1.jpeg)"), 1)
+        self.assertIn("**FIG. 1.** Caption body for the AIP figure.", rewritten)
+
+    def test_rewrite_inline_figure_links_is_data_driven_for_non_legacy_publisher(
+        self,
+    ) -> None:
         markdown = "\n\n".join(
             [
                 "# Springer Figure Example",
@@ -313,15 +440,17 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             rewritten.index("**Figure 2.** Caption body for the springer figure."),
         )
 
-    def test_rewrite_inline_figure_links_ignores_cross_references_in_asset_captions(self) -> None:
+    def test_rewrite_inline_figure_links_ignores_cross_references_in_asset_captions(
+        self,
+    ) -> None:
         """rule: rule-rewrite-inline-figure-links"""
-        markdown = golden_criteria_scenario_asset("inline_figure_link_rewrite", "article.md").read_text(
-            encoding="utf-8"
-        )
+        markdown = golden_criteria_scenario_asset(
+            "inline_figure_link_rewrite", "article.md"
+        ).read_text(encoding="utf-8")
         figure_assets = json.loads(
-            golden_criteria_scenario_asset("inline_figure_link_rewrite", "assets.json").read_text(
-                encoding="utf-8"
-            )
+            golden_criteria_scenario_asset(
+                "inline_figure_link_rewrite", "assets.json"
+            ).read_text(encoding="utf-8")
         )
 
         rewritten = rewrite_inline_figure_links(
@@ -330,8 +459,12 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             publisher="pnas",
         )
 
-        self.assertEqual(rewritten.count("![Figure 1](downloads/pnas.example.fig01.jpeg)"), 1)
-        self.assertEqual(rewritten.count("![Figure 4](downloads/pnas.example.fig04.jpeg)"), 1)
+        self.assertEqual(
+            rewritten.count("![Figure 1](downloads/pnas.example.fig01.jpeg)"), 1
+        )
+        self.assertEqual(
+            rewritten.count("![Figure 4](downloads/pnas.example.fig04.jpeg)"), 1
+        )
         self.assertNotIn("![Figure 1](downloads/pnas.example.fig04.jpeg)", rewritten)
 
     def test_figure_link_injection_and_rewrite_share_path_preference(self) -> None:
@@ -353,7 +486,9 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             }
         ]
 
-        rewritten = rewrite_inline_figure_links(markdown, figure_assets=figure_assets, publisher="science")
+        rewritten = rewrite_inline_figure_links(
+            markdown, figure_assets=figure_assets, publisher="science"
+        )
         injected = inject_inline_figure_links(
             markdown,
             figure_assets=figure_assets,
@@ -399,7 +534,9 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             injected.index("**Figure 2.** Caption body."),
         )
 
-    def test_inject_inline_figure_links_falls_back_to_first_body_reference(self) -> None:
+    def test_inject_inline_figure_links_falls_back_to_first_body_reference(
+        self,
+    ) -> None:
         markdown = "\n\n".join(
             [
                 "# Figure Link Example",
@@ -449,7 +586,9 @@ class AtyponBrowserWorkflowPostprocessTests(unittest.TestCase):
             injected.index("## References"),
         )
 
-    def test_inject_inline_figure_links_caption_block_takes_priority_over_body_reference(self) -> None:
+    def test_inject_inline_figure_links_caption_block_takes_priority_over_body_reference(
+        self,
+    ) -> None:
         markdown = "\n\n".join(
             [
                 "# Figure Link Example",

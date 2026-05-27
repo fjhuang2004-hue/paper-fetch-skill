@@ -67,3 +67,7 @@ providers:
     display_source: iop_html
     status: implemented
     manifest_path: onboarding/manifests/iop.yml
+  - name: aip
+    display_source: aip_html
+    status: implemented
+    manifest_path: onboarding/manifests/aip.yml

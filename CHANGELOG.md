@@ -6,12 +6,23 @@ All notable public changes to `paper-fetch-skill` are documented in this file.
 
 <!-- SCAFFOLD: changelog-unreleased -->
 
+## 1.9.0 - 2026-05-27
+
+### Added
+
+- Add AIP Publishing (`aip`) provider routing for `10.1063/` and `pubs.aip.org`, with CloakBrowser article HTML, seeded-browser PDF fallback, `aip_html` / `aip_pdf` sources, body figure/table/formula/supplementary extraction, and provider-managed abstract-only degradation.
 - Add two-step provider onboarding human gates with `prepare-human-preflight` and `finalize-review-artifact` so users review waterfall/access once, then batch-confirm final Markdown quality instead of editing every fixture review by hand.
 - Add IOP Publishing (`iop`) provider routing for `10.1088/` and `iopscience.iop.org`, with CloakBrowser article HTML, seeded-browser PDF fallback, `iop_html` / `iop_pdf` sources, and Radware/hCaptcha challenge rejection.
-- Re-approve the IOP replay fixture coverage so the real `10.1088/1748-9326/ab7d02` capture now covers the supplementary purpose through the article-scoped `stacks.iop.org` media link.
 - Add real IOP fixture coverage for table, formula, and PDF fallback purposes with `10.1088/2058-9565/ac3460` and `10.1088/1748-9326/aa9f73`.
-- Tighten provider fixture discovery so Crossref candidate searches can be DOI-prefix filtered, off-provider DOI candidates are dropped before probing, and challenge/access/empty-shell probes cannot rank as high-confidence fulltext fixtures.
 - Add ACS (`acs`) provider routing for `10.1021/`, `www.acs.org` / `pubs.acs.org`, shared CloakBrowser HTML plus seeded publisher PDF/ePDF workflow, replay-backed table / formula / Supporting Information coverage, and direct public `/doi/pdf` fallback capture with seeded browser-navigation headers.
+
+### Changed
+
+- Tighten provider fixture discovery so Crossref candidate searches can be DOI-prefix filtered, off-provider DOI candidates are dropped before probing, and challenge/access/empty-shell probes cannot rank as high-confidence fulltext fixtures.
+
+### Fixed
+
+- Re-approve the IOP replay fixture coverage so the real `10.1088/1748-9326/ab7d02` capture now covers the supplementary purpose through the article-scoped `stacks.iop.org` media link.
 - Require ACS body figure assets in the onboarding contract and preserve ACS figure image links through browser-workflow cleanup so downloaded body figures rewrite Markdown to local asset paths.
 
 ## 1.8.0 - 2026-05-26

@@ -19,23 +19,38 @@ DEFAULT_FETCH_VALUES: tuple[tuple[str, str], ...] = (
 )
 
 DEFAULT_FETCH_NOTES: tuple[str, ...] = (
-    "`include_refs=null` behaves like `all` when `max_tokens=\"full_text\"`.",
+    '`include_refs=null` behaves like `all` when `max_tokens="full_text"`.',
     "When `max_tokens` is a positive integer, `include_refs=null` behaves like `top10`.",
 )
 
 SKILL_ENVIRONMENT_VARIABLES: tuple[tuple[str, str], ...] = (
     ("ELSEVIER_API_KEY", "Required for official Elsevier full-text access."),
-    ("WILEY_TDM_CLIENT_TOKEN", "Optional Wiley Text and Data Mining client token for the official Wiley PDF lane; browser PDF/ePDF fallback can still run without it when the local runtime is ready."),
-    ("CLOAKBROWSER_HEADLESS", "Optional override (true/false) for the CloakBrowser browser runtime. Defaults to true."),
-    ("CLOAKBROWSER_TIMEOUT_MS", "Optional override for CloakBrowser per-request timeout. Defaults to 120000."),
-    ("PAPER_FETCH_BROWSER_USER_AGENT", "Optional browser-only User-Agent override for CloakBrowser/Playwright contexts; use a normal Chrome UA for AGU/Wiley Cloudflare challenge issues."),
+    (
+        "WILEY_TDM_CLIENT_TOKEN",
+        "Optional Wiley Text and Data Mining client token for the official Wiley PDF lane; browser PDF/ePDF fallback can still run without it when the local runtime is ready.",
+    ),
+    (
+        "CLOAKBROWSER_HEADLESS",
+        "Optional override (true/false) for the CloakBrowser browser runtime. Defaults to true.",
+    ),
+    (
+        "CLOAKBROWSER_TIMEOUT_MS",
+        "Optional override for CloakBrowser per-request timeout. Defaults to 120000.",
+    ),
+    (
+        "PAPER_FETCH_BROWSER_USER_AGENT",
+        "Optional browser-only User-Agent override for CloakBrowser/Playwright contexts; use a normal Chrome UA for AGU/Wiley Cloudflare challenge issues.",
+    ),
     ("PAPER_FETCH_DOWNLOAD_DIR", "Overrides the default CLI/MCP download directory."),
     ("PAPER_FETCH_RUN_LIVE", "Test-only flag for live publisher integration checks."),
 )
 
 ERROR_CONTRACT: tuple[tuple[str, str], ...] = (
     ("ambiguous", "Contains `candidates`; prompt the user to choose and retry."),
-    (NO_ACCESS, "Credentials or entitlements are missing; inspect `missing_env` when present, then retry."),
+    (
+        NO_ACCESS,
+        "Credentials or entitlements are missing; inspect `missing_env` when present, then retry.",
+    ),
     (RATE_LIMITED, "Back off and retry later."),
     (ERROR, "Any other failure; inspect `reason`."),
 )
@@ -58,7 +73,7 @@ def server_instructions() -> str:
         "behaves like 'all'. When asset_profile is body/all, optional "
         "strategy.inline_image_budget can tune the default inline ImageContent caps of "
         "3 figures, 2 MiB each, and 8 MiB total. `provider_hint` and "
-        "`preferred_providers` may include `elsevier`, `springer`, `wiley`, `science`, `pnas`, `ams`, `acs`, `iop`, `mdpi`, `ieee`, `arxiv`, `copernicus`, or `crossref`. "
+        "`preferred_providers` may include `elsevier`, `springer`, `wiley`, `science`, `pnas`, `ams`, `acs`, `iop`, `aip`, `mdpi`, `ieee`, `arxiv`, `copernicus`, or `crossref`. "
         "`elsevier` keeps an official XML route first and may then fall back to the "
         "official Elsevier API PDF lane before degrading to metadata-only, publishing "
         "`elsevier_xml` on XML success and `elsevier_pdf` on PDF fallback success. `springer` keeps a provider-managed direct HTML route "
@@ -66,8 +81,8 @@ def server_instructions() -> str:
         "the CloakBrowser HTML route, then seeded-browser publisher PDF/ePDF "
         "fallback, and may still continue into the official Wiley TDM API PDF lane "
         "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing `wiley_browser`. `science`, "
-        "`pnas`, `ams`, `acs`, `iop`, and `mdpi` require the local browser runtime but no legacy local "
-        "rate-limit env vars; AMS publishes `ams_html` or `ams_pdf` and ignores `citation_xml_url`; ACS publishes `acs`; IOP publishes `iop_html` or `iop_pdf` and rejects Radware/hCaptcha challenge pages; MDPI publishes `mdpi_html` or `mdpi_pdf` and does not use an XML route. `ieee` uses "
+        "`pnas`, `ams`, `acs`, `iop`, `aip`, and `mdpi` require the local browser runtime but no legacy local "
+        "rate-limit env vars; AMS publishes `ams_html` or `ams_pdf` and ignores `citation_xml_url`; ACS publishes `acs`; IOP publishes `iop_html` or `iop_pdf` and rejects Radware/hCaptcha challenge pages; AIP publishes `aip_html` or `aip_pdf`; MDPI publishes `mdpi_html` or `mdpi_pdf` and does not use an XML route. `ieee` uses "
         "landing metadata, the Xplore dynamic HTML endpoint, and direct HTTP PDF fallback, "
         "publishing `ieee_html` or `ieee_pdf` when those routes return usable full text. `arxiv` uses "
         "arXiv ID-derived HTML first, optional API/HTML metadata merge, and text-only PDF fallback while publishing "
@@ -80,7 +95,7 @@ def server_instructions() -> str:
         "remote image links already present in rendered Markdown. "
         "`asset_profile='body'` means provider-cleaned body figure/table/formula assets only, "
         "while `asset_profile='all'` additionally downloads supplementary files. "
-        "Inline ImageContent still only comes from body figures. Wiley/Science/PNAS/AMS/ACS/IOP/MDPI support "
+        "Inline ImageContent still only comes from body figures. Wiley/Science/PNAS/AMS/ACS/IOP/AIP/MDPI support "
         "`asset_profile=body|all` on successful CloakBrowser HTML routes and "
         "prefer full-size/original figures before falling back to previews, while "
         "their PDF/ePDF fallback routes remain text-only. Springer, IEEE, arXiv, and Copernicus PDF fallback "
@@ -121,9 +136,9 @@ def fetch_tool_description() -> str:
         "CloakBrowser HTML first, then seeded-browser publisher PDF/ePDF "
         "fallback, and may still continue into the official Wiley TDM API PDF lane "
         "when `WILEY_TDM_CLIENT_TOKEN` is configured while publishing source "
-        "`wiley_browser` on success. `science`, `pnas`, `ams`, `acs`, `iop`, and `mdpi` routes use "
+        "`wiley_browser` on success. `science`, `pnas`, `ams`, `acs`, `iop`, `aip`, and `mdpi` routes use "
         "provider-managed browser runtime HTML plus seeded-browser publisher PDF/ePDF repo-local "
-        "workflows; AMS publishes `ams_html` or `ams_pdf` and does not request `citation_xml_url` / `/doc/...xml`; ACS publishes `acs`; IOP publishes `iop_html` or `iop_pdf`, rejects Radware/hCaptcha challenge pages, and does not implement unauthenticated TDM XML/PDF; MDPI publishes `mdpi_html` or `mdpi_pdf` and does not use an XML route. `ieee` uses landing metadata, "
+        "workflows; AMS publishes `ams_html` or `ams_pdf` and does not request `citation_xml_url` / `/doc/...xml`; ACS publishes `acs`; IOP publishes `iop_html` or `iop_pdf`, rejects Radware/hCaptcha challenge pages, and does not implement unauthenticated TDM XML/PDF; AIP publishes `aip_html` or `aip_pdf`; MDPI publishes `mdpi_html` or `mdpi_pdf` and does not use an XML route. `ieee` uses landing metadata, "
         "the Xplore dynamic HTML endpoint, and direct HTTP PDF fallback while publishing "
         "`ieee_html` or `ieee_pdf`. `arxiv` uses ID-derived official HTML first, optional API/HTML metadata merge, and text-only PDF "
         "fallback while publishing `arxiv_html` or `arxiv_pdf`. `copernicus` uses direct HTTP landing discovery, public NLM/JATS XML, "
@@ -134,7 +149,7 @@ def fetch_tool_description() -> str:
         "`asset_profile='body'` means provider-cleaned body figure/table/formula assets only, "
         "while `asset_profile='all'` additionally downloads supplementary files; "
         "supplementary files are saved as assets but are not emitted as ImageContent. "
-        "Wiley/Science/PNAS/AMS/ACS/IOP/MDPI support body/all assets on successful CloakBrowser HTML routes while keeping "
+        "Wiley/Science/PNAS/AMS/ACS/IOP/AIP/MDPI support body/all assets on successful CloakBrowser HTML routes while keeping "
         "PDF/ePDF fallback text-only, and Springer/IEEE/arXiv/Copernicus PDF fallback is also text-only "
         "in this version. Set "
         "download_dir to isolate task-local downloads; the MCP server can also surface "

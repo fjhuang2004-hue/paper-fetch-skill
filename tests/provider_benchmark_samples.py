@@ -38,7 +38,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         accepted_live_source_trail_groups=(("fulltext:elsevier_article_ok",),),
         required_env=("ELSEVIER_API_KEY", "CROSSREF_MAILTO"),
         fallback_dois=("10.1016/j.rse.2026.115369",),
-        fixture_name=golden_criteria_fixture("10.1016/j.rse.2025.114648", "original.xml"),
+        fixture_name=golden_criteria_fixture(
+            "10.1016/j.rse.2025.114648", "original.xml"
+        ),
         fixture_kind="xml",
         resolve_url="https://linkinghub.elsevier.com/retrieve/pii/S0034425725000525",
     ),
@@ -51,7 +53,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="springer_html",
         accepted_live_source_trail_groups=(("fulltext:springer_html_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1038/d41586-023-01829-w", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1038/d41586-023-01829-w", "original.html"
+        ),
         fixture_kind="html",
     ),
     "science": ProviderBenchmarkSample(
@@ -63,7 +67,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="science",
         accepted_live_source_trail_groups=(("fulltext:science_html_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1126/science.ady3136", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1126/science.ady3136", "original.html"
+        ),
         fixture_kind="html",
     ),
     "wiley": ProviderBenchmarkSample(
@@ -90,7 +96,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="pnas",
         accepted_live_source_trail_groups=(("fulltext:pnas_html_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1073/pnas.2406303121", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1073/pnas.2406303121", "original.html"
+        ),
         fixture_kind="html",
     ),
     "mdpi": ProviderBenchmarkSample(
@@ -102,7 +110,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="mdpi_html",
         accepted_live_source_trail_groups=(("fulltext:mdpi_html_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.3390/membranes15030093", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.3390/membranes15030093", "original.html"
+        ),
         fixture_kind="html",
     ),
     "ieee": ProviderBenchmarkSample(
@@ -113,7 +123,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         landing_url="https://ieeexplore.ieee.org/document/10772041/",
         expected_source="ieee_html",
         accepted_live_source_trail_groups=(("fulltext:ieee_html_ok",),),
-        fixture_name=golden_criteria_fixture("10.1109/TIM.2024.3509573", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1109/TIM.2024.3509573", "original.html"
+        ),
         fixture_kind="html",
     ),
     "arxiv": ProviderBenchmarkSample(
@@ -124,7 +136,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         landing_url="https://arxiv.org/abs/2605.06663v1",
         expected_source="arxiv_html",
         accepted_live_source_trail_groups=(("fulltext:arxiv_html_ok",),),
-        fixture_name=golden_criteria_fixture("10.48550/arxiv.2605.06663v1", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.48550/arxiv.2605.06663v1", "original.html"
+        ),
         fixture_kind="html",
     ),
     "ams": ProviderBenchmarkSample(
@@ -136,7 +150,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="ams_pdf",
         accepted_live_source_trail_groups=(("fulltext:ams_pdf_fallback_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1175/jcli-d-23-0738.1", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1175/jcli-d-23-0738.1", "original.html"
+        ),
         fixture_kind="html",
     ),
     "copernicus": ProviderBenchmarkSample(
@@ -157,7 +173,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         title="Creation and application of virtual patient cohorts of heart models",
         landing_url="https://royalsocietypublishing.org/doi/10.1098/rsta.2019.0558",
         expected_source="royalsocietypublishing_html",
-        accepted_live_source_trail_groups=(("fulltext:royalsocietypublishing_html_ok",),),
+        accepted_live_source_trail_groups=(
+            ("fulltext:royalsocietypublishing_html_ok",),
+        ),
         required_env=("CROSSREF_MAILTO",),
         fixture_name=golden_criteria_fixture("10.1098/rsta.2019.0558", "original.html"),
         fixture_kind="html",
@@ -174,7 +192,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
             ("fulltext:annualreviews_pdf_fallback_ok",),
         ),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1146/annurev-control-030123-013355", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1146/annurev-control-030123-013355", "original.html"
+        ),
         fixture_kind="html",
     ),
     "oxfordacademic": ProviderBenchmarkSample(
@@ -186,7 +206,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="oxfordacademic_html",
         accepted_live_source_trail_groups=(("fulltext:oxfordacademic_html_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1093/bioinformatics/btaa161", "original.html"),
+        fixture_name=golden_criteria_fixture(
+            "10.1093/bioinformatics/btaa161", "original.html"
+        ),
         fixture_kind="html",
     ),
     "plos": ProviderBenchmarkSample(
@@ -198,7 +220,9 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         expected_source="plos_xml",
         accepted_live_source_trail_groups=(("fulltext:plos_xml_ok",),),
         required_env=("CROSSREF_MAILTO",),
-        fixture_name=golden_criteria_fixture("10.1371/journal.pone.0263725", "original.xml"),
+        fixture_name=golden_criteria_fixture(
+            "10.1371/journal.pone.0263725", "original.xml"
+        ),
         fixture_kind="xml",
     ),
     "acs": ProviderBenchmarkSample(
@@ -229,6 +253,24 @@ PROVIDER_BENCHMARK_SAMPLES: dict[str, ProviderBenchmarkSample] = {
         ),
         fixture_kind="html",
     ),
+    "aip": ProviderBenchmarkSample(
+        provider="aip",
+        doi="10.1063/5.0129134",
+        year=2022,
+        title="On-chip on-demand delivery of K+ for in vitro bioelectronics",
+        landing_url="https://pubs.aip.org/aip/adv/article/12/12/125205/2820011/On-chip-on-demand-delivery-of-K-for-in-vitro",
+        expected_source="aip_html",
+        accepted_live_source_trail_groups=(
+            ("fulltext:aip_html_ok",),
+            ("fulltext:aip_pdf_fallback_ok",),
+        ),
+        required_env=("CROSSREF_MAILTO",),
+        fixture_name=golden_criteria_fixture(
+            "10.1063/5.0129134",
+            "original.html",
+        ),
+        fixture_kind="html",
+    ),
 }
 
 
@@ -254,11 +296,15 @@ def provider_benchmark_sample(provider: str) -> ProviderBenchmarkSample:
 
 
 def iter_provider_benchmark_samples() -> tuple[ProviderBenchmarkSample, ...]:
-    return tuple(PROVIDER_BENCHMARK_SAMPLES[provider] for provider in official_provider_names())
+    return tuple(
+        PROVIDER_BENCHMARK_SAMPLES[provider] for provider in official_provider_names()
+    )
 
 
 def source_trail_matches(
     source_trail: list[str] | tuple[str, ...],
     accepted_groups: tuple[tuple[str, ...], ...],
 ) -> bool:
-    return any(all(marker in source_trail for marker in group) for group in accepted_groups)
+    return any(
+        all(marker in source_trail for marker in group) for group in accepted_groups
+    )

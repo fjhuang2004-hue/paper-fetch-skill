@@ -21,6 +21,7 @@ from paper_fetch.providers._pdf_candidates import extract_pdf_candidate_urls_fro
 from paper_fetch.provider_catalog import PROVIDER_CATALOG
 from paper_fetch.providers.base import RawFulltextPayload
 from paper_fetch.providers.acs import AcsClient
+from paper_fetch.providers.aip import AipClient
 from paper_fetch.providers.ams import AmsClient
 from paper_fetch.providers.pnas import PnasClient
 from paper_fetch.providers.science import ScienceClient
@@ -32,13 +33,14 @@ SCIENCE_SAMPLE = provider_benchmark_sample("science")
 WILEY_SAMPLE = provider_benchmark_sample("wiley")
 PNAS_SAMPLE = provider_benchmark_sample("pnas")
 ACS_SAMPLE = provider_benchmark_sample("acs")
+AIP_SAMPLE = provider_benchmark_sample("aip")
 
 
 class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
     def test_atypon_profile_scope_is_catalog_aligned(self) -> None:
         self.assertEqual(
             ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES,
-            ("science", "pnas", "wiley", "ams", "acs", "iop"),
+            ("science", "pnas", "wiley", "ams", "acs", "iop", "aip"),
         )
         self.assertTrue(
             set(ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES) <= set(PROVIDER_CATALOG)
@@ -109,6 +111,12 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
                 "drop_keywords": {"article-metrics", "rightslink"},
                 "drop_text": {"Download Citation", "Check for updates"},
             },
+            "aip": {
+                "candidate_selectors": {"#itemFullTextId", "[itemprop='articleBody']"},
+                "remove_selectors": {".article-metrics", ".cookie-banner"},
+                "drop_keywords": {"article-metrics", "rightslink"},
+                "drop_text": {"Download Citation", "Check for updates"},
+            },
         }
 
         for publisher, expectations in cases.items():
@@ -160,7 +168,9 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
             ],
         )
         ams_doi = "10.1175/jcli-d-23-0738.1"
-        ams_landing = "https://journals.ametsoc.org/view/journals/clim/37/24/JCLI-D-23-0738.1.xml"
+        ams_landing = (
+            "https://journals.ametsoc.org/view/journals/clim/37/24/JCLI-D-23-0738.1.xml"
+        )
         self.assertEqual(
             build_html_candidates("ams", ams_doi, ams_landing),
             [ams_landing],
@@ -181,6 +191,20 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
                 f"https://pubs.acs.org/doi/pdf/{ACS_SAMPLE.doi}?download=true",
             ],
         )
+        self.assertEqual(
+            build_html_candidates("aip", AIP_SAMPLE.doi)[:2],
+            [
+                f"https://pubs.aip.org/doi/full/{AIP_SAMPLE.doi}",
+                f"https://pubs.aip.org/doi/{AIP_SAMPLE.doi}",
+            ],
+        )
+        self.assertEqual(
+            build_pdf_candidates("aip", AIP_SAMPLE.doi, None)[:2],
+            [
+                f"https://pubs.aip.org/doi/epdf/{AIP_SAMPLE.doi}",
+                f"https://pubs.aip.org/doi/pdf/{AIP_SAMPLE.doi}",
+            ],
+        )
 
     def test_provider_profiles_match_candidate_builder_priority(self) -> None:
         crossref_pdf_url = (
@@ -197,6 +221,7 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
                 "https://journals.ametsoc.org/downloadpdf/journals/clim/37/24/JCLI-D-23-0738.1.xml",
             ),
             ("acs", AcsClient(None, {}), ACS_SAMPLE.doi, None),
+            ("aip", AipClient(None, {}), AIP_SAMPLE.doi, None),
         )
 
         for provider, client, doi, pdf_url in cases:
@@ -246,7 +271,9 @@ class AtyponBrowserWorkflowCandidateTests(unittest.TestCase):
             ],
         )
 
-    def test_extract_pdf_url_from_crossref_recognizes_ams_downloadpdf_links(self) -> None:
+    def test_extract_pdf_url_from_crossref_recognizes_ams_downloadpdf_links(
+        self,
+    ) -> None:
         pdf_url = "https://journals.ametsoc.org/downloadpdf/journals/clim/37/24/JCLI-D-23-0738.1.xml"
 
         self.assertEqual(

@@ -12,12 +12,16 @@ from bs4 import BeautifulSoup
 
 from paper_fetch.extraction.html.parsing import choose_parser
 from paper_fetch.extraction.html.semantics import collect_html_section_hints
-from paper_fetch.extraction.html._metadata import merge_html_metadata, parse_html_metadata
+from paper_fetch.extraction.html._metadata import (
+    merge_html_metadata,
+    parse_html_metadata,
+)
 from paper_fetch.http import HttpTransport
 from paper_fetch.models import article_from_markdown
 from paper_fetch.publisher_identity import normalize_doi
 from paper_fetch.providers import (
     _acs_html,
+    _aip_html,
     _pnas_html,
     _science_html,
     _ams_html,
@@ -35,6 +39,7 @@ from paper_fetch.providers import (
     elsevier as elsevier_provider,
     arxiv as arxiv_provider,
     acs as acs_provider,
+    aip as aip_provider,
     pnas as pnas_provider,
     science as science_provider,
     ams as ams_provider,
@@ -48,10 +53,14 @@ from paper_fetch.providers import (
     wiley as wiley_provider,
 )
 from paper_fetch.providers._article_markdown_jats import parse_jats_xml
+from paper_fetch.providers.browser_workflow.asset_download import (
+    plan_browser_asset_download,
+)
 from paper_fetch.providers.ieee import IeeeClient
 from paper_fetch.quality.html_availability import assess_html_fulltext_availability
 from paper_fetch.providers.base import ProviderContent, RawFulltextPayload
 from paper_fetch.providers._pdf_common import pdf_fetch_result_from_bytes
+from paper_fetch.runtime import RuntimeContext
 from paper_fetch.tracing import trace_from_markers
 from paper_fetch.utils import normalize_text
 from tests.golden_corpus_adapters import (
@@ -88,11 +97,15 @@ class GoldenCorpusFixture:
 
     @property
     def source_url(self) -> str:
-        return str(self.sample.get("source_url") or self.sample.get("landing_url") or "")
+        return str(
+            self.sample.get("source_url") or self.sample.get("landing_url") or ""
+        )
 
     @property
     def landing_url(self) -> str:
-        return str(self.sample.get("landing_url") or self.sample.get("source_url") or "")
+        return str(
+            self.sample.get("landing_url") or self.sample.get("source_url") or ""
+        )
 
     @property
     def route_kind(self) -> str:
@@ -118,7 +131,9 @@ class GoldenCorpusFixture:
             return article_path
         if pdf_path.exists():
             return pdf_path
-        raise FileNotFoundError(f"Golden fixture is missing canonical original.html/original.xml/original.pdf/article.html: {self.doi}")
+        raise FileNotFoundError(
+            f"Golden fixture is missing canonical original.html/original.xml/original.pdf/article.html: {self.doi}"
+        )
 
     @property
     def expected_path(self) -> Path:
@@ -139,18 +154,26 @@ def iter_golden_corpus_fixtures() -> tuple[GoldenCorpusFixture, ...]:
 
 def _has_replay_asset(sample: dict[str, Any]) -> bool:
     assets = sample.get("assets") if isinstance(sample.get("assets"), dict) else {}
-    return any(name in assets for name in ("original.html", "original.xml", "original.pdf", "article.html"))
+    return any(
+        name in assets
+        for name in ("original.html", "original.xml", "original.pdf", "article.html")
+    )
 
 
 def golden_corpus_fixture_for_doi(doi: str) -> GoldenCorpusFixture:
     sample = golden_criteria_sample_for_doi(doi)
     if "expected.json" not in sample.get("assets", {}) or not _has_replay_asset(sample):
-        raise FileNotFoundError(f"Golden corpus fixture is missing expected.json: {doi}")
+        raise FileNotFoundError(
+            f"Golden corpus fixture is missing expected.json: {doi}"
+        )
     return GoldenCorpusFixture(sample_id=str(sample["sample_id"]), sample=sample)
 
 
 def iter_golden_corpus_representative_fixtures() -> tuple[GoldenCorpusFixture, ...]:
-    return tuple(golden_corpus_fixture_for_doi(doi) for doi in representative_golden_corpus_dois())
+    return tuple(
+        golden_corpus_fixture_for_doi(doi)
+        for doi in representative_golden_corpus_dois()
+    )
 
 
 def _base_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
@@ -217,10 +240,14 @@ def _build_springer_article(fixture: GoldenCorpusFixture):
             diagnostics={
                 "availability_diagnostics": diagnostics.to_dict(),
                 "extraction": {
-                    "abstract_text": normalize_text(abstract_sections[0]["text"]) if abstract_sections else None,
+                    "abstract_text": normalize_text(abstract_sections[0]["text"])
+                    if abstract_sections
+                    else None,
                     "abstract_sections": abstract_sections,
                     "section_hints": section_hints,
-                    "extracted_authors": list(extraction_payload.get("extracted_authors") or []),
+                    "extracted_authors": list(
+                        extraction_payload.get("extracted_authors") or []
+                    ),
                 },
             },
         ),
@@ -235,6 +262,7 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
     metadata = _base_metadata(fixture)
     client_map = {
         "acs": acs_provider.AcsClient,
+        "aip": aip_provider.AipClient,
         "ams": ams_provider.AmsClient,
         "annualreviews": annualreviews_provider.AnnualreviewsClient,
         "iop": iop_provider.IopClient,
@@ -296,10 +324,19 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
         metadata=metadata,
     )
     downloaded_assets = (
-        _downloaded_annualreviews_body_assets(fixture, list(extraction.get("extracted_assets") or []))
+        _downloaded_annualreviews_body_assets(
+            fixture, list(extraction.get("extracted_assets") or [])
+        )
         if fixture.provider == "annualreviews"
         else []
     )
+    if fixture.provider == "aip":
+        downloaded_assets = _downloaded_aip_body_assets(
+            fixture,
+            client,
+            html_text,
+            fixture.source_url,
+        )
     raw_payload = RawFulltextPayload(
         provider=fixture.provider,
         source_url=fixture.source_url,
@@ -320,7 +357,67 @@ def _build_browser_workflow_article(fixture: GoldenCorpusFixture):
         trace=trace_from_markers([f"fulltext:{fixture.provider}_html_ok"]),
         merged_metadata=metadata,
     )
-    return client.to_article_model(metadata, raw_payload, downloaded_assets=downloaded_assets)
+    return client.to_article_model(
+        metadata, raw_payload, downloaded_assets=downloaded_assets
+    )
+
+
+def _downloaded_aip_body_assets(
+    fixture: GoldenCorpusFixture,
+    client: Any,
+    html_text: str,
+    source_url: str,
+) -> list[dict[str, Any]]:
+    downloaded: list[dict[str, Any]] = []
+    assets_dir = golden_criteria_asset(fixture.doi, "body_assets")
+    if not assets_dir.is_dir():
+        return downloaded
+    local_asset_paths = sorted(assets_dir.glob("m_*.jpeg"))
+    if not local_asset_paths:
+        return downloaded
+    plan = plan_browser_asset_download(
+        article_id=fixture.doi,
+        output_dir=assets_dir,
+        html_text=html_text,
+        source_url=source_url,
+        profile={
+            "client": client,
+            "context": RuntimeContext(env={}),
+            "asset_profile": "body",
+        },
+        deps=client.deps,
+    )
+    figure_index = 0
+    for item in plan.body_assets:
+        if str(item.get("kind") or "").lower() != "figure":
+            continue
+        if str(item.get("section") or "body").lower() not in {"", "body"}:
+            continue
+        asset_url = str(
+            item.get("full_size_url")
+            or item.get("url")
+            or item.get("preview_url")
+            or ""
+        )
+        if not asset_url:
+            continue
+        figure_index += 1
+        if figure_index > len(local_asset_paths):
+            break
+        asset_path = local_asset_paths[figure_index - 1]
+        downloaded_asset = dict(item)
+        downloaded_asset.update(
+            {
+                "path": golden_criteria_repo_path(asset_path),
+                "download_url": asset_url,
+                "source_url": asset_url,
+                "content_type": "image/jpeg",
+                "download_tier": "full_size",
+                "downloaded_bytes": asset_path.stat().st_size,
+            }
+        )
+        downloaded.append(downloaded_asset)
+    return downloaded
 
 
 def _downloaded_annualreviews_body_assets(
@@ -358,7 +455,9 @@ def _downloaded_annualreviews_body_assets(
                 "path": golden_criteria_repo_path(asset_path),
                 "download_url": asset_url,
                 "source_url": asset_url,
-                "content_type": "image/gif" if asset_path.suffix.lower() == ".gif" else "image/png",
+                "content_type": "image/gif"
+                if asset_path.suffix.lower() == ".gif"
+                else "image/png",
                 "download_tier": "full_size",
                 "downloaded_bytes": asset_path.stat().st_size,
             }
@@ -370,7 +469,9 @@ def _downloaded_annualreviews_body_assets(
 def _ieee_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     article_number = str(fixture.sample.get("article_number") or "")
     landing_metadata = _ieee_metadata._parse_landing_metadata(
-        golden_criteria_asset(fixture.doi, "landing.html").read_text(encoding="utf-8", errors="ignore")
+        golden_criteria_asset(fixture.doi, "landing.html").read_text(
+            encoding="utf-8", errors="ignore"
+        )
     )
     metadata = _ieee_metadata._merge_ieee_metadata(
         _base_metadata(fixture),
@@ -380,7 +481,9 @@ def _ieee_fixture_metadata(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     references_path = golden_criteria_asset(fixture.doi, "references.json")
     if references_path.exists():
         references_payload = json.loads(references_path.read_text(encoding="utf-8"))
-        references = _ieee_metadata._references_from_ieee_reference_payload(references_payload)
+        references = _ieee_metadata._references_from_ieee_reference_payload(
+            references_payload
+        )
         if references:
             metadata["references"] = references
     if not metadata.get("doi"):
@@ -399,7 +502,9 @@ def _ieee_downloaded_body_assets(
     for index, item in enumerate(extracted_assets, start=1):
         if item.get("kind") not in {"figure", "table"} or item.get("section") != "body":
             continue
-        asset_url = item.get("url") or item.get("full_size_url") or item.get("preview_url")
+        asset_url = (
+            item.get("url") or item.get("full_size_url") or item.get("preview_url")
+        )
         if not asset_url:
             continue
         path = tmpdir / f"ieee-asset-{index}.gif"
@@ -454,8 +559,12 @@ def _build_ieee_article(fixture: GoldenCorpusFixture):
     )
     client = IeeeClient(HttpTransport(), {})
     with tempfile.TemporaryDirectory() as tmpdir:
-        downloaded_assets = _ieee_downloaded_body_assets(extraction.extracted_assets, Path(tmpdir))
-        return client.to_article_model({"doi": fixture.doi}, raw_payload, downloaded_assets=downloaded_assets)
+        downloaded_assets = _ieee_downloaded_body_assets(
+            extraction.extracted_assets, Path(tmpdir)
+        )
+        return client.to_article_model(
+            {"doi": fixture.doi}, raw_payload, downloaded_assets=downloaded_assets
+        )
 
 
 def _build_oxfordacademic_article(fixture: GoldenCorpusFixture):
@@ -595,7 +704,9 @@ def _build_copernicus_article(fixture: GoldenCorpusFixture):
 
 def _build_royalsocietypublishing_article(fixture: GoldenCorpusFixture):
     metadata = _base_metadata(fixture)
-    client = royalsocietypublishing_provider.RoyalsocietypublishingClient(HttpTransport(), {})
+    client = royalsocietypublishing_provider.RoyalsocietypublishingClient(
+        HttpTransport(), {}
+    )
     if fixture.route_kind == "pdf_fallback":
         body = fixture.raw_path.read_bytes()
         if not metadata.get("doi"):
@@ -851,15 +962,20 @@ def _lightweight_arxiv_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     return _article_model_positive_summary(_build_arxiv_article(fixture), fixture)
 
 
-def _article_model_positive_summary(article, fixture: GoldenCorpusFixture) -> dict[str, Any]:
-    abstract_sections = [section for section in article.sections if section.kind == "abstract"]
+def _article_model_positive_summary(
+    article, fixture: GoldenCorpusFixture
+) -> dict[str, Any]:
+    abstract_sections = [
+        section for section in article.sections if section.kind == "abstract"
+    ]
     body_sections = [section for section in article.sections if section.kind == "body"]
     return {
         "doi": normalize_doi(str(article.doi or fixture.doi)),
         "has": {
             "title": bool(normalize_text(article.metadata.title)),
             "authors": bool(article.metadata.authors),
-            "abstract": bool(normalize_text(article.metadata.abstract)) or bool(abstract_sections),
+            "abstract": bool(normalize_text(article.metadata.abstract))
+            or bool(abstract_sections),
             "body": bool(body_sections),
         },
         "validated_fields": ("title", "authors", "abstract", "body"),
@@ -889,7 +1005,8 @@ def _lightweight_springer_summary(fixture: GoldenCorpusFixture) -> dict[str, Any
         "has": {
             "title": bool(normalize_text(metadata.get("title"))),
             "authors": bool(extraction_payload["extracted_authors"]),
-            "abstract": bool(normalize_text(metadata.get("abstract"))) or bool(extraction_payload["abstract_sections"]),
+            "abstract": bool(normalize_text(metadata.get("abstract")))
+            or bool(extraction_payload["abstract_sections"]),
             "body": bool(extraction_payload["section_hints"]),
         },
         "validated_fields": ("title", "authors", "abstract", "body"),
@@ -898,9 +1015,13 @@ def _lightweight_springer_summary(fixture: GoldenCorpusFixture) -> dict[str, Any
     }
 
 
-def _lightweight_atypon_browser_workflow_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
+def _lightweight_atypon_browser_workflow_summary(
+    fixture: GoldenCorpusFixture,
+) -> dict[str, Any]:
     if fixture.route_kind == "pdf_fallback":
-        return _article_model_positive_summary(_build_browser_workflow_article(fixture), fixture)
+        return _article_model_positive_summary(
+            _build_browser_workflow_article(fixture), fixture
+        )
     html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
     metadata = parse_html_metadata(html_text, fixture.source_url)
     browser_helpers = {
@@ -910,6 +1031,10 @@ def _lightweight_atypon_browser_workflow_summary(fixture: GoldenCorpusFixture) -
         ),
         "acs": (
             _acs_html.extract_authors,
+            lambda _html_text: (),
+        ),
+        "aip": (
+            _aip_html.extract_authors,
             lambda _html_text: (),
         ),
         "science": (
@@ -943,22 +1068,29 @@ def _lightweight_atypon_browser_workflow_summary(fixture: GoldenCorpusFixture) -
         },
         "validated_fields": ("title", "authors"),
         "blocking_fallback_signals": tuple(blocking_fallback_signals(html_text)),
-        "source_candidate_hit": fixture.source_url in candidate_urls or fixture.landing_url in candidate_urls,
+        "source_candidate_hit": fixture.source_url in candidate_urls
+        or fixture.landing_url in candidate_urls,
     }
 
 
 def _lightweight_mdpi_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     if fixture.route_kind == "pdf_fallback":
-        return _article_model_positive_summary(_build_browser_workflow_article(fixture), fixture)
+        return _article_model_positive_summary(
+            _build_browser_workflow_article(fixture), fixture
+        )
     html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
     metadata = parse_html_metadata(html_text, fixture.source_url)
-    article_html, title, abstract_text, _container_text_length = _mdpi_html._article_container_html(
-        html_text,
-        metadata,
+    article_html, title, abstract_text, _container_text_length = (
+        _mdpi_html._article_container_html(
+            html_text,
+            metadata,
+        )
     )
     article_soup = BeautifulSoup(article_html, choose_parser())
     article = article_soup.find("article")
-    section_hints = collect_html_section_hints(article, title=title) if article is not None else []
+    section_hints = (
+        collect_html_section_hints(article, title=title) if article is not None else []
+    )
     client = mdpi_provider.MdpiClient(HttpTransport(), {})
     candidate_urls = client.html_candidates(
         fixture.doi,
@@ -974,13 +1106,16 @@ def _lightweight_mdpi_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
         },
         "validated_fields": ("title", "authors", "abstract", "body"),
         "blocking_fallback_signals": (),
-        "source_candidate_hit": fixture.source_url in candidate_urls or fixture.landing_url in candidate_urls,
+        "source_candidate_hit": fixture.source_url in candidate_urls
+        or fixture.landing_url in candidate_urls,
     }
 
 
 def _lightweight_annualreviews_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
     if fixture.route_kind == "pdf_fallback":
-        return _article_model_positive_summary(_build_browser_workflow_article(fixture), fixture)
+        return _article_model_positive_summary(
+            _build_browser_workflow_article(fixture), fixture
+        )
     html_text = fixture.raw_path.read_text(encoding="utf-8", errors="ignore")
     metadata = parse_html_metadata(html_text, fixture.source_url)
     article_html, title, _container_text_length, section_hints, abstract_sections = (
@@ -1000,8 +1135,11 @@ def _lightweight_annualreviews_summary(fixture: GoldenCorpusFixture) -> dict[str
             "body": bool(section_hints) or bool(normalize_text(article_html)),
         },
         "validated_fields": ("title", "authors", "abstract", "body"),
-        "blocking_fallback_signals": tuple(_annualreviews_html.blocking_fallback_signals(html_text)),
-        "source_candidate_hit": fixture.source_url in candidate_urls or fixture.landing_url in candidate_urls,
+        "blocking_fallback_signals": tuple(
+            _annualreviews_html.blocking_fallback_signals(html_text)
+        ),
+        "source_candidate_hit": fixture.source_url in candidate_urls
+        or fixture.landing_url in candidate_urls,
     }
 
 
@@ -1018,8 +1156,10 @@ def _lightweight_ieee_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
         "has": {
             "title": bool(normalize_text(metadata.get("title"))),
             "authors": bool(metadata.get("authors")),
-            "abstract": bool(normalize_text(metadata.get("abstract"))) or bool(extraction.abstract_sections),
-            "body": bool(extraction.section_hints) or bool(normalize_text(extraction.markdown_text)),
+            "abstract": bool(normalize_text(metadata.get("abstract")))
+            or bool(extraction.abstract_sections),
+            "body": bool(extraction.section_hints)
+            or bool(normalize_text(extraction.markdown_text)),
         },
         "validated_fields": ("title", "authors", "abstract", "body"),
         "blocking_fallback_signals": (),
@@ -1031,8 +1171,12 @@ def _lightweight_copernicus_summary(fixture: GoldenCorpusFixture) -> dict[str, A
     return _article_model_positive_summary(_build_copernicus_article(fixture), fixture)
 
 
-def _lightweight_royalsocietypublishing_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
-    return _article_model_positive_summary(_build_royalsocietypublishing_article(fixture), fixture)
+def _lightweight_royalsocietypublishing_summary(
+    fixture: GoldenCorpusFixture,
+) -> dict[str, Any]:
+    return _article_model_positive_summary(
+        _build_royalsocietypublishing_article(fixture), fixture
+    )
 
 
 def _lightweight_plos_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
@@ -1040,10 +1184,14 @@ def _lightweight_plos_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
 
 
 def _lightweight_oxfordacademic_summary(fixture: GoldenCorpusFixture) -> dict[str, Any]:
-    return _article_model_positive_summary(_build_oxfordacademic_article(fixture), fixture)
+    return _article_model_positive_summary(
+        _build_oxfordacademic_article(fixture), fixture
+    )
 
 
-def lightweight_positive_summary_from_fixture(fixture: GoldenCorpusFixture) -> dict[str, Any]:
+def lightweight_positive_summary_from_fixture(
+    fixture: GoldenCorpusFixture,
+) -> dict[str, Any]:
     return golden_corpus_adapter(fixture.provider).lightweight_summary(fixture)
 
 
@@ -1098,6 +1246,33 @@ def _register_golden_corpus_adapters() -> None:
     )
     register_golden_corpus_adapter(
         GoldenCorpusAdapter(
+            provider="aip",
+            build_article=_build_browser_workflow_article,
+            lightweight_summary=_lightweight_atypon_browser_workflow_summary,
+            primary_contract=ProviderGoldenContract(
+                route_kind="html",
+                content_prefix="text/html",
+                source="aip_html",
+                primary_marker="fulltext:aip_html_ok",
+            ),
+            fallback_contracts={
+                "pdf_fallback": ProviderGoldenContract(
+                    route_kind="pdf_fallback",
+                    content_prefix="application/pdf",
+                    source="aip_pdf",
+                    primary_marker="fulltext:aip_pdf_fallback_ok",
+                ),
+            },
+            representative_doi="10.1063/5.0129134",
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+            ),
+        )
+    )
+    register_golden_corpus_adapter(
+        GoldenCorpusAdapter(
             provider="annualreviews",
             build_article=_build_browser_workflow_article,
             lightweight_summary=_lightweight_annualreviews_summary,
@@ -1116,7 +1291,11 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1146/annurev-control-030123-013355",
-            representative_count_fields=("sections", "abstract_sections", "body_sections"),
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+            ),
         )
     )
     register_golden_corpus_adapter(
@@ -1223,7 +1402,11 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1088/1748-9326/ab7d02",
-            representative_count_fields=("sections", "abstract_sections", "body_sections"),
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+            ),
         )
     )
     register_golden_corpus_adapter(
@@ -1268,7 +1451,11 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.3390/membranes15030093",
-            representative_count_fields=("sections", "abstract_sections", "body_sections"),
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+            ),
         )
     )
     register_golden_corpus_adapter(
@@ -1313,7 +1500,11 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1098/rsta.2019.0558",
-            representative_count_fields=("sections", "abstract_sections", "body_sections"),
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+            ),
         )
     )
     register_golden_corpus_adapter(
@@ -1336,7 +1527,12 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1093/bioinformatics/btaa161",
-            representative_count_fields=("sections", "abstract_sections", "body_sections", "references"),
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+                "references",
+            ),
         )
     )
     register_golden_corpus_adapter(
@@ -1359,7 +1555,11 @@ def _register_golden_corpus_adapters() -> None:
                 ),
             },
             representative_doi="10.1371/journal.pone.0263725",
-            representative_count_fields=("sections", "abstract_sections", "body_sections"),
+            representative_count_fields=(
+                "sections",
+                "abstract_sections",
+                "body_sections",
+            ),
         )
     )
 
@@ -1368,17 +1568,28 @@ _register_golden_corpus_adapters()
 
 
 def expected_summary_from_article(article) -> dict[str, Any]:
-    abstract_sections = [section for section in article.sections if section.kind == "abstract"]
+    abstract_sections = [
+        section for section in article.sections if section.kind == "abstract"
+    ]
     body_sections = [section for section in article.sections if section.kind == "body"]
-    data_sections = [section for section in article.sections if section.kind == "data_availability"]
-    code_sections = [section for section in article.sections if section.kind == "code_availability"]
-    figure_assets = [asset for asset in article.assets if getattr(asset, "kind", "") == "figure"]
-    table_assets = [asset for asset in article.assets if getattr(asset, "kind", "") == "table"]
+    data_sections = [
+        section for section in article.sections if section.kind == "data_availability"
+    ]
+    code_sections = [
+        section for section in article.sections if section.kind == "code_availability"
+    ]
+    figure_assets = [
+        asset for asset in article.assets if getattr(asset, "kind", "") == "figure"
+    ]
+    table_assets = [
+        asset for asset in article.assets if getattr(asset, "kind", "") == "table"
+    ]
     return {
         "has": {
             "title": bool(normalize_text(article.metadata.title)),
             "authors": bool(article.metadata.authors),
-            "abstract": bool(normalize_text(article.metadata.abstract)) or bool(abstract_sections),
+            "abstract": bool(normalize_text(article.metadata.abstract))
+            or bool(abstract_sections),
             "body": bool(body_sections),
             "figures": bool(figure_assets),
             "references": bool(article.references),
