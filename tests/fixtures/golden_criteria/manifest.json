@@ -3226,6 +3226,20 @@
         "markdown-quality-prompt.md": "tests/fixtures/golden_criteria/10.1063_5.0188905/markdown-quality-prompt.md",
         "markdown-quality.json": "tests/fixtures/golden_criteria/10.1063_5.0188905/markdown-quality.json"
       }
+    },
+    "10.1080_07388551.2025.2612060": {
+      "doi": "10.1080/07388551.2025.2612060",
+      "publisher": "tandf",
+      "title": "TODO: fill golden criteria title",
+      "source_url": "",
+      "landing_url": "",
+      "route_kind": "html",
+      "content_type": "text/html",
+      "origin_kind": "placeholder",
+      "usage_kind": "content",
+      "fixture_family": "golden",
+      "expected_outcome": "pending",
+      "assets": {}
     }
   },
   "tests": [

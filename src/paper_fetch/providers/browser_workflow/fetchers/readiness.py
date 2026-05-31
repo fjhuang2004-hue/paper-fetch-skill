@@ -14,6 +14,9 @@ ATYPON_BODY_READY_SELECTORS: Mapping[str, tuple[str, ...]] = {
         "#html_fulltext",
         ".articleSection",
     ),
+    "tandf": (
+        ".hlFld-Fulltext",
+    ),
     "wiley": (
         ".article-section__content.en.main",
         "section.article-section__content",

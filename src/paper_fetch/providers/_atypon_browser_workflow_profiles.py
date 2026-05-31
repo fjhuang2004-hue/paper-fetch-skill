@@ -82,6 +82,7 @@ ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES = (
     "acs",
     "iop",
     "aip",
+    "tandf",
 )
 
 
