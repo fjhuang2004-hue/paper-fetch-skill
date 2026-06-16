@@ -258,33 +258,48 @@ async def _click_turnstile(tab) -> bool:
 # Core: single-shot CF bypass attempt (from cf_unified.py try_once)
 # ═══════════════════════════════════════════════════════════════════
 
-async def _finalize(tab, browser, url: str, cf_type: str, publisher: str = "") -> dict[str, Any]:
-    """Read page HTML, optionally auto-login, stop browser, return result."""
-    # Auto-login if publisher supports it
-    if publisher:
-        try:
-            from ._nodriver_login import has_login_handler, try_auto_login
-            if has_login_handler(publisher):
-                logger.info("Checking if auto-login needed for %s…", publisher)
-                login_result = await try_auto_login(tab, publisher)
-                if login_result.get("access") == "full_text":
-                    logger.info("Auto-login succeeded for %s", publisher)
-                else:
-                    logger.debug("Auto-login: access=%s for %s", login_result.get("access"), publisher)
-        except Exception as exc:
-            logger.debug("Auto-login skipped (%s)", exc)
+async def _auto_login_if_needed(tab, publisher: str) -> None:
+    """Attempt auto-login if the publisher has a login handler."""
+    if not publisher:
+        return
+    try:
+        from ._nodriver_login import has_login_handler, try_auto_login
+        if has_login_handler(publisher):
+            logger.info("Checking if auto-login needed for %s…", publisher)
+            login_result = await try_auto_login(tab, publisher)
+            if login_result.get("access") == "full_text":
+                logger.info("Auto-login succeeded for %s", publisher)
+            else:
+                logger.debug("Auto-login: access=%s for %s", login_result.get("access"), publisher)
+    except Exception as exc:
+        logger.debug("Auto-login skipped (%s)", exc)
 
+
+async def _extract_page_data(tab, url: str) -> dict[str, Any]:
+    """Extract HTML/title/URL from the current tab (does NOT close browser)."""
     html = await tab.evaluate("document.documentElement.outerHTML") or ""
     title = await tab.evaluate("document.title") or ""
     final_url = await tab.evaluate("window.location.href") or url
+    if isinstance(html, list): html = html[0] if html else ""
+    if isinstance(title, list): title = title[0] if title else ""
+    if isinstance(final_url, list): final_url = final_url[0] if final_url else url
+    return {"ok": True, "html": str(html), "title": str(title), "final_url": str(final_url)}
+
+
+async def _stop_browser_safely(browser) -> None:
     try:
         await browser.stop()
     except Exception:
         pass
-    if isinstance(html, list): html = html[0] if html else ""
-    if isinstance(title, list): title = title[0] if title else ""
-    if isinstance(final_url, list): final_url = final_url[0] if final_url else url
-    return {"ok": True, "html": str(html), "title": str(title), "final_url": str(final_url), "cf_type": cf_type}
+
+
+async def _finalize(tab, browser, url: str, cf_type: str, publisher: str = "") -> dict[str, Any]:
+    """Read page HTML, optionally auto-login, stop browser, return result."""
+    await _auto_login_if_needed(tab, publisher)
+    result = await _extract_page_data(tab, url)
+    await _stop_browser_safely(browser)
+    result["cf_type"] = cf_type
+    return result
 
 
 async def _try_once(url: str, chrome_path: str, user_data_dir: str,
@@ -365,6 +380,159 @@ async def _try_once(url: str, chrome_path: str, user_data_dir: str,
 
     # "none" or "unknown" — assume passed
     return await _finalize(tab, browser, url, cf_type, publisher)
+
+
+async def _try_once_keep_alive(url: str, chrome_path: str, user_data_dir: str,
+                               headless: bool = False, publisher: str = "") -> dict[str, Any]:
+    """Like ``_try_once`` but returns ``browser`` + ``tab`` on success
+    so the caller can do more work (e.g. image download) before closing.
+
+    On success the returned dict includes keys: ``browser``, ``tab``.
+    The caller MUST close the browser when done.
+    """
+    kill_chrome(user_data_dir=user_data_dir)
+
+    real = _resolve_real_profile()
+    if not real:
+        return {"ok": False, "cf_type": "no_profile", "error": "No real Chrome profile found"}
+
+    profile = _copy_profile_fresh(real, user_data_dir)
+    kwargs = dict(browser_executable_path=chrome_path, headless=headless, sandbox=False)
+    if profile:
+        kwargs["user_data_dir"] = profile
+        kwargs["browser_args"] = ["--profile-directory=Default"]
+
+    uc = import_nodriver()
+    browser = await uc.start(**kwargs)
+    await asyncio.sleep(2)
+
+    for _ in range(5):
+        try:
+            tab = await browser.get(url)
+            break
+        except (StopIteration, RuntimeError):
+            await asyncio.sleep(1)
+    else:
+        await _stop_browser_safely(browser)
+        raise RuntimeError("Cannot get browser tab")
+
+    await tab.sleep(3)
+
+    # Already passed?
+    if await _check_cf_passed(tab):
+        await _auto_login_if_needed(tab, publisher)
+        result = await _extract_page_data(tab, url)
+        result["cf_type"] = "none"
+        result["browser"] = browser
+        result["tab"] = tab
+        return result
+
+    cf_type = await _detect_cf_type(tab)
+    logger.debug("CF type=%s for %s (keep-alive)", cf_type, url)
+
+    if cf_type == "hcaptcha":
+        await _stop_browser_safely(browser)
+        return {"ok": False, "cf_type": "hcaptcha", "error": "hcaptcha cannot be auto-bypassed"}
+
+    if cf_type == "turnstile_visible":
+        ok = await _click_turnstile(tab)
+        if ok:
+            await _auto_login_if_needed(tab, publisher)
+            result = await _extract_page_data(tab, url)
+            result["cf_type"] = "turnstile"
+            result["browser"] = browser
+            result["tab"] = tab
+            return result
+        await _stop_browser_safely(browser)
+        return {"ok": False, "cf_type": "turnstile", "error": "Turnstile click failed"}
+
+    if cf_type in ("turnstile_hidden", "js_challenge"):
+        for i in range(25):
+            await tab.sleep(1)
+            if await _check_cf_passed(tab):
+                await _auto_login_if_needed(tab, publisher)
+                result = await _extract_page_data(tab, url)
+                result["cf_type"] = cf_type
+                result["browser"] = browser
+                result["tab"] = tab
+                return result
+            if i == 5:
+                h = await tab.evaluate("document.documentElement.outerHTML") or ""
+                if "challenges.cloudflare.com" in h.lower():
+                    logger.debug("Delayed Turnstile detected for %s (keep-alive)", url)
+                    ok = await _click_turnstile(tab)
+                    if ok:
+                        await _auto_login_if_needed(tab, publisher)
+                        result = await _extract_page_data(tab, url)
+                        result["cf_type"] = "turnstile"
+                        result["browser"] = browser
+                        result["tab"] = tab
+                        return result
+                    await _stop_browser_safely(browser)
+                    return {"ok": False, "cf_type": "turnstile", "error": "Delayed Turnstile failed"}
+
+    # "none" or "unknown" — assume passed
+    await _auto_login_if_needed(tab, publisher)
+    result = await _extract_page_data(tab, url)
+    result["cf_type"] = cf_type
+    result["browser"] = browser
+    result["tab"] = tab
+    return result
+
+
+def fetch_html_keep_browser(
+    candidate_urls: list[str],
+    *,
+    publisher: str,
+    config: BrowserRuntimeConfig,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Fetch HTML via nodriver WITHOUT closing the browser.
+
+    Returns a dict with keys: ``html``, ``title``, ``final_url``, ``cf_type``,
+    ``browser``, ``tab``.  The caller MUST call ``await browser.stop()``
+    when done with the browser.
+
+    Only tries the first URL (no retries) to keep latency predictable.
+    """
+    chrome_path = config.binary_path or DEFAULT_CHROME_EXE
+    user_data_dir = str(config.user_data_dir or DEFAULT_NODRIVER_TEMP_PROFILE)
+    headless = config.headless
+
+    if not candidate_urls:
+        raise BrowserRuntimeFailure("no_candidate_urls", "No candidate URLs provided")
+
+    async def _fetch():
+        url = candidate_urls[0]
+        result = await _try_once_keep_alive(url, chrome_path, user_data_dir, headless, publisher)
+        if result.get("ok"):
+            html = result.get("html", "")
+            if html and len(html) > 500:
+                return result
+            # HTML too short — close browser and fail
+            await _stop_browser_safely(result.get("browser"))
+            raise BrowserRuntimeFailure(
+                "html_fetch_failed",
+                f"HTML too short ({len(html)} chars)",
+            )
+        # CF failed — browser already closed by _try_once_keep_alive
+        raise BrowserRuntimeFailure(
+            "html_fetch_failed",
+            result.get("error", "CF bypass failed"),
+        )
+
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if running_loop is not None:
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_run_fetch_in_new_loop, _fetch)
+            return future.result(timeout=config.timeout_ms / 1000.0)
+    else:
+        return _run_fetch_in_new_loop(_fetch)
 
 
 # ═══════════════════════════════════════════════════════════════════
