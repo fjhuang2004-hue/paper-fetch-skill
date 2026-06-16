@@ -12,8 +12,6 @@ from .parsing import choose_parser
 from .semantics import collect_html_section_hints
 from ._runtime import (
     clean_markdown,
-    extract_article_markdown,
-    extract_article_markdown_from_cleaned_html,
 )
 
 HtmlMarkdownRenderFn = Callable[[str, str], str]
@@ -43,14 +41,10 @@ class HtmlMarkdownRenderer:
     def _render_raw(self, html_text: str, source_url: str) -> str:
         if self.renderer is not None:
             return str(self.renderer(html_text, source_url) or "")
-        kwargs = {}
-        if self.trafilatura_backend is not _DEFAULT_TRAFILATURA:
-            kwargs["trafilatura_backend"] = self.trafilatura_backend
-        if self.noise_profile is not None:
-            kwargs["noise_profile"] = self.noise_profile
-        if self.cleaned_html:
-            return extract_article_markdown_from_cleaned_html(html_text, source_url, **kwargs)
-        return extract_article_markdown(html_text, source_url, **kwargs)
+        # No renderer configured — strip HTML tags as a simple fallback.
+        from bs4 import BeautifulSoup as _Bs
+        soup = _Bs(html_text, choose_parser())
+        return soup.get_text("\n", strip=True)
 
 
 def clean_rendered_markdown(

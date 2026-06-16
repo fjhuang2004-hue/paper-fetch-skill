@@ -9,7 +9,7 @@ import time
 from typing import TYPE_CHECKING, Any, Mapping
 
 from ..artifacts import ArtifactStore
-from ..extraction.html import render_html_markdown
+
 from ..http import RequestFailure
 from ..models import ArticleModel, AssetProfile
 from ..runtime import RuntimeContext
@@ -516,8 +516,11 @@ class ProviderClient:
         metadata: Mapping[str, Any],
         context: RuntimeContext,
     ) -> tuple[str, Mapping[str, Any]]:
-        del metadata, context
-        return render_html_markdown(html_text, source_url), {
+        del metadata, context, source_url
+        from bs4 import BeautifulSoup as _Bs
+        from ..extraction.html.parsing import choose_parser as _cp
+        soup = _Bs(html_text, _cp())
+        return soup.get_text("\n", strip=True), {
             "html_to_markdown": {
                 "provider": self.name,
                 "parser": "generic",

@@ -40,6 +40,20 @@ CLOAKBROWSER_BINARY_PATH_ENV_VAR = "CLOAKBROWSER_BINARY_PATH"
 CLOAKBROWSER_USER_DATA_DIR_ENV_VAR = "CLOAKBROWSER_USER_DATA_DIR"
 CLOAKBROWSER_TIMEOUT_MS_ENV_VAR = "CLOAKBROWSER_TIMEOUT_MS"
 
+# ── nodriver (CDP-based Chrome) runtime ──
+NODRIVER_CHROME_PATH_ENV_VAR = "NODRIVER_CHROME_PATH"
+NODRIVER_USER_DATA_DIR_ENV_VAR = "NODRIVER_USER_DATA_DIR"
+NODRIVER_HEADLESS_ENV_VAR = "NODRIVER_HEADLESS"
+
+import sys as _sys
+if _sys.platform == "win32":
+    DEFAULT_CHROME_EXE = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+    DEFAULT_NODRIVER_TEMP_PROFILE = Path.home() / "AppData" / "Local" / "Temp" / "nodriver_paper_fetch"
+else:
+    DEFAULT_CHROME_EXE = "/usr/bin/google-chrome"
+    DEFAULT_NODRIVER_TEMP_PROFILE = Path("/tmp/nodriver_paper_fetch")
+del _sys
+
 
 def load_env_file(path: Path) -> dict[str, str]:
     if not path.exists():

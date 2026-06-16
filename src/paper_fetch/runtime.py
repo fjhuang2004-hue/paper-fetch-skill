@@ -13,7 +13,8 @@ from typing import Any, Hashable, Mapping
 
 from .artifacts import DEFAULT_ARTIFACT_MODE, ArtifactMode, ArtifactStore
 from .config import (
-    CLOAKBROWSER_BINARY_PATH_ENV_VAR,
+    NODRIVER_CHROME_PATH_ENV_VAR,
+    NODRIVER_USER_DATA_DIR_ENV_VAR,
     HTTP_DISK_CACHE_DIR_ENV_VAR,
     HTTP_DISK_CACHE_ENV_VAR,
     HTTP_DISK_CACHE_MAX_AGE_DAYS_ENV_VAR,
@@ -160,23 +161,23 @@ class RuntimeContext:
             self.clients = build_clients(self.transport, self.env)
         return self.clients
 
-    def playwright_browser(self, *, headless: bool = True) -> Any:
-        """Return a lazily started shared CloakBrowser browser."""
+    def playwright_browser(self, *, headless: bool = False) -> Any:
+        """Return a lazily started shared nodriver Chrome browser."""
 
         return self._browser_lifecycle().browser(headless=headless)
 
-    def new_browser_context(self, *, headless: bool = True, **context_kwargs: Any) -> Any:
-        """Create an isolated browser context from the shared CloakBrowser browser."""
+    def new_browser_context(self, *, headless: bool = False, **context_kwargs: Any) -> Any:
+        """Create an isolated browser context from the shared nodriver browser."""
 
         return self._browser_lifecycle().new_context(headless=headless, **context_kwargs)
 
-    def new_playwright_context(self, *, headless: bool = True, **context_kwargs: Any) -> Any:
-        """Create an isolated browser context from the shared CloakBrowser browser."""
+    def new_playwright_context(self, *, headless: bool = False, **context_kwargs: Any) -> Any:
+        """Create an isolated browser context from the shared nodriver browser."""
 
         return self.new_browser_context(headless=headless, **context_kwargs)
 
     def close_playwright(self) -> None:
-        """Close any browser owned by this runtime context."""
+        """Close any nodriver browser owned by this runtime context."""
 
         with self._browser_context_manager_lock:
             manager = self._browser_context_manager
@@ -186,8 +187,13 @@ class RuntimeContext:
     def _browser_lifecycle(self) -> BrowserContextManager:
         with self._browser_context_manager_lock:
             if self._browser_context_manager is None:
-                binary_path = str((self.env or {}).get(CLOAKBROWSER_BINARY_PATH_ENV_VAR, "")).strip() or None
-                self._browser_context_manager = BrowserContextManager(binary_path=binary_path)
+                env = self.env or {}
+                chrome_path = str(env.get(NODRIVER_CHROME_PATH_ENV_VAR, "")).strip() or None
+                user_data_dir = str(env.get(NODRIVER_USER_DATA_DIR_ENV_VAR, "")).strip() or None
+                self._browser_context_manager = BrowserContextManager(
+                    binary_path=chrome_path,
+                    user_data_dir=user_data_dir,
+                )
             return self._browser_context_manager
 
     def close(self) -> None:

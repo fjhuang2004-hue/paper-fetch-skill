@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from html.parser import HTMLParser
 from typing import Any, Mapping
 
 from ...extraction.html.language import (
@@ -56,11 +55,6 @@ from .provider_rules import (
     normalize_noise_profile,
 )
 
-try:
-    import trafilatura
-except ImportError:  # pragma: no cover - exercised implicitly when dependency is absent
-    trafilatura = None
-
 from bs4 import BeautifulSoup
 
 HTML_ROOT_SELECTORS = ("article", "main", '[role="main"]')
@@ -94,8 +88,6 @@ TEXT_EXTRACTION_BLOCK_TAGS = frozenset(
     for tag in ("p", "div", "section", "article", "li", "ul", "ol", "table", "tr")
     if tag in HTML_BLOCK_TAGS
 )
-_USE_MODULE_TRAFILATURA = object()
-
 
 @dataclass(frozen=True)
 class HtmlCleanupRules:
@@ -126,78 +118,6 @@ def html_cleanup_rules(noise_profile: str | None = None) -> HtmlCleanupRules:
         markdown_short_tokens=policy.markdown_short_tokens,
         markdown_promo_tokens=policy.markdown_contains_tokens,
     )
-
-
-class _FallbackMarkdownParser(HTMLParser):
-    BLOCK_TAGS = TEXT_EXTRACTION_BLOCK_TAGS
-    HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.lines: list[str] = []
-        self._current: list[str] = []
-        self._heading_level = 0
-        self._skip_depth = 0
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        lowered_tag = tag.lower()
-        attributes = {key.lower(): (value or "") for key, value in attrs}
-        if lowered_tag in {"script", "style", "nav", "footer", "header"}:
-            self._skip_depth += 1
-            return
-        if self._skip_depth:
-            return
-        class_attr = attributes.get("class", "").lower()
-        id_attr = attributes.get("id", "").lower()
-        skip_attr_tokens = ("cookie", "nav", "footer", "share", "signin")
-        if lowered_tag not in self.HEADING_TAGS:
-            skip_attr_tokens = (*skip_attr_tokens, "header")
-        if any(token in f"{class_attr} {id_attr}" for token in skip_attr_tokens):
-            self._skip_depth += 1
-            return
-        if lowered_tag in self.HEADING_TAGS:
-            self._flush()
-            self._heading_level = int(lowered_tag[1])
-        elif lowered_tag == "br":
-            self._current.append("\n")
-        elif lowered_tag in self.BLOCK_TAGS:
-            self._flush()
-
-    def handle_endtag(self, tag: str) -> None:
-        lowered_tag = tag.lower()
-        if (
-            lowered_tag in {"script", "style", "nav", "footer", "header"}
-            and self._skip_depth
-        ):
-            self._skip_depth -= 1
-            return
-        if self._skip_depth:
-            if lowered_tag in {"div", "section", "article"}:
-                self._skip_depth = max(0, self._skip_depth - 1)
-            return
-        if lowered_tag in self.HEADING_TAGS:
-            self._flush()
-            self._heading_level = 0
-        elif lowered_tag in self.BLOCK_TAGS:
-            self._flush()
-
-    def handle_data(self, data: str) -> None:
-        if self._skip_depth:
-            return
-        if data.strip():
-            self._current.append(data)
-
-    def _flush(self) -> None:
-        text = normalize_text("".join(self._current))
-        if not text:
-            self._current = []
-            return
-        if self._heading_level:
-            self.lines.append(f"{'#' * self._heading_level} {text}")
-        else:
-            self.lines.append(text)
-        self.lines.append("")
-        self._current = []
 
 
 def decode_html(body: bytes) -> str:
@@ -337,63 +257,6 @@ def extract_html_section_hints(
             html_text, noise_profile=noise_profile, title=title
         )["section_hints"]
     )
-
-
-def extract_article_markdown(
-    html_text: str,
-    source_url: str,
-    *,
-    trafilatura_backend: Any = _USE_MODULE_TRAFILATURA,
-    noise_profile: str | None = None,
-) -> str:
-    active_noise_profile = _normalize_noise_profile(noise_profile)
-    cleaned_html, _ = prepare_html_extraction_tree(
-        html_text, noise_profile=active_noise_profile
-    )
-    return extract_article_markdown_from_cleaned_html(
-        cleaned_html,
-        source_url,
-        trafilatura_backend=trafilatura_backend,
-        noise_profile=active_noise_profile,
-        raw_html=html_text,
-    )
-
-
-def extract_article_markdown_from_cleaned_html(
-    cleaned_html: str,
-    source_url: str,
-    *,
-    trafilatura_backend: Any = _USE_MODULE_TRAFILATURA,
-    noise_profile: str | None = None,
-    raw_html: str | None = None,
-) -> str:
-    del source_url
-    active_noise_profile = _normalize_noise_profile(noise_profile)
-    active_trafilatura = (
-        trafilatura
-        if trafilatura_backend is _USE_MODULE_TRAFILATURA
-        else trafilatura_backend
-    )
-    if active_trafilatura is not None:
-        for candidate_html in [cleaned_html, raw_html]:
-            if not candidate_html:
-                continue
-            extracted = active_trafilatura.extract(
-                candidate_html,
-                output_format="markdown",
-                include_links=True,
-                include_tables=True,
-                favor_precision=True,
-            )
-            if extracted:
-                cleaned = clean_markdown(extracted, noise_profile=active_noise_profile)
-                if cleaned:
-                    return cleaned
-
-    parser = _FallbackMarkdownParser()
-    parser.feed(cleaned_html)
-    parser.close()
-    return clean_markdown("\n".join(parser.lines), noise_profile=active_noise_profile)
 
 
 def _strip_markdown_chrome_sections(markdown_text: str) -> str:

@@ -22,6 +22,7 @@ dependencies = [
   "rapidfuzz>=3,<4",
   "trafilatura>=2.0,<3",
   "lxml>=6,<7",
+  "nodriver>=0.50,<1",
   "playwright>=1.47,<2",
   "PyMuPDF>=1.27,<2",
   "pymupdf4llm>=1.27,<2",

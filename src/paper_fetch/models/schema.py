@@ -41,6 +41,7 @@ SourceKind = Literal[
     "aip_html",
     "aip_pdf",
     "crossref_meta",
+    "oa_shortcut",
 ]
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 import re
 from typing import Any, Mapping
 
@@ -188,6 +189,157 @@ def finalize_extraction(
     return markdown_text, finalized
 
 
+# ── Unicode sub/sup for chemical formulas ──
+_SUB = str.maketrans({
+    "0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄",
+    "5": "₅", "6": "₆", "7": "₇", "8": "₈", "9": "₉",
+    "+": "₊", "-": "₋",
+})
+_SUP = str.maketrans({
+    "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴",
+    "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹",
+    "+": "⁺", "-": "⁻",
+})
+
+
+def _normalise_chem(text: str) -> str:
+    """Convert residual <sub>/<sup> HTML to Unicode."""
+    text = re.sub(r"<sub>([^<]*)</sub>", lambda m: m.group(1).translate(_SUB), text, flags=re.IGNORECASE)
+    text = re.sub(r"<sup>([^<]*)</sup>", lambda m: m.group(1).translate(_SUP), text, flags=re.IGNORECASE)
+    return text
+
+
+def extract_body_markdown(body_container: Tag) -> str:
+    """Extract structured markdown from an ACS article body container.
+
+    ACS paragraphs are ``<div class='NLM_p'>``, not ``<p>``.
+    Body sections are ``<div class='NLM_sec'>`` with h2/h3 headings.
+    Stops at back-matter (Supporting Information / Acknowledgments / References).
+    """
+    BACK_MATTER = {
+        "supporting information", "acknowledgments", "references",
+        "author information", "author contributions", "cited by",
+        "data availability", "terms & conditions", "associated content",
+    }
+
+    def _normalise(text: str) -> str:
+        return normalize_text(text).lower().strip()
+
+    def _is_back_matter(heading_text: str) -> bool:
+        return _normalise(heading_text) in BACK_MATTER
+
+    def _is_figure_label(el: Tag) -> bool:
+        return "fig-label" in (el.get("class") or [])
+
+    def _inside_figure(el: Tag) -> bool:
+        return el.find_parent("figure") is not None
+
+    def _is_nlm_paragraph(el: Tag) -> bool:
+        """ACS uses <div class='NLM_p'> for body paragraphs."""
+        if el.name != "div":
+            return False
+        cls = el.get("class") or []
+        return "NLM_p" in cls
+
+    # ── Scope to the full-text container only ──
+    # Everything outside .hlFld-FullText is header/front-matter noise.
+    fulltext = body_container.select_one(".hlFld-FullText")
+    if fulltext is None:
+        # Some ACS pages might not have the class — fall back to body_container
+        fulltext = body_container
+
+    items: list[tuple[str, str]] = []  # [("h2"|"h3"|"p"|"li"|"table", text)]
+    seen_back_matter = False
+
+    for el in fulltext.descendants:
+        if seen_back_matter:
+            break
+        if not isinstance(el, Tag):
+            continue
+
+        tag = el.name.lower() if el.name else ""
+
+        # Skip anything inside a <figure> (captions)
+        if _inside_figure(el):
+            continue
+
+        # Skip chrome divs
+        if tag == "div":
+            cls = el.get("class") or []
+            if any(c in ("article_content-header", "article__copy", "article__cc-license") for c in cls):
+                continue
+
+        # ── Headings ──
+        if tag in ("h2", "h3", "h4"):
+            if _is_figure_label(el):
+                continue
+            heading_text = el.get_text(strip=True)
+            if not heading_text:
+                continue
+            if _is_back_matter(heading_text):
+                seen_back_matter = True
+                break
+            level = int(tag[1])
+            items.append((f"h{level}", heading_text))
+
+        # ── ACS paragraphs (div.NLM_p) ──
+        # Threshold >30 chars filters out "Click to copy" chrome fragments.
+        elif _is_nlm_paragraph(el):
+            text = normalize_text(el.get_text(" ", strip=True))
+            if text and len(text) > 30:
+                items.append(("p", text))
+
+        # ── Regular <p> paragraphs (fallback for non-NLM_p content) ──
+        # Threshold >40 chars filters out short chrome / figure-label runts.
+        elif tag == "p":
+            text = normalize_text(el.get_text(" ", strip=True))
+            if text and len(text) > 40:
+                items.append(("p", text))
+
+        # ── List items ──
+        elif tag == "li":
+            if el.parent and el.parent.name in ("ul", "ol"):
+                text = normalize_text(el.get_text(" ", strip=True))
+                if text and len(text) > 15:
+                    items.append(("li", text))
+
+        # ── Tables ──
+        elif tag == "table":
+            text = normalize_text(el.get_text("\n", strip=True))
+            if text and len(text) > 20:
+                items.append(("table", text))
+
+    # ── Build markdown ──
+    _PREFIX: dict[str, str] = {"h2": "## ", "h3": "### ", "h4": "#### ", "li": "- "}
+    lines: list[str] = []
+    for kind, text in items:
+        prefix = _PREFIX.get(kind)
+        if prefix is not None:
+            lines.append(f"{prefix}{text}")
+        else:
+            lines.append(text)
+        lines.append("")
+
+    return _normalise_chem("\n".join(lines))
+
+
+def rewrite_image_urls_to_local(markdown_text: str, output_dir: str) -> str:
+    """Rewrite ``![Figure N](CDN_url)`` → ``![Figure N](images/basename)``
+    for images already downloaded to ``output_dir/images/``.
+    """
+    img_dir = Path(output_dir) / "images"
+    img_pattern = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+
+    def _rewrite(match):
+        alt_text, url = match.group(1), match.group(2)
+        basename = url.rsplit("/", 1)[-1].split("?")[0]
+        if (img_dir / basename).exists():
+            return f"![{alt_text}](images/{basename})"
+        return match.group(0)
+
+    return img_pattern.sub(_rewrite, markdown_text)
+
+
 def scoped_asset_extractor(*args: Any, **kwargs: Any) -> list[dict[str, str]]:
     from .atypon_browser_workflow.asset_scopes import extract_scoped_html_assets
 
@@ -200,6 +352,7 @@ __all__ = [
     "extract_references",
     "acs_before_block_normalization",
     "acs_body_container",
+    "extract_body_markdown",
     "finalize_extraction",
     "scoped_asset_extractor",
 ]

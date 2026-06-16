@@ -390,14 +390,9 @@ class BrowserWorkflowClient(ProviderClient):
         asset_profile: AssetProfile = "all",
         context: RuntimeContext | None = None,
     ) -> dict[str, list[dict[str, Any]]]:
-        return self._download_browser_backed_related_assets(
-            doi,
-            metadata,
-            raw_payload,
-            output_dir,
-            asset_profile=asset_profile,
-            context=context,
-        )
+        # FIXME: Image/asset download uses Playwright API and is incompatible
+        # with nodriver.  Skipped until a nodriver-native downloader is written.
+        return empty_asset_results()
 
     def _download_browser_backed_related_assets(
         self,

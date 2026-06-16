@@ -32,7 +32,6 @@ from ...extraction.html._runtime import (
     _publication_watermark_label_tokens,
     body_metrics,
     clean_markdown,
-    extract_article_markdown,
     has_sufficient_article_body,
 )
 from ...extraction.html.front_matter import COMMON_FRONT_MATTER_LINE_PATTERNS
@@ -547,7 +546,6 @@ def _strip_heading_terminal_punctuation(heading_text: str) -> str:
 
 __all__ = [
     "clean_markdown",
-    "extract_article_markdown",
     "body_metrics",
     "has_sufficient_article_body",
     "BODY_PARAGRAPH_MIN_CHARS",

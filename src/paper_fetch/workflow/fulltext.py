@@ -27,6 +27,8 @@ from ..utils import (
     safe_text,
 )
 from .metadata import fetch_metadata_for_resolved_query
+from .oa_shortcut import try_oa_shortcut
+from .bridge import try_bridge_fetch
 from .rendering import finalize_article
 from .resolution import resolve_paper
 from .routing import provider_allowed, resolve_query_with_session_cache
@@ -73,6 +75,56 @@ def maybe_save_provider_html_payload(
         doi=doi,
         metadata=metadata,
     )
+
+
+def _save_oa_markdown(
+    *,
+    artifact_store: ArtifactStore,
+    doi: str | None,
+    metadata: Mapping[str, Any],
+    markdown_text: str,
+) -> None:
+    """Persist OA shortcut markdown to the download directory."""
+    download_dir = artifact_store.download_dir
+    if download_dir is None:
+        return
+    safe_doi = safe_text(doi) or "article"
+    slug = (
+        safe_doi.replace("/", "_").replace(":", "_").replace(".", "_")
+        if doi
+        else "article"
+    )
+    out_path = download_dir / f"{slug}_oa_shortcut.md"
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(markdown_text, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _save_bridge_markdown(
+    *,
+    artifact_store: ArtifactStore,
+    doi: str | None,
+    metadata: Mapping[str, Any],
+    markdown_text: str,
+) -> None:
+    """Persist WSL→Windows bridge markdown to the download directory."""
+    download_dir = artifact_store.download_dir
+    if download_dir is None:
+        return
+    safe_doi = safe_text(doi) or "article"
+    slug = (
+        safe_doi.replace("/", "_").replace(":", "_").replace(".", "_")
+        if doi
+        else "article"
+    )
+    out_path = download_dir / f"{slug}_bridge.md"
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(markdown_text, encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _provider_fetch_result(
@@ -342,6 +394,59 @@ def fetch_article(
 
         doi = normalize_doi(safe_text(metadata.get("doi") or resolved.doi)) or None
         warnings: list[str] = []
+
+        # ── OA shortcut (EPMC / PMC) ────────────────────────────────
+        if doi:
+            oa_started_at = time.monotonic()
+            try:
+                oa_result = try_oa_shortcut(
+                    doi=doi,
+                    metadata=metadata,
+                    transport=active_transport,
+                )
+            except Exception:
+                oa_result = None
+            _record_stage_timing(runtime, "oa_shortcut_seconds", oa_started_at)
+            if oa_result is not None:
+                oa_article, oa_markdown = oa_result
+                # Persist markdown alongside other download artefacts
+                _save_oa_markdown(
+                    artifact_store=runtime.artifact_store,
+                    doi=doi,
+                    metadata=metadata,
+                    markdown_text=oa_markdown,
+                )
+                extend_unique(source_trail, [fulltext_marker("oa_shortcut", "article_ok")])
+                return finalize_article(oa_article, warnings=warnings, source_trail=source_trail)
+        # ── end OA shortcut ────────────────────────────────────────
+
+        # ── WSL→Windows bridge (browser-dependent publishers) ─────
+        if doi and provider_name:
+            bridge_started_at = time.monotonic()
+            try:
+                landing_url = safe_text(metadata.get("landing_page_url")) or ""
+                bridge_result = try_bridge_fetch(
+                    doi=doi,
+                    publisher=provider_name,
+                    url=landing_url or f"https://doi.org/{doi}",
+                    metadata=metadata,
+                )
+            except Exception:
+                logger.debug("bridge: attempt failed", exc_info=True)
+                bridge_result = None
+            _record_stage_timing(runtime, "bridge_seconds", bridge_started_at)
+            if bridge_result is not None:
+                bridge_article, bridge_md = bridge_result
+                # Save markdown for reference
+                _save_bridge_markdown(
+                    artifact_store=runtime.artifact_store,
+                    doi=doi,
+                    metadata=metadata,
+                    markdown_text=bridge_md,
+                )
+                extend_unique(source_trail, [fulltext_marker("bridge", "article_ok")])
+                return finalize_article(bridge_article, warnings=warnings, source_trail=source_trail)
+        # ── end bridge ────────────────────────────────────────────
 
         fulltext_started_at = time.monotonic()
         article = _try_official_provider(

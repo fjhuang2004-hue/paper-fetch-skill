@@ -77,7 +77,7 @@ def _ensure_body_markdown_heading(markdown_text: str, *, title: str | None = Non
     normalized_title = normalize_heading(title or "")
     first_heading = _markdown_heading_info(blocks[0])
     if first_heading is None:
-        return clean_markdown(f"## Main Text\n\n{markdown_text}", noise_profile=None)
+        return normalize_markdown_text(markdown_text)
 
     _, heading_text = first_heading
     if normalized_title and normalize_heading(heading_text) == normalized_title:
@@ -85,10 +85,7 @@ def _ensure_body_markdown_heading(markdown_text: str, *, title: str | None = Non
             return normalize_markdown_text(markdown_text)
         second_heading = _markdown_heading_info(blocks[1])
         if second_heading is None:
-            return clean_markdown(
-                "\n\n".join([blocks[0], "## Main Text", *blocks[1:]]),
-                noise_profile=None,
-            )
+            return normalize_markdown_text(markdown_text)
     return normalize_markdown_text(markdown_text)
 
 
@@ -401,8 +398,11 @@ def _postprocess_browser_workflow_markdown(
                     started_content = True
                     abstract_prose_blocks_seen += 1
                     continue
-                kept.append("## Main Text")
-                state.transition("body_heading", is_heading=True)
+                # Transition from abstract to body without injecting a synthetic heading.
+                # The next explicit heading (e.g. Introduction / Results) will be preserved.
+                state.transition("body_heading", is_heading=False)
+                kept.append(block)
+                started_content = True
                 abstract_prose_blocks_seen = 0
             else:
                 if not title_kept and normalized_title:
