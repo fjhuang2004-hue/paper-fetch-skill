@@ -1,6 +1,6 @@
 # paper-fetch-skill 架构文档
 
-> 最后更新：2026-06-16 | trafilatura 已死，ACS + Elsevier 专属 DOM 提取器完成，图片下载合并一轮浏览器
+> 最后更新：2026-06-16 | trafilatura 已死，ACS + Elsevier + Wiley 专属 DOM 提取器完成，图片下载合并一轮浏览器
 
 ## 一、整体流程
 
@@ -52,7 +52,8 @@
 ╔══════════════════════════════════════════════════════════╗
 ║  ④  HTML → Markdown（按出版社分派）                      ║
 ║  ACS:      专属 DOM 提取器 (_acs_html.py)                 ║
-║  Elsevier: 专属 DOM 提取器 (_elsevier_html.py) 🆕         ║
+║  Elsevier: 专属 DOM 提取器 (_elsevier_html.py)             ║
+║  Wiley:    专属 DOM 提取器 (_wiley_dom.py) 🆕              ║
 ║  Springer/IEEE/MDPI/Oxford/...: 各自 DOM 提取器           ║
 ║  PLOS/Copernicus: JATS XML 解析                           ║
 ║  Wiley/PNAS/Science/AIP/...: render_container_markdown    ║
@@ -72,7 +73,9 @@ bridge_windows.py (单次 asyncio.run, 一轮浏览器)
     → if publisher == "acs":
         → _acs_extract_body(_raw_body)            # ACS 专属 DOM
     → elif publisher == "elsevier":
-        → _elsevier_extract_body(_raw_body)       # Elsevier 专属 DOM 🆕
+        → _elsevier_extract_body(_raw_body)       # Elsevier 专属 DOM
+    → elif publisher == "wiley":
+        → _wiley_extract_body(_raw_body)           # Wiley 专属 DOM 🆕
     → else:
         → render_container_markdown()             # 通用 DOM
   → _download_images_async(tab, img_urls)         # 同浏览器 JS fetch()
@@ -84,9 +87,9 @@ bridge_windows.py (单次 asyncio.run, 一轮浏览器)
 
 | 类型 | 数量 | 出版社 | 关键文件 |
 |------|------|--------|----------|
-| 专属 DOM | 10 | ACS, **Elsevier**, Springer, IEEE, MDPI, Oxford, Ann.Rev., R.Soc., arXiv, Annual Reviews | 各自 `_{name}_html.py` |
+| 专属 DOM | 11 | ACS, Elsevier, **Wiley**, Springer, IEEE, MDPI, Oxford, Ann.Rev., R.Soc., arXiv, Annual Reviews | 各自 `_{name}_html.py` |
 | JATS XML | 2 | PLOS, Copernicus | `_article_markdown_*.py` |
-| 通用 DOM | 7 | Wiley, PNAS, Science, AIP, AMS, IOP, T&F | `render_container_markdown()` |
+| 通用 DOM | 6 | PNAS, Science, AIP, AMS, IOP, T&F | `render_container_markdown()` |
 | 不存在 | 2 | ASM, RSC | — |
 
 ### ACS DOM 提取器规则
@@ -106,6 +109,17 @@ bridge_windows.py (单次 asyncio.run, 一轮浏览器)
 - 表格: `<table>` → Markdown table
 - 特殊: 登录后需 reload 才能加载全文（ScienceDirect 默认摘要页）
 - 文件: `src/paper_fetch/providers/_elsevier_html.py`
+
+### Wiley DOM 提取器规则 🆕
+- 范围: `section.article-section__full` 内（body container已去摘要）
+- 段落: 纯 `<p>` 标签（无特殊 class，比 ACS/Elsevier 简单）
+- 标题: h2.article-section__title / h3.article-section__sub-title / h4.section3
+- 后置截断: Acknowledgments / Author Contributions / Conflict of Interest / Data Availability / Supporting Information 处停止
+- 图片: `<figure class="figure">` → `<img src="/cms/asset/UUID/file.png">`（相对URL→绝对 `onlinelibrary.wiley.com`）
+- 题注: `<figcaption class="figure__caption">` 清洗 "Open in figure viewer PowerPoint" 噪音
+- 表格: `<table class="table article-section__table pgwide">` → Markdown table
+- 图片下载: CDP `Network.loadNetworkResource` + `IO.read` stream 读取（非OA CDN 有 CF 保护）
+- 文件: `src/paper_fetch/providers/_wiley_dom.py`
 
 ## 四、项目结构
 
@@ -158,8 +172,9 @@ src/paper_fetch/
 | trafilatura 删除 | ✅ | _runtime.py + 所有补丁清理 |
 | ACS 专属 DOM 提取器 | ✅ | 6/6 论文通过 |
 | Elsevier 专属 DOM 提取器 | ✅ | 4/4 论文通过，端到端含图片下载 |
-| 桥接图片下载（合并一轮浏览器） | ✅ | 同浏览器 fetch API |
-| Wiley/PNAS/Science DOM | ❌ | 待写 |
+| Wiley 专属 DOM 提取器 | ✅ 🆕 | 4/4 论文通过，CDP stream 图片下载 |
+| 桥接图片下载（合并一轮浏览器） | ✅ | CDP Network.loadNetworkResource + IO.read |
+| PNAS/Science DOM | ❌ | 待写 |
 | Cell (cell.com) DOM | ❌ | 待单独 |
 | ASM 出版社接入 | ❌ | 代码库不存在 |
 | RSC 出版社接入 | ❌ | 代码库不存在 |
