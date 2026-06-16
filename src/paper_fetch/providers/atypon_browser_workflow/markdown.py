@@ -229,6 +229,64 @@ def extract_browser_workflow_markdown(
             markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
         )
         return markdown, extraction_payload
+    elif publisher == "wiley":
+        from .._wiley_dom import extract_body_markdown as _wiley_extract_body, extract_abstract as _wiley_extract_abstract
+
+        # Abstract — section.article-section__abstract on Wiley pages.
+        abstract_text = _wiley_extract_abstract(_raw_body)
+
+        # Body — Wiley DOM walker (plain <p>, figure/img, table, back-matter cut-off).
+        # Use _raw_body (before normalization) to preserve <figure>/<table> tags.
+        body_md = _wiley_extract_body(_raw_body)
+
+        # Assemble complete markdown.
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None  # already handled above
+        # Wiley extractor already produces clean structured output —
+        # skip the generic postprocessor.
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        # Wiley extractor already produces inline figure images.
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
     else:
         lines: list[str] = []
         render_container_markdown(body_container, lines, level=2)

@@ -34,6 +34,7 @@ os.environ.setdefault(
 from paper_fetch.providers._nodriver_fetch import (
     _try_once_keep_alive,
     _stop_browser_safely,
+    _cdp,
 )
 from paper_fetch.config import DEFAULT_CHROME_EXE, DEFAULT_NODRIVER_TEMP_PROFILE
 from paper_fetch.providers.browser_runtime.types import BrowserRuntimeConfig
@@ -48,8 +49,27 @@ async def _download_images_async(
     output_dir: Path,
     timeout_per_image: float = 15.0,
 ) -> int:
-    """Download images using an already-open browser tab (same-origin)."""
+    """Download images using CDP ``Network.loadNetworkResource``.
+
+    Uses the browser's network stack (cookies, CF clearance) rather than
+    ``fetch()`` from JavaScript, which can be blocked by CF on CDN assets
+    for non-OA content.
+    """
     if not image_urls:
+        return 0
+
+    # Get current frame ID for CDP commands.
+    try:
+        frame_tree = await asyncio.wait_for(
+            tab.send(_cdp("Page.getFrameTree")),
+            timeout=10.0,
+        )
+        frame_id = frame_tree["frameTree"]["frame"]["id"]
+    except Exception:
+        frame_id = None
+
+    if not frame_id:
+        print("[bridge]  Cannot get frameId for CDP image download", flush=True)
         return 0
 
     downloaded = 0
@@ -60,29 +80,37 @@ async def _download_images_async(
             downloaded += 1
             continue
         try:
-            result = await asyncio.wait_for(
-                tab.evaluate(
-                    f"""
-                    (async () => {{
-                        const resp = await fetch('{url}');
-                        if (!resp.ok) return null;
-                        const blob = await resp.blob();
-                        const reader = new FileReader();
-                        return new Promise((resolve) => {{
-                            reader.onload = () => resolve(reader.result);
-                            reader.readAsDataURL(blob);
-                        }});
-                    }})()
-                    """,
-                    await_promise=True,
-                ),
+            cdp_result = await asyncio.wait_for(
+                tab.send(_cdp("Network.loadNetworkResource", {
+                    "frameId": frame_id,
+                    "url": url,
+                    "options": {
+                        "disableCache": False,
+                        "includeCredentials": True,
+                    },
+                })),
                 timeout=timeout_per_image,
             )
-            if result and isinstance(result, str) and result.startswith("data:"):
-                payload = result.split(",", 1)[1] if "," in result else result
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                local_path.write_bytes(base64.b64decode(payload))
-                downloaded += 1
+            resource = cdp_result.get("resource", {})
+            success = resource.get("success")
+            status = resource.get("httpStatusCode")
+            body_b64 = resource.get("body") or ""
+            stream_handle = resource.get("stream") or ""
+            if success and status in (200, 304):
+                # If body is empty, read from stream handle via IO.read
+                if not body_b64 and stream_handle:
+                    try:
+                        io_result = await asyncio.wait_for(
+                            tab.send(_cdp("IO.read", {"handle": stream_handle})),
+                            timeout=timeout_per_image,
+                        )
+                        body_b64 = io_result.get("data") or ""
+                    except Exception:
+                        pass
+                if body_b64:
+                    local_path.parent.mkdir(parents=True, exist_ok=True)
+                    local_path.write_bytes(base64.b64decode(body_b64))
+                    downloaded += 1
         except Exception:
             pass
     return downloaded
@@ -177,6 +205,8 @@ async def _do_bridge(args: argparse.Namespace) -> dict:
             if downloaded > 0:
                 if args.publisher == "acs":
                     from paper_fetch.providers._acs_html import rewrite_image_urls_to_local
+                elif args.publisher == "wiley":
+                    from paper_fetch.providers._wiley_dom import rewrite_image_urls_to_local
                 else:
                     from paper_fetch.providers._elsevier_html import rewrite_image_urls_to_local
                 md_text = rewrite_image_urls_to_local(md_text, str(out_dir))
