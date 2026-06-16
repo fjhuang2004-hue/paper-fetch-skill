@@ -82,6 +82,9 @@ def extract_browser_workflow_markdown(
         _content_fragment_html(asset_container, publisher=publisher), source_url
     )
 
+    # Snapshot raw body before normalization destroys <figure>/<table> tags.
+    _raw_body = copy.deepcopy(container)
+
     table_entries = _normalize_special_blocks(container, publisher)
     abstract_sections = _abstract_section_payloads(container)
     abstract_block_texts = _abstract_block_texts_from_payloads(abstract_sections)
@@ -130,6 +133,70 @@ def extract_browser_workflow_markdown(
             figure_assets=figure_assets,
             clean_markdown_fn=lambda v: clean_rendered_markdown(v, noise_profile=noise_profile),
         )
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
+    elif publisher == "elsevier":
+        from .._elsevier_html import extract_body_markdown as _elsevier_extract_body
+
+        # Abstract — #abs0010 on ScienceDirect pages.
+        abstract_el = soup.select_one("#abs0010")
+        abstract_text = ""
+        if abstract_el:
+            abs_heading = abstract_el.find("h2")
+            if abs_heading:
+                abs_heading.decompose()
+            abstract_text = normalize_text(abstract_el.get_text(" ", strip=True))
+
+        # Body — Elsevier DOM walker (div.u-margin-s-bottom, section[id], back-matter cut-off).
+        # Use _raw_body (before normalization) to preserve <figure>/<table> tags.
+        body_md = _elsevier_extract_body(_raw_body)
+
+        # Assemble complete markdown.
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None  # already handled above
+        # Elsevier extractor already produces clean structured output —
+        # skip the generic postprocessor.
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        # Elsevier extractor already produces inline figure images.
         quality_metadata = dict(metadata or {})
         if title and not quality_metadata.get("title"):
             quality_metadata["title"] = title

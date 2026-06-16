@@ -139,6 +139,17 @@ async def _do_bridge(args: argparse.Namespace) -> dict:
         page_title = fetch_result.get("title") or ""
         print(f"[bridge] HTML fetched ({len(html)} chars), browser kept alive", flush=True)
 
+        # ScienceDirect: after CARSI login, reload if full-text not loaded.
+        if args.publisher == "elsevier" and "#body" not in html:
+            print("[bridge] Abstract page detected, reloading for full-text...", flush=True)
+            await tab.get(final_url or args.url)
+            await tab.sleep(6)
+            html = await tab.evaluate("document.documentElement.outerHTML") or ""
+            if isinstance(html, list):
+                html = html[0] if html else ""
+            html = str(html)
+            print(f"[bridge] After reload: {len(html)} chars", flush=True)
+
         # Save raw HTML
         html_path = out_dir / "bridge_html.html"
         html_path.write_text(html, encoding="utf-8", errors="ignore")
@@ -164,7 +175,10 @@ async def _do_bridge(args: argparse.Namespace) -> dict:
             downloaded = await _download_images_async(tab, img_urls, out_dir)
             print(f"[bridge] Downloaded {downloaded}/{len(img_urls)} images", flush=True)
             if downloaded > 0:
-                from paper_fetch.providers._acs_html import rewrite_image_urls_to_local
+                if args.publisher == "acs":
+                    from paper_fetch.providers._acs_html import rewrite_image_urls_to_local
+                else:
+                    from paper_fetch.providers._elsevier_html import rewrite_image_urls_to_local
                 md_text = rewrite_image_urls_to_local(md_text, str(out_dir))
 
         # ── Step 4: Close browser ──
