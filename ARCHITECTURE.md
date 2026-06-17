@@ -65,7 +65,6 @@
 ║  ASM:      专属 DOM 提取器 (_asm_html.py) 🆕               ║
 ║  IEEE/MDPI/Oxford/...: 各自 DOM 提取器                    ║
 ║  PLOS/Copernicus: JATS XML 解析                           ║
-║  AIP/AMS/IOP: render_container_markdown                   ║
 ║  ✅ 图片下载: CDP Network.loadNetworkResource+IO.read     ║
 ║  ⚠️ PDF 兜底未适配 nodriver                              ║
 ╚══════════════════════════════════════════════════════════╝
@@ -88,19 +87,15 @@ bridge_windows.py (单次 asyncio.run, 一轮浏览器)
     → elif publisher == "tandf":
         → _tandf_extract_body(_raw_body)          # T&F 专属 DOM 🆕
     → else:
-        → render_container_markdown()             # 通用 DOM
-  → _download_images_async(tab, img_urls)         # CDP Network.loadNetworkResource
-  → rewrite_image_urls_to_local()                 # CDN→images/xxx
-  → 保存 bridge_article.md + images/              # 输出到 DOI 文件夹
+        → render_container_markdown()             # 通用 DOM（兜底）
 ```
 
-## 三、提取器分布（20 个出版社）
+## 三、提取器分布（16 个出版社，全生物类）
 
 | 类型 | 数量 | 出版社 | 关键文件 |
 |------|------|--------|----------|
-| 专属 DOM | 16 | ACS, Elsevier, Wiley, T&F, **PNAS**, **Science**, Springer, IEEE, MDPI, Oxford, Ann.Rev., R.Soc., arXiv, Annual Reviews, **RSC**, **ASM** 🆕 | 各自 `_{name}_html.py` 或 `_{name}_dom.py` |
+| 专属 DOM | 14 | ACS, Elsevier, Wiley, T&F, PNAS, Science, Springer, MDPI, Oxford, Ann.Rev., R.Soc., Annual Reviews, RSC, ASM | 各自 `_{name}_html.py` 或 `_{name}_dom.py` |
 | JATS XML | 2 | PLOS, Copernicus | `_article_markdown_*.py` |
-| 通用 DOM | 3 | AIP, AMS, IOP | `render_container_markdown()` |
 
 ### RSC DOM 提取器规则 🆕
 - 范围: `#wrapper`（articlehtml 端点）或 `#pnlArticleContentLoaded`（landing page AJAX）
