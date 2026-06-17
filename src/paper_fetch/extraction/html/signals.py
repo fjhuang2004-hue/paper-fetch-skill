@@ -98,8 +98,9 @@ ACCESS_GATE_PATTERNS = (
     "purchase access",
     "purchase digital access to this article",
     "institutional access",
-    "log in to your account",
     "login to your account",
+    "log in to your account",
+
     "subscribe to continue",
     "access through your institution",
     "rent or buy",

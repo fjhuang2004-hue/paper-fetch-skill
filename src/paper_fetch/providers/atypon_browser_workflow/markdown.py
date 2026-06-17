@@ -287,6 +287,352 @@ def extract_browser_workflow_markdown(
             markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
         )
         return markdown, extraction_payload
+    elif publisher == "science":
+        from .._science_dom import extract_body_markdown as _science_extract_body, extract_abstract as _science_extract_abstract, extract_editors_summary as _science_extract_summary
+
+        abstract_text = _science_extract_abstract(soup)
+        summary_text = _science_extract_summary(soup)
+        body_md = _science_extract_body(_raw_body)
+
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if summary_text:
+            parts.append(f"## Editor's summary\n\n{summary_text}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
+    elif publisher == "pnas":
+        from .._pnas_dom import extract_body_markdown as _pnas_extract_body, extract_abstract as _pnas_extract_abstract, extract_significance as _pnas_extract_significance
+
+        abstract_text = _pnas_extract_abstract(soup)
+        significance_text = _pnas_extract_significance(soup)
+        # Use _raw_body (deep-copied before _normalize_figure_blocks destroyed figure-wrap divs).
+        body_md = _pnas_extract_body(_raw_body)
+
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if significance_text:
+            parts.append(f"## Significance\n\n{significance_text}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
+    elif publisher == "tandf":
+        from .._tandf_dom import extract_body_markdown as _tandf_extract_body, extract_abstract as _tandf_extract_abstract
+
+        # Abstract — .hlFld-Abstract on T&F pages.
+        abstract_text = _tandf_extract_abstract(_raw_body)
+
+        # Body — T&F DOM walker (.hlFld-Fulltext, NLM_sec, plain <p>, .figureView, table).
+        body_md = _tandf_extract_body(_raw_body)
+
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
+    elif publisher == "springer":
+        from ..html_springer_nature import extract_springer_nature_markdown as _springer_extract_md
+
+        # extract_springer_nature_markdown handles everything: title, abstract, body, post-processing.
+        # It parses raw HTML so it works with the original html_text (figures intact).
+        markdown = _springer_extract_md(html_text, source_url)
+        abstract_markdown = None  # Already embedded in markdown
+
+        # Strip the leading "# Title\n\n" — we inject it via front matter instead.
+        if markdown.startswith("# "):
+            first_blank = markdown.find("\n\n")
+            if first_blank > 0:
+                markdown = markdown[first_blank + 2:]
+
+        # Extract abstract text for the extraction payload
+        abstract_el = soup.select_one("#Abs1-content") or soup.select_one("[data-test='abstract']")
+        abstract_text = normalize_text(abstract_el.get_text(" ", strip=True)) if abstract_el else ""
+
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        # Include title in front matter (other branches strip it from body above;
+        # we already stripped the "# Title" line so it won't be duplicated).
+        markdown = _inject_front_matter(
+            markdown, title=title, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
+    elif publisher == "rsc":
+        from .._rsc_html import extract_body_markdown as _rsc_extract_body
+
+        # Abstract — div.abstract on RSC pages (articlehtml endpoint).
+        abstract_el = soup.select_one("div.abstract")
+        abstract_text = ""
+        if abstract_el:
+            abs_heading = abstract_el.find("h2")
+            if abs_heading:
+                abs_heading.decompose()
+            abstract_text = normalize_text(abstract_el.get_text(" ", strip=True))
+
+        # Body — RSC DOM walker.  Use _raw_body (captured before
+        # _normalize_figure_blocks strips <figure>/<img> tags) so the
+        # extractor can find hi-res image URLs.
+        from .._rsc_html import rsc_body_container as _rsc_hook
+        _raw_body_copy = copy.deepcopy(_raw_body)
+        _rsc_hook(_raw_body_copy)
+        body_md = _rsc_extract_body(_raw_body_copy)
+
+        # Assemble complete markdown.
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None  # already handled above
+
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        # RSC extractor already produces inline figures with hi-res URLs —
+        # skip generic figure injection which would overwrite with low-res URLs.
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
+    elif publisher == "asm":
+        from .._asm_html import extract_body_markdown as _asm_extract_body
+        from .._asm_html import extract_abstract as _asm_extract_abstract
+
+        # Abstract — ASM has two frontend variants:
+        #   new pb: #primary-abstract → <h2> + <div> + #abs-sec-1
+        #   old Atypon: #abstract (section) or #abstracts (div)
+        abstract_text = _asm_extract_abstract(soup)
+
+        # Body — ASM DOM walker.  Use _raw_body (captured before
+        # _normalize_figure_blocks strips <figure>/<img> tags) so the
+        # extractor can find hi-res image URLs in data-viewer-src.
+        _raw_body_copy = copy.deepcopy(_raw_body)
+        body_md = _asm_extract_body(_raw_body_copy)
+
+        # Assemble complete markdown.
+        parts: list[str] = []
+        if title:
+            clean_title = normalize_text(str(title))
+            parts.append(f"# {clean_title}\n")
+        if abstract_text:
+            parts.append(f"## Abstract\n\n{abstract_text}\n")
+        parts.append(body_md)
+        markdown = "\n".join(parts)
+        abstract_markdown = None  # already handled above
+
+        markdown = _inject_inline_table_blocks(
+            markdown, table_entries=table_entries, publisher=publisher
+        )
+        # ASM extractor already produces inline figures with hi-res URLs —
+        # skip generic figure injection which would overwrite with low-res URLs.
+        quality_metadata = dict(metadata or {})
+        if title and not quality_metadata.get("title"):
+            quality_metadata["title"] = title
+        diagnostics = HtmlQualityAssessor(publisher).assess(
+            markdown, quality_metadata,
+            html_text=html_text, title=title, final_url=source_url,
+            container_tag=container.name,
+            container_text_length=len(" ".join(container.stripped_strings)),
+            section_hints=section_hints,
+        )
+        if not diagnostics.accepted:
+            raise HtmlExtractionFailure(
+                diagnostics.reason, availability_failure_message(diagnostics)
+            )
+        extraction_payload = {
+            "title": title,
+            "abstract_text": abstract_text,
+            "abstract_sections": abstract_sections,
+            "section_hints": section_hints,
+            "container_tag": container.name,
+            "container_text_length": len(" ".join(container.stripped_strings)),
+            "availability_diagnostics": diagnostics.to_dict(),
+        }
+        profile = _publisher_profile(publisher)
+        if profile.finalize_extraction is not None:
+            markdown, extraction_payload = profile.finalize_extraction(
+                html_text, source_url, markdown, extraction_payload, metadata=metadata,
+            )
+        markdown = _inject_front_matter(
+            markdown, title=None, extraction_payload=extraction_payload, metadata=metadata,
+        )
+        return markdown, extraction_payload
     else:
         lines: list[str] = []
         render_container_markdown(body_container, lines, level=2)

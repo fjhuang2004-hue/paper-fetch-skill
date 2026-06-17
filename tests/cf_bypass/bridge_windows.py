@@ -198,6 +198,11 @@ async def _do_bridge(args: argparse.Namespace) -> dict:
         img_urls = list(set(
             m.group(1) for m in _re.finditer(r"!\[[^\]]*\]\(([^)]+)\)", md_text)
         ))
+        # Normalize protocol-relative URLs (e.g. "//media.springernature.com/...")
+        img_urls = [
+            f"https:{u}" if u.startswith("//") else u
+            for u in img_urls
+        ]
         if img_urls:
             print(f"[bridge] Downloading {len(img_urls)} images in same browser session…", flush=True)
             downloaded = await _download_images_async(tab, img_urls, out_dir)
@@ -207,6 +212,18 @@ async def _do_bridge(args: argparse.Namespace) -> dict:
                     from paper_fetch.providers._acs_html import rewrite_image_urls_to_local
                 elif args.publisher == "wiley":
                     from paper_fetch.providers._wiley_dom import rewrite_image_urls_to_local
+                elif args.publisher == "tandf":
+                    from paper_fetch.providers._tandf_dom import rewrite_image_urls_to_local
+                elif args.publisher == "pnas":
+                    from paper_fetch.providers._pnas_dom import rewrite_image_urls_to_local
+                elif args.publisher == "science":
+                    from paper_fetch.providers._science_dom import rewrite_image_urls_to_local
+                elif args.publisher == "springer":
+                    from paper_fetch.providers._nature_dom import rewrite_image_urls_to_local
+                elif args.publisher == "rsc":
+                    from paper_fetch.providers._rsc_html import rewrite_image_urls_to_local
+                elif args.publisher == "asm":
+                    from paper_fetch.providers._asm_html import rewrite_image_urls_to_local
                 else:
                     from paper_fetch.providers._elsevier_html import rewrite_image_urls_to_local
                 md_text = rewrite_image_urls_to_local(md_text, str(out_dir))

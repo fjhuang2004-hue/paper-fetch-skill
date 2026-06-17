@@ -134,6 +134,14 @@ def try_bridge_fetch(
     else:
         article_title = str(raw_title or "")
 
+    # Convert linkinghub.elsevier.com → direct ScienceDirect URL.
+    # linkinghub is an interstitial JS-redirect that fails in headless browsers.
+    import re as _re
+    _pii_match = _re.search(r'linkinghub\.elsevier\.com/retrieve/pii/([A-Za-z0-9]+)', url)
+    if _pii_match:
+        url = f"https://www.sciencedirect.com/science/article/pii/{_pii_match.group(1)}"
+        logger.info("bridge: converted linkinghub URL → %s", url)
+
     cmd = [
         "cmd.exe",
         "/c",

@@ -83,6 +83,8 @@ ATYPON_BROWSER_WORKFLOW_PROVIDER_NAMES = (
     "iop",
     "aip",
     "tandf",
+    "rsc",
+    "asm",
 )
 
 
