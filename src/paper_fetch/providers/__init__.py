@@ -12,12 +12,9 @@ from typing import Any
 
 _EXPORTS: dict[str, tuple[str, str]] = {
     "AcsClient": (".acs", "AcsClient"),
-    "AmsClient": (".ams", "AmsClient"),
-    "ArxivClient": (".arxiv", "ArxivClient"),
     "CrossrefClient": (".crossref", "CrossrefClient"),
     "CopernicusClient": (".copernicus", "CopernicusClient"),
     "ElsevierClient": (".elsevier", "ElsevierClient"),
-    "IeeeClient": (".ieee", "IeeeClient"),
     "PnasClient": (".pnas", "PnasClient"),
     "PlosClient": (".plos", "PlosClient"),
     "ScienceClient": (".science", "ScienceClient"),
